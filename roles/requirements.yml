@@ -1,0 +1,13 @@
+roles:
+  - name: geerlingguy.elasticsearch
+    src: git+https://github.com/geerlingguy/ansible-role-elasticsearch.git
+  - name: geerlingguy.java
+    src: git+https://github.com/geerlingguy/ansible-role-java.git
+  - name: elastic.elasticsearch
+    src: https://github.com/axonops/ansible-elasticsearch.git
+    version: v7.17.0
+collections:
+  - name: community.elastic
+    source: https://galaxy.ansible.com
+  - name: community.cassandra
+    source: https://galaxy.ansible.com

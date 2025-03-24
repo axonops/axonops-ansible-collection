@@ -1,0 +1,31 @@
+- name: Deploy AxonOps Server
+  hosts: axon-server
+  become: true
+  vars:
+    install_cassandra: true
+    install_elastic: true
+    java_pkg: java-11-openjdk-headless
+    es_version: 7.17.4
+    es_api_uri: "https://127.0.0.1:9200"
+    es_api_host: "127.0.0.1"
+    es_heap_size: 512M
+    axon_server_cql_hosts:
+      - localhost:9042
+    axon_dash_listen_address: 0.0.0.0
+    cassandra_dc: "axonops"
+    cassandra_listen_address: 127.0.0.1
+    cassandra_listen_interface: lo
+    cassandra_rpc_address: 127.0.0.1
+  roles:
+    - role: cassandra
+      tags: cassandra
+      when: install_cassandra is defined and install_cassandra
+    - role: elastic
+      tags: elastic
+      when: install_elastic is defined and install_elastic
+    - role: server
+      tags: server, axonops-server
+    - role: dash
+      tags: dash, axonops-dashboard
+
+# code: language=ansible

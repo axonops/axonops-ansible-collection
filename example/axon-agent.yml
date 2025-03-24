@@ -1,0 +1,37 @@
+- name: Deploy AxonOps Agent
+  hosts: cassandra
+  become: true
+  vars:
+    axon_java_agent: "axon-cassandra4.1-agent"
+    axon_agent_version: "1.0.131"
+    axon_java_agent_version: "1.0.14"
+    axon_agent_server_port: 1888
+    axon_agent_tls_mode: "disabled"
+    customer_name: example
+    java_pkg: java-11-openjdk-headless
+
+  roles:
+    - role: cassandra
+      tags: cassandra
+      vars:
+        cassandra_dc: "example"
+        cassandra_listen_address: 127.0.0.1
+        cassandra_listen_interface: lo
+        cassandra_rpc_address: 127.0.0.1
+    - role: agent
+      tags: agent, axonops-agent
+      vars:
+        axon_agent_server_host: "{{ groups['axon-server'] | first }}"
+        cassandra_dc: "DC1"
+        cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | first }}"
+
+  post_tasks:
+    - name: Add axonops to the cassandra group
+      tags: user
+      ansible.builtin.user:
+        name: cassandra
+        groups: cassandra,axonops
+        append: true
+      notify: restart axon-agent
+
+# code: language=ansible

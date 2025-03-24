@@ -1,0 +1,23 @@
+---
+- name: Include OS speficig config
+  ansible.builtin.include_tasks: "repo/{{ ansible_os_family }}.yml"
+  tags:
+    - axon_server_repo
+
+- name: Include installation tasks
+  ansible.builtin.import_tasks: install.yml
+  tags:
+    - axon_server_install
+
+- name: Import configuration tasks
+  ansible.builtin.import_tasks: configure.yml
+  tags:
+    - axon_server_configure
+
+- name: Make sure the server is started on boot
+  ansible.builtin.systemd:
+    name: axon-server
+    state: started
+    enabled: true
+
+# code: language=ansible

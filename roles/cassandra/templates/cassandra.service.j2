@@ -1,0 +1,20 @@
+[Unit]
+Description=Cassandra
+After=network.target
+
+[Service]
+User=cassandra
+Group=cassandra
+Environment=CASSANDRA_LOG_DIR={{ cassandra_log_dir | default('/var/log/cassandra') }}
+ExecStart=/usr/sbin/cassandra -f -p /run/cassandra/cassandra.pid
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=1000000
+LimitMEMLOCK=infinity
+LimitNPROC=32768
+LimitAS=infinity
+#Restart=always
+
+
+[Install]
+WantedBy=multi-user.target

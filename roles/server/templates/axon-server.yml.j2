@@ -1,0 +1,77 @@
+host: {{ axon_server_listen_address | default('127.0.0.1') }}  # API endpoint
+port: {{ axon_server_listen_port | default('8080') }} # API port
+elastic_host: {{ axon_server_elastic_host | default('http://127.0.0.1') }} # elastic endpoint
+elastic_port: {{ axon_server_elastic_port | default('9200') }} # elastic port
+{% if axon_server_hum %}
+hum: true
+{% endif %}
+
+{% if axon_server_ldap_enabled == true %}
+auth:
+  enabled: true
+  type: "LDAP"
+  settings:
+    {{ axon_server_ldap_setting | to_nice_yaml(indent=2) | indent(4) }}
+{% else %}
+auth:
+  enabled: false
+{% endif %}
+
+tls:
+  mode: "{{ axon_server_tls_mode | default('disabled') }}" # disabled, TLS, mTLS
+{% if axon_server_tls_mode == "TLS" or axon_server_tls_mode == "mTLS" %}
+  certFile: "{{ axon_server_tls_certfile }}"
+  keyFile: "{{ axon_server_tls_keyfile }}"
+{% endif %}
+{% if axon_server_tls_mode == "mTLS" %}
+  caFile: "{{ axon_server_tls_cafile }}"
+  skipVerify: "{{ axon_server_tls_skipverify | default('false') }}"
+{% endif %}
+
+# axon-dash configuration
+axon-dash:
+  host: {{ axon_server_dashboard_host | default('127.0.0.1') }}
+  port: {{ axon_server_dashboard_port | default('3000') }}
+  https: {{ axon_server_dashboard_https | default ('false') }}
+
+alerting:
+# How long to wait before sending a notification again if it has already
+# been sent successfully for an alert. (Usually ~3h or more).
+  notification_interval: {{ axon_server_notification_interval | default('3h') }}
+
+retention:
+  {{ axon_server_retention | to_nice_yaml(indent=2) | indent(2) }}
+
+{% if axon_server_org_name is defined %}
+org_name: {{ axon_server_org_name }}
+{% endif %}
+
+{% if axon_server_cql_hosts is defined and axon_server_cql_hosts | length > 0 %}
+cql_hosts:
+{% for host in axon_server_cql_hosts %}
+ - {{ host }}
+{% endfor %}
+cql_username: "{{ axon_server_username }}"
+cql_password: "{{ axon_server_password }}"
+cql_local_dc: "{{ axon_server_local_dc }}"
+cql_proto_version: 4
+cql_max_searchqueriesparallelism: 100
+cql_batch_size: 100
+cql_page_size: 100
+cql_cache_metrics: true
+cql_autocreate_tables: true
+cql_retrypolicy_numretries: 3
+cql_retrypolicy_min: 1s
+cql_retrypolicy_max: 10s
+cql_reconnectionpolicy_maxretries: 10
+cql_reconnectionpolicy_initialinterval: 1s
+cql_reconnectionpolicy_maxinterval: 10s
+cql_keyspace_replication: "{{ axon_server_cql_keyspace_replication }}"
+cql_metrics_cache_max_size: 2048  #MB
+cql_metrics_cache_max_items : 100000
+
+{% endif %}
+
+{% if axon_server_license_key is defined and axon_server_license_key | length > 0 %}
+license_key: {{ axon_server_license_key }}
+{% endif %}

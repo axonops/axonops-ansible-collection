@@ -1,0 +1,16 @@
+---
+- name: Add AxonOps noarch yum repository
+  ansible.builtin.yum_repository:
+    description: "AxonOps NoArch Repository"
+    name: axonops-yum-noarch
+    baseurl: "{{ axon_agent_redhat_repository | default('https://packages.axonops.com/yum') }}"
+    repo_gpgcheck: false
+    gpgcheck: false
+
+- name: Set package names
+  ansible.builtin.set_fact:
+    axon_agent_pkg: "axon-agent-{{ axon_agent_version }}-1"
+    axon_java_agent_pkg: "{{ axon_java_agent }}-{{ axon_java_agent_version }}-1"
+    pkg_ext: "{{ ansible_architecture }}.rpm"
+
+# code: language=ansible

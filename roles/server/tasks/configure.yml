@@ -1,0 +1,11 @@
+---
+- name: Configure axon-server
+  ansible.builtin.template:
+    src: axon-server.yml.j2
+    dest: /etc/axonops/axon-server.yml
+    owner: axonops
+    group: axonops
+    mode: "0644"
+  notify: restart axon-server
+
+# code: language=ansible

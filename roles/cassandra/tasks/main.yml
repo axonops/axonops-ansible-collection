@@ -1,0 +1,88 @@
+- name: Install Java
+  ansible.builtin.package:
+    name: "{{ java_pkg }}"
+    state: present
+  when:
+    - java_pkg is defined
+    - ansible_os_family == 'RedHat'
+
+- name: Set up repos Debian
+  when: ansible_os_family == 'Debian'
+  block:
+    - name: Set up Cassandra apt repos
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/cassandra.sources.list
+        content: "deb [signed-by=/etc/apt/keyrings/apache-cassandra.asc] https://debian.cassandra.apache.org 41x main"
+        mode: "0644"
+
+    - name: GPG key for Cassandra
+      ansible.builtin.get_url:
+        url: https://downloads.apache.org/cassandra/KEYS
+        dest: /etc/apt/keyrings/apache-cassandra.asc
+
+    - name: Set pkg name
+      ansible.builtin.set_fact:
+        cassandra_pkg: "cassandra"
+
+- name: Set up repos Redhat
+  when: ansible_os_family == 'RedHat'
+  block:
+    - name: Set up Cassandra apt repos
+      ansible.builtin.copy:
+        dest: /etc/yum.repos.d/cassandra.repo
+        mode: "0644"
+        owner: root
+        group: root
+        content: |
+          [cassandra41]
+          name=Apache Cassandra
+          baseurl=https://redhat.cassandra.apache.org/41x/
+          gpgcheck=0
+          repo_gpgcheck=0
+
+    - name: Set pkg name
+      ansible.builtin.set_fact:
+        cassandra_pkg: "cassandra"
+
+- name: Install pre-reqs
+  when: ansible_os_family == 'RedHat'
+  ansible.builtin.package:
+    name: chkconfig
+
+- name: Install Cassandra
+  ansible.builtin.package:
+    update_cache: true
+    name: "{{ cassandra_pkg }}"
+
+- name: Ensure Cassandra node configured (4.1.x)
+  notify: Restart Cassandra
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/cassandra/conf/{{ item }}"
+    mode: "0644"
+  with_items:
+    - cassandra-env.sh
+    - cassandra-rackdc.properties
+    - cassandra.yaml
+    - logback.xml
+    - jvm-server.options
+    - jvm11-server.options
+    - jvm-clients.options
+    - jvm11-clients.options
+
+- name: Systemd service for cassandra
+  ansible.builtin.template:
+    dest: /etc/systemd/system/cassandra.service
+    src: templates/cassandra.service.j2
+    mode: "0644"
+    owner: root
+    group: root
+  notify: Reload systemd
+
+- name: Start cassandra
+  ansible.builtin.systemd:
+    name: cassandra
+    enabled: true
+    state: started
+
+# code: language=ansible

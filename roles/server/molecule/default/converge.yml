@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: geerlingguy.java
+    - role: cassandra
+    - role: geerlingguy.elasticsearch
+  vars:
+    docker: true
+    molecule: true
+    axon_server_ldap_enabled: false

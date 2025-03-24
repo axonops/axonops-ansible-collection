@@ -1,0 +1,9 @@
+---
+- name: Ensure Axon server is installed.
+  ansible.builtin.package:
+    name: axon-server
+    state: "{{ axon_server_state }}"
+  notify:
+    - restart axon-server
+
+# code: language=ansible

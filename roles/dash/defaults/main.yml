@@ -1,0 +1,25 @@
+---
+axon_dash_start_at_boot: true
+axon_dash_state: present
+# Override the IP and port that axon-dash should listen on
+#axon_dash_listen_address: 127.0.0.1
+#axon_dash_listen_port: 3000
+# Override this if axon-server is not running on the same machine as axon-dash
+#axon_dash_server_endpoint: http://127.0.0.1:8080
+
+# repository
+axon_agent_public_repository: present
+axon_agent_beta_repository: absent
+
+has_internet_access: true
+axon_dash_version: 1.0.117-1
+
+axon_dash_nginx:
+  enabled: false
+  hostname: "{{ ansible_fqdn }}"
+  listen: "{{ ansible_default_ipv4.address }}:443"
+  ssl_cert: "/etc/nginx/axon_dash.crt"
+  ssl_key: "/etc/nginx/axon_dash.key"
+  ssl_csr: "/etc/nginx/axon_dash.csr"
+  ssl_create: true # creates certs automatically
+  upstream: http://localhost:3000
