@@ -6,6 +6,10 @@ This collection provides Ansible roles and playbooks to deploy [AxonOps](https:/
 show how you can install the AxonOps server with Elasticsearch® and Cassandra® to store metrics and configurations
 and how you can install the AxonOps agent to connect to your Apache Cassandra cluster.
 
+Ansible is an open-source IT automation platform that enables organizations to automate various IT processes, including provisioning, configuration management, application deployment, and orchestration. It operates as an agentless system, using remote connections via SSH or Windows Remote Management to execute tasks. Ansible is widely used for its simplicity and flexibility, allowing users to define infrastructure as code. For more information about Ansible, you can visit the [Ansible project documentation](https://docs.ansible.com/ansible/latest/index.html).
+
+Although this example project has been implemented using Ansible, it is possible to achieve similar results using alternative tools like Chef or Puppet, offering flexibility for those who prefer different automation solutions.
+
 ## Playbooks
 
 ### Inventory
