@@ -1,7 +1,7 @@
 # AxonOps Ansible Collection
 
 This collection provides Ansible roles and playbooks to deploy AxonOps components. The examples below
-show how you can install the AxonOps server with Elasticsearch and Cassandra to store metrics and configurations
+show how you can install the AxonOps server with Elasticsearch® and Cassandra® to store metrics and configurations
 and how you can install also the AxonOps agent to Apache Cassandra
 
 ## Playbooks
