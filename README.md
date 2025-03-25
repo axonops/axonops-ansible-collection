@@ -36,7 +36,8 @@ make agent ANSIBLE_USER=redhat
 This playbook deploys the AxonOps Agent to Cassandra nodes. If you do not need to install
 Apache Cassandra, set the switch `install_cassandra` to false.
 
-If you have a local mirror repository of the AxonOps packages adjust the `axon_agent_redhat_repository` URL.
+If you have a local mirror repositories of the AxonOps, Elastic and Cassandra packages adjust
+the `*_redhat_repository` URLs.
 
 ```yaml
 - name: Deploy AxonOps Agent
@@ -97,6 +98,7 @@ For more information about the Elasticsearch installation options please see the
       - localhost:9042
     axon_dash_listen_address: 0.0.0.0
     axon_agent_redhat_repository: "https://packages.axonops.com/yum"
+    es_redhat_repository_url: https://artifacts.elastic.co/packages/7.x/yum
 
   roles:
     - role: cassandra
@@ -110,3 +112,4 @@ For more information about the Elasticsearch installation options please see the
     - role: dash
       tags: dash, axonops-dashboard
 ```
+

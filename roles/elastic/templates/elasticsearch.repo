@@ -1,8 +1,14 @@
 [elasticsearch-{{ es_repo_name }}]
+{% if es_redhat_repository_url is defined and es_redhat_repository_url != '' %}
+name=Elasticsearch repository
+baseurl={{ es_redhat_repository_url }}
+gpgcheck=0
+{% else %}
 name=Elasticsearch repository for {{ es_repo_name }} packages
 baseurl={{ es_repo_base }}/packages/{{ es_repo_name }}/yum
-gpgcheck=1
+gpgcheck=0
 gpgkey={{ es_repo_base }}/GPG-KEY-elasticsearch
+{% endif %}
 enabled=1
 autorefresh=1
 type=rpm-md

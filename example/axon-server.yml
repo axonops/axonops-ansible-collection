@@ -9,6 +9,7 @@
       - localhost:9042
     axon_dash_listen_address: 0.0.0.0
     axon_agent_redhat_repository: "https://packages.axonops.com/yum"
+    es_redhat_repository_url: https://artifacts.elastic.co/packages/7.x/yum
 
   roles:
     - role: cassandra
