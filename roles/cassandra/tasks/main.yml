@@ -36,7 +36,7 @@
         content: |
           [cassandra41]
           name=Apache Cassandra
-          baseurl=https://redhat.cassandra.apache.org/41x/
+          baseurl={{ cassandra_redhat_repository_url | default('https://redhat.cassandra.apache.org/41x/') }}
           gpgcheck=0
           repo_gpgcheck=0
 
@@ -54,11 +54,16 @@
     update_cache: true
     name: "{{ cassandra_pkg }}"
 
+- name: Cassandra config directory
+  ansible.builtin.set_fact:
+    cassandra_conf_dir: "/etc/cassandra/conf"
+  when: ansible_os_family == 'Redhat'
+
 - name: Ensure Cassandra node configured (4.1.x)
   notify: Restart Cassandra
   ansible.builtin.template:
     src: "{{ item }}.j2"
-    dest: "/etc/cassandra/conf/{{ item }}"
+    dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
     mode: "0644"
   with_items:
     - cassandra-env.sh

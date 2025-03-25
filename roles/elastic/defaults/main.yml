@@ -1,5 +1,5 @@
 ---
-es_version: "7.17.0"
+es_version: "7.17.16"
 es_use_snapshot_release: false
 oss_version: false
 es_package_name: "elasticsearch"
@@ -45,6 +45,7 @@ es_security_api: "{{ '_security' if es_version is version('7.0.0', '>=') else '_
 es_license_api: "{{ '_license' if es_version is version('7.0.0', '>=') else '_xpack/license' }}"
 es_api_sleep: 15
 es_debian_startup_timeout: 10
+es_heap_size: "512M"
 
 # JVM custom parameters
 es_java_home: ''

@@ -1,16 +1,3 @@
-# ARCHIVED
-
-This project is no longer maintained.
-
-You are welcomed to keep using it and adapting it to work for your own needs, including with Elasticsearch [8.x](docs/8x-support.md).
-
-For alternative getting started experiences, you may want to try one of these options:
-
-- Start a [free trial on Elastic Cloud](https://www.elastic.co/cloud/elasticsearch-service/signup), our hosted service.
-- Take a look at [Elastic Cloud on Kubernetes (ECK)](https://elastic.co/guide/en/cloud-on-k8s/current/k8s-quickstart.html) for launching the stack via Kubernetes.
-- Read our [Running the Elastic Stack on Docker](https://www.elastic.co/guide/en/elastic-stack-get-started/current/get-started-docker.html) guide.
-- Take a look at the [Elastic Stack Terraform provider.](https://github.com/elastic/terraform-provider-elasticstack)
-
 # ansible-elasticsearch
 [![Ansible Galaxy](https://img.shields.io/badge/ansible--galaxy-elastic.elasticsearch-blue.svg)](https://galaxy.ansible.com/elastic/elasticsearch/)
 
@@ -56,7 +43,7 @@ Ansible-elasticsearch 7.5.2 is updating the configuration files provided by this
 
 Starting from Elasticsearch 7.11.0, OSS distributions will no longer be provided following the recent Elasticsearch license change.
 
-This Ansible role will fail if `oss_version` is set to `true` and `es_version` is greater than 
+This Ansible role will fail if `oss_version` is set to `true` and `es_version` is greater than
 `7.11.0`.
 
 See [Doubling down on open, Part II](https://www.elastic.co/blog/licensing-change)

@@ -22,13 +22,13 @@
     recurse: true
     mode: 0755
 
-- name: Python crypto modules
-  package:
-    name: "{{ python_crypto }}"
-    state: latest
-
 - name: Generate a Self Signed OpenSSL certificate for Node Exporter
   block:
+    - name: Python crypto modules
+      package:
+        name: "{{ python_crypto }}"
+        state: latest
+
     - name: Generate an OpenSSL private key.
       openssl_privatekey:
         path: "{{ axon_dash_nginx.ssl_key }}"
@@ -63,3 +63,5 @@
   service:
     name: nginx
     state: started
+
+# code: language=ansible
