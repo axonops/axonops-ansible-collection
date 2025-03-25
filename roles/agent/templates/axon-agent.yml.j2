@@ -1,0 +1,157 @@
+{% if axon_agent_server_host is defined %}
+axon-server:
+    hosts: {{ axon_agent_server_host }}
+{% if axon_agent_server_port is defined %}
+    port: {{ axon_agent_server_port | default(1888) }}
+{% endif %}
+{% endif %}
+
+axon-agent:
+{% if axon_agent_server_host is not defined %}
+    prom_only: true
+{% endif %}
+{% if customer_name is defined %}
+    org: "{{ customer_name }}"
+{% else %}
+    org: "{{ axon_agent_customer_name | default('Digitalis') }}"
+{% endif %}
+{% if axon_agent_key is defined %}
+    key: {{ axon_agent_key }}
+{% endif %}
+{% if axon_agent_host_name is defined %}
+    host_name: "{{ axon_agent_host_name }}"
+{% endif %}
+{% if axon_agent_cluster_name is defined %}
+    cluster_name: "{{ axon_agent_cluster_name }}"
+{% endif %}
+{% if axon_agent_OpenTSDB_service_test is defined %}
+    host: "{{ ansible_default_ipv4.address }}"
+    OpenTSDB_service_test: true
+    ssl: false
+    port: 9916
+{% endif %}
+{% if axon_agent_human_readable_identifier is defined %}
+    human_readable_identifier: "{{ axon_agent_human_readable_identifier }}"
+{% endif %}
+{% if axon_agent_force_send_all_metrics_prom is defined %}
+    force_send_all_metrics_prom: true
+{% endif %}
+{% if axon_agent_tmp_path is defined and axon_agent_tmp_path != "" %}
+    tmp_path: "{{ axon_agent_tmp_path }}"
+{% endif %}
+{% if axon_agent_tls_mode is defined %}
+    tls:
+      mode: "{{ axon_agent_tls_mode }}" # disabled, TLS, mTLS
+{% if axon_agent_tls_mode == "TLS" or axon_agent_tls_mode == "mTLS" %}
+      skipVerify: {{ axon_agent_tls_skipverify | default('false') }}
+{% if axon_agent_tls_cafile is defined %}
+      caFile: "{{ axon_agent_tls_cafile }}"
+{% endif %}
+{% endif %}
+{% if axon_agent_tls_mode == "mTLS" %}
+      certFile: "{{ axon_agent_tls_certfile }}"
+      keyFile: "{{ axon_agent_tls_keyfile }}"
+{% endif %}
+{% endif %}
+{% if axon_agent_backup_purge_interval is defined %}
+    backup_purge_interval: "{{ axon_agent_backup_purge_interval }}"
+{% endif %}
+
+NTP:
+    host: "{{ axon_agent_ntp_server }}" # Specify your NTP server IP address or hostname
+    timeout: {{ axon_agent_ntp_timeout | default(6) }}
+
+{% if axon_agent_include_service_config %}
+{% if axon_java_agent.startswith('axon-dse') %}
+{{ axon_agent_upper_lower_case_dse_template_var | default('dse') }}:
+    tier0: # metrics collected every 5 seconds
+        metrics:
+            jvm_:
+              - "java.lang:*"
+            cas_:
+              - "org.apache.cassandra.metrics:*"
+              - "org.apache.cassandra.net:type=FailureDetector"
+              - "com.datastax.bdp:type=dsefs,*"
+              - "com.datastax.bdp:type=metrics,*"
+    tier1:
+        frequency: 300 # metrics collected every 300 seconds (5m)
+        metrics:
+            cas_:
+              #- "org.apache.cassandra.metrics:name=EstimatedPartitionSizeHistogram,*"
+              - "org.apache.cassandra.metrics:name=EstimatedPartitionCount,*"
+              #- "org.apache.cassandra.metrics:name=EstimatedColumnCountHistogram,*"
+
+    #tier2:
+    #    frequency: 3600 # 1h
+
+    #tier3:
+    #    frequency: 86400 # 1d
+
+    blacklist: # You can blacklist metrics based on Regex pattern. Hit the agent on http://agentIP:9916/metricslist to list JMX metrics it is collecting
+      - "org.apache.cassandra.metrics:type=ColumnFamily.*" # duplication of table metrics
+      - "org.apache.cassandra.metrics:.*scope=Repair#.*" # ignore each repair instance metrics
+      - "org.apache.cassandra.metrics:.*name=SnapshotsSize.*" # Collecting SnapshotsSize metrics slows down collection
+      - "org.apache.cassandra.metrics:.*Max.*"
+      - "org.apache.cassandra.metrics:.*Min.*"
+      - "com.datastax.bdp:.*Max.*"
+      - "com.datastax.bdp:.*Min.*"
+      - ".*999thPercentile|.*50thPercentile|.*FifteenMinuteRate|.*FiveMinuteRate|.*MeanRate|.*Mean|.*OneMinuteRate|.*StdDev"
+    JMXOperationsBlacklist:
+      - "getThreadInfo"
+      - "getDatacenter"
+      - "getRack"
+    DMLEventsWhitelist: # You can whitelist keyspaces / tables (list of "keyspace" and/or "keyspace.table" to log DML queries. Data is not analysed.
+    # - "system_distributed"
+    DMLEventsBlacklist: # You can blacklist keyspaces / tables from the DMLEventsWhitelist (list of "keyspace" and/or "keyspace.table" to log DML queries. Data is not analysed.
+    # - system_distributed.parent_repair_history
+    logSuccessfulRepairs: false # set it to true if you want to log all the successful repair events.
+    #nodetoolPath : "/path/to/nodetool"
+    warningThresholdMillis: 200 # This will warn in logs when a MBean takes longer than the specified value.
+    logFormat: "%4$s %1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS,%1$tL %5$s%6$s%n"
+{% elif "axon-cassandra" in axon_java_agent %}
+cassandra:
+    tier0: # metrics collected every 5 seconds
+        metrics:
+            jvm_:
+              - "java.lang:*"
+            cas_:
+              - "org.apache.cassandra.metrics:*"
+              - "org.apache.cassandra.net:type=FailureDetector"
+
+    tier1:
+        frequency: 300 # metrics collected every 300 seconds (5m)
+        metrics:
+            cas_:
+              #- "org.apache.cassandra.metrics:name=EstimatedPartitionSizeHistogram,*"
+              - "org.apache.cassandra.metrics:name=EstimatedPartitionCount,*"
+              #- "org.apache.cassandra.metrics:name=EstimatedColumnCountHistogram,*"
+
+    #tier2:
+    #    frequency: 3600 # 1h
+
+    #tier3:
+    #    frequency: 86400 # 1d
+
+    blacklist: # You can blacklist metrics based on Regex pattern. Hit the agent on http://agentIP:9916/metricslist to list JMX metrics it is collecting
+      - "org.apache.cassandra.metrics:type=ColumnFamily.*" # duplication of table metrics
+      - "org.apache.cassandra.metrics:.*scope=Repair#.*" # ignore each repair instance metrics
+      - "org.apache.cassandra.metrics:.*name=SnapshotsSize.*" # Collecting SnapshotsSize metrics slows down collection
+      - "org.apache.cassandra.metrics:.*Max.*"
+      - "org.apache.cassandra.metrics:.*Min.*"
+      - ".*999thPercentile|.*50thPercentile|.*FifteenMinuteRate|.*FiveMinuteRate|.*MeanRate|.*Mean|.*OneMinuteRate|.*StdDev"
+
+    DMLEventsWhitelist: # You can whitelist keyspaces / tables (list of "keyspace" and/or "keyspace.table" to log DML queries. Data is not analysed.
+      - "system_distributed"
+
+    JMXOperationsBlacklist:
+      - "getThreadInfo"
+      - "getDatacenter"
+      - "getRack"
+
+    logSuccessfulRepairs: false # set it to true if you want to log all the successful repair events.
+
+    warningThresholdMillis: {{ axon_agent_warn_threshold_millis | default(1000) }} # This will warn in logs when a MBean takes longer than the specified value.
+
+    logFormat: "%4$s %1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS,%1$tL %5$s%6$s%n"
+{% endif %}
+{% endif %}

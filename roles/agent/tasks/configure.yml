@@ -1,0 +1,57 @@
+---
+
+- name: Copy AxonOps agent config file
+  notify: restart axon-agent
+  ansible.builtin.template:
+    src: axon-agent.yml.j2
+    dest: /etc/axonops/axon-agent.yml
+    owner: axonops
+    group: axonops
+    mode: "0644"
+
+- name: Make sure axon-agent.service.d directory is present if needed
+  ansible.builtin.file:
+    path: /etc/systemd/system/axon-agent.service.d/
+    state: directory
+  when: axon_agent_limitnofile is defined and axon_agent_limitnofile != ''
+
+- name: Copy set limit_nofile id needed
+  ansible.builtin.template:
+    src: limit_nofile.conf.j2
+    dest: /etc/systemd/system/axon-agent.service.d/limit_nofile.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: axon_agent_limitnofile is defined and axon_agent_limitnofile != ''
+
+- name: Create the agent_name file if it is DSE
+  ansible.builtin.template:
+    src: agent_service.j2
+    dest: /var/lib/axonops/agent_service
+    owner: axonops
+    group: axonops
+    mode: "0644"
+  when: axon_java_agent == 'axon-dse6.0-agent' or axon_java_agent == 'axon-dse6.7-agent'
+
+- name: Set hostId file if you have it
+  ansible.builtin.template:
+    src: hostId.j2
+    dest: /var/lib/axonops/hostId
+    owner: axonops
+    group: axonops
+    mode: "0644"
+  notify:
+    - delete local.db
+    - restart axon-agent
+  when: axon_agent_hostid is defined and axon_agent_hostid != ''
+
+- name: Set up sudoers if enabled
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/axonops
+    content: "{{ axon_agent_sudoers }}"
+    mode: "0600"
+    owner: root
+    group: root
+  when: axon_agent_sudoers is defined and axon_agent_sudoers != ""
+
+# code: language=ansible

@@ -1,0 +1,13 @@
+---
+- name: restart axon-server
+  service: name=axon-server state=restarted
+  when: docker is not defined
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart Cassandra
+  ansible.builtin.systemd:
+    state: restarted
+    name: cassandra

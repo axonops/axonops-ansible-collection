@@ -1,0 +1,94 @@
+---
+
+- name: Include Debian repos
+  ansible.builtin.import_tasks: repo/Debian.yml
+  when: ansible_os_family == "Debian"
+
+- name: Include Redhat repos
+  ansible.builtin.import_tasks: repo/RedHat.yml
+  when: ansible_os_family == "RedHat"
+
+# Online installation fixed version
+- name: Ensure Axon agent is installed.
+  ansible.builtin.package:
+    name: "{{ axon_agent_pkg }}"
+    state: "{{ axon_agent_state }}"
+  when: has_internet_access and axon_agent_version != ""
+  notify: restart axon-agent
+
+- name: "Ensure AxonOps Java Agent is installed: {{ axon_agent_pkg }}"
+  ansible.builtin.package:
+    name: "{{ axon_java_agent_pkg }}"
+    state: "{{ axon_agent_state }}"
+  when: has_internet_access and axon_java_agent != '' and not axon_java_agent_force_offline_install and axon_java_agent_version != ""
+  notify: restart axon-agent
+
+# Offline installation
+- name: Copy AxonOps Agent package to target
+  ansible.builtin.copy:
+    src: "{{ axon_agent_download_path }}"
+    dest: "/tmp/axon-agent-{{ axon_agent_version }}.{{ pkg_ext }}"
+    mode: "0644"
+    owner: root
+    group: root
+  when: not has_internet_access
+
+- name: Offline installation
+  when: axon_java_agent_force_offline_install
+  block:
+    - name: Install AxonOps Agent offline (rpm)
+      ansible.builtin.package:
+        name: "/tmp/axon-agent-{{ axon_agent_version }}.{{ pkg_ext }}"
+        state: present
+
+    - name: Copy AxonOps Java Agent package to target
+      ansible.builtin.copy:
+        src: "{{ axon_java_agent_download_path }}"
+        dest: "/tmp/{{ axon_java_agent }}-{{ axon_java_agent_version }}.{{ pkg_ext }}"
+        mode: "0644"
+        owner: root
+        group: root
+      when: axon_java_agent != '' and (axon_java_agent_force_offline_install or not has_internet_access)
+
+    - name: Install AxonOps Java Agent offline (rpm)
+      ansible.builtin.package:
+        name: "/tmp/{{ axon_java_agent }}-{{ axon_java_agent_version }}.{{ pkg_ext }}"
+        state: present
+      when: ansible_os_family == "RedHat" and axon_java_agent != '' and (axon_java_agent_force_offline_install or not has_internet_access)
+
+    - name: Install AxonOps Java Agent offline (deb)
+      ansible.builtin.apt:
+        deb: "/tmp/{{ axon_java_agent }}-{{ axon_java_agent_version }}.{{ pkg_ext }}"
+        state: present
+      when: ansible_os_family == "Debian" and axon_java_agent != '' and (axon_java_agent_force_offline_install or not has_internet_access)
+
+- name: Set up proxy for the axon-agent
+  when: axon_agent_proxy_addr is defined and axon_agent_proxy_addr != ""
+  block:
+    - name: Create override directory
+      ansible.builtin.file:
+        state: directory
+        path: /etc/systemd/system/axon-agent.service.d/
+        mode: "0755"
+
+    - name: "Set up proxy"
+      ansible.builtin.copy:
+        mode: "0644"
+        owner: root
+        group: root
+        dest: /etc/systemd/system/axon-agent.service.d/override.conf
+        content: |
+          [Service]
+          Environment=HTTP_PROXY={{ axon_agent_proxy_addr }}
+          Environment=HTTPS_PROXY={{ axon_agent_proxy_addr }}
+      notify: reload systemd
+
+- name: Make sure the agent is started on boot
+  when: axon_agent_start_at_boot
+  notify: reload systemd
+  ansible.builtin.systemd:
+    name: axon-agent
+    state: started
+    enabled: true
+
+# code: language=ansible

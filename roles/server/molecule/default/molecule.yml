@@ -1,0 +1,51 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: ar-axon-server-centos7
+    image: centos:7
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: /sbin/init
+    privileged: True
+    tmpfs:
+      - /run
+      - /tmp
+    capabilities:
+      - SYS_ADMIN
+  - name: ar-axon-server-ubuntu1804
+    image: ubuntu:18.04
+    command: /sbin/init
+    privileged: True
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    capabilities:
+      - SYS_ADMIN
+    tmpfs:
+      - /run
+      - /tmp
+  - name: ar-axon-server-ubuntu2004
+    image: ubuntu:20.04
+    command: /sbin/init
+    privileged: True
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    capabilities:
+      - SYS_ADMIN
+    tmpfs:
+      - /run
+      - /tmp
+provisioner:
+  name: ansible
+  lint: |
+    set -e
+    yamllint .
+    ansible-lint
+verifier:
+  name: testinfra
+  directory: ./tests

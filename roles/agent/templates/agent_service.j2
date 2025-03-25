@@ -1,0 +1,5 @@
+{% if axon_java_agent == 'axon-dse6.0-agent' or axon_java_agent == 'axon-dse6.7-agent' %}
+dse
+{% else %}
+cassandra
+{% endif %}

@@ -1,0 +1,9 @@
+---
+- name: restart axon-dash
+  service: name=axon-dash state=restarted
+  when: docker is not defined
+
+- name: reload nginx
+  service:
+    name: nginx
+    state: restarted

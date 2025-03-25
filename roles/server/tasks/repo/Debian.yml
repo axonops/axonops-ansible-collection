@@ -1,0 +1,19 @@
+---
+- name: Ensure pre-reqs are installed
+  ansible.builtin.package:
+    name: ['gnupg', 'apt-transport-https', 'debian-archive-keyring']
+    state: present
+
+- name: Add AxonOps apt repository key.
+  ansible.builtin.apt_key:
+    url: https://packages.axonops.com/apt/repo-signing-key.gpg
+    validate_certs: true
+
+- name: Set AxonOps apt repository
+  ansible.builtin.apt_repository:
+    repo: "{{ axon_server_public_repository }}"
+    state: "present"
+    update_cache: true
+    validate_certs: "{{ axon_server_validate_certs | default(true) }}"
+
+# code: language=ansible

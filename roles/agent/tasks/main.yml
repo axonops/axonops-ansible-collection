@@ -1,0 +1,15 @@
+---
+
+- name: Install
+  ansible.builtin.import_tasks: install.yml
+  when:
+    - axon_agent_install is defined
+    - axon_agent_install
+
+- name: Configure
+  ansible.builtin.import_tasks: configure.yml
+  when:
+    - axon_agent_configure is defined
+    - axon_agent_configure
+
+# code: language=ansible

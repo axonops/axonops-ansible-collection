@@ -1,0 +1,42 @@
+---
+- name: Ensure pre-req gnupg is installed
+  ansible.builtin.package:
+    name: ['gnupg', 'apt-transport-https', 'debian-archive-keyring']
+    state: present
+
+- name: Add AxonOps apt repository key.
+  ansible.builtin.apt_key:
+    url: https://packages.axonops.com/apt/repo-signing-key.gpg
+    validate_certs: yes
+
+
+- name: Set AxonOps apt repository to {{ axon_agent_public_repository }}.
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.axonops.com/apt axonops-apt main"
+    state: "{{ axon_agent_public_repository }}"
+    update_cache: yes
+
+- name: Set AxonOps beta apt repository to {{ axon_agent_beta_repository }}.
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.axonops.com/apt axonops-apt-beta main"
+    state: "{{ axon_agent_beta_repository }}"
+    update_cache: yes
+
+- name: Set AxonOps dev apt repository to {{ axon_agent_dev_repository }}.
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.axonops.com/apt axonops-apt-dev main"
+    state: "{{ axon_agent_dev_repository }}"
+    update_cache: yes
+
+# It is required for when you're updating versions
+- name: Run the equivalent of "apt-get update" as a separate step
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Set package names
+  ansible.builtin.set_fact:
+    axon_agent_pkg: "axon-agent={{ axon_agent_version }}"
+    axon_java_agent_pkg: "{{ axon_java_agent }}={{ axon_java_agent_version }}"
+    pkg_ext: "deb"
+
+# code: language=ansible

@@ -1,0 +1,17 @@
+galaxy_info:
+  author: Digitalis.IO DevOps
+  description: Digitalis Role for axon-agent
+  company: Digitalis.IO
+  license: license (GPL-2.0-or-later, MIT, etc)
+  min_ansible_version: 2.9
+
+  platforms:
+  - name: RedHat
+    versions:
+    - all
+  - name: Debian
+    versions:
+    - all
+
+  galaxy_tags:
+  - axon-agent

@@ -1,0 +1,10 @@
+---
+- name: Add AxonOps noarch yum repository
+  ansible.builtin.yum_repository:
+    description: "AxonOps NoArch Repository"
+    name: axonops-yum-noarch
+    baseurl: "{{ axonops_redhat_repository }}"
+    repo_gpgcheck: false
+    gpgcheck: false
+
+# code: language=ansible

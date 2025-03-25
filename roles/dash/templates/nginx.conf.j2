@@ -1,0 +1,16 @@
+server {
+  listen {{ axon_dash_nginx.listen }} ssl;
+
+  server_name {{ axon_dash_nginx.hostname | default(ansible_hostname) }};
+
+  root /usr/share/nginx;
+  index index.html;
+
+  ssl_certificate     {{ axon_dash_nginx.ssl_cert }};
+  ssl_certificate_key {{ axon_dash_nginx.ssl_key }};
+  ssl_protocols       TLSv1.1 TLSv1.2;
+
+  location / {
+    proxy_pass {{ axon_dash_nginx.upstream }};
+  }
+}

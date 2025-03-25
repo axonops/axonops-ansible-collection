@@ -1,0 +1,31 @@
+---
+axon_agent_start_at_boot: true
+
+# Possible Options: axon-cassandra3.11-agent, axon-dse6.0-agent, axon-dse6.7-agent, axon-dse5.1-agent or ""
+axon_java_agent: "axon-cassandra4.1-agent"
+axon_agent_version: "1.0.131"
+axon_java_agent_version: "1.0.14"
+axon_agent_server_port: 1888
+axon_agent_tls_mode: "disabled"
+
+axon_agent_state: present
+axon_agent_ntp_server: "{{ ntp_prefered_server | default('pool.ntp.org') }}"
+axon_java_agent_force_offline_install: false
+
+has_internet_access: true
+axon_agent_upper_lower_case_dse_template_var: DSE
+
+# Set this true to include the "dse" or "cassandra" section in axon-agent.yml. This is not normally required in recent versions.
+axon_agent_include_service_config: false
+
+axon_agent_install: true
+axon_agent_configure: true
+
+# repository
+axon_agent_public_repository: present
+axon_agent_beta_repository: absent
+axon_agent_dev_repository: absent
+
+axon_agent_sudoers: |
+  # Ansible Managed
+  axonops ALL=NOPASSWD: /bin/systemctl start cassandra,/bin/systemctl restart cassandra,/bin/systemctl stop cassandra,/bin/systemctl status cassandra

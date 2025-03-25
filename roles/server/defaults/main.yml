@@ -1,0 +1,66 @@
+---
+axon_server_state: present
+axon_server_hum: false
+
+axon_server_elastic_host: http://127.0.0.1
+axon_server_elastic_port: 9200
+
+# Override listen address and port for the axon-server API
+axon_server_listen_address: 0.0.0.0
+axon_server_listen_port: 8080
+
+axon_server_ldap_enabled: false
+axon_server_ldap_setting:
+  serverName: "axonops_sample"
+  base: "dc=axonops,dc=io"
+  host: "ldap.example.com"
+  port: 636
+  useSSL: true
+  bindDN: ""
+  bindPassword: "secret"
+  userFilter: "(uid=%s)"
+  rolesAttribute: memberOf
+  callAttempts: 3
+  rolesMapping:
+    _global_:
+      superUserRole: 'cn=superuser,o=Groups,dc=axonops,dc=io'
+      adminRole: 'cn=admin,o=Groups,dc=axonops,dc=io'
+      readOnlyRole: 'cn=ro,o=Groups,dc=axonops,dc=io'
+      backupAdminRole: 'cn=backups_ro,o=Groups,dc=axonops,dc=io'
+      dbaRole: 'cn=dba,o=Groups,dc=axonops,dc=io'
+
+axon_server_tls_mode: disabled
+
+# How long to wait before sending a notification again if it has already
+# been sent successfully for an alert. (Usually ~3h or more).
+axon_server_notification_interval: '3h'
+
+axon_server_retention:
+  events: 4w # Must be expressed in weeks (w)
+  security_events: 8w # Must be expressed in weeks (w)
+  metrics:
+    high_resolution: 30d # Must be expressed in days (d)
+    med_resolution: 24w # Must be expressed in weeks (w)
+    low_resolution: 24M # Must be expressed in months (M)
+    super_low_resolution: 3y # Must be expressed in years (y)
+  backups: # Those are use as defaults but can be overridden from the UI
+    local: 10d
+    remote: 30d
+
+# Optional for multplie clusters
+# axon_server_org_name: "axonops"
+
+# CQL configuration
+axon_server_cql_hosts: []
+axon_server_username: "cassandra"
+axon_server_password: "cassandra"
+axon_server_local_dc: "axonops"
+axon_server_cql_keyspace_replication: "{ 'class': 'NetworkTopologyStrategy', 'axonops': 1 }"
+
+
+# repository (it can be 'present' or 'absent')
+axon_server_public_repository: present
+axon_server_beta_repository: absent
+
+axonops_debian_repository: "deb https://packages.axonops.com/apt axonops-apt main"
+axonops_redhat_repository: "https://packages.axonops.com/yum"

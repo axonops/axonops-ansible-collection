@@ -1,0 +1,51 @@
+---
+# Online installation
+- include: "repo/{{ ansible_os_family }}.yml"
+  tags:
+    - axon_dash_repo
+
+- name: Fuse is required for the dashboard in Redhat
+  ansible.builtin.package:
+    name: fuse
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Ensure Axon Dashboard is installed.
+  package:
+    name: axon-dash
+    state: "{{ axon_dash_state }}"
+  notify:
+    - restart axon-dash
+  when: has_internet_access
+
+# Offline installation
+- name: Copy AxonOps Dashboard package to target
+  copy:
+    src: "{{ axon_dash_download_path }}"
+    dest: "/tmp/axon-dash-{{ axon_dash_version }}.x86_64.rpm"
+  when: not has_internet_access
+
+- name: Install AxonOps Dashboard offline
+  package:
+    name: "/tmp/axon-dash-{{ axon_dash_version }}.x86_64.rpm"
+    state: present
+  notify:
+    - restart axon-dash
+  when: not has_internet_access
+
+- name: Configure dashboard
+  template:
+    src: axon-dash.yml.j2
+    dest: /etc/axonops/axon-dash.yml
+  notify:
+    - restart axon-dash
+
+- name: Make sure the dashboard is started on boot
+  when: axon_dash_start_at_boot
+  service:
+    name: axon-dash
+    state: started
+    enabled: yes
+
+- import_tasks: nginx.yml
+  when: axon_dash_nginx is defined and axon_dash_nginx.enabled
