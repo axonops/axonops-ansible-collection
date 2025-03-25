@@ -10,18 +10,27 @@
     # Set to false if you already have Apache Cassandra running
     install_cassandra: true
 
+  pre_tasks:
+    # This is only for this example to work, please review your firewall settings and requirements
+    - name: "Stop firewalld"
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: false
+        state: stopped
+      when: ansible_os_family == 'RedHat'
+      failed_when: false
+
   roles:
     - role: agent
       tags: agent, axonops-agent
       vars:
         axon_agent_server_host: "{{ groups['axon-server'] | first }}"
-        cassandra_dc: "DC1"
-        cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | first }}"
     - role: cassandra
       tags: cassandra
       when: install_cassandra
       vars:
         cassandra_dc: "example"
+        cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | first }}"
 
   post_tasks:
     - name: Add axonops to the cassandra group
