@@ -51,4 +51,3 @@ agent: check-env ## Installs the AxonOps agent to the cassandra nodes
 server: check-env ## Installs the AxonOps server with elasticsearch and optional cassandra
 	@${PIPENVCMD} ansible-playbook -i ${INVENTORY} axon-server.yml --diff ${EXTRA} \
 		-u ${ANSIBLE_USER}
-
