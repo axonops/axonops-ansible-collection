@@ -54,11 +54,6 @@
     update_cache: true
     name: "{{ cassandra_pkg }}"
 
-- name: Cassandra config directory
-  ansible.builtin.set_fact:
-    cassandra_conf_dir: "/etc/cassandra/conf"
-  when: ansible_os_family == 'Redhat'
-
 - name: Ensure Cassandra node configured (4.1.x)
   notify: Restart Cassandra
   ansible.builtin.template:
