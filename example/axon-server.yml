@@ -11,6 +11,16 @@
     axon_agent_redhat_repository: "https://packages.axonops.com/yum"
     es_redhat_repository_url: https://artifacts.elastic.co/packages/7.x/yum
 
+  pre_tasks:
+    # This is only for this example to work, please review your firewall settings and requirements
+    - name: "Stop firewalld"
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: false
+        state: stopped
+      when: ansible_os_family == 'RedHat'
+      failed_when: false
+
   roles:
     - role: cassandra
       tags: cassandra
