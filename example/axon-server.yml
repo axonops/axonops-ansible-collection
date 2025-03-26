@@ -4,7 +4,6 @@
   vars:
     install_cassandra: true
     install_elastic: true
-    java_pkg: java-11-openjdk-headless
     axon_server_cql_hosts:
       - localhost:9042
     axon_dash_listen_address: 0.0.0.0
@@ -22,6 +21,9 @@
       failed_when: false
 
   roles:
+    - name: java
+      role: java
+      tags: java
     - role: cassandra
       tags: cassandra
       when: install_cassandra is defined and install_cassandra

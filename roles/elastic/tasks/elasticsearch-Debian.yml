@@ -43,15 +43,35 @@
   block:
   - name: Debian - Install apt-transport-https to support https APT downloads
     apt:
-      name: apt-transport-https
+      name: 
+        - apt-transport-https
+        - gnupg
+        - curl
       state: present
-
+  
   - name: Debian - Add Elasticsearch repository key
-    apt_key:
-      url: '{{ es_apt_key }}'
-      id: '{{ es_apt_key_id }}'
-      state: present
-    when: es_add_repository and es_apt_key | string
+    when: es_add_repository and es_apt_key
+    block:
+      - name: Debian - Add elasticsearch repository key
+        apt_key:
+          url: '{{ es_apt_key }}'
+          id: '{{ es_apt_key_id }}'
+          state: present
+        failed_when: false
+
+      - name: Ensure /usr/share/keyrings/ exists
+        ansible.builtin.file:
+          state: directory
+          mode: "0755"
+          path: /usr/share/keyrings
+
+      - name: Debian - Add elasticsearch repository key
+        shell: |
+          wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+    rescue:
+      - name: Legacy Apt key
+        debug:
+          msg: "Ignored"
 
   - name: Debian - Add elasticsearch repository
     apt_repository:
