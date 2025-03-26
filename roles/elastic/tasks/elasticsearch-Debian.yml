@@ -43,12 +43,12 @@
   block:
   - name: Debian - Install apt-transport-https to support https APT downloads
     apt:
-      name: 
+      name:
         - apt-transport-https
         - gnupg
         - curl
       state: present
-  
+
   - name: Debian - Add Elasticsearch repository key
     when: es_add_repository and es_apt_key
     block:
