@@ -8,8 +8,10 @@
       ansible.builtin.copy:
         dest: /etc/apt/sources.list.d/nonfree.list
         content: |
-          deb http://deb.debian.org/debian unstable main non-free contrib
-          deb http://deb.debian.org/debian stable main non-free contrib
+          deb http://deb.debian.org/debian {{ ansible_distribution_release | default('stable') }} main non-free contrib
+          {% if ansible_distribution_release == 'bookworm' %}
+          deb http://deb.debian.org/debian sid main non-free contrib
+          {% endif %}
 
     - name: Apt update
       ansible.builtin.apt:
