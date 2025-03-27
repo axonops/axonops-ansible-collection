@@ -1,21 +1,32 @@
 - name: Import OS vars
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
 
-- name: Debian 12 nonfree repos
-  when: ansible_distribution == 'Debian' and ansible_distribution_major_version == '12'
+- name: Debian Azul Java Install
   block:
-    - name: Add nonfree repos
-      ansible.builtin.copy:
-        dest: /etc/apt/sources.list.d/nonfree.list
-        content: |
-          deb http://deb.debian.org/debian {{ ansible_distribution_release | default('stable') }} main non-free contrib
-          {% if ansible_distribution_release == 'bookworm' %}
-          deb http://deb.debian.org/debian sid main non-free contrib
-          {% endif %}
+    - name: Download and dearmor key
+      ansible.builtin.uri:
+        url: "{{ _zulu_jdk.apt_repo.key_url }}"
+        return_content: yes
+      register: key_content
 
-    - name: Apt update
-      ansible.builtin.apt:
-        update_cache: true
+    - name: Dearmor and save the key
+      ansible.builtin.shell:
+        cmd: echo "{{ key_content.content }}" | gpg --dearmor -o /usr/share/keyrings/azul.gpg
+        creates: /usr/share/keyrings/azul.gpg
+
+    - name: Add Repository URL
+      apt_repository:
+        repo: "{{ _zulu_jdk.apt_repo.repo_line }}"
+        state: present
+        filename: zulu
+
+    - name: Install Zulu JDK
+      package:
+        state: "{% if zulu_version is defined and zulu_version != '' %}present{% else %}latest{% endif %}"
+        name: "{{ _zulu_jdk.package_names }}"
+  when: 
+    - _zulu_jdk is defined
+    - ansible_distribution == 'Debian'
 
 - name: Install Java
   ansible.builtin.package:
@@ -23,5 +34,7 @@
     state: present
   when:
     - java_pkg is defined
+    - ansible_distribution != 'Debian'
 
 # code: language=ansible
+

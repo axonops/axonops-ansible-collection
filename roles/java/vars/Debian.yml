@@ -1,2 +1,45 @@
 java_pkg: openjdk-11-jre-headless
 cassandra_conf_dir: /etc/cassandra
+
+# Debian Bookworm JDK
+_zulu_jdk:
+  apt_repo:
+    repo_line: "deb [signed-by=/usr/share/keyrings/azul.gpg] https://repos.azul.com/zulu/deb stable main"
+    key_url: https://repos.azul.com/azul-repo.key
+    key_id: "0xB1998361219BD9C9"
+  package_names:
+    - "zulu11-jdk-headless{% if zulu_version is defined and zulu_version != ''%}={{ zulu_version }}{% endif %}"
+    - "zulu11-ca-jdk-headless{% if zulu_version is defined and zulu_version != ''%}={{ zulu_version }}{% endif %}"
+    - "zulu11-ca-jre-headless{% if zulu_version is defined and zulu_version != ''%}={{ zulu_version }}{% endif %}"
+    - "zulu11-jre-headless{% if zulu_version is defined and zulu_version != ''%}={{ zulu_version }}{% endif %}"
+  install_dir: "/usr/lib/jvm/zulu11"
+  security:
+    #
+    # The Java-level namelookup cache policy for successful lookups:
+    #
+    # any negative value: caching forever
+    # any positive value: the number of seconds to cache an address for
+    # zero: do not cache
+    #
+    # default value is forever (FOREVER). For security reasons, this
+    # caching is made forever when a security manager is set. When a security
+    # manager is not set, the default behavior in this implementation
+    # is to cache for 30 seconds.
+    #
+    # NOTE: setting this to anything other than the default value can have
+    #       serious security implications. Do not set it unless
+    #       you are sure you are not exposed to DNS spoofing attack.
+    #
+    dns_cache_ttl: 30
+    # The Java-level namelookup cache policy for failed lookups:
+    #
+    # any negative value: cache forever
+    # any positive value: the number of seconds to cache negative lookup results
+    # zero: do not cache
+    #
+    # In some Microsoft Windows networking environments that employ
+    # the WINS name service in addition to DNS, name service lookups
+    # that fail may take a noticeably long time to return (approx. 5 seconds).
+    # For this reason the default caching policy is to maintain these
+    # results for 10 seconds.
+    dns_cache_negative_ttl: 10

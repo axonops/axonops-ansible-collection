@@ -1,6 +1,6 @@
 ---
 # Online installation
-- include: "repo/{{ ansible_os_family }}.yml"
+- include_tasks: "repo/{{ ansible_os_family }}.yml"
   tags:
     - axon_dash_repo
 

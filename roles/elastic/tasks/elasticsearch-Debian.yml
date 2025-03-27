@@ -8,7 +8,7 @@
   when: es_allow_downgrades
 
 - name: Gracefully stop and remove elasticsearch package if switching between OSS and standard
-  become: yes
+  become: true
   block:
   - name: Check if the elasticsearch package is installed
     shell: "dpkg-query -W -f'${Status}' {{ es_other_package_name }}"
@@ -18,7 +18,7 @@
     check_mode: no
 
   - name: unhold elasticsearch package when switching to a different package type
-    become: yes
+    become: true
     dpkg_selections:
       name: "{{ es_other_package_name }}"
       selection: "install"
@@ -36,56 +36,39 @@
       state: absent
     when: elasticsearch_package.stdout == 'install ok installed'
 
-
 - name: Install Elasticsearch repository
   when: es_use_repository
-  become: yes
+  become: true
   block:
-  - name: Debian - Install apt-transport-https to support https APT downloads
-    apt:
-      name:
-        - apt-transport-https
-        - gnupg
-        - curl
-      state: present
+    - name: Debian - Install apt-transport-https to support https APT downloads
+      apt:
+        name:
+          - apt-transport-https
+          - gnupg
+          - curl
+          - wget
+        state: present
 
-  - name: Debian - Add Elasticsearch repository key
-    when: es_add_repository and es_apt_key
-    block:
-      - name: Debian - Add elasticsearch repository key
-        apt_key:
-          url: '{{ es_apt_key }}'
-          id: '{{ es_apt_key_id }}'
-          state: present
-        failed_when: false
+    - name: Download and install Elasticsearch GPG key
+      ansible.builtin.uri:
+        url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        return_content: yes
+      register: key_content
 
-      - name: Ensure /usr/share/keyrings/ exists
-        ansible.builtin.file:
-          state: directory
-          mode: "0755"
-          path: /usr/share/keyrings
+    - name: Dearmor and save the key
+      ansible.builtin.shell:
+        cmd: echo "{{ key_content.content }}" | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+        creates: /usr/share/keyrings/elasticsearch-keyring.gpg
 
-      - name: Debian - Add elasticsearch repository key
-        shell: |
-          wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
-    rescue:
-      - name: Legacy Apt key
-        debug:
-          msg: "Ignored"
-
-  - name: Debian - Add elasticsearch repository
-    apt_repository:
-      repo: '{{ item.repo }}'
-      state: '{{ item.state }}'
-    when: es_add_repository
-    with_items:
-      - { repo: "{{ es_apt_url_old }}", state: "absent" }
-      - { repo: "{{ es_apt_url }}", state: "present" }
-      - { repo: "{{ es_other_apt_url }}", state: "absent" }
+    - name: Add Elasticsearch repository
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/{{ es_version.split('.')[0] }}.x/apt stable main"
+        state: present
+        filename: elasticsearch-{{ es_version.split('.')[0] }}.x
 
 - name: Include optional user and group creation.
   when: (es_user_id is defined) and (es_group_id is defined)
-  include: elasticsearch-optional-user.yml
+  include_tasks: elasticsearch-optional-user.yml
 
 - name: Debian - Get installed elasticsearch version
   command: dpkg-query --showformat='${Version}' --show {{ es_package_name }}
@@ -95,14 +78,15 @@
   check_mode: no
 
 - name: Debian - unhold elasticsearch version
-  become: yes
+  become: true
   dpkg_selections:
     name: "{{ es_package_name }}"
     selection: "install"
   when: not es_version_lock or (installed_es_version.stdout and installed_es_version.stdout != es_version)
+  ignore_errors: true
 
 - name: Debian - Ensure elasticsearch is installed
-  become: yes
+  become: true
   apt:
     name: '{{ es_package_name }}{% if es_version is defined and es_version != "" %}={{ es_version }}{% endif %}'
     state: present
@@ -116,7 +100,7 @@
     ES_PATH_CONF: "{{ es_conf_dir }}"
 
 - name: Debian - hold elasticsearch version
-  become: yes
+  become: true
   dpkg_selections:
     name: "{{ es_package_name }}"
     selection: "hold"
@@ -127,7 +111,7 @@
     es_deb_url: "{% if es_version is version('7.0.0', '>=') %}{{ es_package_url }}-{{ es_version }}-amd64.deb{% else %}{{ es_package_url }}-{{ es_version }}.deb{% endif %}"
 
 - name: Debian - Install Elasticsearch from url
-  become: yes
+  become: true
   apt:
     deb: "{% if es_custom_package_url is defined %}{{ es_custom_package_url }}{% else %}{{ es_deb_url }}{% endif %}"
     state: present
