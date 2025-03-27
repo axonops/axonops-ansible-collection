@@ -7,3 +7,7 @@
   service:
     name: nginx
     state: restarted
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
