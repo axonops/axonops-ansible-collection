@@ -34,6 +34,9 @@
       vars:
         cassandra_dc: "example"
         cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | first }}"
+        cassandra_listen_address: "{{ ansible_default_ipv4.address }}"
+        cassandra_listen_interface: "{{ ansible_default_ipv4.interface }}"
+        cassandra_rpc_address: "{{ ansible_default_ipv4.address }}"
 
   post_tasks:
     - name: Add axonops to the cassandra group
