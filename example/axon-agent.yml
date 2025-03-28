@@ -21,6 +21,9 @@
       failed_when: false
 
   roles:
+    - name: java
+      role: java
+      tags: java
     - role: agent
       tags: agent, axonops-agent
       vars:
