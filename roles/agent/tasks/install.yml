@@ -57,7 +57,7 @@
       when: ansible_os_family == "RedHat" and axon_java_agent != '' and (axon_java_agent_force_offline_install or not has_internet_access)
 
     - name: Install AxonOps Java Agent offline (deb)
-      ansible.builtin.apt:
+      ansible.builtin.package:
         deb: "/tmp/{{ axon_java_agent }}-{{ axon_java_agent_version }}.{{ pkg_ext }}"
         state: present
       when: ansible_os_family == "Debian" and axon_java_agent != '' and (axon_java_agent_force_offline_install or not has_internet_access)

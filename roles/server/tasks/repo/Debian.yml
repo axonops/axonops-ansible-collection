@@ -11,7 +11,7 @@
 
 - name: Set AxonOps apt repository
   ansible.builtin.apt_repository:
-    repo: "{{ axon_server_public_repository }}"
+    repo: "{{ axonops_debian_repository }}"
     state: "present"
     update_cache: true
     validate_certs: "{{ axon_server_validate_certs | default(true) }}"

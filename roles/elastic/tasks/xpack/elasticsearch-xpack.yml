@@ -2,12 +2,12 @@
 
 #Security configuration
 - name: include security/elasticsearch-security.yml
-  include: security/elasticsearch-security.yml
+  include_tasks: security/elasticsearch-security.yml
   when: not oss_version
 
 #Make sure elasticsearch.keystore has correct Permissions
 - name: Set elasticsearch.keystore Permissions
-  become: yes
+  become: true
   file:
     state: file
     path: "{{ es_conf_dir }}/elasticsearch.keystore"

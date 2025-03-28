@@ -9,8 +9,8 @@ es_add_repository: true
 es_templates_fileglob: ""
 es_repo_base: "https://artifacts.elastic.co"
 es_apt_key: "{{ es_repo_base }}/GPG-KEY-elasticsearch"
-es_apt_url: "deb {{ es_repo_base }}/packages/{{ es_repo_name }}/apt stable main"
-es_apt_url_old: "deb http://packages.elastic.co/elasticsearch/{{ es_repo_name }}/debian stable main"
+es_apt_url: "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] {{ es_repo_base }}/packages/{{ es_repo_name }}/apt stable main"
+es_apt_url_old: "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] http://packages.elastic.co/elasticsearch/{{ es_repo_name }}/debian stable main"
 es_start_service: true
 es_java_install: "{{ false if (es_version is version('7.0.0', '>=')) else true }}"
 update_java: false

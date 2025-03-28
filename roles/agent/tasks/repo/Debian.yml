@@ -30,7 +30,7 @@
 
 # It is required for when you're updating versions
 - name: Run the equivalent of "apt-get update" as a separate step
-  ansible.builtin.apt:
+  ansible.builtin.package:
     update_cache: yes
 
 - name: Set package names
