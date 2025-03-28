@@ -31,7 +31,7 @@
     when: elasticsearch_package.stdout == 'install ok installed'
 
   - name: Debian - Remove elasticsearch package if we are switching to a different package type
-    apt:
+    package:
       name: '{{ es_other_package_name }}'
       state: absent
     when: elasticsearch_package.stdout == 'install ok installed'
@@ -41,7 +41,7 @@
   become: true
   block:
     - name: Debian - Install apt-transport-https to support https APT downloads
-      apt:
+      package:
         name:
           - apt-transport-https
           - gnupg
@@ -87,7 +87,7 @@
 
 - name: Debian - Ensure elasticsearch is installed
   become: true
-  apt:
+  package:
     name: '{{ es_package_name }}{% if es_version is defined and es_version != "" %}={{ es_version }}{% endif %}'
     state: present
     force: '{{ force_install }}'
@@ -112,7 +112,7 @@
 
 - name: Debian - Install Elasticsearch from url
   become: true
-  apt:
+  package:
     deb: "{% if es_custom_package_url is defined %}{{ es_custom_package_url }}{% else %}{{ es_deb_url }}{% endif %}"
     state: present
   when: not es_use_repository

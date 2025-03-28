@@ -3,6 +3,15 @@
 
 - name: Debian Azul Java Install
   block:
+    - name: Debian - Install apt packages 
+      package:
+        name:
+          - apt-transport-https
+          - gnupg
+          - curl
+          - wget
+        state: present
+
     - name: Download and dearmor key
       ansible.builtin.uri:
         url: "{{ _zulu_jdk.apt_repo.key_url }}"

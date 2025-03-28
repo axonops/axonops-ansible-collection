@@ -30,13 +30,13 @@
 
 - name: Refresh java repo
   become: true
-  apt: update_cache=yes
+  package: update_cache=yes
   changed_when: false
   when: ansible_os_family == 'Debian'
 
 - name: Debian - Ensure Java is installed
   become: true
-  apt: name={{ java }} state={{java_state}}
+  package: name={{ java }} state={{java_state}}
   when: ansible_os_family == 'Debian'
 
 - name: register open_jdk version
