@@ -10,6 +10,8 @@ Ansible is an open-source IT automation platform that enables organizations to a
 
 Although this example project has been implemented using Ansible, it is possible to achieve similar results using alternative tools like Chef or Puppet, offering flexibility for those who prefer different automation solutions.
 
+**Note: please see https://github.com/axonops/axonops-config-automation for setting up your alerts, dashboards, backsups etc..**
+
 ## Playbooks
 
 ### Inventory
