@@ -3,7 +3,7 @@
 
 - name: Debian Azul Java Install
   block:
-    - name: Debian - Install apt packages 
+    - name: Debian - Install apt packages
       package:
         name:
           - apt-transport-https
@@ -33,7 +33,7 @@
       package:
         state: "{% if zulu_version is defined and zulu_version != '' %}present{% else %}latest{% endif %}"
         name: "{{ _zulu_jdk.package_names }}"
-  when: 
+  when:
     - _zulu_jdk is defined
     - ansible_distribution == 'Debian'
 
@@ -46,4 +46,3 @@
     - ansible_distribution != 'Debian'
 
 # code: language=ansible
-

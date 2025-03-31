@@ -10,3 +10,5 @@ repos:
     hooks:
       - id: yamllint
         args: [-c=.yamllint]
+
+exlude: "roles/elastic/tasks/*.yml"

@@ -1,17 +1,28 @@
 galaxy_info:
-  author: Digitalis.IO DevOps
-  description: Digitalis Role for axon-agent
-  company: Digitalis.IO
-  license: license (GPL-2.0-or-later, MIT, etc)
-  min_ansible_version: 2.9
+  author: AxonOps Limited
+  description: This role installs and configures the AxonOps agent
+  company: AxonOps Limited
+  license: Apache 2.0
+  min_ansible_version: "2.10"
 
   platforms:
-  - name: RedHat
-    versions:
-    - all
-  - name: Debian
-    versions:
-    - all
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+    - name: Fedora
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+    - name: Ubuntu
+      versions:
+        - all
 
   galaxy_tags:
-  - axon-agent
+  - axonops
+  - agent
+  dependencies: []
+  documentation: https://github.com/axonops/axonops-ansible-collection
+  issues: https://github.com/axonops/axonops-ansible-collection/issues
