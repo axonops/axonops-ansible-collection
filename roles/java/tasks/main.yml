@@ -1,0 +1,49 @@
+- name: Import OS vars
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Debian Azul Java Install
+  block:
+    - name: Debian - Install apt packages 
+      package:
+        name:
+          - apt-transport-https
+          - gnupg
+          - curl
+          - wget
+        state: present
+
+    - name: Download and dearmor key
+      ansible.builtin.uri:
+        url: "{{ _zulu_jdk.apt_repo.key_url }}"
+        return_content: yes
+      register: key_content
+
+    - name: Dearmor and save the key
+      ansible.builtin.shell:
+        cmd: echo "{{ key_content.content }}" | gpg --dearmor -o /usr/share/keyrings/azul.gpg
+        creates: /usr/share/keyrings/azul.gpg
+
+    - name: Add Repository URL
+      apt_repository:
+        repo: "{{ _zulu_jdk.apt_repo.repo_line }}"
+        state: present
+        filename: zulu
+
+    - name: Install Zulu JDK
+      package:
+        state: "{% if zulu_version is defined and zulu_version != '' %}present{% else %}latest{% endif %}"
+        name: "{{ _zulu_jdk.package_names }}"
+  when: 
+    - _zulu_jdk is defined
+    - ansible_distribution == 'Debian'
+
+- name: Install Java
+  ansible.builtin.package:
+    name: "{{ java_pkg }}"
+    state: present
+  when:
+    - java_pkg is defined
+    - ansible_distribution != 'Debian'
+
+# code: language=ansible
+
