@@ -1,0 +1,14 @@
+---
+namespace: axonops
+name: axonops
+version: 0.1.0
+readme: README.md
+authors:
+  - AxonOps <support@axonops.com>
+description: Ansible collection to install and manage AxonOps components
+license:
+  - Apache-2.0
+tags: [observability, monitoring, cassandra, kafka, axonops]
+repository: https://github.com/axonops/axonops-ansible-collection
+issues: https://github.com/axonops/axonops-ansible-collection/issues
+documentation: https://axonops.com/docs

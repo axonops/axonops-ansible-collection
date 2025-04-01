@@ -1,3 +1,4 @@
+exlude: "roles/elastic/tasks/*.yml"
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.1.0
@@ -10,5 +11,3 @@ repos:
     hooks:
       - id: yamllint
         args: [-c=.yamllint]
-
-exlude: "roles/elastic/tasks/*.yml"
