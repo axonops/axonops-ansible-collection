@@ -1,0 +1,38 @@
+---
+- name: Set config directory if not set
+  tags: always
+  ansible.builtin.set_fact:
+    cassandra_conf_dir: "{{ cassandra_install_root }}/apache-cassandra-{{ cassandra_version }}/conf"
+    cassandra_install_dir: "{{ cassandra_install_root }}/apache-cassandra-{{ cassandra_version }}"
+    cassandra_home_dir: "{{ cassandra_install_root }}/cassandra"
+
+- name: cassandra user
+  ansible.builtin.user:
+    name: cassandra
+    home: "{{ cassandra_log_dir }}"
+    shell: /bin/bash
+
+- name: Cassandra binaries
+  ansible.builtin.unarchive:
+    src: "{{ cassandra_download_url }}"
+    dest: "{{ cassandra_install_root }}"
+    remote_src: true
+    owner: "{{ cassandra_binary_owner | default('cassandra') }}"
+    group: "{{ cassandra_binary_group | default('cassandra')  }}"
+    creates: "{{ cassandra_conf_dir }}"
+
+- name: "ensure Cassandra install directory has the correct owner"
+  ansible.builtin.file:
+    path: "{{ cassandra_install_dir }}"
+    state: directory
+    owner: "{{ cassandra_binary_owner | default('cassandra') }}"
+    group: "{{ cassandra_binary_group | default('cassandra')  }}"
+    mode: 0755
+
+- name: Symlink
+  ansible.builtin.file:
+    state: link
+    src: "{{ cassandra_install_dir }}"
+    dest: "{{ cassandra_home_dir }}"
+
+# code: language=ansible

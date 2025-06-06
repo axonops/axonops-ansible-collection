@@ -3,7 +3,11 @@
 cassandra_binary_owner: root
 cassandra_binary_group: root
 
-cassandra_version: 4.1.8
+cassandra_version: 5.0.4
+# valid options: tar
+cassandra_install_format: tar
+cassandra_install_root: /opt
+cassandra_download_url: https://downloads.apache.org/cassandra/{{ cassandra_version }}/apache-cassandra-{{ cassandra_version }}-bin.tar.gz
 
 # make sure to override default paramters:
 cassandra_dc: axonops
@@ -40,6 +44,7 @@ cassandra_ssl_client_keystore_pass: cassandra
 cassandra_ssl_client_require_client_auth: false
 cassandra_ssl_client_encryption_protocol: TLS
 
+cassandra_start_on_boot: true
 cassandra_auto_bootstrap: true
 cassandra_symlink_homedir: true
 cassandra_jmx_port: 7199
