@@ -1752,7 +1752,7 @@ server_encryption_options:
   #     dc   : Encrypt connections to peers in other datacenters but not within datacenters
   #     rack : Encrypt connections to peers in other racks but not within racks
   #     all  : Always use encrypted connections
-  internode_encryption: {{ cassandra_ssl_internode_encryption | default("none") }}
+  internode_encryption: {{ cassandra_ssl_internode_encryption }}
   # When set to true, encrypted and unencrypted connections are allowed on the storage_port
   # This should _only be true_ while in unencrypted or transitional operation
   # optional defaults to true if internode_encryption is none
@@ -1761,8 +1761,8 @@ server_encryption_options:
   # during upgrade to 4.0; otherwise, set to false.
   legacy_ssl_storage_port_enabled: {{ cassandra_legacy_ssl_storage_port_enabled }}
   # Set to a valid keystore if internode_encryption is dc, rack or all
-  keystore: {{ cassandra_ssl_internode_keystore_file | default("") }}
-  keystore_password: {{ cassandra_ssl_internode_keystore_pass | default("") }}
+  keystore: {{ cassandra_ssl_internode_keystore_file | default('conf/.keystore ')}}
+  #keystore_password: cassandra
   # Configure the way Cassandra creates SSL contexts.
   # To use PEM-based key material, see org.apache.cassandra.security.PEMBasedSslContextFactory
   # ssl_context_factory:
@@ -1775,19 +1775,15 @@ server_encryption_options:
 #  outbound_keystore: conf/.keystore
 #  outbound_keystore_password: cassandra
   # Verify peer server certificates
-  require_client_auth: {{ cassandra_server_encryption_options_require_client_auth | default("false") }}
+  require_client_auth: {{ cassandra_ssl_client_require_client_auth }}
   # Set to a valid trustore if require_client_auth is true
   truststore: {{ cassandra_ssl_truststore_file | default("") }}
-  truststore_password: {{ cassandra_ssl_truststore_pass | default("") }}
+  truststore_password: {{ cassandra_ssl_internode_keystore_pass | default("") }}
   # Verify that the host name in the certificate matches the connected host
-  require_endpoint_verification: {{ cassandra_server_encryption_options_require_endpoint_verification | default("false") }}
+  require_endpoint_verification: {{ cassandra_require_endpoint_verification }}
   # More advanced defaults:
-  protocol: {{ cassandra_ssl_internode_protocol }}
-  store_type: JKS
-{% if cassandra_cipher_suites_server_encryption is defined %}
-  cipher_suites:
-    {{ cassandra_cipher_suites_server_encryption | to_nice_yaml(indent=4) | trim | indent(4) }}
-{% endif %}
+  # protocol: TLS
+  # store_type: JKS
   # cipher_suites: [
   #   TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
   #   TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
@@ -1813,10 +1809,13 @@ client_encryption_options:
   # When set to true, encrypted and unencrypted connections are allowed on the native_transport_port
   # This should _only be true_ while in unencrypted or transitional operation
   # optional defaults to true when enabled is false, and false when enabled is true.
-  optional: {{ cassandra_ssl_client_encryption_optional }}
+{% if cassandra_ssl_client_encryption_enabled | bool %}
+  optional: {{ cassandra_ssl_client_encryption_optional | default(false) | bool }}
+{% endif %}
   # Set keystore and keystore_password to valid keystores if enabled is true
-  keystore: {{ cassandra_ssl_client_keystore_file | default("") }}
-  keystore_password: {{ cassandra_ssl_client_keystore_pass | default("") }}
+  keystore: {{ cassandra_ssl_client_keystore_file | default("conf/.keystore") }}
+  keystore_password: {{ cassandra_ssl_client_keystore_pass | default("cassandra") }}
+  #keystore_password: cassandra
   # Configure the way Cassandra creates SSL contexts.
   # To use PEM-based key material, see org.apache.cassandra.security.PEMBasedSslContextFactory
   # ssl_context_factory:
@@ -1824,19 +1823,26 @@ client_encryption_options:
   #     class_name: org.apache.cassandra.security.DefaultSslContextFactory
   # Verify client certificates
   require_client_auth: {{ cassandra_ssl_client_require_client_auth | default("false") }}
-  require_endpoint_verification: {{ cassandra_ssl_client_require_endpoint_verification | default("false") }}
+  # require_endpoint_verification: false
   # Set trustore and truststore_password if require_client_auth is true
-  truststore: {{ cassandra_ssl_truststore_file | default("") }}
-  truststore_password: {{ cassandra_ssl_truststore_pass | default("") }}
+  # truststore: conf/.truststore
+  # truststore_password: cassandra
   # More advanced defaults:
+  # protocol: TLS
+  # store_type: JKS
+  # cipher_suites: [
+  #   TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+  #   TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+  #   TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_RSA_WITH_AES_128_GCM_SHA256, TLS_RSA_WITH_AES_128_CBC_SHA,
+  #   TLS_RSA_WITH_AES_256_CBC_SHA
+  # ]
   protocol: {{ cassandra_ssl_client_encryption_protocol }}
   store_type: JKS
-  cipher_suites: [
-    TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-    TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-    TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_RSA_WITH_AES_128_GCM_SHA256, TLS_RSA_WITH_AES_128_CBC_SHA,
-    TLS_RSA_WITH_AES_256_CBC_SHA
-  ]
+{% if cassandra_cipher_suites_client_encryption is defined %}
+  cipher_suites:
+  {{ cassandra_cipher_suites_client_encryption | to_nice_yaml(indent=4) | trim | indent(2) }}
+{% endif %}
+
 
 # internode_compression controls whether traffic between nodes is
 # compressed.
@@ -1884,19 +1890,7 @@ user_defined_functions_enabled: {{ cassandra_user_defined_functions_enabled }}
 
 ### AxonOps - Leave this off for now. Since Commtlogs and Hints are not encrypted by this, this feature is meaningless
 transparent_data_encryption_options:
-  enabled: false
-  chunk_length_kb: 64
-  cipher: AES/CBC/PKCS5Padding
-  key_alias: testing:1
-  # CBC IV length for AES needs to be 16 bytes (which is also the default size)
-  # iv_length: 16
-  key_provider:
-    - class_name: org.apache.cassandra.security.JKSKeyProvider
-      parameters:
-        - keystore: conf/.keystore
-          keystore_password: cassandra
-          store_type: JCEKS
-          key_password: cassandra
+  {{ cassandra_transparent_data_encryption_options | to_nice_yaml | indent(2, first=False) }}
 
 # Storage Attached Indexing options.
 # sai_options:

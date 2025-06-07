@@ -1,21 +1,4 @@
-#
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-#
+# {{ ansible_managed }}
 ###########################################################################
 #                         jvm-server.options                              #
 #                                                                         #
@@ -25,7 +8,7 @@
 # - only static flags are accepted (no variables or parameters)           #
 # - dynamic flags will be appended to these on cassandra-env              #
 #                                                                         #
-# See jvm11-server.options and jvm17-server.options for Java version       #
+# See jvm8-server.options and jvm11-server.options for Java version       #
 # specific options.                                                       #
 ###########################################################################
 
@@ -84,7 +67,7 @@
 #-Dcassandra.triggers_dir=directory
 
 # For testing new compaction and compression strategies. It allows you to experiment with different
-# strategies and benchmark write performance differences without affecting the production workload. 
+# strategies and benchmark write performance differences without affecting the production workload.
 #-Dcassandra.write_survey=true
 
 # To disable configuration via JMX of auth caches (such as those for credentials, permissions and
@@ -126,6 +109,9 @@
 # transparent hugepage allocation more effective.
 -XX:+AlwaysPreTouch
 
+# Disable biased locking as it does not benefit Cassandra.
+-XX:-UseBiasedLocking
+
 # Enable thread-local allocation blocks and allow the JVM to automatically
 # resize them at runtime.
 -XX:+UseTLAB
@@ -143,6 +129,7 @@
 ### Debug options
 
 # uncomment to enable flight recorder
+#-XX:+UnlockCommercialFeatures
 #-XX:+FlightRecorder
 
 # uncomment to have Cassandra JVM listen for remote debuggers/profilers on port 1414
@@ -197,11 +184,8 @@
 ###################################
 
 # Defines how to handle INSERT requests with TTL exceeding the maximum supported expiration date:
-# * REJECT: this is the default policy and will reject any requests with expiration date timestamp 
-#   after 2106-02-07T06:28:13+00:00 or 2038-01-19T03:14:06+00:00 depending on compatibility mode (<="nc" sstable formats)
-# * CAP: any insert with TTL expiring after 2106-02-07T06:28:13+00:00 or 2038-01-19T03:14:06+00:00, 
-#   depending on compatibility mode (<="nc" sstable formats), will expire on 2106-02-07T06:28:13+00:00 
-#   or 2038-01-19T03:14:06+00:00 and the client will receive a warning.
+# * REJECT: this is the default policy and will reject any requests with expiration date timestamp after 2038-01-19T03:14:06+00:00.
+# * CAP: any insert with TTL expiring after 2038-01-19T03:14:06+00:00 will expire on 2038-01-19T03:14:06+00:00 and the client will receive a warning.
 # * CAP_NOWARN: same as previous, except that the client warning will not be emitted.
 #
 #-Dcassandra.expiration_date_overflow_policy=REJECT
