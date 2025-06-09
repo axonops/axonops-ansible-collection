@@ -2,9 +2,9 @@
 axon_agent_start_at_boot: true
 
 # Possible Options: axon-cassandra3.11-agent, axon-dse6.0-agent, axon-dse6.7-agent, axon-dse5.1-agent or ""
-axon_java_agent: "axon-cassandra4.1-agent"
-axon_agent_version: "1.0.131"
-axon_java_agent_version: "1.0.14"
+axon_java_agent: "axon-cassandra5.0-agent-jdk17"
+axon_agent_version: "2.0.2"
+axon_java_agent_version: "1.0.10"
 axon_agent_server_port: 1888
 axon_agent_tls_mode: "disabled"
 
