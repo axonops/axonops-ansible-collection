@@ -1,1 +1,1 @@
-java_pkg: java-11-openjdk-headless
+#java_pkg: "{{ _java_pkg | default(omit) }}"

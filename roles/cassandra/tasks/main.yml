@@ -14,7 +14,7 @@
   tags: always
 
 - name: Import vars for RedHat
-  ansible.builtin.include_vars: RadHat.yml
+  ansible.builtin.include_vars: RedHat.yml
   when: ansible_os_family == "RedHat"
   tags: always
 
@@ -154,6 +154,7 @@
   tags: cqlsh
   ansible.builtin.yum:
     name: "{{ cassandra_cqlsh_binary }}"
+    disable_gpg_check: true
   when: cassandra_cqlsh_binary is defined and ansible_os_family == "RedHat"
 
 - name: Start cassandra

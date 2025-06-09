@@ -39,7 +39,7 @@
 
 - name: Install Java
   ansible.builtin.package:
-    name: "{{ java_pkg }}"
+    name: "{{ java_pkg | default(_java_pkg) }}"
     state: present
   when:
     - java_pkg is defined

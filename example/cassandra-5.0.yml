@@ -8,7 +8,6 @@
     axon_agent_version: "2.0.2"
     axon_java_agent_version: "1.0.10"
 
-
   pre_tasks:
     # This is only for this example to work, please review your firewall settings and requirements
     - name: "Stop firewalld"
