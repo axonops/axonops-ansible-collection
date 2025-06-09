@@ -1315,7 +1315,7 @@ concurrent_materialized_view_builders: {{ cassandra_concurrent_materialized_view
 # of compaction, including validation compaction (building Merkle trees
 # for repairs).
 #compaction_throughput: 64MiB/s
-compaction_throughput: {{ cassandra_compaction_throughput | default('64MiB/s') }}
+compaction_throughput: {{ cassandra_compaction_throughput_mb_per_sec | default(cassandra_compaction_throughput) | default('64MiB/s') }}
 
 # When compacting, the replacement sstable(s) can be opened before they
 # are completely written, and used in place of the prior sstables for
@@ -1325,7 +1325,7 @@ compaction_throughput: {{ cassandra_compaction_throughput | default('64MiB/s') }
 # sstable_preemptive_open_interval_in_mb being negative
 # Min unit: MiB
 # sstable_preemptive_open_interval: 50MiB
-sstable_preemptive_open_interval: {{ cassandra_sstable_preemptive_open_interval | default("64MiB") }}
+sstable_preemptive_open_interval: {{ cassandra_sstable_preemptive_open_interval_in_mb | default(cassandra_sstable_preemptive_open_interval) | default("64MiB") }}
 
 # Starting from 4.1 sstables support UUID based generation identifiers. They are disabled by default
 # because once enabled, there is no easy way to downgrade. When the node is restarted with this option

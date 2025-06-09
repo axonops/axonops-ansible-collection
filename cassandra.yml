@@ -3,6 +3,11 @@
   become: true
   vars:
     install_cassandra: true
+    java_pkg: openjdk-17-jre-headless
+    axon_java_agent: "axon-cassandra5.0-agent-jdk17"
+    axon_agent_version: "2.0.2"
+    axon_java_agent_version: "1.0.10"
+
 
   pre_tasks:
     # This is only for this example to work, please review your firewall settings and requirements
@@ -18,6 +23,7 @@
     - name: java
       role: java
       tags: java
+    - role: agent
     - role: cassandra
       tags: cassandra
       when: install_cassandra is defined and install_cassandra

@@ -1,6 +1,3 @@
-java_pkg: openjdk-11-jre-headless
-cassandra_conf_dir: /etc/cassandra
-
 # Debian Bookworm JDK
 _zulu_jdk:
   apt_repo:

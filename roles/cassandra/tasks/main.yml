@@ -16,6 +16,60 @@
   when: cassandra_install_format == "tar"
   ansible.builtin.import_tasks: install-tar.yml
 
+- name: Create AxonOps User
+  tags: axonops_user
+  block:
+    - name: Check if axonops user exists and get groups
+      ansible.builtin.getent:
+        database: group
+      register: group_info
+
+    - name: Get axonops user info
+      ansible.builtin.getent:
+        database: passwd
+        key: axonops
+      register: user_info
+      failed_when: false
+
+    - name: Populate service facts
+      ansible.builtin.service_facts:
+
+    - name: Stop axon-agent if axonops user doesn't belong to cassandra group
+      ansible.builtin.systemd:
+        name: axon-agent
+        state: stopped
+      register: stop_service
+      failed_when:
+        - stop_service.failed == true
+        - '"Could not find the requested service" not in stop_service.msg'
+      when:
+        - ansible_facts.services['axon-agent.service'] is defined
+        - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
+        - user_info.ansible_facts.getent_passwd.axonops is defined
+        - "'cassandra' not in (group_info.ansible_facts.getent_group | dict2items | selectattr('value.2', 'search', user_info.ansible_facts.getent_passwd.axonops.1) | map(attribute='key') | list)"
+
+
+    - name: AxonOps user
+      ansible.builtin.user:
+        name: axonops
+        groups: cassandra
+        shell: /bin/bash
+        home: /home/axonops
+
+    - name: Add axonops to cassandra
+      ansible.builtin.user:
+        name: cassandra
+        groups: axonops
+        append: true
+
+    - name: Start axon-agent
+      ansible.builtin.systemd:
+        name: axon-agent
+        state: started
+      when:
+        - ansible_facts.services['axon-agent.service'] is defined
+        - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
+
 - name: Create main directories
   ansible.builtin.file:
     path: "{{ item }}"

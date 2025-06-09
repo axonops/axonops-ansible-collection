@@ -304,7 +304,11 @@ JVM_OPTS="$JVM_OPTS -Dcassandra.replace_address={{ cassandra_replace_node_ip }}"
 {% endif %}
 
 {% if axon_java_agent is defined and axon_java_agent != "" %}
+{% if cassandra_version.startswith('5.') %}
+. /usr/share/axonops/axonops-jvm.options
+{% else %}
 JVM_OPTS="$JVM_OPTS -javaagent:/usr/share/axonops/{{ axon_java_agent }}.jar=/etc/axonops/axon-agent.yml"
+{% endif %}
 {% endif %}
 
 {% if mcac_install_dir is defined and mcac_install_dir != "" %}
@@ -314,7 +318,6 @@ JVM_OPTS="$JVM_OPTS -javaagent:{{ mcac_install_dir }}/lib/datastax-mcac-agent.ja
 {% if jmx_exporter_config is defined and jmx_exporter_config != "" %}
 JVM_OPTS="$JVM_OPTS -javaagent:{{ jmx_exporter_jar_dest }}=9093:{{ jmx_exporter_config }}"
 {% endif %}
-
 
 {% if cassandra_java_tmp_dir is defined and cassandra_java_tmp_dir != "" %}
 #If /tmp has noexec flag set, update dirs to something else

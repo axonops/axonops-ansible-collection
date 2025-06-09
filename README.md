@@ -12,6 +12,21 @@ Although this example project has been implemented using Ansible, it is possible
 
 **Note: please see https://github.com/axonops/axonops-config-automation for setting up your alerts, dashboards, backsups etc..**
 
+## Before you start
+
+Apache Cassandra 5.0 introduced significant configuration changes that affect how you structure your Ansible playbooks. The most notable change is the shift from parameter names that include units to explicit unit declarations in values. For example:
+
+```yaml
+# Cassandra 4.1
+dynamic_snitch_reset_interval_in_ms: 600000
+
+# Cassandra 5.0
+dynamic_snitch_reset_interval: 600000ms
+```
+
+This makes coding the ansible playbook to support both versions more complex. Before running this playbook, you'll need to review the variables from [roles/cassandra/defaults/main.yml](roles/cassandra/defaults/main.yml) and compare them against [roles/cassandra/templates/5.0.x/cassandra.yaml.j2](roles/cassandra/templates/5.0.x/cassandra.yaml.j2).
+
+
 ## Playbooks
 
 ### Inventory
