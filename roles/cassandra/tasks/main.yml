@@ -144,9 +144,6 @@
 - name: OS configs
   ansible.builtin.import_tasks: os-config.yml
 
-- debug:
-    var: cassandra_cqlsh_binary
-  tags: cqlsh
 - name: Installed the compiled cqlsh binary
   tags: cqlsh
   ansible.builtin.apt:

@@ -1,10 +1,24 @@
+- name: Set config directory if not set (Debian)
+  tags: always
+  when: ansible_os_family == "Debian"
+  ansible.builtin.set_fact:
+    cassandra_conf_dir: "/etc/cassandra"
+
+- name: Set config directory if not set (RedHat)
+  tags: always
+  when: ansible_os_family == "RedHat"
+  ansible.builtin.set_fact:
+    cassandra_conf_dir: "/etc/cassandra/conf"
+
 - name: Set up repos Debian
   when: ansible_os_family == 'Debian'
   block:
     - name: Set up Cassandra apt repos
       ansible.builtin.copy:
         dest: /etc/apt/sources.list.d/cassandra.sources.list
-        content: "deb [signed-by=/etc/apt/keyrings/apache-cassandra.asc] https://debian.cassandra.apache.org 41x main"
+        content: |
+          deb [signed-by=/etc/apt/keyrings/apache-cassandra.asc] https://debian.cassandra.apache.org 41x main
+          deb [signed-by=/etc/apt/keyrings/apache-cassandra.asc] https://debian.cassandra.apache.org 50x main
         mode: "0644"
 
     - name: Ensure /etc/apt/keyrings exists
@@ -38,6 +52,12 @@
           gpgcheck=0
           repo_gpgcheck=0
 
+          [cassandra50]
+          name=Apache Cassandra
+          baseurl={{ cassandra_redhat_repository_url | default('https://redhat.cassandra.apache.org/50x/') }}
+          gpgcheck=0
+          repo_gpgcheck=0
+
     - name: Set pkg name
       ansible.builtin.set_fact:
         cassandra_pkg: "cassandra-{{ cassandra_version }}-1"
@@ -51,5 +71,11 @@
   ansible.builtin.package:
     update_cache: true
     name: "{{ cassandra_pkg }}"
+
+- name: Prevent cassandra from being upgraded
+  when: ansible_os_family == 'Debian'
+  ansible.builtin.dpkg_selections:
+    name: "cassandra"
+    selection: hold
 
 # code: language=ansible
