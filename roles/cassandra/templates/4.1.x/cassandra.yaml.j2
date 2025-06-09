@@ -67,7 +67,11 @@ hinted_handoff_enabled: {{ cassandra_hinted_handoff_enabled }}
 # generated.  After it has been dead this long, new hints for it will not be
 # created until it has been seen alive and gone down again.
 # Min unit: ms
-max_hint_window: {{ cassandra_max_hint_window | default(3) }}h
+{% if cassandra_max_hint_window is defined and cassandra_max_hint_window is search('[0-9]+[smh]$') %}
+max_hint_window: {{ cassandra_max_hint_window }}
+{% else %}
+max_hint_window: {{ cassandra_max_hint_window | default("3") }}h
+{% endif %}
 
 # Maximum throttle in KiBs per second, per delivery thread.  This will be
 # reduced proportionally to the number of nodes in the cluster.  (If there
@@ -75,7 +79,11 @@ max_hint_window: {{ cassandra_max_hint_window | default(3) }}h
 # rate; if there are three, each will throttle to half of the maximum,
 # since we expect two nodes to be delivering hints simultaneously.)
 # Min unit: KiB
-hinted_handoff_throttle: {{ cassandra_hinted_handoff_throttle_in_kb }}KiB
+{% if cassandra_hinted_handoff_throttle is defined %}
+hinted_handoff_throttle: {{ cassandra_hinted_handoff_throttle | default('1024KiB') }}
+{% else %}
+hinted_handoff_throttle: {{ cassandra_hinted_handoff_throttle_in_kb | default(1024) }}KiB
+{% endif %}
 
 # Number of threads with which to deliver hints;
 # Consider increasing this number when you have multi-dc deployments, since
@@ -90,11 +98,19 @@ hints_directory: {{ cassandra_hints_directory }}
 # How often hints should be flushed from the internal buffers to disk.
 # Will *not* trigger fsync.
 # Min unit: ms
-hints_flush_period: {{ cassandra_hints_flush_period_in_ms }}ms
+{% if cassandra_hints_flush_period is defined %}
+hints_flush_period: {{ cassandra_hints_flush_period | default('10000ms') }}
+{% else %}
+hints_flush_period: {{ cassandra_hints_flush_period_in_ms | default(10000) }}ms
+{% endif %}
 
 # Maximum size for a single hints file, in mebibytes.
 # Min unit: MiB
-max_hints_file_size: {{ cassandra_max_hints_file_size_in_mb }}MiB
+{% if cassandra_max_hints_file_size is defined %}
+max_hints_file_size: {{ cassandra_max_hints_file_size | default('128MiB') }}
+{% else %}
+max_hints_file_size: {{ cassandra_max_hints_file_size_in_mb | default(128) }}MiB
+{% endif %}
 
 # The file size limit to store hints for an unreachable host, in mebibytes.
 # Once the local hints files have reached the limit, no more new hints will be created.
@@ -135,7 +151,11 @@ auto_hints_cleanup_enabled: {{ cassandra_auto_hints_cleanup_enabled | default(fa
 # Maximum throttle in KiBs per second, total. This will be
 # reduced proportionally to the number of nodes in the cluster.
 # Min unit: KiB
+{% if cassandra_batchlog_replay_throttle_in_kb is defined %}
 batchlog_replay_throttle: {{ cassandra_batchlog_replay_throttle_in_kb }}KiB
+{% else %}
+batchlog_replay_throttle: {{ cassandra_batchlog_replay_throttle }}
+{% endif %}
 
 # Authentication backend, implementing IAuthenticator; used to identify users
 # Out of the box, Cassandra provides org.apache.cassandra.auth.{AllowAllAuthenticator,
@@ -414,7 +434,11 @@ key_cache_size: {{ cassandra_key_cache_size_in_mb }}MiB
 #
 # Default is 14400 or 4 hours.
 # Min unit: s
+{% if cassandra_key_cache_save_period is defined and cassandra_key_cache_save_period is search('[0-9]+[smh]$') %}
+key_cache_save_period: {{ cassandra_key_cache_save_period | default("4h") }}
+{% elif cassandra_key_cache_save_period is defined and cassandra_key_cache_save_period != '' %}
 key_cache_save_period: {{ cassandra_key_cache_save_period }}s
+{% endif %}
 
 # Number of keys from the key cache to save
 # Disabled by default, meaning all keys are going to be saved
@@ -453,7 +477,12 @@ row_cache_size: {{ cassandra_row_cache_size_in_mb }}MiB
 #
 # Default is 0 to disable saving the row cache.
 # Min unit: s
+{% if cassandra_key_cache_save_period is defined and cassandra_key_cache_save_period is search('[0-9]+[smh]$') %}
+key_cache_save_period: {{ cassandra_key_cache_save_period | default("4h") }}
+{% elif cassandra_key_cache_save_period is defined and cassandra_key_cache_save_period != '' %}
 key_cache_save_period: {{ cassandra_key_cache_save_period }}s
+{% endif %}
+
 
 # Number of keys from the row cache to save.
 # Specify 0 (which is the default), meaning all keys are going to be saved
@@ -481,7 +510,7 @@ counter_cache_size: {{ cassandra_counter_cache_size_in_mb }}MiB
 #
 # Default is 7200 or 2 hours.
 # Min unit: s
-counter_cache_save_period: {{ cassandra_counter_cache_save_period }}s
+counter_cache_save_period: {{ cassandra_counter_cache_save_period | default(7200) }}s
 
 # Number of keys from the counter cache to save
 # Disabled by default, meaning all keys are going to be saved
@@ -516,9 +545,9 @@ counter_cache_save_period: {{ cassandra_counter_cache_save_period }}s
 # the default option is "periodic" where writes may be acked immediately
 # and the CommitLog is simply synced every commitlog_sync_period
 # milliseconds.
-commitlog_sync: {{ cassandra_commitlog_sync }}
+commitlog_sync: {{ cassandra_commitlog_sync | default('periodic') }}
 # Min unit: ms
-commitlog_sync_period: {{ cassandra_commitlog_sync_period_in_ms }}ms
+commitlog_sync_period: {{ cassandra_commitlog_sync_period_in_ms | default(1000) }}ms
 
 # When in periodic commitlog mode, the number of milliseconds to block writes
 # while waiting for a slow disk flush to complete.
@@ -812,9 +841,13 @@ index_summary_resize_interval: {{ cassandra_index_summary_resize_interval_in_min
 # buffers. Enable this to avoid sudden dirty buffer flushing from
 # impacting read latencies. Almost always a good idea on SSDs; not
 # necessarily on platters.
-trickle_fsync: {{ cassandra_trickle_fsync }}
+trickle_fsync: {{ cassandra_trickle_fsync | default(true) }}
 # Min unit: KiB
+{% if cassandra_trickle_fsync_interval is defined %}
 trickle_fsync_interval: {{ cassandra_trickle_fsync_interval_in_kb }}KiB
+{% else %}
+trickle_fsync_interval: {{ cassandra_trickle_fsync_interval | default(10240) }}KiB
+{% endif %}
 
 # TCP port, for commands and data
 # For security reasons, you should not expose this port to the internet.  Firewall it if needed.
@@ -1134,14 +1167,14 @@ stream_entire_sstables: {{ cassandra_stream_entire_sstables }}
 # Setting this value to 0 it disables throttling.
 # When unset, the default is 200 Mbps or 24 MiB/s.
 {% if cassandra_entire_sstable_stream_throughput_outbound is defined %}
-entire_sstable_stream_throughput_outbound: {{ entire_sstable_stream_throughput_outbound }}MiB/s
+entire_sstable_stream_throughput_outbound: {{ cassandra_entire_sstable_stream_throughput_outbound }}MiB/s
 {% endif %}
 
 # Throttles entire SSTable file streaming between datacenters.
 # Setting this value to 0 disables throttling for entire SSTable inter-DC file streaming.
 # When unset, the default is 200 Mbps or 24 MiB/s.
 {% if cassandra_entire_sstable_inter_dc_stream_throughput_outbound is defined %}
-entire_sstable_inter_dc_stream_throughput_outbound: {{ entire_sstable_inter_dc_stream_throughput_outbound }}MiB/s
+entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_entire_sstable_inter_dc_stream_throughput_outbound }}MiB/s
 {% endif %}
 
 # Throttles all outbound streaming file transfers on this node to the
@@ -1250,7 +1283,11 @@ request_timeout: {{ cassandra_request_timeout_in_ms }}ms
 # this timeout to execute, will generate an aggregated log message, so that slow queries
 # can be identified. Set this value to zero to disable slow query logging.
 # Min unit: ms
+{% if cassandra_slow_query_log_timeout_in_ms is defined %}
 slow_query_log_timeout: {{ cassandra_slow_query_log_timeout_in_ms }}ms
+{% else %}
+slow_query_log_timeout: {{ cassandra_slow_query_log_timeout | default('500ms') }}
+{% endif %}
 
 # Enable operation timeout information exchange between nodes to accurately
 # measure request timeouts.  If disabled, replicas will assume that requests
@@ -1260,7 +1297,7 @@ slow_query_log_timeout: {{ cassandra_slow_query_log_timeout_in_ms }}ms
 #
 # Warning: It is generally assumed that users have setup NTP on their clusters, and that clocks are modestly in sync,
 # since this is a requirement for general correctness of last write wins.
-internode_timeout: {{ cassandra_internode_timeout }}
+internode_timeout: {{ cassandra_internode_timeout | default(true) }}
 
 # Set period for idle state control messages for earlier detection of failed streams
 # This node will send a keep-alive message periodically on the streaming's control channel.
@@ -1271,7 +1308,11 @@ internode_timeout: {{ cassandra_internode_timeout }}
 # are detected within 10 minutes
 # Specify 0 to disable.
 # Min unit: s
-streaming_keep_alive_period: {{ cassandra_streaming_keep_alive_period_in_secs }}s
+{% if cassandra_streaming_keep_alive_period_in_secs is defined %}
+streaming_keep_alive_period: {{ cassandra_streaming_keep_alive_period_in_secs | default(300) }}s
+{% else %}
+streaming_keep_alive_period: {{ cassandra_streaming_keep_alive_period | default('300s') }}
+{% endif %}
 
 # Limit number of connections per host for streaming
 # Increase this when you notice that joins are CPU-bound rather that network
@@ -1396,11 +1437,11 @@ endpoint_snitch: {{ cassandra_endpoint_snitch }}
 # controls how often to perform the more expensive part of host score
 # calculation
 # Min unit: ms
-dynamic_snitch_update_interval: {{ cassandra_dynamic_snitch_update_interval_in_ms }}ms
+dynamic_snitch_update_interval: {{ cassandra_dynamic_snitch_update_interval_in_ms | default(100) }}ms
 # controls how often to reset all host scores, allowing a bad host to
 # possibly recover
 # Min unit: ms
-dynamic_snitch_reset_interval: {{ cassandra_dynamic_snitch_reset_interval_in_ms }}ms
+dynamic_snitch_reset_interval: {{ cassandra_dynamic_snitch_reset_interval_in_ms | default(10) }}ms
 # if set greater than zero, this will allow
 # 'pinning' of replicas to hosts in order to increase cache capacity.
 # The badness threshold will control how much worse the pinned host has to be
@@ -1408,7 +1449,7 @@ dynamic_snitch_reset_interval: {{ cassandra_dynamic_snitch_reset_interval_in_ms 
 # expressed as a double which represents a percentage.  Thus, a value of
 # 0.2 means Cassandra would continue to prefer the static snitch values
 # until the pinned host was 20% worse than the fastest.
-dynamic_snitch_badness_threshold: {{ cassandra_dynamic_snitch_badness_threshold }}
+dynamic_snitch_badness_threshold: {{ cassandra_dynamic_snitch_badness_threshold | default(0.1) }}
 
 # Configure server-to-server internode encryption
 #
@@ -1439,22 +1480,28 @@ server_encryption_options:
   #     dc   : Encrypt connections to peers in other datacenters but not within datacenters
   #     rack : Encrypt connections to peers in other racks but not within racks
   #     all  : Always use encrypted connections
-  internode_encryption: {{ cassandra_ssl_internode_encryption | default("none") }}
+  internode_encryption: {{ cassandra_ssl_internode_encryption }}
   # When set to true, encrypted and unencrypted connections are allowed on the storage_port
   # This should _only be true_ while in unencrypted or transitional operation
   # optional defaults to true if internode_encryption is none
   # optional: true
   # If enabled, will open up an encrypted listening socket on ssl_storage_port. Should only be used
   # during upgrade to 4.0; otherwise, set to false.
-  legacy_ssl_storage_port_enabled: {{ cassandra_enable_legacy_ssl_storage_port | default(false) }}
+  legacy_ssl_storage_port_enabled: {{ cassandra_legacy_ssl_storage_port_enabled }}
   # Set to a valid keystore if internode_encryption is dc, rack or all
-  keystore: {{ cassandra_ssl_internode_keystore_file | default("") }}
-  keystore_password: {{ cassandra_ssl_internode_keystore_pass | default("") }}
+  keystore: {{ cassandra_ssl_internode_keystore_file | default('conf/.keystore ')}}
+  #keystore_password: cassandra
   # Configure the way Cassandra creates SSL contexts.
   # To use PEM-based key material, see org.apache.cassandra.security.PEMBasedSslContextFactory
   # ssl_context_factory:
   #     # Must be an instance of org.apache.cassandra.security.ISslContextFactory
   #     class_name: org.apache.cassandra.security.DefaultSslContextFactory
+  # During internode mTLS authentication, inbound connections (acting as servers) use keystore, keystore_password
+  # containing server certificate to create SSLContext and
+  # outbound connections (acting as clients) use outbound_keystore & outbound_keystore_password with client certificates
+  # to create SSLContext. By default, outbound_keystore is the same as keystore indicating mTLS is not enabled.
+#  outbound_keystore: conf/.keystore
+#  outbound_keystore_password: cassandra
   # Verify peer server certificates
   require_client_auth: {{ cassandra_ssl_client_require_client_auth }}
   # Set to a valid trustore if require_client_auth is true
@@ -1471,12 +1518,7 @@ server_encryption_options:
   #   TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_RSA_WITH_AES_128_GCM_SHA256, TLS_RSA_WITH_AES_128_CBC_SHA,
   #   TLS_RSA_WITH_AES_256_CBC_SHA
   # ]
-  protocol: {{ cassandra_ssl_internode_protocol }}
-  store_type: JKS
-{% if cassandra_cipher_suites_server_encryption is defined %}
-  cipher_suites:
-  {{ cassandra_cipher_suites_server_encryption | to_nice_yaml(indent=4) | trim | indent(2) }}
-{% endif %}
+
 # Configure client-to-server encryption.
 #
 # **NOTE** this default configuration is an insecure configuration. If you need to
@@ -1495,10 +1537,13 @@ client_encryption_options:
   # When set to true, encrypted and unencrypted connections are allowed on the native_transport_port
   # This should _only be true_ while in unencrypted or transitional operation
   # optional defaults to true when enabled is false, and false when enabled is true.
-  optional: {{ cassandra_ssl_client_encryption_optional }}
+{% if cassandra_ssl_client_encryption_enabled | bool %}
+  optional: {{ cassandra_ssl_client_encryption_optional | default(false) | bool }}
+{% endif %}
   # Set keystore and keystore_password to valid keystores if enabled is true
-  keystore: {{ cassandra_ssl_client_keystore_file | default("") }}
-  keystore_password: {{ cassandra_ssl_client_keystore_pass | default("") }}
+  keystore: {{ cassandra_ssl_client_keystore_file | default("conf/.keystore") }}
+  keystore_password: {{ cassandra_ssl_client_keystore_pass | default("cassandra") }}
+  #keystore_password: cassandra
   # Configure the way Cassandra creates SSL contexts.
   # To use PEM-based key material, see org.apache.cassandra.security.PEMBasedSslContextFactory
   # ssl_context_factory:
@@ -1506,6 +1551,7 @@ client_encryption_options:
   #     class_name: org.apache.cassandra.security.DefaultSslContextFactory
   # Verify client certificates
   require_client_auth: {{ cassandra_ssl_client_require_client_auth | default("false") }}
+  # require_endpoint_verification: false
   # Set trustore and truststore_password if require_client_auth is true
   # truststore: conf/.truststore
   # truststore_password: cassandra
@@ -1608,8 +1654,8 @@ transparent_data_encryption_options:
 # Adjust the thresholds here if you understand the dangers and want to
 # scan more tombstones anyway.  These thresholds may also be adjusted at runtime
 # using the StorageService mbean.
-tombstone_warn_threshold: {{ cassandra_tombstone_warn_threshold }}
-tombstone_failure_threshold: {{ cassandra_tombstone_failure_threshold }}
+tombstone_warn_threshold: {{ cassandra_tombstone_warn_threshold | default(1000) }}
+tombstone_failure_threshold: {{ cassandra_tombstone_failure_threshold | default(10000) }}
 
 # Filtering and secondary index queries at read consistency levels above ONE/LOCAL_ONE use a
 # mechanism called replica filtering protection to ensure that results from stale replicas do
@@ -1634,14 +1680,14 @@ replica_filtering_protection:
 # Log WARN on any multiple-partition batch size exceeding this value. 5KiB per batch by default.
 # Caution should be taken on increasing the size of this threshold as it can lead to node instability.
 # Min unit: KiB
-batch_size_warn_threshold: {{ cassandra_batch_size_warn_threshold_in_kb }}KiB
+batch_size_warn_threshold: {{ cassandra_batch_size_warn_threshold_in_kb | default(64) }}KiB
 
 # Fail any multiple-partition batch exceeding this value. 50KiB (10x warn threshold) by default.
 # Min unit: KiB
-batch_size_fail_threshold: {{ cassandra_batch_size_fail_threshold_in_kb }}KiB
+batch_size_fail_threshold: {{ cassandra_batch_size_fail_threshold_in_kb | default(640) }}KiB
 
 # Log WARN on any batches not of type LOGGED than span across more partitions than this limit
-unlogged_batch_across_partitions_warn_threshold: {{ cassandra_unlogged_batch_across_partitions_warn_threshold }}
+unlogged_batch_across_partitions_warn_threshold: {{ cassandra_unlogged_batch_across_partitions_warn_threshold | default(10) }}
 
 # Log a warning when compacting partitions larger than this value
 compaction_large_partition_warning_threshold: {{ cassandra_compaction_large_partition_warning_threshold_mb }}MiB

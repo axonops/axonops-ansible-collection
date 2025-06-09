@@ -1,9 +1,6 @@
 - name: Import OS vars
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
 
-- debug:
-    var: java_pkg
-
 - name: Debian Azul Java Install
   block:
     - name: Debian - Install apt packages

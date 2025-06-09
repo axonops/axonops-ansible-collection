@@ -1,0 +1,31 @@
+- name: Deploy AxonOps Server
+  hosts: all
+  become: true
+  vars:
+    install_cassandra: true
+    java_pkg: openjdk-11-jre-headless
+    axon_java_agent: "axon-cassandra5.0-agent"
+    axon_agent_version: ""
+    axon_java_agent_version: ""
+    cassandra_version: 4.1.9
+
+  pre_tasks:
+    # This is only for this example to work, please review your firewall settings and requirements
+    - name: "Stop firewalld"
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: false
+        state: stopped
+      when: ansible_os_family == 'RedHat'
+      failed_when: false
+
+  roles:
+    - name: java
+      role: java
+      tags: java
+    - role: agent
+    - role: cassandra
+      tags: cassandra
+      when: install_cassandra is defined and install_cassandra
+
+# code: language=ansible

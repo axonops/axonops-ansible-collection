@@ -8,6 +8,16 @@
   when: cassandra_version.startswith('5.0')
   tags: always
 
+- name: Import vars for Debian
+  ansible.builtin.include_vars: Debian.yml
+  when: ansible_os_family == "Debian"
+  tags: always
+
+- name: Import vars for RedHat
+  ansible.builtin.include_vars: RadHat.yml
+  when: ansible_os_family == "RedHat"
+  tags: always
+
 - name: Install from pkg
   when: cassandra_install_format == "pkg"
   ansible.builtin.import_tasks: install-pkg.yml
@@ -113,6 +123,7 @@
         - jvm11-clients.options
 
     - name: Ensure Cassandra node configured (5.x only)
+      when: cassandra_version.startswith('5.')
       ansible.builtin.template:
         src: "{{ tmpl_dir }}/{{ item }}.j2"
         dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
@@ -129,6 +140,24 @@
     owner: root
     group: root
   notify: Reload systemd
+
+- name: OS configs
+  ansible.builtin.import_tasks: os-config.yml
+
+- debug:
+    var: cassandra_cqlsh_binary
+  tags: cqlsh
+- name: Installed the compiled cqlsh binary
+  tags: cqlsh
+  ansible.builtin.apt:
+    deb: "{{ cassandra_cqlsh_binary }}"
+  when: cassandra_cqlsh_binary is defined and ansible_os_family == "Debian"
+
+- name: Installed the compiled cqlsh binary
+  tags: cqlsh
+  ansible.builtin.yum:
+    name: "{{ cassandra_cqlsh_binary }}"
+  when: cassandra_cqlsh_binary is defined and ansible_os_family == "RedHat"
 
 - name: Start cassandra
   tags: service
