@@ -129,7 +129,7 @@ appender reference in the root level section below.
   </root>
 
   <logger name="org.apache.cassandra" level="DEBUG"/>
-  
+
 {% if cassandra_log_outbound_tcp_connection != 'disabled' %}
   <logger name="org.apache.cassandra.net.OutboundTcpConnection" level="DEBUG"/>
 {% endif %}

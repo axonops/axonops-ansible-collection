@@ -113,7 +113,7 @@ max_hints_size_per_host: {{ cassandra_max_hints_size_per_host }}
 auto_hints_cleanup_enabled: {{ cassandra_auto_hints_cleanup_enabled | default("true") }}
 
 # Enable/disable transfering hints to a peer during decommission. Even when enabled, this does not guarantee
-# consistency for logged batches, and it may delay decommission when coupled with a strict hinted_handoff_throttle. 
+# consistency for logged batches, and it may delay decommission when coupled with a strict hinted_handoff_throttle.
 # Default: true
 transfer_hints_on_decommission: {{ cassandra_transfer_hints_on_decommission | default("true") }}
 
@@ -508,7 +508,7 @@ commit_failure_policy: {{ cassandra_commit_failure_policy | default("die") }}
 # Default value ("auto") is 1/256th of the heap or 10MiB, whichever is greater
 # Min unit: MiB
 # prepared_statements_cache_size:
-prepared_statements_cache_size: {{ cassandra_prepared_statements_cache_size | default("24MiB") }} # AxonOps Recommended
+prepared_statements_cache_size: {{ cassandra_prepared_statements_cache_size_mb | default(cassandra_prepared_statements_cache_size) | default("24MiB") }} # AxonOps Recommended
 
 # Maximum size of the key cache in memory.
 #
@@ -525,7 +525,7 @@ prepared_statements_cache_size: {{ cassandra_prepared_statements_cache_size | de
 #
 # This is only relevant to SSTable formats that use key cache, e.g. BIG.
 # Min unit: MiB
-key_cache_size: {{ cassandra_key_cache_size | default("512MiB") }} # AxonOps Recommended
+key_cache_size: {{ cassandra_key_cache_size_mib | default(cassandra_key_cache_size) | default("512MiB") }}
 
 # Duration in seconds after which Cassandra should
 # save the key cache. Caches are saved to saved_caches_directory as
@@ -538,7 +538,11 @@ key_cache_size: {{ cassandra_key_cache_size | default("512MiB") }} # AxonOps Rec
 # This is only relevant to SSTable formats that use key cache, e.g. BIG.
 # Default is 14400 or 4 hours.
 # Min unit: s
+{% if cassandra_key_cache_save_period is defined and cassandra_key_cache_save_period is search('[0-9]+[smh]$') %}
 key_cache_save_period: {{ cassandra_key_cache_save_period | default("4h") }}
+{% else %}
+key_cache_save_period: {{ cassandra_key_cache_save_period }}s
+{% endif %}
 
 # Number of keys from the key cache to save
 # Disabled by default, meaning all keys are going to be saved
@@ -569,7 +573,7 @@ row_cache_class_name: {{ cassandra_row_cache_class_name | default("org.apache.ca
 # Default value is 0, to disable row caching.
 # Min unit: MiB
 # row_cache_size: 0MiB
-row_cache_size: {{ cassandra_row_cache_size | default("0MiB") }}
+row_cache_size: {{ cassandra_row_cache_size_in_mb | default(cassandra_row_cache_size) | default("0MiB") }}
 
 # Duration in seconds after which Cassandra should save the row cache.
 # Caches are saved to saved_caches_directory as specified in this configuration file.
@@ -581,7 +585,11 @@ row_cache_size: {{ cassandra_row_cache_size | default("0MiB") }}
 # Default is 0 to disable saving the row cache.
 # Min unit: s
 # row_cache_save_period: 0s
+{% if cassandra_row_cache_save_period is defined and cassandra_row_cache_save_period.endswith('s') or cassandra_row_cache_save_period.endswith('m') or cassandra_row_cache_save_period.endswith('h') %}
 key_cache_save_period: {{ cassandra_row_cache_save_period | default("0s") }}
+{% else %}
+key_cache_save_period: {{ cassandra_row_cache_save_period }}s
+{% endif %}
 
 # Number of keys from the row cache to save.
 # Specify 0 (which is the default), meaning all keys are going to be saved
@@ -604,7 +612,7 @@ row_cache_keys_to_save: {{ cassandra_row_cache_keys_to_save }}
 # Default value is empty to make it "auto" (min(2.5% of Heap (in MiB), 50MiB)). Set to 0 to disable counter cache.
 # NOTE: if you perform counter deletes and rely on low gcgs, you should disable the counter cache.
 # Min unit: MiB
-counter_cache_size: {{ cassandra_counter_cache_size | default("") }}
+counter_cache_size: {{ cassandra_counter_cache_size_in_mb | default(cassandra_counter_cache_size) | default("") }}
 
 # Duration in seconds after which Cassandra should
 # save the counter cache (keys only). Caches are saved to saved_caches_directory as
@@ -612,7 +620,11 @@ counter_cache_size: {{ cassandra_counter_cache_size | default("") }}
 #
 # Default is 7200 or 2 hours.
 # Min unit: s
+{% if cassandra_counter_cache_save_period is defined and cassandra_counter_cache_save_period.endswith('s') or cassandra_counter_cache_save_period.endswith('m') or cassandra_counter_cache_save_period.endswith('h') %}
 counter_cache_save_period: {{ cassandra_counter_cache_save_period | default('2h') }}
+{% else %}
+counter_cache_save_period: {{ cassandra_counter_cache_save_period }}s
+{% endif %}
 
 # Number of keys from the counter cache to save
 # Disabled by default, meaning all keys are going to be saved
@@ -633,7 +645,11 @@ saved_caches_directory: {{ cassandra_saved_caches_directory }}
 # while still having the cache during runtime.
 # Min unit: s
 # cache_load_timeout: 30s
+{% if cassandra_cache_load_timeout is defined and cassandra_cache_load_timeout.endswith('s') or cassandra_cache_load_timeout.endswith('m') or cassandra_cache_load_timeout.endswith('h') %}
 cache_load_timeout: {{ cassandra_cache_load_timeout | default("2m") }}
+{% else %}
+cache_load_timeout: {{ cassandra_cache_load_timeout }}s
+{% endif %}
 
 # commitlog_sync may be either "periodic", "group", or "batch."
 #
@@ -656,7 +672,11 @@ commitlog_sync_group_window: {{ cassandra_commitlog_sync_group_window | default(
 commitlog_sync: {{ cassandra_commitlog_sync | default("periodic") }}
 # Min unit: ms
 # commitlog_sync_period: 10000ms
+{% if cassandr_commitlog_sync_period is defined and cassandr_commitlog_sync_period.endswith('s') or cassandr_commitlog_sync_period.endswith('m') or cassandr_commitlog_sync_period.endswith('h') %}
 commitlog_sync_period: {{ cassandr_commitlog_sync_period | default("10s") }}
+{% else %}
+commitlog_sync_period: {{ cassandr_commitlog_sync_period }}s
+{% endif %}
 
 # When in periodic commitlog mode, the number of milliseconds to block writes
 # while waiting for a slow disk flush to complete.
@@ -684,7 +704,7 @@ periodic_commitlog_sync_lag_block: {{ cassandra_periodic_commitlog_sync_lag_bloc
 #
 # Min unit: MiB
 #commitlog_segment_size: 32MiB
-commitlog_segment_size: {{ cassandra_commitlog_segment_size | default("32MiB") }}
+commitlog_segment_size: {{ cassandra_commitlog_segment_size_in_mb | default(cassandra_commitlog_segment_size) | default("32MiB") }}
 
 # Compression to apply to the commit log. If omitted, the commit log
 # will be written uncompressed.  LZ4, Snappy, and Deflate compressors
@@ -809,11 +829,11 @@ disk_optimization_strategy: {{ cassandra_disk_optimization_strategy | default("s
 # memtable_heap_space: 2048MiB
 # Min unit: MiB
 # memtable_offheap_space: 2048MiB
-{% if cassandra_memtable_heap_space is defined %}
-memtable_heap_space: {{ cassandra_memtable_heap_space }}
+{% if cassandra_memtable_heap_space is defined or cassandra_memtable_heap_space_in_mb is defined %}
+memtable_heap_space: {{ cassandra_memtable_heap_space_in_mb | default(cassandra_memtable_heap_space) }}
 {% endif %}
-{% if cassandra_memtable_offheap_space is defined %}
-memtable_offheap_space: {{ cassandra_memtable_offheap_space }}
+{% if cassandra_memtable_offheap_space is defined or cassandra_memtable_offheap_space_in_mb is defined %}
+memtable_offheap_space: {{ cassandra_memtable_offheap_space_in_mb | default(cassandra_memtable_offheap_space) }}
 {% endif %}
 
 # memtable_cleanup_threshold is deprecated. The default calculation
@@ -854,8 +874,8 @@ memtable_allocation_type: {{ cassandra_memtable_allocation_type | default("offhe
 #
 # Min unit: MiB
 # repair_session_space:
-{% if cassandra_repair_session_space is defined %}
-repair_session_space: {{ cassandra_repair_session_space }}
+{% if cassandra_repair_session_space is defined or cassandra_repair_session_space_in_mb is defined %}
+repair_session_space: {{ cassandra_repair_session_space_in_mb | default(cassandra_repair_session_space) }}
 {% endif %}
 
 # Total space to use for commit logs on disk.
@@ -868,8 +888,8 @@ repair_session_space: {{ cassandra_repair_session_space }}
 # of the commitlog volume.
 #
 # commitlog_total_space: 8192MiB
-{% if cassandra_commitlog_total_space is defined %}
-commitlog_total_space: {{ cassandra_commitlog_total_space }}
+{% if cassandra_commitlog_total_space is defined or cassandra_commitlog_total_space_in_mb is defined %}
+commitlog_total_space: {{ cassandra_commitlog_total_space_in_mb | default(cassandra_commitlog_total_space) }}
 {% endif %}
 
 # This sets the number of memtable flush writer threads per disk
@@ -1186,8 +1206,8 @@ internode_socket_receive_buffer_size: {{ cassandra_internode_socket_receive_buff
 # Set to true to have Cassandra create a hard link to each sstable
 # flushed or streamed locally in a backups/ subdirectory of all the
 # keyspace data in this node.  Removing these links is the operator's
-# responsibility. The operator can also turn off incremental backups 
-# for specified table by setting table parameter incremental_backups to 
+# responsibility. The operator can also turn off incremental backups
+# for specified table by setting table parameter incremental_backups to
 # false, which is set to true by default. See CASSANDRA-15402
 incremental_backups: {{ cassandra_incremental_backups | default("false") }}
 
@@ -1506,8 +1526,10 @@ internode_timeout: {{ cassandra_internode_timeout }}
 # Specify 0 to disable.
 # Min unit: s
 # streaming_keep_alive_period: 300s
-{% if cassandra_streaming_keep_alive_period is defined %}
-streaming_keep_alive_period: {{ cassandra_streaming_keep_alive_period }}
+{% if cassandra_streaming_keep_alive_period is defined and cassandra_streaming_keep_alive_period is search('[0-9]+[smh]$') %}
+streaming_keep_alive_period: {{ cassandra_streaming_keep_alive_period | default('300s') }}
+{% else %}
+streaming_keep_alive_period: {{ cassandra_streaming_keep_alive_period | default('300') }}s
 {% endif %}
 
 # Limit number of connections per host for streaming
@@ -1652,10 +1674,10 @@ phi_convict_threshold: {{ cassandra_phi_convict_threshold | default("12") }}
 #    domain and get its respective value.
 #
 # CloudstackSnitch:
-#    A snitch that assumes a Cloudstack Zone follows the typical convention 
+#    A snitch that assumes a Cloudstack Zone follows the typical convention
 #    country-location-az and uses a country/location tuple as a datacenter
 #    and the availability zone as a rack.
-#    WARNING: This snitch is deprecated and it is scheduled to be removed 
+#    WARNING: This snitch is deprecated and it is scheduled to be removed
 #    in the next major version of Cassandra.
 #
 # Ec2Snitch:
@@ -2637,20 +2659,20 @@ default_secondary_index_enabled: {{ cassandra_default_secondary_index_enabled }}
 #
 # This will also determine if certain features depending on newer formats are available. For example, extended TTLs
 # up to 2106 depend on the sstable, commitlog, hints and messaging versions that were introduced by Cassandra 5.0,
-# so that feature won't be available if this property is set to CASSANDRA_4. See upgrade guides for details. Currently 
+# so that feature won't be available if this property is set to CASSANDRA_4. See upgrade guides for details. Currently
 # the only supported major is CASSANDRA_4.
 #
 # Possible values are in the StorageCompatibilityMode.java file accessible online. At the time of writing these are:
 # - CASSANDRA_4: Stays compatible with the 4.x line in features, formats and component versions.
-# - UPGRADING:   The cluster monitors nodes versions during this interim stage. _This has a cost_ but ensures any new features, 
+# - UPGRADING:   The cluster monitors nodes versions during this interim stage. _This has a cost_ but ensures any new features,
 #                formats, versions, etc are enabled safely.
 # - NONE:        Start with all the new features and formats enabled.
 #
 # A typical upgrade would be:
 # - Do a rolling upgrade starting all nodes in CASSANDRA_Y compatibility mode.
-# - Once the new binary is rendered stable do a rolling restart with UPGRADING. The cluster will enable new features in a safe way 
+# - Once the new binary is rendered stable do a rolling restart with UPGRADING. The cluster will enable new features in a safe way
 #   until all nodes are started in UPGRADING, then all new features are enabled.
-# - Do a rolling restart with all nodes starting with NONE. This sheds the extra cost of checking nodes versions and ensures 
+# - Do a rolling restart with all nodes starting with NONE. This sheds the extra cost of checking nodes versions and ensures
 #   a stable cluster. If a node from a previous version was started by accident we won't any longer toggle behaviors as when UPGRADING.
 #
 storage_compatibility_mode: {{ cassandra_storage_compatibility_mode | default("NONE") }}
