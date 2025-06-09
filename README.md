@@ -3,14 +3,18 @@
 [AxonOps](https://axonops.com/) can be used either via our SaaS service or you can install it locally in your environment.
 
 This collection provides Ansible roles and playbooks to deploy [AxonOps](https://axonops.com/) components. The examples below
-show how you can install the AxonOps server with Elasticsearch® and Cassandra® to store metrics and configurations
+show how you can install the AxonOps server with Elasticsearch® and Cassandra® to store metrics and configurations,
 and how you can install the AxonOps agent to connect to your Apache Cassandra cluster.
 
-Ansible is an open-source IT automation platform that enables organizations to automate various IT processes, including provisioning, configuration management, application deployment, and orchestration. It operates as an agentless system, using remote connections via SSH or Windows Remote Management to execute tasks. Ansible is widely used for its simplicity and flexibility, allowing users to define infrastructure as code. For more information about Ansible, you can visit the [Ansible project documentation](https://docs.ansible.com/ansible/latest/index.html).
+Ansible is an open-source IT automation platform that enables organizations to automate various IT processes, including provisioning, configuration management,
+application deployment, and orchestration. It operates as an agentless system, using remote connections via SSH or Windows Remote Management
+to execute tasks. Ansible is widely used for its simplicity and flexibility, allowing users to define infrastructure as code.
+For more information about Ansible, visit the [Ansible project documentation](https://docs.ansible.com/ansible/latest/index.html).
 
-Although this example project has been implemented using Ansible, it is possible to achieve similar results using alternative tools like Chef or Puppet, offering flexibility for those who prefer different automation solutions.
+Although this example project has been implemented using Ansible, it is possible to achieve similar results using alternative tools like Chef or Puppet,
+offering flexibility for those who prefer different automation solutions.
 
-**Note: please see https://github.com/axonops/axonops-config-automation for setting up your alerts, dashboards, backsups etc..**
+**Note: please see https://github.com/axonops/axonops-config-automation for setting up your alerts, dashboards, backsups etc...**
 
 ## Before you start
 
@@ -28,6 +32,22 @@ This makes coding the ansible playbook to support both versions more complex. Be
 
 
 ## Playbooks
+
+### Installing the collection
+
+Download the latest release from [GitHub](https://github.com/axonops/axonops-ansible-collection/releases/). Then use `ansible-galaxy`
+to install the tarball into a directory configured in [COLLECTIONS_PATHS](https://docs.ansible.com/ansible/latest/reference_appendices/config.html#collections-paths).
+
+```sh
+ansible-galaxy collection install <downloaded_tar>
+```
+
+You may also use this short script to download and install the latest version:
+
+```sh
+LATEST=$(curl -s https://api.github.com/repos/axonops/axonops-ansible-collection/releases/latest | jq -r '.assets[0].browser_download_url')
+ansible-galaxy collection install $LATEST
+```
 
 ### Inventory
 
