@@ -1,6 +1,7 @@
 ---
 # Online installation
-- include_tasks: "repo/{{ ansible_os_family }}.yml"
+- name: Import OS specific variables
+  include_tasks: "repo/{{ ansible_os_family }}.yml"
   tags:
     - axon_dash_repo
 
@@ -23,9 +24,14 @@
     mode: '0644'
   notify: reload systemd
 
+- name: Add version to the package name
+  set_fact:
+    axon_dash_versioned_package: "axon-dash-{{ axon_dash_version }}"
+  when: axon_dash_version is defined and axon_dash_version != ''
+
 - name: Ensure Axon Dashboard is installed.
   package:
-    name: axon-dash
+    name: "{{ axon_dash_versioned_package | default('axon-dash') }}"
     state: "{{ axon_dash_state }}"
   notify:
     - restart axon-dash

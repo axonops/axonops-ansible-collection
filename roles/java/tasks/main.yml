@@ -1,9 +1,37 @@
 - name: Import OS vars
   ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
 
-- name: Debian Azul Java Install
+- name: Install Zulu JDK on RedHat
+  when:
+    - _zulu_jdk is defined
+    - java_use_zulu | default(false) or (ansible_os_family == 'RedHat' and ansible_distribution_major_version is version('10', '>='))  # Use Zulu JDK for RHEL 10 and above
+    - ansible_os_family == 'RedHat'
   block:
-    - name: Debian - Install apt packages
+    - name: Add Zulu JDK repository
+      ansible.builtin.dnf:
+        name: "{{ _zulu_jdk.yum_repo }}"
+        state: present
+        disable_gpg_check: true
+        disablerepo:
+          - "*"  # Disable all other repositories to avoid conflicts
+
+    - name: Install Zulu JDK
+      ansible.builtin.dnf:
+        state: "present"
+        name: "{{ _zulu_jdk.package_names }}"
+        disable_gpg_check: true
+
+    - name: Set as installed
+      ansible.builtin.set_fact:
+        java_zulu_installed: true
+
+- name: Debian Zulu Java Install
+  when:
+    - _zulu_jdk is defined
+    - java_use_zulu | default(false)
+    - ansible_os_family == 'Debian'
+  block:
+    - name: "Debian - Install apt packages"
       package:
         name:
           - apt-transport-https
@@ -15,15 +43,15 @@
     - name: Download and dearmor key
       ansible.builtin.uri:
         url: "{{ _zulu_jdk.apt_repo.key_url }}"
-        return_content: yes
+        return_content: true
       register: key_content
 
-    - name: Dearmor and save the key
+    - name: "Dearmor and save the key"
       ansible.builtin.shell:
         cmd: echo "{{ key_content.content }}" | gpg --dearmor -o /usr/share/keyrings/azul.gpg
         creates: /usr/share/keyrings/azul.gpg
 
-    - name: Add Repository URL
+    - name: "Add Repository URL"
       apt_repository:
         repo: "{{ _zulu_jdk.apt_repo.repo_line }}"
         state: present
@@ -33,16 +61,22 @@
       package:
         state: "{% if zulu_version is defined and zulu_version != '' %}present{% else %}latest{% endif %}"
         name: "{{ _zulu_jdk.package_names }}"
-  when:
-    - _zulu_jdk is defined
-    - ansible_distribution == 'Debian'
+
+    - name: Set as installed
+      ansible.builtin.set_fact:
+        java_zulu_installed: true
 
 - name: Install Java
   ansible.builtin.package:
     name: "{{ java_pkg | default(_java_pkg) }}"
     state: present
-  when:
-    - java_pkg is defined
-    - ansible_distribution != 'Debian'
+  when: java_zulu_installed is not defined or java_zulu_installed == false
+
+- name: Select Zulu Java as default
+  community.general.alternatives:
+    name: java
+    path: "/usr/lib/jvm/zulu{{ _zulu_major_version }}/bin/java"
+    link: /usr/bin/java
+  when: java_zulu_installed is defined and java_zulu_installed == true
 
 # code: language=ansible

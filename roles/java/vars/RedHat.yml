@@ -1,1 +1,10 @@
-_java_pkg: java-11-openjdk-headless
+_java_pkg: "{% if cassandra_version is defined and cassandra_version.startswith('5') %}java-17-openjdk-headless{% else %}java-11-openjdk-headless{% endif %}"
+_zulu_major_version: "{% if cassandra_version is defined and cassandra_version.startswith('5') %}17{% else %}11{% endif %}"
+
+# RedHat
+_zulu_jdk:
+  yum_repo: "https://cdn.azul.com/zulu/bin/zulu-repo-1.0.0-1.noarch.rpm"
+  package_names:
+    - "zulu{{ _zulu_major_version }}-ca-jre-headless{% if zulu_version is defined and zulu_version != ''%}={{ zulu_version }}{% endif %}"
+    - "zulu{{ _zulu_major_version }}-jre-headless{% if zulu_version is defined and zulu_version != ''%}={{ zulu_version }}{% endif %}"
+  install_dir: "/usr/lib/jvm/zulu{{ _zulu_major_version }}"

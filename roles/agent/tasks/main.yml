@@ -1,4 +1,25 @@
 ---
+- name: Preflight check
+  ansible.builtin.assert:
+    that:
+      - axon_agent_customer_name is defined
+    fail_msg: "You must configured the axon_agent_customer_name variable."
+
+- name: Confirm if SSL is required
+  ansible.builtin.assert:
+    that:
+      - axon_agent_tls_mode is defined
+      - axon_agent_tls_mode in ['disabled', 'TLS', 'mTLS']
+    fail_msg: "You must configured the axon_agent_tls_mode variable with one of the following values: disabled, TLS, mTLS."
+  when: axon_agent_tls_mode is defined
+
+- name: Confirm if SSL is required
+  ansible.builtin.assert:
+    that:
+      - axon_agent_tls_certfile is defined
+      - axon_agent_tls_keyfile is defined
+    fail_msg: "You must configured axon_agent_tls_keyfile and axon_agent_tls_certfile variables when axon_agent_tls_mode is set to mTLS."
+  when: axon_agent_tls_mode is defined and (axon_agent_tls_mode == 'mTLS' or axon_agent_tls_mode == 'TLS')
 
 - name: Install
   ansible.builtin.import_tasks: install.yml

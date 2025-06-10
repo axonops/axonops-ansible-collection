@@ -1,0 +1,25 @@
+- name: Start or restart Cassandra and AxonOps Agent
+  hosts: cassandra
+  become: true
+  serial: 1
+  vars:
+    state: started
+  tasks:
+    - name: Start Cassandra service
+      ansible.builtin.service:
+        name: cassandra
+        state: "{{ state }}"
+
+    - name: Start AxonOps Agent
+      ansible.builtin.service:
+        name: axon-agent
+        state: "{{ state }}"
+
+    - name: Wait for Cassandra to be up and running
+      ansible.builtin.wait_for:
+        port: 9042
+        host: "{{ ansible_default_ipv4.address | default('localhost') }}"
+        timeout: 300
+        state: started
+
+# code: language=ansible

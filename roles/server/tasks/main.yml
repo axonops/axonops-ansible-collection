@@ -4,6 +4,29 @@
   tags:
     - axon_server_repo
 
+- name: Preflight check
+  ansible.builtin.assert:
+    that:
+      - axon_server_state is defined
+      - axon_server_state in ['present', 'absent']
+    fail_msg: "You must configured the axon_server_state variable with one of the following values: present, absent."
+
+- name: Confirm if TLS is required
+  ansible.builtin.assert:
+    that:
+      - axon_server_tls_mode is defined
+      - axon_server_tls_mode in ['disabled', 'TLS', 'mTLS']
+    fail_msg: "You must configured the axon_server_tls_mode variable with one of the following values: disabled, TLS, mTLS."
+  when: axon_server_tls_mode is defined
+
+- name: Confirm if TLS is required
+  ansible.builtin.assert:
+    that:
+      - axon_server_tls_certfile is defined
+      - axon_server_tls_keyfile is defined
+    fail_msg: "You must configured axon_server_tls_keyfile and axon_server_tls_certfile variables when axon_server_tls_mode is set to mTLS."
+  when: axon_server_tls_mode is defined and (axon_server_tls_mode == 'mTLS' or axon_server_tls_mode == 'TLS')
+
 - name: Include installation tasks
   ansible.builtin.import_tasks: install.yml
   tags:

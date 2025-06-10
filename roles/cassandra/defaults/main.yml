@@ -168,12 +168,12 @@ cassandra_request_timeout: "10s"
 # Network Configuration
 cassandra_storage_port: 7000
 cassandra_ssl_storage_port: 7001
-cassandra_listen_address: "localhost"
+cassandra_listen_address: "{{ ansible_default_ipv4.address | default('localhost') }}"
 cassandra_internode_authenticator_class_name: "org.apache.cassandra.auth.AllowAllInternodeAuthenticator"
 cassandra_start_native_transport: true
 cassandra_native_transport_port: 9042
 cassandra_native_transport_allow_older_protocols: true
-cassandra_rpc_address: "localhost"
+cassandra_rpc_address: "{{ ansible_default_ipv4.address | default('localhost') }}"
 cassandra_rpc_keepalive: true
 
 # Internode TCP Configuration
