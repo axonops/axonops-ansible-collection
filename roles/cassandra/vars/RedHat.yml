@@ -1,1 +1,2 @@
-java_pkg: java-11-openjdk-headless
+_cassandra_cqlsh_binary: "https://github.com/axonops/cqlsh/releases/download/v{{ cassandra_cqlsh_binary_version }}/cqlsh-{{ cassandra_cqlsh_binary_version }}-1.{{ ansible_architecture }}.rpm"
+#https://github.com/axonops/cqlsh/releases/download/v0.1.3/cqlsh-0.1.3-1.x86_64.rpm

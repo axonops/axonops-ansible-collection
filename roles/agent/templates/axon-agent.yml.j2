@@ -10,11 +10,7 @@ axon-agent:
 {% if axon_agent_server_host is not defined %}
     prom_only: true
 {% endif %}
-{% if customer_name is defined %}
-    org: "{{ customer_name }}"
-{% else %}
-    org: "{{ axon_agent_customer_name | default('Digitalis') }}"
-{% endif %}
+    org: "{{ axon_agent_customer_name }}"
 {% if axon_agent_key is defined %}
     key: {{ axon_agent_key }}
 {% endif %}

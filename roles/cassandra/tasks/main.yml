@@ -1,72 +1,136 @@
-- name: Set up repos Debian
-  when: ansible_os_family == 'Debian'
+- name: Import vars for 4.1
+  ansible.builtin.include_vars: cassandra-4.1.yml
+  when: cassandra_version.startswith('4.1')
+  tags: always
+
+- name: Import vars for 5.0
+  ansible.builtin.include_vars: cassandra-5.0.yml
+  when: cassandra_version.startswith('5.0')
+  tags: always
+
+- name: Import vars for Debian
+  ansible.builtin.include_vars: Debian.yml
+  when: ansible_os_family == "Debian"
+  tags: always
+
+- name: Import vars for RedHat
+  ansible.builtin.include_vars: RedHat.yml
+  when: ansible_os_family == "RedHat"
+  tags: always
+
+- name: Install from pkg
+  when: cassandra_install_format == "pkg"
+  ansible.builtin.import_tasks: install-pkg.yml
+
+- name: Install from tar
+  when: cassandra_install_format == "tar"
+  ansible.builtin.import_tasks: install-tar.yml
+
+- name: Create AxonOps User
+  tags: axonops_user
   block:
-    - name: Set up Cassandra apt repos
-      ansible.builtin.copy:
-        dest: /etc/apt/sources.list.d/cassandra.sources.list
-        content: "deb [signed-by=/etc/apt/keyrings/apache-cassandra.asc] https://debian.cassandra.apache.org 41x main"
-        mode: "0644"
+    - name: Check if axonops user exists and get groups
+      ansible.builtin.getent:
+        database: group
+      register: group_info
 
-    - name: Ensure /etc/apt/keyrings exists
-      ansible.builtin.file:
-        state: directory
-        mode: "0755"
-        path: /etc/apt/keyrings
+    - name: Get axonops user info
+      ansible.builtin.getent:
+        database: passwd
+        key: axonops
+      register: user_info
+      failed_when: false
 
-    - name: GPG key for Cassandra
-      ansible.builtin.get_url:
-        url: https://downloads.apache.org/cassandra/KEYS
-        dest: /etc/apt/keyrings/apache-cassandra.asc
+    - name: Populate service facts
+      ansible.builtin.service_facts:
 
-    - name: Set pkg name
-      ansible.builtin.set_fact:
-        cassandra_pkg: "cassandra={{ cassandra_version }}"
+    - name: Stop axon-agent if axonops user doesn't belong to cassandra group
+      ansible.builtin.systemd:
+        name: axon-agent
+        state: stopped
+      register: stop_service
+      failed_when:
+        - stop_service.failed == true
+        - '"Could not find the requested service" not in stop_service.msg'
+      when:
+        - ansible_facts.services['axon-agent.service'] is defined
+        - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
+        - user_info.ansible_facts.getent_passwd.axonops is defined
+        - "'cassandra' not in (group_info.ansible_facts.getent_group | dict2items | selectattr('value.2', 'search', user_info.ansible_facts.getent_passwd.axonops.1) | map(attribute='key') | list)"
 
-- name: Set up repos Redhat
-  when: ansible_os_family == 'RedHat'
-  block:
-    - name: Set up Cassandra apt repos
-      ansible.builtin.copy:
-        dest: /etc/yum.repos.d/cassandra.repo
-        mode: "0644"
-        owner: root
-        group: root
-        content: |
-          [cassandra41]
-          name=Apache Cassandra
-          baseurl={{ cassandra_redhat_repository_url | default('https://redhat.cassandra.apache.org/41x/') }}
-          gpgcheck=0
-          repo_gpgcheck=0
 
-    - name: Set pkg name
-      ansible.builtin.set_fact:
-        cassandra_pkg: "cassandra-{{ cassandra_version }}-1"
+    - name: AxonOps user
+      ansible.builtin.user:
+        name: axonops
+        groups: cassandra
+        shell: /bin/bash
+        home: /home/axonops
 
-- name: Install pre-reqs
-  when: ansible_os_family == 'RedHat'
-  ansible.builtin.package:
-    name: chkconfig
+    - name: Add axonops to cassandra
+      ansible.builtin.user:
+        name: cassandra
+        groups: axonops
+        append: true
 
-- name: Install Cassandra
-  ansible.builtin.package:
-    update_cache: true
-    name: "{{ cassandra_pkg }}"
+    - name: Start axon-agent
+      ansible.builtin.systemd:
+        name: axon-agent
+        state: started
+      when:
+        - ansible_facts.services['axon-agent.service'] is defined
+        - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
 
-- name: Ensure Cassandra node configured (4.1.x)
-  notify: Restart Cassandra
-  ansible.builtin.template:
-    src: "{{ item }}.j2"
-    dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
-    mode: "0644"
+- name: Create main directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: "0750"
+    owner: "cassandra"
+    group: "cassandra"
+    state: directory
   with_items:
-    - cassandra-env.sh
-    - cassandra-rackdc.properties
-    - cassandra.yaml
-    - logback.xml
-    - jvm-server.options
-    - jvm11-server.options
-    - jvm-clients.options
-    - jvm11-clients.options
+    - "{{ cassandra_log_dir }}"
+    - "{{ cassandra_hints_directory }}"
+    - "{{ cassandra_gc_log_dir }}"
+    - "{{ cassandra_saved_caches_directory }}"
+    - "{{ cassandra_data_directory }}"
+
+- name: Deploy configuration
+  tags: config
+  block:
+    - name: Template directory
+      ansible.builtin.set_fact:
+        tmpl_dir: 5.0.x
+      when: cassandra_version.startswith('5.')
+
+    - name: Template directory
+      ansible.builtin.set_fact:
+        tmpl_dir: 4.1.x
+      when: cassandra_version.startswith('4.1')
+
+    - name: Ensure Cassandra node configured
+      ansible.builtin.template:
+        src: "{{ tmpl_dir }}/{{ item }}.j2"
+        dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
+        mode: "0644"
+      with_items:
+        - cassandra-env.sh
+        - cassandra-rackdc.properties
+        - cassandra.yaml
+        - logback.xml
+        - jvm-server.options
+        - jvm11-server.options
+        - jvm-clients.options
+        - jvm11-clients.options
+
+    - name: Ensure Cassandra node configured (5.x only)
+      when: cassandra_version.startswith('5.')
+      ansible.builtin.template:
+        src: "{{ tmpl_dir }}/{{ item }}.j2"
+        dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
+        mode: "0644"
+      with_items:
+        - jvm17-server.options
+        - jvm17-clients.options
 
 - name: Systemd service for cassandra
   ansible.builtin.template:
@@ -77,10 +141,28 @@
     group: root
   notify: Reload systemd
 
+- name: OS configs
+  ansible.builtin.import_tasks: os-config.yml
+
+- name: Installed the compiled cqlsh binary
+  tags: cqlsh
+  ansible.builtin.apt:
+    deb: "{{ cassandra_cqlsh_binary }}"
+  when: cassandra_cqlsh_binary is defined and ansible_os_family == "Debian"
+
+- name: Installed the compiled cqlsh binary
+  tags: cqlsh
+  ansible.builtin.yum:
+    name: "{{ cassandra_cqlsh_binary }}"
+    disable_gpg_check: true
+  when: cassandra_cqlsh_binary is defined and ansible_os_family == "RedHat"
+
 - name: Start cassandra
+  tags: service
   ansible.builtin.systemd:
     name: cassandra
     enabled: true
     state: started
+  when: cassandra_start_on_boot is defined and cassandra_start_on_boot
 
 # code: language=ansible

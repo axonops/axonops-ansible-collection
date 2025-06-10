@@ -1,1 +1,8 @@
-java_pkg: openjdk-11-jre-headless
+_cassandra_cqlsh_binary: |-
+  {% if ansible_architecture == 'x86_64' %}
+  https://github.com/axonops/cqlsh/releases/download/v{{ cassandra_cqlsh_binary_version }}/cqlsh_{{ cassandra_cqlsh_binary_version }}_amd64.deb
+  {% elif ansible_architecture == 'aarch64' %}
+  https://github.com/axonops/cqlsh/releases/download/v{{ cassandra_cqlsh_binary_version }}/cqlsh_{{ cassandra_cqlsh_binary_version }}_arm64.deb
+  {% else %}
+  https://github.com/axonops/cqlsh/releases/download/v{{ cassandra_cqlsh_binary_version }}/cqlsh_{{ cassandra_cqlsh_binary_version }}_{{ ansible_architecture }}.deb
+  {% endif %}

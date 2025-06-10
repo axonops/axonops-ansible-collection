@@ -12,7 +12,7 @@ axon_agent_public_repository: present
 axon_agent_beta_repository: absent
 
 has_internet_access: true
-axon_dash_version: 1.0.117-1
+axon_dash_version: ""
 
 axon_dash_nginx:
   enabled: false

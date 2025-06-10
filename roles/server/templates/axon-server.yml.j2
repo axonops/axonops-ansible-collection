@@ -66,7 +66,9 @@ cql_retrypolicy_max: 10s
 cql_reconnectionpolicy_maxretries: 10
 cql_reconnectionpolicy_initialinterval: 1s
 cql_reconnectionpolicy_maxinterval: 10s
+{% if axon_server_cql_keyspace_replication is defined and axon_server_cql_keyspace_replication != '' %}
 cql_keyspace_replication: "{{ axon_server_cql_keyspace_replication }}"
+{% endif %}
 cql_metrics_cache_max_size: 2048  #MB
 cql_metrics_cache_max_items : 100000
 

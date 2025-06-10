@@ -1,0 +1,5 @@
+---
+# By default, this role will install the latest version of Java from OpenJDK.
+# If you want to use Zulu Java, set `java_use_zulu` to `true`. This only works on Debian-based systems.
+java_use_zulu: false
+java_install_epel: false

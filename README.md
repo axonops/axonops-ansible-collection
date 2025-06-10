@@ -16,6 +16,21 @@ offering flexibility for those who prefer different automation solutions.
 
 **Note: please see https://github.com/axonops/axonops-config-automation for setting up your alerts, dashboards, backsups etc...**
 
+## Before you start
+
+Apache Cassandra 5.0 introduced significant configuration changes that affect how you structure your Ansible playbooks. The most notable change is the shift from parameter names that include units to explicit unit declarations in values. For example:
+
+```yaml
+# Cassandra 4.1
+dynamic_snitch_reset_interval_in_ms: 600000
+
+# Cassandra 5.0
+dynamic_snitch_reset_interval: 600000ms
+```
+
+This makes coding the ansible playbook to support both versions more complex. Before running this playbook, you'll need to review the variables from [roles/cassandra/defaults/main.yml](roles/cassandra/defaults/main.yml) and compare them against [roles/cassandra/templates/5.0.x/cassandra.yaml.j2](roles/cassandra/templates/5.0.x/cassandra.yaml.j2).
+
+
 ## Playbooks
 
 ### Installing the collection
@@ -73,38 +88,24 @@ the `*_redhat_repository` URLs.
   become: true
   vars:
     axon_java_agent: "axon-cassandra4.1-agent"
-    axon_agent_version: "1.0.131"
-    axon_java_agent_version: "1.0.14"
     customer_name: example
     java_pkg: java-11-openjdk-headless
-    axon_agent_redhat_repository: "https://packages.axonops.com/yum"
-    cassandra_redhat_repository_url: https://redhat.cassandra.apache.org/41x/
     # Set to false if you already have Apache Cassandra running
     install_cassandra: true
 
   roles:
-    - role: agent
-      tags: agent, axonops-agent
-      vars:
-        axon_agent_server_host: "{{ groups['axon-server'] | first }}"
-        cassandra_dc: "DC1"
-        cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | first }}"
     - role: cassandra
       tags: cassandra
       when: install_cassandra
       vars:
         cassandra_dc: "example"
 
-  post_tasks:
-    - name: Add axonops to the cassandra group
-      tags: user
-      ansible.builtin.user:
-        name: cassandra
-        groups: cassandra,axonops
-        append: true
-      notify:
-        - restart axon-agent
-        - Restart Cassandra
+    - role: agent
+      tags: agent, axonops-agent
+      vars:
+        axon_agent_server_host: "{{ groups['axon-server'] | first }}"
+        cassandra_dc: "DC1"
+        cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | first }}"
 ```
 
 ### axon-server.yml
@@ -121,7 +122,7 @@ For more information about the Elasticsearch installation options please see the
   vars:
     install_cassandra: true
     install_elastic: true
-    java_pkg: java-11-openjdk-headless
+    java_pkg: java-17-openjdk-headless
     axon_server_cql_hosts:
       - localhost:9042
     axon_dash_listen_address: 0.0.0.0

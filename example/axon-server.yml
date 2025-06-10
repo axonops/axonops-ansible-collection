@@ -9,6 +9,17 @@
     axon_dash_listen_address: 0.0.0.0
     axon_agent_redhat_repository: "https://packages.axonops.com/yum"
     es_redhat_repository_url: https://artifacts.elastic.co/packages/7.x/yum
+    cassandra_cluster_name: axonops
+    cassandra_dc: default
+    cassandra_rack: rack1
+    axon_java_agent: "axon-cassandra5.0-agent-jdk17"
+    axon_agent_server_host: localhost
+    axon_agent_tls_mode: "disabled"
+    axon_agent_customer_name: "mycompany"
+    cassandra_start_on_boot: true
+    cassandra_listen_address: "localhost"
+    cassandra_rpc_address: "localhost"
+
 
   pre_tasks:
     # This is only for this example to work, please review your firewall settings and requirements
@@ -24,6 +35,8 @@
     - name: java
       role: java
       tags: java
+    - role: agent
+      tags: agent, axonops-agent
     - role: cassandra
       tags: cassandra
       when: install_cassandra is defined and install_cassandra
