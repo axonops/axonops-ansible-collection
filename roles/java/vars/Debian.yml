@@ -1,5 +1,12 @@
 _java_pkg: "{% if cassandra_version is defined and cassandra_version.startswith('5') %}openjdk-17-jre-headless{% else %}openjdk-11-jre-headless{% endif %}"
-_zulu_major_version: "{% if cassandra_version is defined and cassandra_version.startswith('5') %}17{% else %}11{% endif %}"
+_zulu_major_version: >-
+  {%- if java_zulu_version is defined and java_zulu_version != '' -%}
+    {{ java_zulu_version }}
+  {%- elif cassandra_version is defined and cassandra_version.startswith('5') -%}
+    17
+  {%- else -%}
+    11
+  {%- endif -%}
 
 # Debian Bookworm JDK
 _zulu_jdk:
