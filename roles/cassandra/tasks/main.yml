@@ -26,6 +26,15 @@
   when: cassandra_install_format == "tar"
   ansible.builtin.import_tasks: install-tar.yml
 
+- name: Create tmp dir for Cassandra if it is not /tmp
+  ansible.builtin.file:
+    path: "{{ cassandra_java_tmp_dir }}"
+    state: directory
+    mode: "1777"
+    owner: "cassandra"
+    group: "cassandra"
+  when: cassandra_java_tmp_dir is defined and cassandra_java_tmp_dir != '' and cassandra_java_tmp_dir != "/tmp"
+
 - name: Create AxonOps User
   tags: axonops_user
   block:
