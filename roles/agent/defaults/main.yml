@@ -6,7 +6,9 @@ axon_java_agent: "axon-cassandra5.0-agent-jdk17"
 axon_agent_version: "2.0.2"
 axon_java_agent_version: "1.0.10"
 axon_agent_server_port: 1888
-axon_agent_tls_mode: "disabled"
+
+# This is should be left undefined unless you are using a custom AxonOps server.
+#axon_agent_tls_mode: "disabled"
 
 axon_agent_state: present
 axon_agent_ntp_server: "{{ ntp_prefered_server | default('pool.ntp.org') }}"
