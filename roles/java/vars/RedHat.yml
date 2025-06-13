@@ -1,5 +1,12 @@
 _java_pkg: "{% if cassandra_version is defined and cassandra_version.startswith('5') %}java-17-openjdk-headless{% else %}java-11-openjdk-headless{% endif %}"
-_zulu_major_version: "{% if cassandra_version is defined and cassandra_version.startswith('5') %}17{% else %}11{% endif %}"
+_zulu_major_version: >-
+  {%- if java_zulu_version is defined and java_zulu_version != '' -%}
+    {{ java_zulu_version }}
+  {%- elif cassandra_version is defined and cassandra_version.startswith('5') -%}
+    17
+  {%- else -%}
+    11
+  {%- endif -%}
 
 # RedHat
 _zulu_jdk:
