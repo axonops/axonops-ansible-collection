@@ -8,7 +8,6 @@
 - name: Confirm if SSL is required
   ansible.builtin.assert:
     that:
-      - axon_agent_tls_mode is defined
       - axon_agent_tls_mode in ['disabled', 'TLS', 'mTLS']
     fail_msg: "You must configured the axon_agent_tls_mode variable with one of the following values: disabled, TLS, mTLS."
   when: axon_agent_tls_mode is defined

@@ -1,11 +1,13 @@
 ---
 axon_agent_start_at_boot: true
 
+axon_agent_server_host: agents.axonops.cloud
+axon_agent_server_port: "{% if axon_agent_server_host == 'agents.axonops.cloud' %}443{% else %}1888{% endif %}"
+
 # Possible Options: axon-cassandra3.11-agent, axon-dse6.0-agent, axon-dse6.7-agent, axon-dse5.1-agent or ""
 axon_java_agent: "axon-cassandra5.0-agent-jdk17"
 axon_agent_version: "2.0.2"
 axon_java_agent_version: "1.0.10"
-axon_agent_server_port: 1888
 
 # This is should be left undefined unless you are using a custom AxonOps server.
 #axon_agent_tls_mode: "disabled"
