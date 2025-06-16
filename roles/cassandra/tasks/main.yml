@@ -103,6 +103,31 @@
     - "{{ cassandra_saved_caches_directory }}"
     - "{{ cassandra_data_directory }}"
 
+- name: Copy over keystores
+  tags: ssl
+  when:
+    - (cassandra_require_endpoint_verification is defined and cassandra_require_endpoint_verification | bool) or (cassandra_ssl_internode_encryption != 'none')
+    - cassandra_ssl_files is defined and cassandra_ssl_files | length > 0
+  block:
+    - name: Ensure Cassandra SSL directories exist
+      ansible.builtin.file:
+        state: directory
+        path: /opt/ssl
+        mode: '0750'
+        owner: cassandra
+        group: cassandra
+
+    - name: Copy Cassandra SSL keystore
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: /opt/ssl/
+        owner: cassandra
+        group: cassandra
+        mode: '0640'
+      loop: "{{ cassandra_ssl_files }}"
+      no_log: true
+      when: item is defined
+
 - name: Deploy configuration
   tags: config
   block:

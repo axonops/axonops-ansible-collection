@@ -35,7 +35,7 @@ axon-agent:
 {% if axon_agent_tmp_path is defined and axon_agent_tmp_path != "" %}
     tmp_path: "{{ axon_agent_tmp_path }}"
 {% endif %}
-{% if axon_agent_tls_mode is defined %}
+{% if axon_agent_tls_mode is defined and  axon_agent_tls_mode != '' %}
     tls:
       mode: "{{ axon_agent_tls_mode }}" # disabled, TLS, mTLS
 {% if axon_agent_tls_mode == "TLS" or axon_agent_tls_mode == "mTLS" %}
@@ -44,7 +44,7 @@ axon-agent:
       caFile: "{{ axon_agent_tls_cafile }}"
 {% endif %}
 {% endif %}
-{% if axon_agent_tls_mode == "mTLS" %}
+{% if axon_agent_tls_mode is defined and axon_agent_tls_mode == "mTLS" %}
       certFile: "{{ axon_agent_tls_certfile }}"
       keyFile: "{{ axon_agent_tls_keyfile }}"
 {% endif %}
