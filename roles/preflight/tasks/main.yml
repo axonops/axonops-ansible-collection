@@ -21,7 +21,7 @@
 - name: Assert OS is supported
   when: preflight_check_os is defined and preflight_check_os | bool
   ansible.builtin.assert:
-    that: ansible_distribution in ['Ubuntu', 'Debian', 'CentOS', 'RedHat']
+    that: ansible_distribution in ['Ubuntu', 'Debian', 'CentOS', 'RedHat', 'Rocky']
     fail_msg: "Unsupported OS for Apache Cassandra."
 
 - name: Check memory
