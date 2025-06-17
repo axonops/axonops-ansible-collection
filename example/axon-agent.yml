@@ -22,13 +22,13 @@
 
   roles:
     - name: java
-      role: java
+      role: axonops.axonops.java
       tags: java
-    - role: agent
+    - role: axonops.axonops.agent
       tags: agent, axonops-agent
       vars:
         axon_agent_server_host: "{{ groups['axon-server'] | first }}"
-    - role: cassandra
+    - role: axonops.axonops.cassandra
       tags: cassandra
       when: install_cassandra
       vars:

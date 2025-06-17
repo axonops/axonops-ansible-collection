@@ -1,5 +1,5 @@
 - name: Deploy AxonOps Server
-  hosts: cassandra
+  hosts: "{{ target | default('cassandra') }}"
   become: true
   vars:
     install_cassandra: true
@@ -28,12 +28,15 @@
       failed_when: false
 
   roles:
+    - name: preflight
+      tags: preflight
+      role: axonops.axonops.preflight
     - name: java
-      role: java
+      role: axonops.axonops.java
       tags: java
-    - role: agent
+    - role: axonops.axonops.agent
       tags: agent
-    - role: cassandra
+    - role: axonops.axonops.cassandra
       tags: cassandra
       when: install_cassandra is defined and install_cassandra
 
