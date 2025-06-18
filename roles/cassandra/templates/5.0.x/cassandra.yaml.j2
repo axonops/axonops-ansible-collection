@@ -2163,7 +2163,7 @@ auth_write_consistency_level: {{ cassandra_auth_write_consistency_level }}
 
 # Delays on auth resolution can lead to a thundering herd problem on reconnects; this option will enable
 # warming of auth caches prior to node completing startup. See CASSANDRA-16958
-# auth_cache_warming_enabled: false
+auth_cache_warming_enabled: "{{ cassandra_auth_cache_warming_enabled | default("false") }}"
 
 # If enabled, dynamic data masking allows to attach CQL masking functions to the columns of a table.
 # Users without the UNMASK permission will see an obscured version of the values of the columns with an attached mask.
@@ -2194,7 +2194,7 @@ transient_replication_enabled: {{ cassandra_transient_replication_enabled | defa
 drop_compact_storage_enabled: {{ cassandra_drop_compact_storage_enabled | default("false") }}
 
 # Whether or not USE <keyspace> is allowed. This is enabled by default to avoid failure on upgrade.
-#use_statements_enabled: true
+use_statements_enabled: {{ cassandra_use_statements_enabled | default("true") }}
 
 # When the client triggers a protocol exception or unknown issue (Cassandra bug) we increment
 # a client metric showing this; this logic will exclude specific subnets from updating these

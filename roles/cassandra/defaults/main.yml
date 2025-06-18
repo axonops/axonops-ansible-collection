@@ -321,3 +321,17 @@ audit_logging_options:
 cassandra_default_secondary_index_enabled: true
 cassandra_default_secondary_index: sai
 cassandra_memtable_flush_writers: 2
+
+cassandra_auth_read_consistency_level: LOCAL_QUORUM
+cassandra_auth_write_consistency_level: LOCAL_QUORUM
+
+cassandra_auth_cache_warming_enabled: true
+cassandra_use_statements_enabled: false
+cassandra_secondary_indexes_enabled: true
+cassandra_user_timestamps_enabled: true
+cassandra_simplestrategy_enabled: false
+cassandra_minimum_replication_factor_fail_threshold: 2
+cassandra_maximum_replication_factor_warn_threshold: 3
+cassandra_zero_ttl_on_twcs_warned: true
+
+cassandra_auto_snapshot_ttl: 30d
