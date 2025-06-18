@@ -2715,18 +2715,13 @@ default_secondary_index_enabled: {{ cassandra_default_secondary_index_enabled }}
 #
 storage_compatibility_mode: {{ cassandra_storage_compatibility_mode | default("NONE") }}
 
-# Any optoin new or not defined above
-{% if cassandra_additional_options is defined %}
-{{ cassandra_additional_options | to_nice_yaml }}
-{% endif %}
-
 # From cassandra_latest.yaml
 batchlog_endpoint_strategy: {{ cassandra_batchlog_endpoint_strategy | default('dynamic_remote') }}
 
 # TTL for different trace types used during logging of the repair process.
 {% if cassandra_trace_type_query_ttl is defined %}
 # Min unit: s
-trace_type_query_ttl: {{ trace_type_query_ttl | default('1d') }}
+trace_type_query_ttl: {{ cassandra_trace_type_query_ttl | default('1d') }}
 {% endif %}
 {% if cassandra_trace_type_repair_ttl is defined %}
 # Min unit: s
@@ -2735,4 +2730,9 @@ trace_type_repair_ttl: {{ cassandra_trace_type_repair_ttl | default('7d') }}
 
 {% if cassandra_user_defined_functions_enabled is defined %}
 user_defined_functions_enabled: {{ cassandra_user_defined_functions_enabled | default(false) }}
+{% endif %}
+
+# Any option new or not defined above
+{% if cassandra_additional_options is defined %}
+{{ cassandra_additional_options | to_nice_yaml }}
 {% endif %}
