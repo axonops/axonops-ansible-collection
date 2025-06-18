@@ -21,10 +21,10 @@
 
   roles:
     - name: java
-      role: java
+      role: axonops.axonops.java
       tags: java
-    - role: agent
-    - role: cassandra
+    - role: axonops.axonops.agent
+    - role: axonops.axonops.cassandra
       tags: cassandra
       when: install_cassandra is defined and install_cassandra
 

@@ -1,0 +1,5 @@
+preflight_check_memory: true
+preflight_check_ntp: true
+preflight_check_os: true
+preflight_check_cassandra_data_directory: true
+preflight_check_swap: true

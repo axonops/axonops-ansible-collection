@@ -1,0 +1,70 @@
+---
+- name: Check NTP or Chrony
+  when: preflight_check_ntp is defined and preflight_check_ntp | bool
+  block:
+    - name: Check for NTP installation
+      ansible.builtin.command: ntpd -v
+      register: ntp_check
+      ignore_errors: true
+
+    - name: Check for Chrony installation
+      ansible.builtin.command: chronyd -v
+      register: chrony_check
+      ignore_errors: true
+
+    - name: Assert Chrony is installed
+      ansible.builtin.assert:
+        that:
+          - chrony_check.rc == 0 or ntp_check.rc == 0
+        fail_msg: "Neither NTP nor Chrony is installed."
+
+- name: Assert OS is supported
+  when: preflight_check_os is defined and preflight_check_os | bool
+  ansible.builtin.assert:
+    that: ansible_distribution in ['Ubuntu', 'Debian', 'CentOS', 'RedHat', 'Rocky']
+    fail_msg: "Unsupported OS for Apache Cassandra."
+
+- name: Check memory
+  when: preflight_check_memory is defined and preflight_check_memory | bool
+  block:
+    - name: Run the free command
+      ansible.builtin.command: free -m
+      register: memory_check
+      changed_when: false
+
+    - name: Assert minimum RAM (in MB)
+      ansible.builtin.assert:
+        that: memory_check.stdout_lines[1].split()[1] | int >= 8192
+        fail_msg: "Insufficient RAM for Cassandra (minimum 8GB recommended)."
+
+- name: Check swap is disabled
+  when: preflight_check_swap is defined and preflight_check_swap | bool
+  block:
+    - name: Run the swapon command
+      ansible.builtin.command: swapon --show
+      register: swap_check
+      changed_when: false
+
+    - name: Assert swap is disabled
+      ansible.builtin.assert:
+        that: swap_check.stdout == ""
+        fail_msg: "Swap is enabled. Disable swap for Cassandra."
+
+- name: Check Cassandra data directory
+  when:
+    - preflight_check_cassandra_data_directory is defined and preflight_check_cassandra_data_directory | bool
+    - cassandra_data_directory is defined and cassandra_data_directory != ""
+  block:
+    - name: Check Cassandra data directory mount type
+      ansible.builtin.command: "findmnt -T {{ cassandra_data_directory }} -o FSTYPE -n"
+      register: mount_type
+      changed_when: false
+      ignore_errors: true
+
+    - name: Assert data directory is not on NFS/SAN
+      when: mount_type.rc == 0 and mount_type.stdout != ""
+      ansible.builtin.assert:
+        that: mount_type.stdout not in ['nfs', 'cifs', 'glusterfs']
+        fail_msg: "Cassandra data directory should not be on NFS/SAN."
+
+# code: language=ansible

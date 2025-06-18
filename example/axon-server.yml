@@ -33,19 +33,19 @@
 
   roles:
     - name: java
-      role: java
+      role: axonops.axonops.java
       tags: java
-    - role: agent
+    - role: axonops.axonops.agent
       tags: agent, axonops-agent
-    - role: cassandra
+    - role: axonops.axonops.cassandra
       tags: cassandra
       when: install_cassandra is defined and install_cassandra
-    - role: elastic
+    - role: axonops.axonops.elastic
       tags: elastic
       when: install_elastic is defined and install_elastic
-    - role: server
+    - role: axonops.axonops.server
       tags: server, axonops-server
-    - role: dash
+    - role: axonops.axonops.dash
       tags: dash, axonops-dashboard
 
 # code: language=ansible
