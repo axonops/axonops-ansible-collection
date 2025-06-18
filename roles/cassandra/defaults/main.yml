@@ -183,7 +183,7 @@ cassandra_internode_streaming_tcp_user_timeout: "5m"
 cassandra_internode_timeout: true
 
 # Slow Query Configuration
-cassandra_slow_query_log_timeout: "500ms"
+cassandra_slow_query_log_timeout: "2s"
 
 # Phi Convict Threshold
 cassandra_phi_convict_threshold: 12
@@ -237,11 +237,12 @@ cassandra_sstable_selected_format: "bti"
 #cassandra_column_index_cache_size: "2KiB"
 
 # Default Compaction Strategy
-default_compaction:
+cassandra_default_compaction:
   class_name: "UnifiedCompactionStrategy"
   parameters:
     scaling_parameters: "T4"
     target_sstable_size: "1GiB"
+    min_sstable_size: 100MiB
 
 # Trickle Fsync
 cassandra_trickle_fsync: true
@@ -316,3 +317,7 @@ audit_logging_options:
   excluded_keyspaces: system, system_schema, system_virtual_schema
   block: false  # Don't block operations if audit queue is full
   max_queue_weight: 268435456  # 256MB - max audit events in memory
+
+cassandra_default_secondary_index_enabled: true
+cassandra_default_secondary_index: sai
+cassandra_memtable_flush_writers: 2

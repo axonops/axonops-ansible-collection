@@ -1305,10 +1305,11 @@ column_index_cache_size: {{ cassandra_column_index_cache_size | default("2KiB") 
 # compaction parameters.
 #
 default_compaction:
-  class_name: UnifiedCompactionStrategy
+  class_name: {{ cassandra_default_compaction.class_name | default('UnifiedCompactionStrategy') }}
   parameters:
-    scaling_parameters: T4
-    target_sstable_size: 1GiB
+    scaling_parameters: {{ cassandra_default_compaction.scaling_parameters | default('T4') }}
+    target_sstable_size: {{ cassandra_default_compaction.target_sstable_size | default('1GiB') }}
+    min_sstable_size: {{ cassandra_default_compaction.min_sstable_size | default('100MiB') }}
 
 
 # Number of simultaneous compactions to allow, NOT including
