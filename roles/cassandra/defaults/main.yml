@@ -304,3 +304,15 @@ cassandra_jvm_gc_log_file_number: 10
 cassandra_jvm_gc_log_file_max_size_mb: 10
 cassandra_jvm_parallel_gc_threads: 4
 cassandra_jvm_conc_gc_threads: 4
+
+cassandra_audit_log_enabled: false
+audit_logging_options:
+  enabled: false
+  logger:
+    - class_name: FileAuditLogger
+  # Audit everything except QUERY (SELECT) and DML (INSERT, UPDATE, DELETE)
+  included_categories: DDL,DCL,OTHER,AUTH,ERROR
+  excluded_categories: QUERY,DML,PREPARE
+  excluded_keyspaces: system, system_schema, system_virtual_schema
+  block: false  # Don't block operations if audit queue is full
+  max_queue_weight: 268435456  # 256MB - max audit events in memory
