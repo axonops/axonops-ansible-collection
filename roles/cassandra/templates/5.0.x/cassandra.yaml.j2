@@ -2052,7 +2052,7 @@ max_value_size: {{ cassandra_max_value_size }}
 # Suggested value for use in production: 3
 {% if cassandra_default_keyspace_rf is defined %}
 default_keyspace_rf: {{ cassandra_default_keyspace_rf }}
-{% else %}
+{% endif %}
 
 # Track a metric per keyspace indicating whether replication achieved the ideal consistency
 # level for writes without timing out. This is different from the consistency level requested by
