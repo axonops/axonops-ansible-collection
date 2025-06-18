@@ -330,7 +330,7 @@ cassandra_use_statements_enabled: false
 cassandra_secondary_indexes_enabled: true
 cassandra_user_timestamps_enabled: true
 cassandra_simplestrategy_enabled: false
-cassandra_default_keyspace_rf: 3
+cassandra_default_keyspace_rf: 2
 cassandra_minimum_replication_factor_fail_threshold: 2
 cassandra_maximum_replication_factor_warn_threshold: 3
 cassandra_zero_ttl_on_twcs_warned: true
