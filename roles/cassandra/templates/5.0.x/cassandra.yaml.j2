@@ -2050,7 +2050,9 @@ max_value_size: {{ cassandra_max_value_size }}
 # A further note about system keyspaces - system_traces and system_distributed keyspaces take RF of 2 or default,
 # whichever is higher, and system_auth keyspace takes RF of 1 or default, whichever is higher.
 # Suggested value for use in production: 3
-# default_keyspace_rf: 1
+{% if cassandra_default_keyspace_rf is defined %}
+default_keyspace_rf: {{ cassandra_default_keyspace_rf }}
+{% else %}
 
 # Track a metric per keyspace indicating whether replication achieved the ideal consistency
 # level for writes without timing out. This is different from the consistency level requested by
