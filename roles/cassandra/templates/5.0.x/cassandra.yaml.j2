@@ -1399,7 +1399,7 @@ entire_sstable_stream_throughput_outbound: {{ cassandra_entire_sstable_stream_th
 # Setting this value to 0 disables throttling for entire SSTable inter-DC file streaming.
 # When unset, the default is 200 Mbps or 24 MiB/s.
 # entire_sstable_inter_dc_stream_throughput_outbound: 24MiB/s
-{% if entire_sstable_inter_dc_stream_throughput_outbound is defined and entire_sstable_inter_dc_stream_throughput_outbound.endswith('s') %}
+{% if cassandra_entire_sstable_inter_dc_stream_throughput_outbound is defined and cassandra_entire_sstable_inter_dc_stream_throughput_outbound.endswith('s') %}
 entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_entire_sstable_inter_dc_stream_throughput_outbound | default("24MiB/s") }}
 {% else %}
 entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_entire_sstable_inter_dc_stream_throughput_outbound }}MiB/s
