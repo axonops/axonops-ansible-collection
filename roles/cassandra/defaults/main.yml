@@ -238,7 +238,7 @@ cassandra_sstable_selected_format: "bti"
 
 # Default Compaction Strategy
 cassandra_default_compaction:
-  class_name: "UnifiedCompactionStrategy"
+  class_name: "SizeTieredCompactionStrategy"
   parameters:
     scaling_parameters: "T4"
     target_sstable_size: "1GiB"
