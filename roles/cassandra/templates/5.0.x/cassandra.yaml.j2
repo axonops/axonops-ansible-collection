@@ -1389,10 +1389,12 @@ stream_entire_sstables: {{ cassandra_stream_entire_sstables }}
 # Setting this value to 0 it disables throttling.
 # When unset, the default is 200 Mbps or 24 MiB/s.
 # entire_sstable_stream_throughput_outbound: 24MiB/s
-{% if cassandra_entire_sstable_stream_throughput_outbound is defined and cassandra_entire_sstable_stream_throughput_outbound.endswith('s') %}
+{% if cassandra_entire_sstable_stream_throughput_outbound is defined and cassandra_entire_sstable_stream_throughput_outbound != '' %}
+{% if cassandra_entire_sstable_stream_throughput_outbound.endswith('s') %}
 entire_sstable_stream_throughput_outbound: {{ cassandra_entire_sstable_stream_throughput_outbound | default("24MiB/s") }}
 {% else %}
 entire_sstable_stream_throughput_outbound: {{ cassandra_entire_sstable_stream_throughput_outbound }}MiB/s
+{% endif %}
 {% endif %}
 
 # Throttles entire SSTable file streaming between datacenters.
@@ -1401,7 +1403,7 @@ entire_sstable_stream_throughput_outbound: {{ cassandra_entire_sstable_stream_th
 # entire_sstable_inter_dc_stream_throughput_outbound: 24MiB/s
 {% if cassandra_entire_sstable_inter_dc_stream_throughput_outbound is defined and cassandra_entire_sstable_inter_dc_stream_throughput_outbound.endswith('s') %}
 entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_entire_sstable_inter_dc_stream_throughput_outbound | default("24MiB/s") }}
-{% else %}
+{% elif cassandra_entire_sstable_inter_dc_stream_throughput_outbound is defined and cassandra_entire_sstable_inter_dc_stream_throughput_outbound != '' %}
 entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_entire_sstable_inter_dc_stream_throughput_outbound }}MiB/s
 {% endif %}
 
@@ -1411,10 +1413,14 @@ entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_entire_sstable_
 # can lead to saturating the network connection and degrading rpc performance.
 # When unset, the default is 200 Mbps or 24 MiB/s.
 # stream_throughput_outbound: 24MiB/s
-{% if cassandra_stream_throughput_outbound is defined and cassandra_stream_throughput_outbound.endswith('s') %}
+{% if cassandra_stream_throughput_outbound is defined and cassandra_stream_throughput_outbound != '' %}
+{% if cassandra_stream_throughput_outbound.endswith('s') %}
 stream_throughput_outbound: {{ cassandra_stream_throughput_outbound | default("24MiB/s") }}
 {% else %}
 stream_throughput_outbound: {{ cassandra_stream_throughput_outbound }}MiB/s
+{% endif %}
+{% elif cassandra_stream_throughput_outbound_megabits_per_sec is defined and cassandra_stream_throughput_outbound_megabits_per_sec != '' %}
+stream_throughput_outbound: {{ cassandra_stream_throughput_outbound_megabits_per_sec }}MiB/s
 {% endif %}
 
 # Throttles all streaming file transfer between the datacenters,
@@ -1425,7 +1431,9 @@ stream_throughput_outbound: {{ cassandra_stream_throughput_outbound }}MiB/s
 # inter_dc_stream_throughput_outbound: 24MiB/s
 {% if cassandra_inter_dc_stream_throughput_outbound is defined and cassandra_inter_dc_stream_throughput_outbound.endswith('s') %}
 inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound | default("24MiB/s") }}
-{% else %}
+{% elif cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec is defined and cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec != '' %}
+inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec }}MiB/s
+{% elif cassandra_inter_dc_stream_throughput_outbound is defined and cassandra_inter_dc_stream_throughput_outbound != '' %}
 inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound }}MiB/s
 {% endif %}
 
