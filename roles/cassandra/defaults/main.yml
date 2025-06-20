@@ -63,7 +63,7 @@ cassandra_env_extra: []
 #           key_password: cassandra
 
 # Cluster Configuration
-cassandra_num_tokens: 32
+cassandra_num_tokens: 16
 
 # Hints Configuration
 cassandra_hinted_handoff_enabled: true
@@ -91,13 +91,13 @@ cassandra_cidr_authorizer_mode: "MONITOR"
 cassandra_cidr_groups_cache_refresh_interval: 5
 cassandra_ip_cache_max_size: 100
 
-# # Cache Configuration
-# # cassandra_roles_validity: "120s"
-# # cassandra_roles_update_interval: "10s"
-# # cassandra_permissions_validity: "60s"
-# # cassandra_permissions_update_interval: "10s"
-# # cassandra_credentials_validity: "120s"
-# # cassandra_credentials_update_interval: "10s"
+# Cache Configuration
+cassandra_roles_validity: "30m"
+cassandra_roles_update_interval: "1m"
+cassandra_permissions_validity: "30s"
+cassandra_permissions_update_interval: "1m"
+cassandra_credentials_validity: "2m"
+cassandra_credentials_update_interval: "1m"
 
 # Partitioner
 cassandra_partitioner: "org.apache.cassandra.dht.Murmur3Partitioner"
@@ -161,7 +161,7 @@ cassandra_read_request_timeout: "5s"
 cassandra_range_request_timeout: "10s"
 cassandra_write_request_timeout: "2s"
 cassandra_counter_write_request_timeout: "5s"
-cassandra_cas_contention_timeout: "1s"
+cassandra_cas_contention_timeout: "2s"
 cassandra_truncate_request_timeout: "60s"
 cassandra_request_timeout: "10s"
 
@@ -183,7 +183,7 @@ cassandra_internode_streaming_tcp_user_timeout: "5m"
 cassandra_internode_timeout: true
 
 # Slow Query Configuration
-cassandra_slow_query_log_timeout: "500ms"
+cassandra_slow_query_log_timeout: "2s"
 
 # Phi Convict Threshold
 cassandra_phi_convict_threshold: 12
@@ -193,7 +193,7 @@ cassandra_endpoint_snitch: "GossipingPropertyFileSnitch"
 
 # Dynamic Snitch Configuration
 cassandra_dynamic_snitch_update_interval: "100ms"
-cassandra_dynamic_snitch_reset_interval: "10m"
+cassandra_dynamic_snitch_reset_interval: "5m"
 cassandra_dynamic_snitch_badness_threshold: "0.1"
 
 # Crypto Provider
@@ -234,22 +234,23 @@ cassandra_snapshot_links_per_second: 16384
 
 # SSTable Configuration
 cassandra_sstable_selected_format: "bti"
-cassandra_column_index_cache_size: "2KiB"
+#cassandra_column_index_cache_size: "2KiB"
 
 # Default Compaction Strategy
-default_compaction:
-  class_name: "UnifiedCompactionStrategy"
+cassandra_default_compaction:
+  class_name: "SizeTieredCompactionStrategy"
   parameters:
     scaling_parameters: "T4"
     target_sstable_size: "1GiB"
+    min_sstable_size: 100MiB
 
 # Trickle Fsync
 cassandra_trickle_fsync: true
 cassandra_trickle_fsync_interval: "10MiB"
 
 # Index Summary
-cassandra_index_summary_capacity: ""
-cassadra_index_summary_resize_interval: "60m"
+#cassandra_index_summary_capacity: ""
+#cassadra_index_summary_resize_interval: "60m"
 
 # Safety Thresholds
 cassandra_tombstone_warn_threshold: 1000
@@ -261,8 +262,8 @@ cassandra_batch_size_fail_threshold: "640KiB"
 cassandra_unlogged_batch_across_partitions_warn_threshold: 10
 
 # GC Configuration
-cassandra_gc_log_threshold: "200ms"
-cassandra_gc_warn_threshold: "1000ms"
+cassandra_gc_log_threshold: "500ms"
+cassandra_gc_warn_threshold: "2000ms"
 
 # Experimental Features
 cassandra_materialized_views_enabled: false
@@ -278,7 +279,7 @@ cassandra_repaired_data_tracking_for_range_reads_enabled: false
 cassandra_repaired_data_tracking_for_partition_reads_enabled: false
 cassandra_report_unconfirmed_repaired_data_mismatches: false
 
-cassandra_column_index_size: 64KiB
+#cassandra_column_index_size: 64KiB
 
 # Transparent Data Encryption (disabled by default)
 cassandra_transparent_data_encryption_options:
@@ -304,3 +305,35 @@ cassandra_jvm_gc_log_file_number: 10
 cassandra_jvm_gc_log_file_max_size_mb: 10
 cassandra_jvm_parallel_gc_threads: 4
 cassandra_jvm_conc_gc_threads: 4
+
+cassandra_audit_log_enabled: false
+audit_logging_options:
+  enabled: false
+  logger:
+    - class_name: FileAuditLogger
+  # Audit everything except QUERY (SELECT) and DML (INSERT, UPDATE, DELETE)
+  included_categories: DDL,DCL,OTHER,AUTH,ERROR
+  excluded_categories: QUERY,DML,PREPARE
+  excluded_keyspaces: system, system_schema, system_virtual_schema
+  block: false  # Don't block operations if audit queue is full
+  max_queue_weight: 268435456  # 256MB - max audit events in memory
+
+cassandra_default_secondary_index_enabled: true
+cassandra_default_secondary_index: sai
+cassandra_memtable_flush_writers: 2
+
+cassandra_auth_read_consistency_level: LOCAL_QUORUM
+cassandra_auth_write_consistency_level: LOCAL_QUORUM
+
+cassandra_auth_cache_warming_enabled: true
+cassandra_use_statements_enabled: false
+cassandra_secondary_indexes_enabled: true
+cassandra_user_timestamps_enabled: true
+cassandra_simplestrategy_enabled: false
+cassandra_default_keyspace_rf: 2
+cassandra_minimum_replication_factor_fail_threshold: 2
+cassandra_maximum_replication_factor_warn_threshold: 3
+cassandra_zero_ttl_on_twcs_warned: true
+cassandra_stream_entire_sstables: true
+
+cassandra_auto_snapshot_ttl: 30d

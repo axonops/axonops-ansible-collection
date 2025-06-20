@@ -201,7 +201,8 @@ authenticator:
 # - AllowAllAuthorizer allows any action to any user - set it to disable authorization.
 # - CassandraAuthorizer stores permissions in system_auth.role_permissions table. Please
 #   increase system_auth keyspace replication factor if you use this authorizer.
-authorizer: {{ cassandra_authorizer | default("CassandraAuthorizer") }}
+authorizer:
+  class_name: {{ cassandra_authorizer | default("CassandraAuthorizer") }}
 
 # Part of the Authentication & Authorization backend, implementing IRoleManager; used
 # to maintain grants and memberships between roles.
@@ -213,7 +214,8 @@ authorizer: {{ cassandra_authorizer | default("CassandraAuthorizer") }}
 # - CassandraRoleManager stores role data in the system_auth keyspace. Please
 #   increase system_auth keyspace replication factor if you use this role manager.
 #role_manager: CassandraRoleManager
-role_manager: {{ cassandra_role_manager | default("CassandraRoleManager") }}
+role_manager:
+  class_name: {{ cassandra_role_manager | default("CassandraRoleManager") }}
 
 # Network authorization backend, implementing INetworkAuthorizer; used to restrict user
 # access to certain DCs
@@ -223,7 +225,8 @@ role_manager: {{ cassandra_role_manager | default("CassandraRoleManager") }}
 # - AllowAllNetworkAuthorizer allows access to any DC to any user - set it to disable authorization.
 # - CassandraNetworkAuthorizer stores permissions in system_auth.network_permissions table. Please
 #   increase system_auth keyspace replication factor if you use this authorizer.
-network_authorizer: {{ cassandra_network_authorizer | default("AllowAllNetworkAuthorizer") }}
+network_authorizer:
+  class_name: {{ cassandra_network_authorizer | default("AllowAllNetworkAuthorizer") }}
 
 # CIDR authorization backend, implementing ICIDRAuthorizer; used to restrict user
 # access from certain CIDRs
@@ -590,9 +593,9 @@ row_cache_size: {{ cassandra_row_cache_size_in_mb | default(cassandra_row_cache_
 # Min unit: s
 # row_cache_save_period: 0s
 {% if cassandra_row_cache_save_period is defined and cassandra_row_cache_save_period.endswith('s') or cassandra_row_cache_save_period.endswith('m') or cassandra_row_cache_save_period.endswith('h') %}
-key_cache_save_period: {{ cassandra_row_cache_save_period | default("0s") }}
+row_cache_save_period: {{ cassandra_row_cache_save_period | default("0s") }}
 {% else %}
-key_cache_save_period: {{ cassandra_row_cache_save_period }}s
+row_cache_save_period: {{ cassandra_row_cache_save_period }}s
 {% endif %}
 
 # Number of keys from the row cache to save.
@@ -958,7 +961,9 @@ cdc_free_space_check_interval: {{ cassandra_cdc_free_space_check_interval }}
 # is a best-effort process. In extreme conditions Cassandra may need to use
 # more than this amount of memory.
 # Min unit: KiB
+{% if cassandra_index_summary_capacity is defined and cassandra_index_summary_capacity != '' %}
 index_summary_capacity: {{ cassandra_index_summary_capacity | default("") }}
+{% endif %}
 
 # How frequently index summaries should be resampled.  This is done
 # periodically to redistribute memory from the fixed-size pool to sstables
@@ -966,7 +971,9 @@ index_summary_capacity: {{ cassandra_index_summary_capacity | default("") }}
 # process, leaving existing index summaries at their current sampling level.
 # Min unit: m
 #index_summary_resize_interval: 60m
+{% if cassadra_index_summary_resize_interval is defined and cassadra_index_summary_resize_interval != '' %}
 index_summary_resize_interval: {{ cassadra_index_summary_resize_interval | default("60m") }}
+{% endif %}
 
 # Whether to, when doing sequential writing, fsync() at intervals in
 # order to force the operating system to flush the dirty
@@ -1271,7 +1278,7 @@ sstable:
 # in use (64 KiB for BIG, 16KiB for BTI).
 # Min unit: KiB
 # column_index_size: 4KiB
-{% if cassandra_sstable_selected_format is defined %}
+{% if cassandra_column_index_size is defined  and column_index_size != ''%}
 column_index_size: {{ cassandra_column_index_size }}
 {% endif %}
 
@@ -1286,7 +1293,9 @@ column_index_size: {{ cassandra_column_index_size }}
 # This is only relevant to SSTable formats that use key cache, e.g. BIG.
 # Min unit: KiB
 #column_index_cache_size: 2KiB
+{% if cassandra_column_index_cache_size is defined and cassandra_column_index_cache_size != '' %}
 column_index_cache_size: {{ cassandra_column_index_cache_size | default("2KiB") }}
+{% endif %}
 
 # Default compaction strategy, applied when a table's parameters do not
 # specify compaction.
@@ -1296,10 +1305,11 @@ column_index_cache_size: {{ cassandra_column_index_cache_size | default("2KiB") 
 # compaction parameters.
 #
 default_compaction:
-  class_name: UnifiedCompactionStrategy
+  class_name: {{ cassandra_default_compaction.class_name | default('SizeTieredCompactionStrategy') }}
   parameters:
-    scaling_parameters: T4
-    target_sstable_size: 1GiB
+    scaling_parameters: {{ cassandra_default_compaction.scaling_parameters | default('T4') }}
+    target_sstable_size: {{ cassandra_default_compaction.target_sstable_size | default('1GiB') }}
+    min_sstable_size: {{ cassandra_default_compaction.min_sstable_size | default('100MiB') }}
 
 
 # Number of simultaneous compactions to allow, NOT including
@@ -1379,19 +1389,21 @@ stream_entire_sstables: {{ cassandra_stream_entire_sstables }}
 # Setting this value to 0 it disables throttling.
 # When unset, the default is 200 Mbps or 24 MiB/s.
 # entire_sstable_stream_throughput_outbound: 24MiB/s
-{% if cassandra_entire_sstable_stream_throughput_outbound is defined and cassandra_entire_sstable_stream_throughput_outbound.endswith('s') %}
+{% if cassandra_entire_sstable_stream_throughput_outbound is defined and cassandra_entire_sstable_stream_throughput_outbound != '' %}
+{% if cassandra_entire_sstable_stream_throughput_outbound.endswith('s') %}
 entire_sstable_stream_throughput_outbound: {{ cassandra_entire_sstable_stream_throughput_outbound | default("24MiB/s") }}
 {% else %}
 entire_sstable_stream_throughput_outbound: {{ cassandra_entire_sstable_stream_throughput_outbound }}MiB/s
+{% endif %}
 {% endif %}
 
 # Throttles entire SSTable file streaming between datacenters.
 # Setting this value to 0 disables throttling for entire SSTable inter-DC file streaming.
 # When unset, the default is 200 Mbps or 24 MiB/s.
 # entire_sstable_inter_dc_stream_throughput_outbound: 24MiB/s
-{% if entire_sstable_inter_dc_stream_throughput_outbound is defined and entire_sstable_inter_dc_stream_throughput_outbound.endswith('s') %}
+{% if cassandra_entire_sstable_inter_dc_stream_throughput_outbound is defined and cassandra_entire_sstable_inter_dc_stream_throughput_outbound.endswith('s') %}
 entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_entire_sstable_inter_dc_stream_throughput_outbound | default("24MiB/s") }}
-{% else %}
+{% elif cassandra_entire_sstable_inter_dc_stream_throughput_outbound is defined and cassandra_entire_sstable_inter_dc_stream_throughput_outbound != '' %}
 entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_entire_sstable_inter_dc_stream_throughput_outbound }}MiB/s
 {% endif %}
 
@@ -1401,11 +1413,14 @@ entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_entire_sstable_
 # can lead to saturating the network connection and degrading rpc performance.
 # When unset, the default is 200 Mbps or 24 MiB/s.
 # stream_throughput_outbound: 24MiB/s
-{% if cassandra_stream_throughput_outbound is defined and cassandra_stream_throughput_outbound.endswith('s') %}
+{% if cassandra_stream_throughput_outbound is defined and cassandra_stream_throughput_outbound != '' %}
+{% if cassandra_stream_throughput_outbound.endswith('s') %}
 stream_throughput_outbound: {{ cassandra_stream_throughput_outbound | default("24MiB/s") }}
-entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_stream_throughput_outbound | default("24MiB/s") }}
 {% else %}
-entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_stream_throughput_outbound }}MiB/s
+stream_throughput_outbound: {{ cassandra_stream_throughput_outbound }}MiB/s
+{% endif %}
+{% elif cassandra_stream_throughput_outbound_megabits_per_sec is defined and cassandra_stream_throughput_outbound_megabits_per_sec != '' %}
+stream_throughput_outbound: {{ cassandra_stream_throughput_outbound_megabits_per_sec }}MiB/s
 {% endif %}
 
 # Throttles all streaming file transfer between the datacenters,
@@ -1416,9 +1431,10 @@ entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_stream_throughp
 # inter_dc_stream_throughput_outbound: 24MiB/s
 {% if cassandra_inter_dc_stream_throughput_outbound is defined and cassandra_inter_dc_stream_throughput_outbound.endswith('s') %}
 inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound | default("24MiB/s") }}
-entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound | default("24MiB/s") }}
-{% else %}
-entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound }}MiB/s
+{% elif cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec is defined and cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec != '' %}
+inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec }}MiB/s
+{% elif cassandra_inter_dc_stream_throughput_outbound is defined and cassandra_inter_dc_stream_throughput_outbound != '' %}
+inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound }}MiB/s
 {% endif %}
 
 # Server side timeouts for requests. The server will return a timeout exception
@@ -2042,7 +2058,9 @@ max_value_size: {{ cassandra_max_value_size }}
 # A further note about system keyspaces - system_traces and system_distributed keyspaces take RF of 2 or default,
 # whichever is higher, and system_auth keyspace takes RF of 1 or default, whichever is higher.
 # Suggested value for use in production: 3
-# default_keyspace_rf: 1
+{% if cassandra_default_keyspace_rf is defined %}
+default_keyspace_rf: {{ cassandra_default_keyspace_rf }}
+{% endif %}
 
 # Track a metric per keyspace indicating whether replication achieved the ideal consistency
 # level for writes without timing out. This is different from the consistency level requested by
@@ -2155,7 +2173,7 @@ auth_write_consistency_level: {{ cassandra_auth_write_consistency_level }}
 
 # Delays on auth resolution can lead to a thundering herd problem on reconnects; this option will enable
 # warming of auth caches prior to node completing startup. See CASSANDRA-16958
-# auth_cache_warming_enabled: false
+auth_cache_warming_enabled: "{{ cassandra_auth_cache_warming_enabled | default("false") }}"
 
 # If enabled, dynamic data masking allows to attach CQL masking functions to the columns of a table.
 # Users without the UNMASK permission will see an obscured version of the values of the columns with an attached mask.
@@ -2186,7 +2204,7 @@ transient_replication_enabled: {{ cassandra_transient_replication_enabled | defa
 drop_compact_storage_enabled: {{ cassandra_drop_compact_storage_enabled | default("false") }}
 
 # Whether or not USE <keyspace> is allowed. This is enabled by default to avoid failure on upgrade.
-#use_statements_enabled: true
+use_statements_enabled: {{ cassandra_use_statements_enabled | default("true") }}
 
 # When the client triggers a protocol exception or unknown issue (Cassandra bug) we increment
 # a client metric showing this; this logic will exclude specific subnets from updating these
@@ -2705,7 +2723,24 @@ default_secondary_index_enabled: {{ cassandra_default_secondary_index_enabled }}
 #
 storage_compatibility_mode: {{ cassandra_storage_compatibility_mode | default("NONE") }}
 
-# Any optoin new or not defined above
+# From cassandra_latest.yaml
+batchlog_endpoint_strategy: {{ cassandra_batchlog_endpoint_strategy | default('dynamic_remote') }}
+
+# TTL for different trace types used during logging of the repair process.
+{% if cassandra_trace_type_query_ttl is defined %}
+# Min unit: s
+trace_type_query_ttl: {{ cassandra_trace_type_query_ttl | default('1d') }}
+{% endif %}
+{% if cassandra_trace_type_repair_ttl is defined %}
+# Min unit: s
+trace_type_repair_ttl: {{ cassandra_trace_type_repair_ttl | default('7d') }}
+{% endif %}
+
+{% if cassandra_user_defined_functions_enabled is defined %}
+user_defined_functions_enabled: {{ cassandra_user_defined_functions_enabled | default(false) }}
+{% endif %}
+
+# Any option new or not defined above
 {% if cassandra_additional_options is defined %}
 {{ cassandra_additional_options | to_nice_yaml }}
 {% endif %}
