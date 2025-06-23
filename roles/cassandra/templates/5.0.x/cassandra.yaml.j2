@@ -1297,6 +1297,7 @@ column_index_size: {{ cassandra_column_index_size }}
 column_index_cache_size: {{ cassandra_column_index_cache_size | default("2KiB") }}
 {% endif %}
 
+{% if cassandra_default_compaction.class_name is defined and cassandra_default_compaction.class_name != '' %}
 # Default compaction strategy, applied when a table's parameters do not
 # specify compaction.
 # The selected compaction strategy will also apply to system tables.
@@ -1307,9 +1308,10 @@ column_index_cache_size: {{ cassandra_column_index_cache_size | default("2KiB") 
 default_compaction:
   class_name: {{ cassandra_default_compaction.class_name | default('SizeTieredCompactionStrategy') }}
   parameters:
-    scaling_parameters: {{ cassandra_default_compaction.scaling_parameters | default('T4') }}
-    target_sstable_size: {{ cassandra_default_compaction.target_sstable_size | default('1GiB') }}
-    min_sstable_size: {{ cassandra_default_compaction.min_sstable_size | default('100MiB') }}
+    scaling_parameters: {{ cassandra_default_compaction.scaling_parameters | default('') }}
+    target_sstable_size: {{ cassandra_default_compaction.target_sstable_size | default('') }}
+    min_sstable_size: {{ cassandra_default_compaction.min_sstable_size | default('') }}
+{% endif %}
 
 
 # Number of simultaneous compactions to allow, NOT including

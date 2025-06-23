@@ -237,12 +237,12 @@ cassandra_sstable_selected_format: "bti"
 #cassandra_column_index_cache_size: "2KiB"
 
 # Default Compaction Strategy
-cassandra_default_compaction:
-  class_name: "SizeTieredCompactionStrategy"
-  parameters:
-    scaling_parameters: "T4"
-    target_sstable_size: "1GiB"
-    min_sstable_size: 100MiB
+# cassandra_default_compaction:
+#   class_name: "SizeTieredCompactionStrategy"
+#   parameters:
+#     scaling_parameters: "T4"
+#     target_sstable_size: "1GiB"
+#     min_sstable_size: 100MiB
 
 # Trickle Fsync
 cassandra_trickle_fsync: true
