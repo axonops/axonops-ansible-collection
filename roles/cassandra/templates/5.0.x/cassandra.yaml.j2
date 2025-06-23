@@ -2008,7 +2008,7 @@ replica_filtering_protection:
     # If the failure threshold is breached, it is likely that either the current page/fetch size
     # is too large or one or more replicas is severely out-of-sync and in need of repair.
     cached_rows_warn_threshold: {{ cassandra_replica_filtering_protection_cached_rows_warn_threshold | default("2000") }}
-    cached_rows_fail_threshold: {{ replica_filtering_protection_cached_rows_fail_threshold | default("32000") }}
+    cached_rows_fail_threshold: {{ cassandra_replica_filtering_protection_cached_rows_fail_threshold | default("32000") }}
 
 # Log WARN on any multiple-partition batch size exceeding this value. 5KiB per batch by default.
 # Caution should be taken on increasing the size of this threshold as it can lead to node instability.

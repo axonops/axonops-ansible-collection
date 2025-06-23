@@ -256,7 +256,7 @@ cassandra_trickle_fsync_interval: "10MiB"
 cassandra_tombstone_warn_threshold: 1000
 cassandra_tombstone_failure_threshold: 100000
 cassandra_replica_filtering_protection_cached_rows_warn_threshold: 2000
-replica_filtering_protection_cached_rows_fail_threshold: 32000
+cassandra_replica_filtering_protection_cached_rows_fail_threshold: 32000
 cassandra_batch_size_warn_threshold: "64KiB"
 cassandra_batch_size_fail_threshold: "640KiB"
 cassandra_unlogged_batch_across_partitions_warn_threshold: 10
@@ -337,3 +337,5 @@ cassandra_zero_ttl_on_twcs_warned: true
 cassandra_stream_entire_sstables: true
 
 cassandra_auto_snapshot_ttl: 30d
+
+cassandra_bash_profile: true
