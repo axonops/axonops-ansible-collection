@@ -173,8 +173,6 @@
     dest: "{{ cassandra_jmx_password_file }}"
     content: |
       {{ cassandra_jmx_user | default('cassandra') }} {{ cassandra_jmx_password }}
-      monitorRole QED
-      controlRole R&D
     owner: cassandra
     group: cassandra
     mode: "0640"
