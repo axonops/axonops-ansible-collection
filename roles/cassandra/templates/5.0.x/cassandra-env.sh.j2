@@ -328,6 +328,9 @@ JVM_OPTS="$JVM_OPTS -Djna.tmpdir={{ cassandra_jna_tmp_dir }} -Djava.io.tmpdir={{
 {% if cassandra_jmx_password is defined and cassandra_jmx_password != "" %}
 JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=true"
 JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.password.file={{ cassandra_jmx_password_file }}"
+{% if cassandra_jmx_access_file is defined and cassandra_jmx_access is defined and cassandra_jmx_access != '' and cassandra_jmx_access_file != '' %}
+JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.access.file={{ cassandra_jmx_access_file}}"
+{% endif %}
 {% endif %}
 
 {% for line in cassandra_env_extra %}

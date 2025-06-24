@@ -166,16 +166,28 @@
         - jvm17-server.options
         - jvm17-clients.options
 
-- name: JMX password
-  tags: jmx
+- name: JMX Authentication
   when: cassandra_jmx_password is defined and cassandra_jmx_password != ""
-  ansible.builtin.copy:
-    dest: "{{ cassandra_jmx_password_file }}"
-    content: |
-      {{ cassandra_jmx_user | default('cassandra') }} {{ cassandra_jmx_password }}
-    owner: cassandra
-    group: cassandra
-    mode: "0640"
+  tags: jmx
+  block:
+    - name: JMX password
+      ansible.builtin.copy:
+        dest: "{{ cassandra_jmx_password_file }}"
+        content: |
+          {{ cassandra_jmx_user | default('cassandra') }} {{ cassandra_jmx_password }}
+        owner: cassandra
+        group: cassandra
+        mode: "0640"
+
+    - name: JMX Access config
+      when:
+        - cassandra_jmx_access_file is defined and cassandra_jmx_access is defined and cassandra_jmx_access != '' and cassandra_jmx_access_file != ''
+      ansible.builtin.copy:
+        dest: "{{ cassandra_jmx_access_file }}"
+        content: "{{ cassandra_jmx_access }}"
+        owner: cassandra
+        group: cassandra
+        mode: "0640"
 
 - name: Systemd service for cassandra
   ansible.builtin.template:

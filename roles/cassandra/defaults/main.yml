@@ -344,3 +344,11 @@ cassandra_bash_profile: true
 # cassandra_jmx_user: "cassandra"
 # cassandra_jmx_password: ""
 # cassandra_jmx_password_file: "/opt/cassandra/conf/jmxremote.password"
+# cassandra_jmx_access_file: "/opt/cassandra/conf/jmxremote.access"
+# cassandra_jmx_access: |
+#   cassandra readwrite
+#   <new_superuser> readwrite
+#   <some_other_user> readonly
+#   controlRole readwrite \
+#   create javax.management.monitor.,javax.management.timer. \
+#   unregister
