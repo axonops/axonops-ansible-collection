@@ -39,12 +39,12 @@
 
 - name: Add Cassandra to the profile path
   tags: profile,cassandra,cassandra_profile
+  when: cassandra_bash_profile
   ansible.builtin.copy:
     dest: /etc/profile.d/cassandra.sh
     content: |
       export CASSANDRA_HOME={{ cassandra_home_dir }}
       export PATH=$PATH:$CASSANDRA_HOME/bin
     mode: '0644'
-  when: ansible_os_family != 'Windows'
 
 # code: language=ansible
