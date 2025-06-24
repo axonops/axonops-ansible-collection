@@ -339,3 +339,8 @@ cassandra_stream_entire_sstables: true
 cassandra_auto_snapshot_ttl: 30d
 
 cassandra_bash_profile: true
+
+# Define the JMX user and password for Cassandra (optional)
+# cassandra_jmx_user: "cassandra"
+# cassandra_jmx_password: ""
+# cassandra_jmx_password_file: "/opt/cassandra/conf/jmxremote.password"

@@ -45,6 +45,10 @@
     content: |
       export CASSANDRA_HOME={{ cassandra_home_dir }}
       export PATH=$PATH:$CASSANDRA_HOME/bin
+      {% if cassandra_jmx_password is defined and cassandra_jmx_password != "" %}
+      alias nodetool='nodetool -u {{ cassandra_jmx_user | default("cassandra") }} -pwf {{ cassandra_jmx_password_file }}'
+      {% else %}
+      {% endif %}
     mode: '0644'
 
 # code: language=ansible

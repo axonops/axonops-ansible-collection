@@ -166,6 +166,19 @@
         - jvm17-server.options
         - jvm17-clients.options
 
+- name: JMX password
+  tags: jmx
+  when: cassandra_jmx_password is defined and cassandra_jmx_password != ""
+  ansible.builtin.copy:
+    dest: "{{ cassandra_jmx_password_file }}"
+    content: |
+      {{ cassandra_jmx_user | default('cassandra') }} {{ cassandra_jmx_password }}
+      monitorRole QED
+      controlRole R&D
+    owner: cassandra
+    group: cassandra
+    mode: "0640"
+
 - name: Systemd service for cassandra
   ansible.builtin.template:
     dest: /etc/systemd/system/cassandra.service
