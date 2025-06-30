@@ -1,0 +1,13 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    cassandra_cluster_name: default
+    cassandra_dc: default
+    cassandra_rack: rack1
+    cassandra_max_heap_size: 512M
+    cassandra_version: 5.0.4
+    cassandra_start_on_boot: false
+
+  roles:
+    - role: cassandra

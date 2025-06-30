@@ -1,5 +1,5 @@
 ---
-name: AxonOps Agent Molecule
+name: Apache Cassandra Molecule
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
 
 defaults:
   run:
-    working-directory: roles/agent
+    working-directory: roles/dash
 
 jobs:
   molecule:
