@@ -1,5 +1,5 @@
 ---
-name: Apache Cassandra Molecule
+name: AxonOps Dashboard Molecule
 
 on:
   push:
