@@ -1,5 +1,7 @@
 ---
 - name: Converge
   hosts: all
+  vars:
+    axon_agent_customer_name: molecule
   roles:
     - role: agent

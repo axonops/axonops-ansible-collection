@@ -1,9 +1,0 @@
----
-  - hosts: all
-    name: Converge
-    roles:
-      - role: ar-axon-agent
-    vars:
-      docker: true
-      molecule: true
-      axon_java_agent: axon-dse5.1-agent
