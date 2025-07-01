@@ -1,0 +1,66 @@
+---
+- name: Initialize axonops_commitlog_archive for {{ org }}/{{ cluster }}
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_commitlog_archive: []
+
+- name: Load cluster-specific commitlog archive settings
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_commitlog_archive: "{{ axonops_commitlog_archive + (lookup('file', item) | from_yaml).axonops_commitlog_archive }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/commitlog_archive.yml"
+
+- name: Include the default configs
+  tags: always
+  ansible.builtin.include_vars: "{{ item }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/commitlog_archive.yml"
+
+- name: Include the vault secrets
+  tags: always
+  ansible.builtin.include_vars: "{{ item }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/vault.yml"
+
+- name: Apply Commitlog Archive Settings on {{ org }}/{{ cluster }}
+  axonops.axonops.commitlog_archive:
+    org: "{{ org }}"
+    cluster: "{{ cluster }}"
+    cluster_type: "{{ commitlog_item.cluster_type|default(omit) }}"
+    present: "{{ commitlog_item.present|default(true) }}"
+    remote_path: "{{ commitlog_item.remote_path }}"
+    remote_retention: "{{ commitlog_item.remote_retention|default('60d') }}"
+    remote_type: "{{ commitlog_item.remote_type }}"
+    timeout: "{{ commitlog_item.timeout|default('10h') }}"
+    transfers: "{{ commitlog_item.transfers|default('0') }}"
+    bw_limit: "{{ commitlog_item.bw_limit|default('') }}"
+    datacenters: "{{ commitlog_item.datacenters }}"
+    azure_account: "{{ commitlog_item.azure_account | default(omit) }}"
+    azure_endpoint: "{{ commitlog_item.azure_endpoint | default(omit)}}"
+    azure_key: "{{ commitlog_item.azure_key | default(omit)}}"
+    azure_use_msi: "{{ commitlog_item.azure_use_msi | default(omit)}}"
+    azure_msi_object_id: "{{ commitlog_item.azure_msi_object_id | default(omit)}}"
+    azure_msi_client_id: "{{ commitlog_item.azure_msi_client_id | default(omit)}}"
+    azure_msi_mi_res_id: "{{ commitlog_item.azure_msi_mi_res_id | default(omit)}}"
+    s3_region: "{{ commitlog_item.s3_region |default('')}}"
+    s3_access_key_id: "{{ s3_access_key_id }}"
+    s3_secret_access_key: "{{ s3_secret_access_key }}"
+    s3_storage_class: "{{ commitlog_item.s3_storage_class|default('STANDARD') }}"
+    s3_acl: "{{ commitlog_item.s3_acl|default('private') }}"
+    s3_encryption: "{{ commitlog_item.s3_encryption|default('AES256') }}"
+    s3_disable_checksum: "{{ commitlog_item.s3_disable_checksum|default('False') }}"
+    host: "{{ commitlog_item.host |default('')}}"
+    ssh_user: "{{ commitlog_item.ssh_user |default(omit)}}"
+    ssh_pass: "{{ commitlog_item.ssh_pass |default(omit)}}"
+    key_file: "{{ commitlog_item.key_file |default(omit)}}"
+  with_items:
+    "{{ axonops_commitlog_archive }}"
+  no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
+  loop_control:
+    loop_var: commitlog_item
+  tags:
+  - commitlogs
+  - commitlogs_archive
+
+# code: language=ansible

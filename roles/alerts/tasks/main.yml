@@ -1,0 +1,48 @@
+- name: Get org from env if not set already
+  ansible.builtin.set_fact:
+    org: "{{ lookup('env', 'AXONOPS_ORG') | default(omit) }}"
+  when: org is not defined
+
+- name: Get cluster from env if not set already
+  ansible.builtin.set_fact:
+    cluster: "{{ lookup('env', 'AXONOPS_CLUSTER') | default(omit) }}"
+  when: cluster is not defined
+
+- name: Assert all required variables are set
+  ansible.builtin.assert:
+    that:
+      - org is defined
+      - org | length > 0
+      - cluster is defined
+      - cluster | length > 0
+    fail_msg: >-
+      Required variables are missing or empty. Please ensure 'org' and 'cluster' are set.
+    success_msg: >-
+      All required variables for alerts are set.
+
+- name: Import metric alerts tasks
+  ansible.builtin.import_tasks: metrics_alerts.yml
+  tags: metrics
+
+- name: Import log alerts tasks
+  ansible.builtin.import_tasks: log_alerts.yml
+  tags: logs
+
+- name: Import backup tasks
+  ansible.builtin.import_tasks: backups.yml
+  tags: backups
+
+- name: Import alert routes tasks
+  ansible.builtin.import_tasks: alert_routes.yml
+  tags: routes
+
+- name: Import service checks tasks
+  ansible.builtin.import_tasks: service_checks.yml
+  tags: service_checks
+
+- name: Import slack tasks
+  ansible.builtin.import_tasks: slack_integration.yml
+  when: slack_url is defined
+  tags: slack
+
+# code: language=ansible

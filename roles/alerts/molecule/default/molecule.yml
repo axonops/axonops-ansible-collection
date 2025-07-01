@@ -1,0 +1,27 @@
+---
+dependency:
+  name: galaxy
+  options:
+    ignore-errors: true
+driver:
+  name: docker
+platforms:
+  - name: ${MOLECULE_INSTANCE_NAME:-"alerts"}
+    image: "geerlingguy/docker-${MOLECULE_DISTRO:-rockylinux9}-ansible:latest"
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    env:
+      AXONOPS_URL: ${AXONOPS_URL:-https://dash.axonops.cloud/}
+      AXONOPS_ORG: ${AXONOPS_ORG:-'axonops'}
+      AXONOPS_CLUSTER: ${AXONOPS_CLUSTER:-'axonsaas'}
+      AXONOPS_USERNAME: ${AXONOPS_USERNAME}
+      AXONOPS_PASSWORD: ${AXONOPS_PASSWORD}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ${HOME}/.ansible:/root/.ansible
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+provisioner:
+  name: ansible
+  playbooks:
+    converge: converge.yml

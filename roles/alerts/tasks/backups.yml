@@ -1,0 +1,76 @@
+---
+- name: Initialize axonops_backups for {{ org }}/{{ cluster }}
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_backups: []
+
+- name: Load cluster-specific backups
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_backups: "{{ axonops_backups + (lookup('file', item) | from_yaml).backups }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/backups.yml"
+
+- name: Include the default configs
+  tags: always
+  ansible.builtin.include_vars: "{{ item }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/backups.yml"
+
+- name: Include the vault secrets
+  tags: always
+  ansible.builtin.include_vars: "{{ item }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/vault.yml"
+
+- name: Apply Backup on {{ org }}/{{ cluster }}
+  axonops.axonops.backup:
+    org: "{{ org }}"
+    cluster: "{{ cluster }}"
+    cluster_type: "{{ backups_item.cluster_type|default(omit) }}"
+    present: "{{ backups_item.present|default(true) }}"
+    local_retention: "{{ backups_item.local_retention|default('10d') }}"
+    remote_path: "{{ backups_item.remote_path|default(omit) }}"
+    remote_retention: "{{ backups_item.remote_retention|default('60d') }}"
+    remote_type: "{{ backups_item.remote_type|default(omit) }}"
+    timeout: "{{ backups_item.timeout|default('10h') }}"
+    transfers: "{{ backups_item.transfers|default('1') }}"
+    remote: "{{ backups_item.remote|default(omit) }}"
+    tps_limit: "{{ backups_item.tps_limit|default('50') }}"
+    bw_limit: "{{ backups_item.bw_limit|default('') }}"
+    tag: "{{ backups_item.tag|default('') }}"
+    datacenters: "{{ backups_item.datacenters }}"
+    # nodes: {'type': 'list', 'default': []},
+    # tables_keyspace': {'type': 'list'},
+    # tables: {'type': 'list'},
+    keyspaces: "{{ backups_item.keyspaces|default([]) }}"
+    schedule: "{{ backups_item.schedule|default(True) }}"
+    schedule_expr: "{{ backups_item.schedule_expr|default('0 1 * * *') }}"
+    azure_account: "{{ backups_item.azure_account | default(omit) }}"
+    azure_endpoint: "{{ backups_item.azure_endpoint | default(omit)}}"
+    azure_key: "{{ backups_item.azure_key | default(omit)}}"
+    azure_use_msi: "{{ backups_item.azure_use_msi | default(omit)}}"
+    azure_msi_object_id: "{{ backups_item.azure_msi_object_id | default(omit)}}"
+    azure_msi_client_id: "{{ backups_item.azure_msi_client_id | default(omit)}}"
+    azure_msi_mi_res_id: "{{ backups_item.azure_msi_mi_res_id | default(omit)}}"
+    s3_region: "{{ backups_item.s3_region |default('')}}"
+    s3_access_key_id: "{{ s3_access_key_id }}"
+    s3_secret_access_key: "{{ s3_secret_access_key }}"
+    s3_storage_class: "{{ backups_item.s3_storage_class|default('STANDARD') }}"
+    s3_acl: "{{ backups_item.s3_acl|default('private') }}"
+    s3_encryption: "{{ backups_item.s3_encryption|default('AES256') }}"
+    s3_no_check_bucket: "{{ backups_item.s3_no_check_bucket|default('False') }}"
+    s3_disable_checksum: "{{ backups_item.s3_disable_checksum|default('False') }}"
+    host: "{{ backups_item.host |default('')}}"
+    ssh_user: "{{ backups_item.ssh_user |default(omit)}}"
+    ssh_pass: "{{ backups_item.ssh_pass |default(omit)}}"
+    key_file: "{{ backups_item.key_file |default(omit)}}"
+  with_items:
+    "{{ axonops_backups }}"
+  loop_control:
+    loop_var: backups_item
+  no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
+  tags:
+  - backups
+
+# code: language=ansible

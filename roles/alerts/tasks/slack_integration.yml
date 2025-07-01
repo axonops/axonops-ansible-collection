@@ -1,0 +1,15 @@
+---
+- name: Apply Slack Integration on  {{ slack_integration.key }}
+  axonops.axonops.slack_integration:
+    org: "{{ org }}"
+    cluster: "{{ slack_integration.key }}"
+    present: "{{ item.present|default(true) }}"
+    name: "{{ item.name }}"
+    webhook_url: "{{ item.webhook_url }}"
+  with_items:
+    "{{ slack_url }}"
+  tags:
+  - axonops_slack_integration
+  - slack_integration
+  - integration
+  - slack
