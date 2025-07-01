@@ -52,7 +52,7 @@ axon-agent:
 {% if axon_agent_backup_purge_interval is defined %}
     backup_purge_interval: "{{ axon_agent_backup_purge_interval }}"
 {% endif %}
-    disable_command_exec: "{{ axon_agent_disable_command_exec | default(false) | bool }}"
+    disable_command_exec: {{ axon_agent_disable_command_exec | default(false) | bool }}
     scripts_location: {{ axon_agent_scripts_location | default('/var/lib/axonops/scripts/') }}
 
 NTP:
