@@ -1,0 +1,342 @@
+######## Service Checks ########
+# This is an example set of service checks for the health of your cluster.
+# These rules are some examples of how checks can be configured for
+# your Apache Cassandra cluster. The checks defined here will be applied
+# to all clusters
+
+
+axonops_shell_check:
+
+- name: Check for schema disagreement
+  interval: 15m
+  timeout: 2m
+  shell: /bin/bash
+  present: true
+  script: |-
+    EXIT_OK=0
+    EXIT_WARNING=1
+    EXIT_CRITICAL=2
+
+    if type nodetool >/dev/null; then
+        NODETOOL=nodetool
+    elif [ -x /opt/cassandra/bin/nodetool ]; then
+        NODETOOL=/opt/cassandra/bin/nodetool
+    elif [ -x /usr/local/cassandra/bin/nodetool ]; then
+        NODETOOL=/usr/local/cassandra/bin/nodetool
+    else
+        echo "nodetool not found"
+        exit $EXIT_CRITICAL
+    fi
+    
+    # Sleep up to 60 seconds to avoid simultaneous checks
+    sleep $(shuf -i 1-60 -n 1)
+
+    schema_variations=$($NODETOOL gossipinfo | grep SCHEMA | grep -vi UNREACHABLE | sed -e 's/SCHEMA:[0-9]*://g' | uniq | wc -l)
+    if [ $? -gt 0 ]; then
+        exit $EXIT_CRITICAL=2
+    fi
+
+    if [ $schema_variations -gt 1 ]; then
+      exit $EXIT_CRITICAL
+    else
+      exit $EXIT_OK
+    fi
+
+- name: Check for node DOWN
+  interval: 15m
+  timeout: 2m
+  shell: /bin/bash
+  present: true
+  script: |-
+    EXIT_OK=0
+    EXIT_WARNING=1
+    EXIT_CRITICAL=2
+
+    WARNING_DN_COUNT=1
+    CRITICAL_DN_COUNT=2
+
+    if type nodetool >/dev/null; then
+        NODETOOL=nodetool
+    elif [ -x /opt/cassandra/bin/nodetool ]; then
+        NODETOOL=/opt/cassandra/bin/nodetool
+    elif [ -x /usr/local/cassandra/bin/nodetool ]; then
+        NODETOOL=/usr/local/cassandra/bin/nodetool
+    else
+        echo "nodetool not found"
+        exit $EXIT_CRITICAL
+    fi
+    
+    # Sleep up to 60 seconds to avoid simultaneous checks
+    sleep $(shuf -i 1-60 -n 1)
+
+    # Get the local Data Center from 'nodetool info'
+    local_dc=$($NODETOOL info | awk -F: '/Data Center/{gsub(/^[ \t]+/, "", $2); print $2}')
+    if [ -z $local_dc ]; then
+        exit $EXIT_WARN
+    fi
+
+    # Initialize counts
+    local_dn_count=0
+    remote_dn_count=0
+
+    # Declare associative arrays
+    declare -A dc_dn_counts  # Counts of DN per Data Center
+    declare -A dcrack_dn_counts  # Counts of DN per Data Center and Rack
+
+    # Initialize variables
+    current_dc=""
+    in_node_section=false
+
+    # Process 'nodetool status' output without using a subshell
+    while read -r line; do
+        # Check for Data Center line
+        if [[ "$line" =~ ^Datacenter:\ (.*) ]]; then
+            current_dc="${BASH_REMATCH[1]}"
+            continue
+        fi
+
+        # Skip irrelevant lines
+        if [[ "$line" =~ ^\s*$ ]] || [[ "$line" =~ ^==+ ]] || [[ "$line" =~ ^Status= ]]; then
+            continue
+        fi
+
+        # Trim leading spaces
+        line=$(echo "$line" | sed 's/^[ \t]*//')
+
+        # Get the status code (first field)
+        status=$(echo "$line" | awk '{print $1}')
+
+        # Process nodes with status 'DN'
+        if [[ "$status" == "DN" ]]; then
+            # Extract the Rack (last field)
+            rack=$(echo "$line" | awk '{print $NF}')
+
+            # Update counts based on whether the node is in the local DC
+            if [[ "$current_dc" == "$local_dc" ]]; then
+                ((local_dn_count++))
+            else
+                ((remote_dn_count++))
+            fi
+
+            # Update per-DC counts
+            dc_dn_counts["$current_dc"]=$(( ${dc_dn_counts["$current_dc"]} + 1 ))
+
+            # Update per-DC:Rack counts
+            dcrack_key="${current_dc}:${rack}"
+            dcrack_dn_counts["$dcrack_key"]=$(( ${dcrack_dn_counts["$dcrack_key"]} + 1 ))
+        fi
+    done < <($NODETOOL status)
+
+    # Output the counts
+    echo "DN in local DC ($local_dc): $local_dn_count"
+    echo "DN in remote DC: $remote_dn_count"
+
+    echo -e "\n'DN' node counts per Data Center:"
+    for dc in "${!dc_dn_counts[@]}"; do
+        echo "DC '$dc': ${dc_dn_counts[$dc]} DN nodes"
+    done
+
+    echo -e "\n'DN' node counts per Data Center and Rack:"
+    for dcrack in "${!dcrack_dn_counts[@]}"; do
+        echo "$dcrack: ${dcrack_dn_counts[$dcrack]} DN nodes"
+    done
+
+    for dc in "${!dc_dn_counts[@]}"; do
+        if [ ${dc_dn_counts[$dc]} -ge $CRITICAL_DN_COUNT ]; then
+            exit $EXIT_CRITICAL
+        elif [ ${dc_dn_counts[$dc]} -eq $WARNING_DN_COUNT ]; then
+            exit $EXIT_WARNING
+        fi
+    done
+
+    exit $EXIT_OK
+
+- name: SSL certificate check
+  interval: 12h
+  timeout: 1m
+  script: |-
+    set -euo pipefail
+    EXIT_OK=0
+    EXIT_WARNING=1
+    EXIT_CRITICAL=2
+    if output=$(echo | openssl s_client -connect {{.comp_listen_address}}:{{.comp_native_transport_port}} 2>/dev/null); then
+      # Check OCSP validity
+      if echo "$output" | openssl x509 -noout -ocspid > /dev/null 2>&1; then
+        echo "OCSP stapling is OK."
+      else
+        echo "OCSP stapling is NOT available or the OCSP response is INVALID."
+        exit $EXIT_CRITICAL
+      fi
+      # Check certificate expiration
+      if echo "$output" | openssl x509 -noout -checkend 432000; then
+        if echo "$output" | openssl x509 -noout -checkend 864000; then
+          echo "The certificate on {{.comp_listen_address}}:{{.comp_native_transport_port}} will NOT expire in the next 10 days!"
+        else
+          echo "Certificate will expire within 10 days!"
+          echo "(or is invalid)"
+          exit $EXIT_WARNING
+        fi
+      else
+        echo "Certificate has expired or will do so within 5 days!"
+        echo "(or is invalid)"
+        exit $EXIT_CRITICAL
+      fi
+    else
+      echo "Unable to connect to {{.comp_listen_address}}:{{.comp_native_transport_port}}. Endpoint is unreachable."
+      exit $EXIT_OK
+    fi
+
+- name: Debian / Ubuntu - Check host needs reboot
+  interval: 12h
+  present: true
+  timeout: 1m
+  script: |-
+    set -euo pipefail
+
+    if [ -f /var/run/reboot-required ]
+    then
+        echo `hostname` Reboot required
+        exit 1
+    else
+        echo "Nothing to do"
+    fi
+
+- name: Check AWS events
+  interval: 12h
+  present: true
+  timeout: 1m
+  shell: '/usr/bin/python3'
+  script: |-
+    import urllib.request
+    import json
+
+    url = "http://169.254.169.254/latest/meta-data/events/maintenance/scheduled"
+    response = urllib.request.urlopen(url).read()
+
+    data = json.loads(response.decode('utf-8'))
+
+    if not data:
+        print("No events for this node")
+        exit(0)
+    else:
+        print("Events detected:")
+        for event in data:
+            print(f"{event['NotBefore']} - {event['Description']}")
+        exit(1)
+
+- name: Check for commitlog archives
+  interval: 12h
+  present: true
+  timeout: 1m
+  script: |-
+    #!/bin/bash
+
+    # Directory containing .axon_commit_log as a subdirectory
+    commit_log_dir="{{ .comp_commitlog_directory }}"
+
+    # Random sleep between 0 and 60 seconds
+    sleep $(( $RANDOM % 60 ))
+
+    # Full path to the .axon_commit_log directory
+    log_dir="${commit_log_dir}/.axon_commit_log"
+
+    # Exit silently with 0 if directory does not exist
+    if [[ ! -d "$log_dir" ]]; then
+        exit 0
+    fi
+
+    # Count the number of files (not directories) in the directory
+    file_count=$(find "$log_dir" -type f | wc -l)
+
+    if [[ $file_count -gt 20 ]]
+        echo "ERROR: More than 20 files ($file_count) in $log_dir."
+        exit 2
+    elif [[ $file_count -gt 10 ]]; then
+        echo "WARNING: More than 10 files ($file_count) in $log_dir."
+        exit 1
+    else
+        echo "OK: $file_count files in $log_dir."
+        exit 0
+    fi
+
+- name: Cassandra CQL Consistency Level Test Script
+  interval: 12h
+  present: true
+  timeout: 1m
+  script: |-
+    #!/bin/bash
+    #
+    # Cassandra CQL Consistency Level Test Script
+    # Executes read-only test queries at EACH_QUORUM, LOCAL_QUORUM, and LOCAL_ONE consistency levels
+    # Returns non-zero exit code on any error
+     
+    # Connection parameters {{.comp_listen_address}}:{{.comp_native_transport_port}}
+    # Uncomment this two variables to test in local 
+    # CASSANDRA_HOST="10.0.1.113"
+    # CASSANDRA_PORT="9042"
+    
+    # Comment out to test in local
+    CASSANDRA_HOST="{{.comp_listen_address}}"
+    CASSANDRA_PORT="{{.comp_native_transport_port}}"
+     
+    # Verify cqlsh installation
+    if ! command -v /opt/cassandra/bin/cqlsh &> /dev/null; then
+        echo -e "Error: cqlsh not found. Install Cassandra client tools."
+        exit 1
+    fi
+     
+    # Connection command
+    CQLSH_CMD="/opt/cassandra/bin/cqlsh $CASSANDRA_HOST $CASSANDRA_PORT"
+     
+    # Initialize error counter
+    ERRORS=0
+     
+    # Execute read-only test with specified consistency level
+    execute_test() {
+        local level=$1
+        local query=$2
+        local description=$3
+       
+        echo -e "Testing: $description (CL: $level)"
+        output=$($CQLSH_CMD -e "CONSISTENCY $level; $query;" 2>&1)
+        result=$?
+       
+        if [ $result -eq 0 ]; then
+            echo -e "Success: Read operation completed"
+        else
+            echo -e "Error: Read failed (Code: $result)"
+            echo -e "Error details: $output"
+            ((ERRORS++))
+        fi
+        echo ""
+    }
+     
+     
+    # Main test sequence
+    run_tests() {
+        declare -a TEST_CASES=(
+            "EACH_QUORUM:select x from y limit 10:Each quorum consistency read"
+            "LOCAL_QUORUM:select x from y limit 10:Local quorum read"
+            "LOCAL_ONE:select x from y limit 10:Local one read"
+        )
+     
+        for test_case in "${TEST_CASES[@]}"; do
+            IFS=':' read -r level query description <<< "$test_case"
+            execute_test "$level" "$query" "$description"
+        done
+    }
+     
+     
+    # Main execution flow
+    run_tests
+     
+    # Exit with appropriate code
+    if [ $ERRORS -gt 0 ]; then
+        echo -e "Test failed with $ERRORS error(s)"
+        exit 1
+    else
+        echo -e "All read-only tests completed successfully"
+        exit 0
+    fi
+
+axonops_tcp_check: []

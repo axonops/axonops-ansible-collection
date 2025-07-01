@@ -1,0 +1,84 @@
+######## Cassandra Alert Routes ########
+# This is an example set of AxonOps alert routes.
+# Alert endpoints are defined for your entire org. However. the routes
+# are defined per cluster.
+
+axonops_alert_routes:
+
+#### Global Alert Routes ####
+- integration_name: example_opsgenie_integration_ops
+  integration_type: opsgenie
+  type: global
+  severity: error
+  enable_override: false
+
+- integration_name: example_opsgenie_integration_ops
+  integration_type: opsgenie
+  type: global
+  severity: warning
+  enable_override: false
+
+- integration_name: example_slack_integration_ops
+  integration_type: slack
+  type: global
+  severity: info
+  enable_override: false
+
+#### Backups Alert Routes Override ####
+- integration_name: example_slack_integration_backups
+  integration_type: slack
+  type: backups
+  severity: error
+  enable_override: true
+
+- integration_name: example_slack_integration_backups
+  integration_type: slack
+  type: backups
+  severity: warning
+  enable_override: true
+
+- integration_name: example_slack_integration_backups
+  integration_type: slack
+  type: backups
+  severity: info
+  enable_override: true
+
+
+#### Metrics Alerts Routes Override ####
+- integration_name: example_slack_integration_metrics
+  integration_type: slack
+  type: metrics
+  severity: error
+  enable_override: true
+
+- integration_name: example_slack_integration_metrics
+  integration_type: slack
+  type: backups
+  severity: warning
+  enable_override: true
+
+- integration_name: example_slack_integration_metrics
+  integration_type: slack
+  type: backups
+  severity: info
+  enable_override: true
+
+
+#### Repair Alerts Routes Override ####
+- integration_name: example_slack_integration_repair
+  integration_type: slack
+  type: repairs
+  severity: error
+  enable_override: true
+
+- integration_name: example_slack_integration_repair
+  integration_type: slack
+  type: repairs
+  severity: warning
+  enable_override: true
+
+- integration_name: example_slack_integration_repair
+  integration_type: slack
+  type: repairs
+  severity: info
+  enable_override: true
