@@ -52,17 +52,12 @@ axon-agent:
 {% if axon_agent_backup_purge_interval is defined %}
     backup_purge_interval: "{{ axon_agent_backup_purge_interval }}"
 {% endif %}
+    disable_command_exec: {{ axon_agent_disable_command_exec | default(false) | bool }}
+    scripts_location: {{ axon_agent_scripts_location | default('/var/lib/axonops/scripts/') }}
 
 NTP:
     host: "{{ axon_agent_ntp_server }}" # Specify your NTP server IP address or hostname
     timeout: {{ axon_agent_ntp_timeout | default(6) }}
-
-# Optionally restrict which commands can be executed by axon-agent.
-# If "true", only scripts placed in scripts_location can be executed by axon-agent.
-disable_command_exec: "{{ axon_agent_disable_command_exec | default(false) | bool }}"
-# If disable_command_exec is true then axon-agent is only allowed to execute scripts
-# under this path
-scripts_location: {{ axon_agent_scripts_location | default('/var/lib/axonops/scripts/') }}
 
 {% if axon_agent_include_service_config %}
 {% if axon_java_agent.startswith('axon-dse') %}
