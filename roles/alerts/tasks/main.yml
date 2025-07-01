@@ -80,4 +80,8 @@
   tags: pagerduty_integration
   when: pagerduty_integration is defined
 
+- name: Import dashboard
+  ansible.builtin.import_tasks: dashboards.yml
+  tags: dashboards
+
 # code: language=ansible
