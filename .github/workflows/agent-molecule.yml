@@ -16,7 +16,7 @@ defaults:
 
 jobs:
   molecule:
-    name: Molecule
+    name: Molecule AxonOps Agent
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -39,7 +39,7 @@ jobs:
         run: pip3 install ansible molecule molecule-plugins[docker] docker
 
       - name: Run Molecule tests.
-        run: molecule test
+        run: molecule --debug converge
         env:
           PY_COLORS: '1'
           ANSIBLE_FORCE_COLOR: '1'

@@ -16,7 +16,7 @@ defaults:
 
 jobs:
   molecule:
-    name: Molecule
+    name: Molecule Dashboard
     runs-on: ubuntu-latest
     strategy:
       matrix:

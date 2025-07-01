@@ -16,7 +16,7 @@ defaults:
 
 jobs:
   molecule:
-    name: Molecule
+    name: Molecule Elastic
     runs-on: ubuntu-latest
     strategy:
       matrix:
