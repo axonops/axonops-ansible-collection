@@ -1,6 +1,7 @@
 ---
 - name: Converge
   hosts: all
-  
+  vars:
+    molecule: true
   roles:
     - role: elastic
