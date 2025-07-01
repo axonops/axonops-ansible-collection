@@ -9,3 +9,5 @@
   - axonops_agent_disconnection_tolerance
   - agent_disconnection_tolerance
   - disconnection_tolerance
+
+# code: language=ansible

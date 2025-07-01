@@ -3,7 +3,7 @@
   axonops.axonops.human_readableid:
     org: "{{ org }}"
     cluster: "{{ human_readableid.key }}"
-    present: "{{ item.present|default(true) }}"
+    present: "{{ item.present | default(true) }}"
     id: "{{ item.id|default('axon_agent_hostname') }}"
   with_items:
     "{{ human_readableid.value }}"
@@ -11,3 +11,5 @@
   - axonops_human_readableid
   - human_readableid
   - readableid
+
+# code: language=ansible
