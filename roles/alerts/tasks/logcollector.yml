@@ -1,0 +1,20 @@
+---
+- name: Install logcollector on {{ logcollector.key }}
+  axonops.axonops.logcollector:
+    org: "{{ org }}"
+    cluster: "{{ logcollector.key }}"
+    name: "{{ item.name }}"
+    interval: "{{ item.interval|default('5s') }}"
+    timeout: "{{ item.timeout|default('1m') }}"
+    filename: "{{ item.filename }}"
+    dateFormat: "{{ item.dateFormat }}"
+    readonly: "{{ item.readonly|default(false) }}"
+    present: "{{ item.present|default(true) }}"
+  with_items:
+    "{{ logcollector.value }}"
+  tags:
+  - axonops_logcollector
+  - logcollectors
+  - logcollector
+  - logs
+  - log

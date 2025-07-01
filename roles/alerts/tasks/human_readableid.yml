@@ -1,0 +1,13 @@
+---
+- name: Apply Human ReadableID on {{ human_readableid.key }}
+  axonops.axonops.human_readableid:
+    org: "{{ org }}"
+    cluster: "{{ human_readableid.key }}"
+    present: "{{ item.present|default(true) }}"
+    id: "{{ item.id|default('axon_agent_hostname') }}"
+  with_items:
+    "{{ human_readableid.value }}"
+  tags:
+  - axonops_human_readableid
+  - human_readableid
+  - readableid

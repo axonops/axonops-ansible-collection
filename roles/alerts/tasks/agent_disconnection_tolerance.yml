@@ -1,0 +1,11 @@
+---
+- name: Set the agent disconnection tolerance on {{ agent_disconnection_tolerance.key }}
+  axonops.axonops.agent_disconnection_tolerance:
+    org: "{{ org }}"
+    cluster: "{{ agent_disconnection_tolerance.key }}"
+    warn_timeout: "{{ agent_disconnection_tolerance.value.warn_timeout|default('30s') }}"
+    error_timeout: "{{ agent_disconnection_tolerance.value.error_timeout|default('1m') }}"
+  tags:
+  - axonops_agent_disconnection_tolerance
+  - agent_disconnection_tolerance
+  - disconnection_tolerance

@@ -1,0 +1,17 @@
+---
+- name: Install pagerduty integration on {{ pagerduty_integration.key }}
+  axonops.axonops.pagerduty_integration:
+    org: "{{ org }}"
+    cluster: "{{ pagerduty_integration.key }}"
+    name: "{{ item.name }}"
+    integration_key: "{{ item.integration_key }}"
+    present: "{{ item.present | default(true) }}"
+  with_items:
+    "{{ pagerduty_integration.value }}"
+  tags:
+  - axonops_pagerduty_integration
+  - pagerduty_integration
+  - integration
+  - pagerduty
+
+# code: language=ansible
