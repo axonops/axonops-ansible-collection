@@ -78,5 +78,6 @@
 - name: Import tasks from pagerduty_integration.yml
   ansible.builtin.import_tasks: pagerduty_integration.yml
   tags: pagerduty_integration
+  when: pagerduty_integration is defined
 
 # code: language=ansible
