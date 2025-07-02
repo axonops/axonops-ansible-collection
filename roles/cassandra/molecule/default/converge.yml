@@ -8,6 +8,17 @@
     cassandra_max_heap_size: 512M
     cassandra_version: 5.0.4
     cassandra_start_on_boot: false
-
+  pre_tasks:
+    # bug in the container we use for testing
+    - name: "Create /usr/share/man/man1/"
+      ansible.builtin.file:
+        path: /usr/share/man/man1/
+        state: directory
+        recurse: true
+        mode: "0755"
   roles:
+    - role: java
+      vars:
+        java_use_zulu: true
+        #java_pkg: openjdk-11-jre-headless
     - role: cassandra

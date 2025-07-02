@@ -1,6 +1,6 @@
 ---
 - name: Add AxonOps yum repository
-  yum_repository:
+  ansible.builtin.yum_repository:
     name: axonops-yum
     description: "AxonOps Repository"
     baseurl: "{{ axon_agent_redhat_repository | default('https://packages.axonops.com/yum') }}"

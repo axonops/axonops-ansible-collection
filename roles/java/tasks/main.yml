@@ -67,17 +67,22 @@
       ansible.builtin.set_fact:
         java_zulu_installed: true
 
+- name: Run apt-update
+  when: ansible_os_family == 'Debian'
+  ansible.builtin.apt:
+    update_cache: true
+
 - name: Install Java
   ansible.builtin.package:
     name: "{{ java_pkg | default(_java_pkg) }}"
     state: present
-  when: java_zulu_installed is not defined or java_zulu_installed == false
+  when: java_zulu_installed is not defined or not java_zulu_installed
 
 - name: Select Zulu Java as default
   community.general.alternatives:
     name: java
     path: "/usr/lib/jvm/zulu{{ _zulu_major_version }}/bin/java"
     link: /usr/bin/java
-  when: java_zulu_installed is defined and java_zulu_installed == true
+  when: java_zulu_installed is defined and java_zulu_installed
 
 # code: language=ansible
