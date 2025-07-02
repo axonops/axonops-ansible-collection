@@ -19,7 +19,7 @@
     - "config/{{ org }}/{{ cluster }}/dashboards.yml"
 
 - name: "Install dashboard templates on {{ org }}/{{ cluster }}"
-  axonops.configuration.dashboard_template:
+  axonops.axonops.dashboard_template:
     org: "{{ org }}"
     cluster: "{{ cluster }}"
     cluster_type: "{{ dashboard_item.cluster_type | default(omit) }}"
