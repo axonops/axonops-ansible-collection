@@ -3,6 +3,7 @@
   tags: always
   ansible.builtin.set_fact:
     axonops_dashboard_templates: []
+  when: axonops_dashboard_templates is not defined
 
 - name: Load organization-wide alert rules
   tags: always

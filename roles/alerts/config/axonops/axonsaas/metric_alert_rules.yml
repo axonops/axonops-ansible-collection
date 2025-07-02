@@ -1,9 +1,0 @@
-axonops_alert_rules:
-  - name: CPU usage per host
-    dashboard: System
-    chart: CPU usage per host
-    operator: '>='
-    critical_value: 99
-    warning_value: 90
-    duration: 1h
-    description: Detected High CPU usage

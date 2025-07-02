@@ -3,6 +3,7 @@
   tags: always
   ansible.builtin.set_fact:
     axonops_shell_check: []
+  when: axonops_shell_check is not defined
 
 - name: Load organization-wide shell check rules
   tags: always

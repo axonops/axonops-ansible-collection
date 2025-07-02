@@ -3,6 +3,7 @@
   tags: always
   ansible.builtin.set_fact:
     axonops_commitlog_archive: []
+  when: axonops_commitlog_archive is not defined
 
 - name: Load cluster-specific commitlog archive settings
   tags: always

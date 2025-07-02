@@ -3,6 +3,7 @@
   tags: always
   ansible.builtin.set_fact:
     axonops_alert_rules: []
+  when: axonops_alert_rules is not defined
 
 - name: Load organization-wide alert rules
   tags: always
