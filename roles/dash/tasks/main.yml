@@ -1,7 +1,7 @@
 ---
 # Online installation
 - name: Import OS specific variables
-  include_tasks: "repo/{{ ansible_os_family }}.yml"
+  ansible.builtin.include_tasks: "repo/{{ ansible_os_family }}.yml"
   tags:
     - axon_dash_repo
 
@@ -18,19 +18,19 @@
     mode: '0644'
 
 - name: Create service override file
-  template:
+  ansible.builtin.template:
     src: axon-dash-service.j2
     dest: /etc/systemd/system/axon-dash.service.d/override.conf
     mode: '0644'
   notify: reload systemd
 
 - name: Add version to the package name
-  set_fact:
+  ansible.builtin.set_fact:
     axon_dash_versioned_package: "axon-dash-{{ axon_dash_version }}"
   when: axon_dash_version is defined and axon_dash_version != ''
 
 - name: Ensure Axon Dashboard is installed.
-  package:
+  ansible.builtin.package:
     name: "{{ axon_dash_versioned_package | default('axon-dash') }}"
     state: "{{ axon_dash_state }}"
   notify:
@@ -38,33 +38,44 @@
   when: has_internet_access
 
 # Offline installation
-- name: Copy AxonOps Dashboard package to target
-  copy:
-    src: "{{ axon_dash_download_path }}"
-    dest: "/tmp/axon-dash-{{ axon_dash_version }}.x86_64.rpm"
-  when: not has_internet_access
+- name: Offline installation
+  when: not has_internet_access and axon_dash_download_path is defined
+  block:
+    - name: Set RPM architecture variable
+      ansible.builtin.set_fact:
+        pkg_arch: >-
+          {% if ansible_architecture == 'aarch64' %}aarch64{% else %}x86_64{% endif %}
 
-- name: Install AxonOps Dashboard offline
-  package:
-    name: "/tmp/axon-dash-{{ axon_dash_version }}.x86_64.rpm"
-    state: present
-  notify:
-    - restart axon-dash
-  when: not has_internet_access
+    - name: Copy AxonOps Dashboard package to target
+      ansible.builtin.copy:
+        src: "{{ axon_dash_download_path }}"
+        dest: "/tmp/axon-dash-{{ axon_dash_version }}.{{ pkg_arch }}.rpm"
+        mode: "0644"
+        owner: "{{ ansible_user | default('root') }}"
+        group: "{{ ansible_user | default('root') }}"
 
-- name: Configure dashboard
-  template:
+    - name: Install AxonOps Dashboard offline
+      ansible.builtin.package:
+        name: "/tmp/axon-dash-{{ axon_dash_version }}.{{ pkg_arch }}.rpm"
+        state: present
+      notify:
+        - restart axon-dash
+
+- name: "Configure dashboard"
+  ansible.builtin.template:
     src: axon-dash.yml.j2
     dest: /etc/axonops/axon-dash.yml
+    mode: "0644"
   notify:
     - restart axon-dash
 
 - name: Make sure the dashboard is started on boot
   when: axon_dash_start_at_boot
-  service:
+  ansible.builtin.service:
     name: axon-dash
     state: started
-    enabled: yes
+    enabled: true
 
-- import_tasks: nginx.yml
+- name: Nginx tasks
+  ansible.builtin.import_tasks: nginx.yml
   when: axon_dash_nginx is defined and axon_dash_nginx.enabled
