@@ -38,8 +38,18 @@ jobs:
       - name: Install test dependencies.
         run: pip3 install ansible molecule molecule-plugins[docker] docker
 
-      - name: Run Molecule tests.
-        run: molecule --debug destroy; molecule --debug converge
+      - name: Run Molecule destroy (ignore failures)
+        run: molecule -v destroy
+        continue-on-error: true
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: agent-${{ matrix.distro }}
+
+      - name: Run Molecule converge
+        run: molecule -v converge
         env:
           PY_COLORS: '1'
           ANSIBLE_FORCE_COLOR: '1'
