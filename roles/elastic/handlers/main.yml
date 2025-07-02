@@ -1,13 +1,13 @@
 - name: reload systemd configuration
-  become: true
   systemd:
     daemon_reload: true
 
 # Restart service and ensure it is enabled
-
 - name: restart elasticsearch
-  become: true
-  service: name=elasticsearch state=restarted enabled=yes
+  service:
+    name: elasticsearch
+    state: restarted
+    enabled: true
   when:
     - es_restart_on_change
     - es_start_service
