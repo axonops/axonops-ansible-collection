@@ -27,7 +27,7 @@ axonops_shell_check:
         echo "nodetool not found"
         exit $EXIT_CRITICAL
     fi
-    
+
     # Sleep up to 60 seconds to avoid simultaneous checks
     sleep $(shuf -i 1-60 -n 1)
 
@@ -65,7 +65,7 @@ axonops_shell_check:
         echo "nodetool not found"
         exit $EXIT_CRITICAL
     fi
-    
+
     # Sleep up to 60 seconds to avoid simultaneous checks
     sleep $(shuf -i 1-60 -n 1)
 
@@ -269,38 +269,38 @@ axonops_shell_check:
     # Cassandra CQL Consistency Level Test Script
     # Executes read-only test queries at EACH_QUORUM, LOCAL_QUORUM, and LOCAL_ONE consistency levels
     # Returns non-zero exit code on any error
-     
+
     # Connection parameters {{.comp_listen_address}}:{{.comp_native_transport_port}}
-    # Uncomment this two variables to test in local 
+    # Uncomment this two variables to test in local
     # CASSANDRA_HOST="10.0.1.113"
     # CASSANDRA_PORT="9042"
-    
+
     # Comment out to test in local
     CASSANDRA_HOST="{{.comp_listen_address}}"
     CASSANDRA_PORT="{{.comp_native_transport_port}}"
-     
+
     # Verify cqlsh installation
     if ! command -v /opt/cassandra/bin/cqlsh &> /dev/null; then
         echo -e "Error: cqlsh not found. Install Cassandra client tools."
         exit 1
     fi
-     
+
     # Connection command
     CQLSH_CMD="/opt/cassandra/bin/cqlsh $CASSANDRA_HOST $CASSANDRA_PORT"
-     
+
     # Initialize error counter
     ERRORS=0
-     
+
     # Execute read-only test with specified consistency level
     execute_test() {
         local level=$1
         local query=$2
         local description=$3
-       
+
         echo -e "Testing: $description (CL: $level)"
         output=$($CQLSH_CMD -e "CONSISTENCY $level; $query;" 2>&1)
         result=$?
-       
+
         if [ $result -eq 0 ]; then
             echo -e "Success: Read operation completed"
         else
@@ -310,8 +310,8 @@ axonops_shell_check:
         fi
         echo ""
     }
-     
-     
+
+
     # Main test sequence
     run_tests() {
         declare -a TEST_CASES=(
@@ -319,17 +319,17 @@ axonops_shell_check:
             "LOCAL_QUORUM:select x from y limit 10:Local quorum read"
             "LOCAL_ONE:select x from y limit 10:Local one read"
         )
-     
+
         for test_case in "${TEST_CASES[@]}"; do
             IFS=':' read -r level query description <<< "$test_case"
             execute_test "$level" "$query" "$description"
         done
     }
-     
-     
+
+
     # Main execution flow
     run_tests
-     
+
     # Exit with appropriate code
     if [ $ERRORS -gt 0 ]; then
         echo -e "Test failed with $ERRORS error(s)"

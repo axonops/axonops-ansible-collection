@@ -1855,7 +1855,7 @@ axonops_dashboard_templates:
     title: Network Transmitted (bytes)
     type: line-chart
     uuid: b241bf5d-0756-43b6-85fc-893322090a0d
--         {
+  - {
             "uuid": "36b858ff-edef-4d5a-b692-0c1df1ac51ae",
             "name": "Coordinator mode",
             "filters": [

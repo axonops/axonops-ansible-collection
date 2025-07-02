@@ -3,8 +3,11 @@
   axonops.axonops.human_readableid:
     org: "{{ org }}"
     cluster: "{{ human_readableid.key }}"
-    present: "{{ item.present | default(true) }}"
-    id: "{{ item.id|default('axon_agent_hostname') }}"
+    present: "{{ human_readableid.present | default(true) }}"
+    id: "{{ human_readableid.id | default('axon_agent_hostname') }}"
+    auth_token: "{{ human_readableid.auth_token | default(omit) }}"
+    username: "{{ human_readableid.username | default(omit) }}"
+    password: "{{ human_readableid.password | default(omit) }}"
   with_items:
     "{{ human_readableid.value }}"
   tags:

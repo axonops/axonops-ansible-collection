@@ -42,6 +42,9 @@
     dc: "{{ metricsalerts_item.dc | default([]) }}"
     rack: "{{ metricsalerts_item.rack | default([]) }}"
     host_id: "{{ metricsalerts_item.host_id | default([]) }}"
+    auth_token: "{{ metricsalerts_item.auth_token | default(omit) }}"
+    username: "{{ metricsalerts_item.username | default(omit) }}"
+    password: "{{ metricsalerts_item.password | default(omit) }}"
   loop: "{{ axonops_alert_rules }}"
   no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
   loop_control:

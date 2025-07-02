@@ -101,9 +101,6 @@ axonops_alert_rules:
   duration: 15m
   description: Failed Auth requests against Kafka Controller
 
-
-
-
 ######## SYSTEM ALERTS ########
 - name: CPU usage per host
   dashboard: System

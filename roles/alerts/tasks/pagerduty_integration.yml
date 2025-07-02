@@ -3,9 +3,12 @@
   axonops.axonops.pagerduty_integration:
     org: "{{ org }}"
     cluster: "{{ pagerduty_integration.key }}"
-    name: "{{ item.name }}"
-    integration_key: "{{ item.integration_key }}"
-    present: "{{ item.present | default(true) }}"
+    name: "{{ pagerduty_integration.name }}"
+    integration_key: "{{ pagerduty_integration.integration_key }}"
+    present: "{{ pagerduty_integration.present | default(true) }}"
+    auth_token: "{{ pagerduty_integration.auth_token | default(omit) }}"
+    username: "{{ pagerduty_integration.username | default(omit) }}"
+    password: "{{ pagerduty_integration.password | default(omit) }}"
   with_items:
     "{{ pagerduty_integration.value }}"
   tags:

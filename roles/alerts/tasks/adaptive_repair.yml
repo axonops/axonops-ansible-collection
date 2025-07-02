@@ -1,16 +1,19 @@
 ---
-- name: Apply Adaptive Repair on {{ adaptive_repair.key }}
+- name: "Apply Adaptive Repair on {{ adaptive_repair.key }}"
   axonops.axonops.adaptive_repair:
     org: "{{ org }}"
     cluster: "{{ adaptive_repair.key }}"
-    active: "{{ adaptive_repair.value.active|default(true) }}"
-    parallelism: "{{ adaptive_repair.value.parallelism|default(10) }}"
-    gc_grace: "{{ adaptive_repair.value.gc_grace|default(86400) }}"
-    #segments: "{{ adaptive_repair.value.segments|default() }}"
-    segment_target_size_mb: "{{ adaptive_repair.value.segment_target_size_mb|default(256) }}"
-    blacklisted: "{{ adaptive_repair.value.blacklisted|default([]) }}"
-    filter_twcs: "{{ adaptive_repair.value.filter_twcs|default(True) }}"
-    retries: "{{ adaptive_repair.value.retries|default(3) }}"
+    active: "{{ adaptive_repair.value.active | default(true) }}"
+    parallelism: "{{ adaptive_repair.value.parallelism | default(10) }}"
+    gc_grace: "{{ adaptive_repair.value.gc_grace | default(86400) }}"
+    #segments: "{{ adaptive_repair.value.segments | default() }}"
+    segment_target_size_mb: "{{ adaptive_repair.value.segment_target_size_mb | default(256) }}"
+    blacklisted: "{{ adaptive_repair.value.blacklisted | default([]) }}"
+    filter_twcs: "{{ adaptive_repair.value.filter_twcs | default(True) }}"
+    retries: "{{ adaptive_repair.value.retries | default(3) }}"
+    auth_token: "{{ adaptive_repair.auth_token | default(omit) }}"
+    username: "{{ adaptive_repair.username | default(omit) }}"
+    password: "{{ adaptive_repair.password | default(omit) }}"
   tags:
   - axonops_adaptive_repair
   - adaptive_repair
