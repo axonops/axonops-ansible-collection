@@ -7,7 +7,6 @@
 
 #Make sure elasticsearch.keystore has correct Permissions
 - name: Set elasticsearch.keystore Permissions
-  become: true
   file:
     state: file
     path: "{{ es_conf_dir }}/elasticsearch.keystore"
