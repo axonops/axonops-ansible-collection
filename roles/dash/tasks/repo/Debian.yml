@@ -1,24 +1,26 @@
 ---
 - name: Ensure pre-req gnupg is installed
-  package:
+  ansible.builtin.apt:
     name: ['gnupg', 'apt-transport-https', 'debian-archive-keyring']
     state: present
+    update_cache: true
 
 
 - name: Add AxonOps apt repository key.
-  apt_key:
+  ansible.builtin.apt_key:
     url: https://packages.axonops.com/apt/repo-signing-key.gpg
-    validate_certs: yes
+    validate_certs: true
 
-
-- name: Set AxonOps apt repository to {{ axon_agent_public_repository }}.
-  apt_repository:
+- name: "Set AxonOps apt repository to {{ axon_agent_public_repository }}"
+  ansible.builtin.apt_repository:
     repo: "deb https://packages.axonops.com/apt axonops-apt main"
     state: "{{ axon_agent_public_repository }}"
-    update_cache: yes
+    update_cache: true
 
-- name: Set AxonOps beta apt repository to {{ axon_agent_beta_repository }}.
-  apt_repository:
+- name: "Set AxonOps beta apt repository to {{ axon_agent_beta_repository }}"
+  ansible.builtin.apt_repository:
     repo: "deb https://packages.axonops.com/apt axonops-apt-beta main"
     state: "{{ axon_agent_beta_repository }}"
-    update_cache: yes
+    update_cache: true
+
+# code: language=ansible

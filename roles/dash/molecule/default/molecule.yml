@@ -6,7 +6,7 @@ dependency:
 driver:
   name: docker
 platforms:
-  - name: ${MOLECULE_INSTANCE_NAME:-"server"}
+  - name: ${MOLECULE_INSTANCE_NAME:-"dash"}
     image: "geerlingguy/docker-${MOLECULE_DISTRO:-rockylinux9}-ansible:latest"
     command: ${MOLECULE_DOCKER_COMMAND:-""}
     volumes:

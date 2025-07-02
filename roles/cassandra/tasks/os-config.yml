@@ -4,11 +4,7 @@
   ansible.builtin.package:
     name: numactl
     state: latest
-
-- name: Minimal VM swappiness
-  ansible.posix.sysctl:
-    name: vm.swappiness
-    value: "1"
+  ignore_errors: true
 
 - name: Configure sysctl settings for Cassandra
   ansible.posix.sysctl:
@@ -18,6 +14,7 @@
     reload: true
     sysctl_file: /etc/sysctl.d/99-cassandra.conf
   loop:
+    - {name: "vm.swappiness", value: "1"}
     - {name: "vm.overcommit_memory", value: "1"}
     - {name: "vm.max_map_count", value: "1048575"}
     - {name: "net.ipv4.tcp_keepalive_time", value: "300"}
@@ -32,6 +29,7 @@
     - cassandra
     - sysctl
     - performance
+  when: ansible_virtualization_type != "docker"
 
 - name: Setup irqbalance
   ansible.builtin.copy:

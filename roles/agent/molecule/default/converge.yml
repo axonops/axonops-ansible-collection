@@ -1,5 +1,11 @@
 ---
 - name: Converge
   hosts: all
+  vars:
+    axon_agent_customer_name: molecule
   roles:
     - role: agent
+      vars:
+        axon_java_agent: "axon-cassandra5.0-agent-jdk17"
+        axon_agent_version: "2.0.2"
+        axon_java_agent_version: "1.0.10"

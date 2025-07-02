@@ -32,13 +32,14 @@
     - ansible_os_family == 'Debian'
   block:
     - name: "Debian - Install apt packages"
-      package:
+      ansible.builtin.apt:
         name:
           - apt-transport-https
           - gnupg
           - curl
           - wget
         state: present
+        update_cache: true
 
     - name: Download and dearmor key
       ansible.builtin.uri:
@@ -52,13 +53,13 @@
         creates: /usr/share/keyrings/azul.gpg
 
     - name: "Add Repository URL"
-      apt_repository:
+      ansible.builtin.apt_repository:
         repo: "{{ _zulu_jdk.apt_repo.repo_line }}"
         state: present
         filename: zulu
 
     - name: Install Zulu JDK
-      package:
+      ansible.builtin.package:
         state: "{% if zulu_version is defined and zulu_version != '' %}present{% else %}latest{% endif %}"
         name: "{{ _zulu_jdk.package_names }}"
 
@@ -66,17 +67,22 @@
       ansible.builtin.set_fact:
         java_zulu_installed: true
 
+- name: Run apt-update
+  when: ansible_os_family == 'Debian'
+  ansible.builtin.apt:
+    update_cache: true
+
 - name: Install Java
   ansible.builtin.package:
     name: "{{ java_pkg | default(_java_pkg) }}"
     state: present
-  when: java_zulu_installed is not defined or java_zulu_installed == false
+  when: java_zulu_installed is not defined or not java_zulu_installed
 
 - name: Select Zulu Java as default
   community.general.alternatives:
     name: java
     path: "/usr/lib/jvm/zulu{{ _zulu_major_version }}/bin/java"
     link: /usr/bin/java
-  when: java_zulu_installed is defined and java_zulu_installed == true
+  when: java_zulu_installed is defined and java_zulu_installed
 
 # code: language=ansible

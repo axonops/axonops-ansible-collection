@@ -1,8 +1,9 @@
 ---
 - name: Ensure pre-req gnupg is installed
-  ansible.builtin.package:
+  ansible.builtin.apt:
     name: ['gnupg', 'apt-transport-https', 'debian-archive-keyring']
     state: present
+    update_cache: true
 
 - name: Add AxonOps apt repository key.
   ansible.builtin.apt_key:

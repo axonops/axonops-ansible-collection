@@ -1,0 +1,58 @@
+---
+name: AxonOps Dashboard Molecule
+
+on:
+  push:
+    branches:
+      - main
+      - molecule
+  pull_request:
+    branches:
+      - main
+
+defaults:
+  run:
+    working-directory: roles/dash
+
+jobs:
+  molecule:
+    name: Molecule Dashboard
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distro:
+          - rockylinux9
+          - ubuntu2204
+          - ubuntu2404
+          - debian12
+
+    steps:
+      - name: Check out the codebase.
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install test dependencies.
+        run: pip3 install ansible molecule molecule-plugins[docker] docker
+
+      - name: Run Molecule destroy (ignore failures)
+        run: molecule -v destroy
+        continue-on-error: true
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: dash-${{ matrix.distro }}
+
+      - name: Run Molecule converge
+        run: molecule -v converge
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: dash-${{ matrix.distro }}
