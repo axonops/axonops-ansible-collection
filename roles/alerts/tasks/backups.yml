@@ -3,6 +3,7 @@
   tags: always
   ansible.builtin.set_fact:
     axonops_backups: []
+  when: axonops_backups is not defined
 
 - name: Load cluster-specific backups
   tags: always

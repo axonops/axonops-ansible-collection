@@ -1,20 +1,42 @@
 ---
-- name: Apply Slack Integration on  {{ slack_integration.key }}
+- name: Initialize axonops_slack_integrations
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_slack_integrations: []
+  when: axonops_slack_integrations is not defined
+
+- name: Load organization-wide Slack integration rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_slack_integrations: "{{ axonops_slack_integrations + (lookup('file', item) | from_yaml).axonops_slack_integrations }}"
+  with_fileglob:
+    - "config/{{ org }}/slack_integrations.yml"
+
+- name: Load cluster-specific Slack integration rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_slack_integrations: "{{ axonops_slack_integrations + (lookup('file', item) | from_yaml).axonops_slack_integrations }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/slack_integrations.yml"
+
+- name: "Install Slack integrations {{ org }}/{{ cluster }}"
   axonops.axonops.slack_integration:
     org: "{{ org }}"
-    cluster: "{{ slack_integration.key }}"
-    present: "{{ slack_integration.present | default(true) }}"
-    name: "{{ slack_integration.name }}"
-    webhook_url: "{{ slack_integration.webhook_url }}"
-    auth_token: "{{ slack_integration.auth_token | default(omit) }}"
-    username: "{{ slack_integration.username | default(omit) }}"
-    password: "{{ slack_integration.password | default(omit) }}"
-  with_items:
-    "{{ slack_integration.value }}"
+    cluster: "{{ cluster }}"
+    present: "{{ slack_item.present | default(true) }}"
+    name: "{{ slack_item.name }}"
+    webhook_url: "{{ slack_item.webhook_url }}"
+    auth_token: "{{ slack_item.auth_token | default(omit) }}"
+    username: "{{ slack_item.username | default(omit) }}"
+    password: "{{ slack_item.password | default(omit) }}"
+  loop: "{{ axonops_slack_integrations }}"
+  loop_control:
+    loop_var: slack_item
   tags:
-  - axonops_slack_integration
-  - slack_integration
-  - integration
-  - slack
+    - axonops_slack_integrations
+    - slack_integrations
+    - slack_integration
+    - integration
+    - slack
 
 # code: language=ansible

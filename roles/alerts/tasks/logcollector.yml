@@ -1,25 +1,47 @@
 ---
-- name: "Install logcollector on {{ logcollector.key }}"
+- name: Initialize axonops_logcollectors
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_logcollectors: []
+  when: axonops_logcollectors is not defined
+
+- name: Load organization-wide logcollector rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_logcollectors: "{{ axonops_logcollectors + (lookup('file', item) | from_yaml).axonops_logcollectors }}"
+  with_fileglob:
+    - "config/{{ org }}/logcollectors.yml"
+
+- name: Load cluster-specific logcollector rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_logcollectors: "{{ axonops_logcollectors + (lookup('file', item) | from_yaml).axonops_logcollectors }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/logcollectors.yml"
+
+- name: "Apply Logcollector on {{ org }}/{{ cluster }}"
   axonops.axonops.logcollector:
     org: "{{ org }}"
-    cluster: "{{ logcollector.key }}"
-    name: "{{ logcollector.name }}"
-    interval: "{{ logcollector.interval | default('5s') }}"
-    timeout: "{{ logcollector.timeout | default('1m') }}"
-    filename: "{{ logcollector.filename }}"
-    dateFormat: "{{ logcollector.dateFormat }}"
-    readonly: "{{ logcollector.readonly | default(false) }}"
-    present: "{{ logcollector.present | default(true) }}"
-    auth_token: "{{ logcollector.auth_token | default(omit) }}"
-    username: "{{ logcollector.username | default(omit) }}"
-    password: "{{ logcollector.password | default(omit) }}"
+    cluster: "{{ cluster }}"
+    name: "{{ logcollector_item.name }}"
+    interval: "{{ logcollector_item.interval | default('5s') }}"
+    timeout: "{{ logcollector_item.timeout | default('1m') }}"
+    filename: "{{ logcollector_item.filename }}"
+    dateFormat: "{{ logcollector_item.dateFormat }}"
+    readonly: "{{ logcollector_item.readonly | default(false) }}"
+    present: "{{ logcollector_item.present | default(true) }}"
+    auth_token: "{{ logcollector_item.auth_token | default(omit) }}"
+    username: "{{ logcollector_item.username | default(omit) }}"
+    password: "{{ logcollector_item.password | default(omit) }}"
   with_items:
-    "{{ logcollector.value }}"
+    "{{ axonops_logcollectors }}"
+  loop_control:
+    loop_var: logcollector_item
   tags:
-  - axonops_logcollector
-  - logcollectors
-  - logcollector
-  - logs
-  - log
+    - axonops_logcollectors
+    - logcollectors
+    - logcollector
+    - logs
+    - log
 
 # code: language=ansible

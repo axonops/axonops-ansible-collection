@@ -42,9 +42,6 @@
 
 - name: Import slack tasks
   ansible.builtin.import_tasks: slack_integration.yml
-  when:
-    - slack_url is defined
-    - slack_integration is defined
   tags: slack
 
 - name: Import tasks from adaptive_repair.yml
@@ -73,12 +70,10 @@
 - name: Import tasks from logcollector.yml
   ansible.builtin.import_tasks: logcollector.yml
   tags: logcollector
-  when: logcollector is defined
 
 - name: Import tasks from pagerduty_integration.yml
   ansible.builtin.import_tasks: pagerduty_integration.yml
   tags: pagerduty_integration
-  when: pagerduty_integration is defined
 
 - name: Import dashboard
   ansible.builtin.import_tasks: dashboards.yml
