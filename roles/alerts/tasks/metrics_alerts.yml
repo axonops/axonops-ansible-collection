@@ -1,0 +1,60 @@
+---
+- name: Initialize axonops_alert_rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_alert_rules: []
+  when: axonops_alert_rules is not defined
+
+- name: Load organization-wide alert rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_alert_rules: "{{ axonops_alert_rules + (lookup('file', item) | from_yaml).axonops_alert_rules }}"
+  with_fileglob:
+    - "config/{{ org }}/metric_alert_rules.yml"
+
+- name: Load cluster-specific alert rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_alert_rules: "{{ axonops_alert_rules + (lookup('file', item) | from_yaml).axonops_alert_rules }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/metric_alert_rules.yml"
+
+- name: "Install metrics alerts on {{ org }}/{{ cluster }}"
+  axonops.axonops.alert_rule:
+    org: "{{ org }}"
+    cluster: "{{ cluster }}"
+    cluster_type: "{{ metricsalerts_item.cluster_type | default(omit) }}"
+    dashboard: "{{ metricsalerts_item.dashboard }}"
+    chart: "{{ metricsalerts_item.chart }}"
+    operator: "{{ metricsalerts_item.operator }}"
+    warning_value: "{{ metricsalerts_item.warning_value }}"
+    critical_value: "{{ metricsalerts_item.critical_value }}"
+    duration: "{{ metricsalerts_item.duration }}"
+    present: "{{ metricsalerts_item.present | default(true) }}"
+    description: "{{ metricsalerts_item.description | default() }}"
+    name: "{{ metricsalerts_item.name | default() }}"
+    scope: "{{ metricsalerts_item.scope | default([]) }}"
+    group_by: "{{ metricsalerts_item.group_by | default([]) }}"
+    routing: "{{ metricsalerts_item.routing | default(omit) }}"
+    percentile: "{{ metricsalerts_item.percentile | default([]) }}"
+    consistency: "{{ metricsalerts_item.consistency | default([]) }}"
+    metric: "{{ metricsalerts_item.metric | default(omit) }}"
+    keyspace: "{{ metricsalerts_item.keyspace | default([]) }}"
+    dc: "{{ metricsalerts_item.dc | default([]) }}"
+    rack: "{{ metricsalerts_item.rack | default([]) }}"
+    host_id: "{{ metricsalerts_item.host_id | default([]) }}"
+    auth_token: "{{ metricsalerts_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ metricsalerts_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ metricsalerts_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+  loop: "{{ axonops_alert_rules }}"
+  no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
+  loop_control:
+    loop_var: metricsalerts_item
+  tags:
+  - axonops_alert_rule
+  - alert_rule
+  - alert
+  - rule
+
+
+# code: language=ansible

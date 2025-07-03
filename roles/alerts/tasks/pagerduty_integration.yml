@@ -1,0 +1,42 @@
+---
+- name: Initialize axonops_pagerduty_integrations
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_pagerduty_integrations: []
+  when: axonops_pagerduty_integrations is not defined
+
+- name: Load organization-wide PagerDuty integration rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_pagerduty_integrations: "{{ axonops_pagerduty_integrations + (lookup('file', item) | from_yaml).axonops_pagerduty_integrations }}"
+  with_fileglob:
+    - "config/{{ org }}/pagerduty_integrations.yml"
+
+- name: Load cluster-specific PagerDuty integration rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_pagerduty_integrations: "{{ axonops_pagerduty_integrations + (lookup('file', item) | from_yaml).axonops_pagerduty_integrations }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/pagerduty_integrations.yml"
+
+- name: "Install PagerDuty integrations on {{ org }}/{{ cluster }}"
+  axonops.axonops.pagerduty_integration:
+    org: "{{ org }}"
+    cluster: "{{ cluster }}"
+    name: "{{ pagerduty_item.name }}"
+    integration_key: "{{ pagerduty_item.integration_key }}"
+    present: "{{ pagerduty_item.present | default(true) }}"
+    auth_token: "{{ pagerduty_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ pagerduty_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ pagerduty_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+  loop: "{{ axonops_pagerduty_integrations }}"
+  loop_control:
+    loop_var: pagerduty_item
+  tags:
+    - axonops_pagerduty_integrations
+    - pagerduty_integrations
+    - pagerduty_integration
+    - integration
+    - pagerduty
+
+# code: language=ansible

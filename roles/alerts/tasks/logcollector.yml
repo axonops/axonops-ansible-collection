@@ -1,0 +1,47 @@
+---
+- name: Initialize axonops_logcollectors
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_logcollectors: []
+  when: axonops_logcollectors is not defined
+
+- name: Load organization-wide logcollector rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_logcollectors: "{{ axonops_logcollectors + (lookup('file', item) | from_yaml).axonops_logcollectors }}"
+  with_fileglob:
+    - "config/{{ org }}/logcollectors.yml"
+
+- name: Load cluster-specific logcollector rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_logcollectors: "{{ axonops_logcollectors + (lookup('file', item) | from_yaml).axonops_logcollectors }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/logcollectors.yml"
+
+- name: "Apply Logcollector on {{ org }}/{{ cluster }}"
+  axonops.axonops.logcollector:
+    org: "{{ org }}"
+    cluster: "{{ cluster }}"
+    name: "{{ logcollector_item.name }}"
+    interval: "{{ logcollector_item.interval | default('5s') }}"
+    timeout: "{{ logcollector_item.timeout | default('1m') }}"
+    filename: "{{ logcollector_item.filename }}"
+    dateFormat: "{{ logcollector_item.dateFormat }}"
+    readonly: "{{ logcollector_item.readonly | default(false) }}"
+    present: "{{ logcollector_item.present | default(true) }}"
+    auth_token: "{{ logcollector_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ logcollector_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ logcollector_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+  with_items:
+    "{{ axonops_logcollectors }}"
+  loop_control:
+    loop_var: logcollector_item
+  tags:
+    - axonops_logcollectors
+    - logcollectors
+    - logcollector
+    - logs
+    - log
+
+# code: language=ansible

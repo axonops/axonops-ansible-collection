@@ -1,0 +1,497 @@
+######## Cassandra Performance Metrics Alert Rules ########
+# This is an example set of alert rules for Cassandra performance metrics.
+# These rules are some examples of how alerts can be configured for
+# your Apache Cassandra cluster. The rules defined here will be applied
+# to all clusters
+
+axonops_alert_rules:
+
+######## OVERVIEW ALERTS ########
+- name: DOWN count per node
+  dashboard: Overview
+  chart: Number of Endpoints Down Per Node Point Of View
+  operator: '>='
+  critical_value: 2
+  warning_value: 1
+  duration: 15m
+  description: Detected DOWN nodes
+
+######## SYSTEM ALERTS ########
+- name: CPU usage per host
+  dashboard: System
+  chart: CPU usage per host
+  operator: '>='
+  critical_value: 99
+  warning_value: 90
+  duration: 1h
+  description: Detected High CPU usage
+
+- name: CPU is Underutilized
+  dashboard: System
+  chart: CPU usage per host
+  operator: <=
+  critical_value: 1
+  warning_value: 5
+  duration: 1w
+  description: CPU load has been very low for 1 week
+
+- name: Disk % Usage $mountpoint
+  dashboard: System
+  chart: Disk % Usage $mountpoint
+  operator: '>='
+  critical_value: 90
+  warning_value: 75
+  duration: 12h
+  description: Detected High disk utilization
+
+- name: Avg IO wait CPU per Host
+  dashboard: System
+  chart: Avg IO wait CPU per Host
+  operator: '>='
+  critical_value: 50
+  warning_value: 20
+  duration: 2h
+  description: Detected high Average IOWait
+
+- name: GC duration
+  dashboard: System
+  chart: GC duration
+  operator: '>='
+  critical_value: 10000
+  warning_value: 5000
+  duration: 2m
+  description: Detected high Garbage Collection cycle time - this is not necessarily the Stop-the-World pause time
+
+- name: Used Memory Percentage
+  dashboard: System
+  chart: Used Memory Percentage
+  operator: '>='
+  critical_value: 85
+  warning_value: 95
+  duration: 1h
+  description: High memory utilization detected
+
+- name: Memory is Underutilized
+  dashboard: System
+  chart: Used Memory Percentage
+  operator: <=
+  critical_value: 10
+  warning_value: 20
+  duration: 1w
+  description: Node memory has been very low for 1 week. Consider reducing memory space
+
+- name: NTP offset (milliseconds)
+  dashboard: System
+  chart: NTP offset (milliseconds)
+  operator: '>='
+  critical_value: 10
+  warning_value: 5
+  duration: 15m
+  description: High NTP time offset detected
+
+######## COORDINATOR ALERTS ########
+- name: Coordinator Read Latency - LOCAL_QUORUM 99thPercentile
+  dashboard: Coordinator
+  chart: Coordinator Read $consistency Latency - $percentile
+  operator: '>='
+  critical_value: 2000000
+  warning_value: 1000000
+  duration: 15m
+  consistency:
+  - LOCAL_QUORUM
+  percentile:
+  - 99thPercentile
+  description: Detected high LOCAL_QUORUM Coordinator Read 99thPercentile latency
+  routing:
+    error:
+    - example_pagerduty_integration_developer
+    - example_pagerduty_integration_ops
+    warning:
+    - example_pagerduty_integration_developer
+    - example_pagerduty_integration_ops
+
+- name: Coordinator Read Latency - LOCAL_ONE 99thPercentile
+  dashboard: Coordinator
+  chart: Coordinator Read $consistency Latency - $percentile
+  operator: '>='
+  critical_value: 2000000
+  warning_value: 1000000
+  duration: 15m
+  consistency:
+  - LOCAL_ONE
+  percentile:
+  - 99thPercentile
+  description: Detected high LOCAL_ONE Coordinator Read 99thPercentile latency
+  routing:
+    error:
+    - example_pagerduty_integration_developer
+    - example_pagerduty_integration_ops
+    warning:
+    - example_pagerduty_integration_developer
+    - example_pagerduty_integration_ops
+
+- name: Coordinator Range Read Latency - 99thPercentile
+  dashboard: Coordinator
+  chart: Coordinator Range Read Request Latency - $percentile
+  operator: '>='
+  critical_value: 2500000
+  warning_value: 1500000
+  duration: 15m
+  percentile:
+  - 99thPercentile
+  description: Detected high Coordinator Read 99thPercentile latency
+  routing:
+    error:
+    - example_pagerduty_integration_developer
+    - example_pagerduty_integration_ops
+    warning:
+    - example_pagerduty_integration_developer
+    - example_pagerduty_integration_ops
+
+- name: Coordinator Write Latency - LOCAL_QUORUM 99thPercentile
+  dashboard: Coordinator
+  chart: Coordinator Write $consistency Latency - $percentile
+  operator: '>='
+  critical_value: 1500000
+  warning_value: 1000000
+  duration: 15m
+  consistency:
+  - LOCAL_QUORUM
+  percentile:
+  - 99thPercentile
+  description: Detected high LOCAL_QUORUM Coordinator Write 99thPercentile latency
+
+- name: Coordinator Write Latency - LOCAL_ONE 99thPercentile
+  dashboard: Coordinator
+  chart: Coordinator Write $consistency Latency - $percentile
+  operator: '>='
+  critical_value: 1500000
+  warning_value: 1000000
+  duration: 15m
+  consistency:
+  - LOCAL_ONE
+  percentile:
+  - 99thPercentile
+  description: Detected high LOCAL_ONE Coordinator Write 99thPercentile latency
+
+- name: Coordinator Read Timeouts Per Second
+  dashboard: Coordinator
+  chart: Read Timeouts Per Second
+  operator: '>='
+  critical_value: 5
+  warning_value: 2
+  duration: 10m
+  description: Detected read Timeouts
+
+- name: Coordinator Write Timeouts Per Second
+  dashboard: Coordinator
+  chart: Write Timeouts Per Second
+  operator: '>='
+  critical_value: 5
+  warning_value: 2
+  duration: 10m
+  description: Detected write timeouts
+
+- name: Coordinator Read Unavailables Per Second
+  dashboard: Coordinator
+  chart: Read Unavailables Per Second
+  operator: '>='
+  critical_value: 100
+  warning_value: 10
+  duration: 1h
+  metric: cas_ClientRequest_Unavailables{axonfunction='rate',scope='Read',function='Count'}
+  group_by:
+  - host_id
+  description: Detected Read Unavailables
+
+- name: Coordinator Write Unavailables Per Second
+  dashboard: Coordinator
+  chart: Write Unavailables Per Second
+  operator: '>='
+  critical_value: 100
+  warning_value: 10
+  duration: 1h
+  metric: cas_ClientRequest_Unavailables{axonfunction='rate',scope='Write',function='Count'}
+  group_by:
+  - host_id
+  description: Detected Write Unavailables
+
+- name: CAS Read Failures
+  dashboard: Coordinator
+  chart: CAS Read Failures
+  operator: '>='
+  critical_value: 100
+  warning_value: 10
+  duration: 30m
+  description: Detected CAS Read Failures
+
+- name: CAS Write Failures
+  dashboard: Coordinator
+  chart: CAS Write Failures
+  operator: '>='
+  critical_value: 100
+  warning_value: 10
+  duration: 30m
+  description: Detected CAS Write Failures
+
+- name: CAS Read Unavailables
+  dashboard: Coordinator
+  chart: CAS Read Unavailables
+  operator: '>='
+  critical_value: 100
+  warning_value: 10
+  duration: 30m
+  description: Detected CAS Read Unavailables
+
+- name: CAS Read Unfinished Commit
+  dashboard: Coordinator
+  chart: CAS Read Unfinished Commit
+  operator: '>='
+  critical_value: 100
+  warning_value: 10
+  duration: 30m
+  description: Detected CAS Read Unfinished Commit
+
+- name: CAS Write Unfinished Commit
+  dashboard: Coordinator
+  chart: CAS Write Unfinished Commit
+  operator: '>='
+  critical_value: 100
+  warning_value: 10
+  duration: 30m
+  description: Detected CAS Write Unfinished Commit
+
+- name: CAS Read Condition Not Met
+  dashboard: Coordinator
+  chart: CAS Read Condition Not Met
+  operator: '>='
+  critical_value: 100
+  warning_value: 10
+  duration: 30m
+  description: Detected CAS Read Condition Not Met
+
+- name: CAS Write Condition Not Met
+  dashboard: Coordinator
+  chart: CAS Write Condition Not Met
+  operator: '>='
+  critical_value: 100
+  warning_value: 10
+  duration: 30m
+  description: Detected CAS Write Condition Not Met
+
+
+######## DROPPED MESSAGES ########
+- name: Dropped Mutations
+  dashboard: Dropped Messages
+  chart: Dropped Mutation per secs
+  operator: '>='
+  critical_value: 1
+  warning_value: 1
+  duration: 30s
+  description: Detected dropped mutations
+
+- name: Dropped Reads
+  dashboard: Dropped Messages
+  chart: Dropped Read per secs
+  operator: '>='
+  critical_value: 1
+  warning_value: 1
+  duration: 30s
+  description: Detected dropped read messages
+
+- name: Dropped Hints
+  dashboard: Dropped Messages
+  chart: Dropped Hints per secs
+  operator: '>='
+  critical_value: 1
+  warning_value: 1
+  duration: 10m
+  description: Detected dropped Hints
+
+######## THREADPOOL ISSUES ########
+- name: Total Blocked Tasks Rate
+  dashboard: Thread Pools
+  chart: Total Blocked Tasks Rate
+  operator: '>='
+  critical_value: 128
+  warning_value: 64
+  duration: 15m
+  description: Detected blocked threads
+
+- name: Total Blocked Compaction Tasks Rate
+  dashboard: Thread Pools
+  chart: Total Blocked Tasks Rate
+  operator: '>='
+  critical_value: 32
+  warning_value: 16
+  duration: 15m
+  description: Detected blocked compaction threads
+  scope:
+  - CompactionExecutor
+  group_by:
+  - scope
+
+- name: Pending Native_Transport_Requests
+  dashboard: Thread Pools
+  chart: Pending Tasks
+  operator: '>='
+  critical_value: 1000
+  warning_value: 500
+  duration: 15m
+  description: Detected high Pending Native_Transport_Requests tasks
+  scope:
+  - Native_Transport_Requests
+  group_by:
+  - scope
+
+- name: Pending ReadStage
+  dashboard: Thread Pools
+  chart: Pending Tasks
+  operator: '>='
+  critical_value: 1000
+  warning_value: 500
+  duration: 15m
+  description: Detected high Pending ReadStage tasks
+  scope:
+  - ReadStage
+  group_by:
+  - scope
+
+- name: Pending MutationStage
+  dashboard: Thread Pools
+  chart: Pending Tasks
+  operator: '>='
+  critical_value: 1000
+  warning_value: 500
+  duration: 15m
+  description: Detected high Pending MutationStage tasks
+  scope:
+  - MutationStage
+  group_by:
+  - scope
+
+- name: Total Blocked Flush Writer Tasks Rate
+  dashboard: Thread Pools
+  chart: Total Blocked Tasks Rate
+  operator: '>='
+  critical_value: 32
+  warning_value: 16
+  duration: 10m
+  description: Detected blocked MemtableFlushWriter threads
+  scope:
+  - MemtableFlushWriter
+  group_by:
+  - scope
+
+- name: Total Blocked Repair_Task Tasks Rate
+  dashboard: Thread Pools
+  chart: Total Blocked Tasks Rate
+  operator: '>='
+  critical_value: 128
+  warning_value: 64
+  duration: 1h
+  description: Detected blocked Repair_Task threads
+  scope:
+  - Repair_Task
+  group_by:
+  - scope
+
+- name: Total Pending Repair_Task Tasks Rate
+  dashboard: Thread Pools
+  chart: Pending Tasks
+  operator: '>='
+  critical_value: 256
+  warning_value: 128
+  duration: 3h
+  description: Too many pending repair threads
+  scope:
+  - Repair_Task
+  group_by:
+  - scope
+
+- name: Pending TP Compaction Tasks
+  dashboard: Compactions
+  chart: Pending TP Compaction Tasks
+  operator: '>='
+  critical_value: 500
+  warning_value: 200
+  duration: 4h
+  description: Detected high Compaction tasks in queue to be processed
+
+
+######## Entropy ########
+- name: Total Hints Created By Each Node
+  dashboard: Entropy
+  chart: Total Hints Created By Each Node
+  operator: '>='
+  critical_value: 100
+  warning_value: 50
+  duration: 2h
+  description: Hints have been created for over 2 hours.
+
+
+######## Cache ########
+- name: KeyCache HitRate Per node
+  dashboard: Cache
+  chart: KeyCache HitRate Per Node
+  operator: <=
+  warning_value: 0.03
+  critical_value: 0.01
+  duration: 20m
+  present: true
+  description: KeyCache HitRate too low
+
+######## Security ########
+- name: Failed Authentications
+  dashboard: Security
+  chart: Failed Authentications
+  operator: '>='
+  critical_value: 20
+  warning_value: 1
+  duration: 3m
+  description: 'Failed authentication in Cassandra'
+
+- name: JMX
+  dashboard: Security
+  chart: JMX
+  operator: '>='
+  critical_value: 100
+  warning_value: 10
+  duration: 3m
+  description: 'JMX connections in Cassandra'
+
+- name: Failed Authorizations
+  dashboard: Security
+  chart: Failed Authorizations
+  operator: '>='
+  critical_value: 20
+  warning_value: 5
+  duration: 3m
+  description: 'Failed authorizations in Cassandra'
+
+- name: DDL queries
+  dashboard: Security
+  chart: DDL queries
+  operator: '>='
+  critical_value: 100
+  warning_value: 5
+  duration: 3m
+  description: 'DDL queries run in Cassandra'
+
+- name: DCL queries
+  dashboard: Security
+  chart: DCL queries
+  operator: '>='
+  critical_value: 100
+  warning_value: 5
+  duration: 3m
+  description: 'DCL queries run in Cassandra'
+
+- name: DML queries
+  dashboard: Security
+  chart: DML queries
+  operator: '>='
+  critical_value: 100
+  warning_value: 5
+  duration: 3m
+  description: 'DML queries in Cassandra'

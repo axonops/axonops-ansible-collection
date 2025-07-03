@@ -1,0 +1,16 @@
+---
+- name: Set the agent disconnection tolerance on {{ agent_disconnection_tolerance.key }}
+  axonops.axonops.agent_disconnection_tolerance:
+    org: "{{ org }}"
+    cluster: "{{ agent_disconnection_tolerance.key }}"
+    warn_timeout: "{{ agent_disconnection_tolerance.value.warn_timeout | default('30s') }}"
+    error_timeout: "{{ agent_disconnection_tolerance.value.error_timeout | default('1m') }}"
+    auth_token: "{{ agent_disconnection_tolerance.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ agent_disconnection_tolerance.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ agent_disconnection_tolerance.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+  tags:
+  - axonops_agent_disconnection_tolerance
+  - agent_disconnection_tolerance
+  - disconnection_tolerance
+
+# code: language=ansible

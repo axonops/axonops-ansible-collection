@@ -1,0 +1,42 @@
+---
+- name: Initialize axonops_slack_integrations
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_slack_integrations: []
+  when: axonops_slack_integrations is not defined
+
+- name: Load organization-wide Slack integration rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_slack_integrations: "{{ axonops_slack_integrations + (lookup('file', item) | from_yaml).axonops_slack_integrations }}"
+  with_fileglob:
+    - "config/{{ org }}/slack_integrations.yml"
+
+- name: Load cluster-specific Slack integration rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_slack_integrations: "{{ axonops_slack_integrations + (lookup('file', item) | from_yaml).axonops_slack_integrations }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/slack_integrations.yml"
+
+- name: "Install Slack integrations {{ org }}/{{ cluster }}"
+  axonops.axonops.slack_integration:
+    org: "{{ org }}"
+    cluster: "{{ cluster }}"
+    present: "{{ slack_item.present | default(true) }}"
+    name: "{{ slack_item.name }}"
+    webhook_url: "{{ slack_item.webhook_url }}"
+    auth_token: "{{ slack_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ slack_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ slack_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+  loop: "{{ axonops_slack_integrations }}"
+  loop_control:
+    loop_var: slack_item
+  tags:
+    - axonops_slack_integrations
+    - slack_integrations
+    - slack_integration
+    - integration
+    - slack
+
+# code: language=ansible

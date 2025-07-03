@@ -1,0 +1,186 @@
+######## Cassandra Log Alert Rules ########
+# This is an example set of log alert rules for Cassandra system.log.
+# These rules are some examples of how alerts can be configured for
+# your Apache Cassandra cluster. The rules defined here will be applied
+# all clusters.
+# Log phrases must be wrapped as: \"text to search\"
+
+axonops_log_alert_rule:
+
+- name: Node Down
+  warning_value: 1
+  critical_value: 5
+  duration: 5m
+  content: \"is now DOWN\"
+  description: Detected node down
+  source: "/var/log/cassandra/system.log"
+  present: true
+
+- name: Unsupported Protocol
+  warning_value: 1
+  critical_value: 30
+  duration: 5m
+  content: \"Invalid or unsupported protocol version\"
+  source: "/var/log/cassandra/system.log"
+  description: Detected clients connecting with invalid or unsupported protocol version
+  present: true
+
+- name: Repair are not in progress
+  warning_value: 1
+  critical_value: 1
+  operator: '<'
+  duration: 24h
+  content: repair
+  source: "/var/log/cassandra/system.log"
+  description: "Detected no repair has been seen in the last 24h"
+  present: true
+
+- name: TLS failed to handshake with peer
+  warning_value: 50
+  critical_value: 100
+  duration: 5m
+  content: \"Failed to handshake with peer\"
+  source: "/var/log/cassandra/system.log"
+  description: "Detected TLS handshake error with peer"
+  present: true
+
+- name: Dropping gossip message
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: \"dropping message of type GOSSIP\"
+  source: "/var/log/cassandra/system.log"
+  description: "Detected gossip message drops"
+  present: true
+
+- name: Failed stream session
+  warning_value: 1
+  critical_value: 1
+  duration: 5ms
+  content: \"failed stream session\"
+  source: "/var/log/cassandra/system.log"
+  description: "Detected stream session failure"
+  present: true
+
+- name: Corrupt SSTable
+  warning_value: 1
+  critical_value: 1
+  duration: 10s
+  content: \"Corrupt sstable\"
+  source: "/var/log/cassandra/system.log"
+  description: "Detected SSTable file corruption"
+  present: true
+
+- name: Anticompaction
+  warning_value: 1
+  critical_value: 1000
+  duration: 5m
+  content: \"Starting anticompaction\"
+  source: "/var/log/cassandra/system.log"
+  description: "Detected anticompaction - possibly triggered by an incremental repair"
+  present: true
+
+- name: JNA Check
+  warning_value: 1
+  critical_value: 1
+  duration: 30s
+  content: \"JNA not found\"
+  source: "/var/log/cassandra/system.log"
+  description: "Missing JNA"
+  present: true
+
+- name: Unable to compact due to disk space
+  warning_value: 1
+  critical_value: 1
+  duration: 15m
+  content: \"Not enough space for compaction\"
+  source: "/var/log/cassandra/system.log"
+  description: "Unable to compact due to disk space"
+  present: true
+
+- name: Maximum memory usage reached for networking buffer pool
+  warning_value: 1
+  critical_value: 1
+  duration: 15m
+  content: \"networking buffer pool, cannot allocate chunk of\"
+  source: "/var/log/cassandra/system.log"
+  description: "Maximum memory usage reached, increase file_cache_size"
+  present: true
+
+- name: Maximum memory usage reached for networking buffer pool
+  warning_value: 1
+  critical_value: 1
+  duration: 15m
+  content: \"networking buffer pool, cannot allocate chunk of\"
+  source: "/var/log/cassandra/system.log"
+  description: "Maximum memory usage reached, increase file_cache_size"
+  present: true
+
+- name: Unable to lock JVM memory (ENOMEM)
+  warning_value: 1
+  critical_value: 1
+  duration: 15m
+  content: \"Unable to lock JVM memory (ENOMEM)\"
+  source: "/var/log/cassandra/system.log"
+  description: "Unable to lock JVM memory (ENOMEM), increase RLIMIT_MEMLOCK"
+  present: true
+
+- name: Unknown mlockall error
+  warning_value: 1
+  critical_value: 1
+  duration: 15m
+  content: \"Unknown mlockall error\"
+  source: "/var/log/cassandra/system.log"
+  description: "Unknown mlockall error"
+  present: true
+
+- name: the current operating system is unsupported
+  warning_value: 1
+  critical_value: 1
+  duration: 15m
+  content: \"the current operating system\"
+  source: "/var/log/cassandra/system.log"
+  description: "the current operating system, is unsupported by Cassandra"
+  present: true
+
+- name: Obsolete version of JNA present
+  warning_value: 1
+  critical_value: 1
+  duration: 15m
+  content: \"Obsolete version of JNA present\"
+  source: "/var/log/cassandra/system.log"
+  description: "Obsolete version of JNA present; unable to read errno. Upgrade to JNA 3.2.7 or later"
+  present: true
+
+# Example error:
+# WARN  [CompactionExecutor:6] 2025-05-22 18:10:45,396 BigTableWriter.java:265 - Writing large partition coordinates_hot/coordinates_2025_01:8263852 (1.941GiB) to sstable /opt/cassandra/data/coordinates_hot/coordinates_2025_01-e61183a01f6911f0817c2f3ce1de0fcc/nb-3024-big-Data.db
+- name: Writing large partition
+  warning_value: 1
+  critical_value: 500
+  duration: 15m
+  content: \"Writing large partition\"
+  source: "/var/log/cassandra/system.log"
+  description: "Cassandra is writing a large partition on disk. This can create issue with reads and repairs. It is suggested to review the schema"
+  present: true
+
+# Example error:
+# WARN  [AntiEntropyStage:1] 2024-02-07 14:46:51,256 NoSpamLogger.java:95 - x.63.94.y:10700->x.68.75.z:10700-LARGE_MESSAGES-adbea270 overloaded; dropping 14.097MiB message (queue: 131.855MiB local, 127.855MiB endpoint, 127.855MiB global)
+- name: Dropped messages due to overloaded node during repairs
+  warning_value: 1
+  critical_value: 500
+  duration: 15m
+  content: "LARGE_MESSAGES-[a-zA-Z0-9]+ overloaded; dropping"
+  source: "/var/log/cassandra/system.log"
+  description: "Cassandra had to drop messages due to repairs overloading the node."
+  present: true
+
+# Example error:
+# [main] 2025-05-22 16:39:56,210 StartupChecks.java:199 - jemalloc shared library could not be preloaded to speed up memory allocations
+- name: Jemalloc shared library could not be preloaded
+  warning_value: 1
+  critical_value: 500
+  duration: 15m
+  content: \"jemalloc shared library could not be preloaded to speed up memory allocations\"
+  source: "/var/log/cassandra/system.log"
+  description: "Jemalloc shared library could not be preloaded. This can affect performance."
+  present: true
