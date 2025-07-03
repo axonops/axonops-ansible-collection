@@ -11,9 +11,9 @@
     blacklisted: "{{ adaptive_repair.value.blacklisted | default([]) }}"
     filter_twcs: "{{ adaptive_repair.value.filter_twcs | default(True) }}"
     retries: "{{ adaptive_repair.value.retries | default(3) }}"
-    auth_token: "{{ adaptive_repair.auth_token | default(omit) }}"
-    username: "{{ adaptive_repair.username | default(omit) }}"
-    password: "{{ adaptive_repair.password | default(omit) }}"
+    auth_token: "{{ adaptive_repair.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ adaptive_repair.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ adaptive_repair.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
   tags:
   - axonops_adaptive_repair
   - adaptive_repair

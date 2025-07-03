@@ -30,9 +30,9 @@
     dateFormat: "{{ logcollector_item.dateFormat }}"
     readonly: "{{ logcollector_item.readonly | default(false) }}"
     present: "{{ logcollector_item.present | default(true) }}"
-    auth_token: "{{ logcollector_item.auth_token | default(omit) }}"
-    username: "{{ logcollector_item.username | default(omit) }}"
-    password: "{{ logcollector_item.password | default(omit) }}"
+    auth_token: "{{ logcollector_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ logcollector_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ logcollector_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
   with_items:
     "{{ axonops_logcollectors }}"
   loop_control:

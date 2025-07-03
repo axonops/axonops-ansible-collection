@@ -99,19 +99,23 @@ def run_module():
                       username=module.params['username'], password=module.params['password'],
                       cluster_type=module.params['cluster_type'], api_token=module.params['api_token'],
                       override_saas=module.params['override_saas'])
+
     if axonops.errors:
         module.fail_json(msg=' '.join(axonops.errors), **result)
 
     integrations_url = \
         f"/api/v1/integrations/{module.params['org']}/{axonops.get_cluster_type()}/{module.params['cluster']}"
-
     # Find the existing integration
     found_definition, error = axonops.find_integration_by_name_and_type(module.params['cluster'], 'slack', module.params['name'])
-    if error is not None:
-        module.fail_json(msg=error)
+    if error:
+        module.fail_json(msg=error, **result)
         return
 
     existing_id = found_definition['ID'] if found_definition and 'ID' in found_definition else None
+    if not existing_id and not module.params['present']:
+        result['changed'] = False
+        result['diff'] = {}
+        module.exit_json(**result)
 
     if existing_id:
         old_data = {
@@ -161,7 +165,7 @@ def run_module():
             method='DELETE'
         )
         if error is not None:
-            module.fail_json(msg=error)
+            module.fail_json(msg=error, **result)
             return
         module.exit_json(**result)
 
@@ -181,10 +185,12 @@ def run_module():
     _, error = axonops.do_request(
         rel_url=integrations_url,
         method='POST',
+        ok_codes=[200, 201, 204, 404],
         json_data=payload
     )
-    if error is not None:
-        module.fail_json(msg=error)
+
+    if error:
+        module.fail_json(msg=error, **result)
         return
 
     module.exit_json(**result)

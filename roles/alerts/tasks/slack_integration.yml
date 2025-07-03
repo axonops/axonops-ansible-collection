@@ -26,9 +26,9 @@
     present: "{{ slack_item.present | default(true) }}"
     name: "{{ slack_item.name }}"
     webhook_url: "{{ slack_item.webhook_url }}"
-    auth_token: "{{ slack_item.auth_token | default(omit) }}"
-    username: "{{ slack_item.username | default(omit) }}"
-    password: "{{ slack_item.password | default(omit) }}"
+    auth_token: "{{ slack_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ slack_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ slack_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
   loop: "{{ axonops_slack_integrations }}"
   loop_control:
     loop_var: slack_item

@@ -69,9 +69,9 @@
     timeout: "{{ shellcheck_item.timeout }}"
     shell: "{{ shellcheck_item.shell | default('/bin/bash') }}"
     script: "{{ shellcheck_item.script }}"
-    auth_token: "{{ shellcheck_item.auth_token | default(omit) }}"
-    username: "{{ shellcheck_item.username | default(omit) }}"
-    password: "{{ shellcheck_item.password | default(omit) }}"
+    auth_token: "{{ shellcheck_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ shellcheck_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ shellcheck_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
   with_items:
     "{{ axonops_shell_check }}"
   no_log: "{{ false if enable_logging is defined and enable_logging else true }}"

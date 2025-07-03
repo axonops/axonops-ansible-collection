@@ -27,9 +27,9 @@
     name: "{{ dashboard_item.name }}"
     filters: "{{ dashboard_item.filters | default(omit) }}"
     panels: "{{ dashboard_item.panels | default(omit) }}"
-    auth_token: "{{ dashboard_item.auth_token | default(omit) }}"
-    username: "{{ dashboard_item.username | default(omit) }}"
-    password: "{{ dashboard_item.password | default(omit) }}"
+    auth_token: "{{ dashboard_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ dashboard_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ dashboard_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
   with_items:
     "{{ axonops_dashboard_templates }}"
   no_log: "{{ false if enable_logging is defined and enable_logging else true }}"

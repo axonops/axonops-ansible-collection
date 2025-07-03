@@ -32,10 +32,6 @@
   ansible.builtin.import_tasks: backups.yml
   tags: backups
 
-- name: Import alert routes tasks
-  ansible.builtin.import_tasks: alert_routes.yml
-  tags: routes
-
 - name: Import service checks tasks
   ansible.builtin.import_tasks: service_checks.yml
   tags: service_checks
@@ -78,5 +74,9 @@
 - name: Import dashboard
   ansible.builtin.import_tasks: dashboards.yml
   tags: dashboards
+
+- name: Import alert routes tasks
+  ansible.builtin.import_tasks: alert_routes.yml
+  tags: routes
 
 # code: language=ansible

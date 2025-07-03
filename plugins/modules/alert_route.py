@@ -167,6 +167,11 @@ def run_module():
         module.fail_json(msg=error)
         return
 
+    if not integration and not module.params['present']:
+        result['changed'] = False
+        result['diff'] = {}
+        module.exit_json(**result)
+
     # if you have a type and a name as input
     integration_id = None
     if module.params['integration_type'] and module.params['integration_name']:

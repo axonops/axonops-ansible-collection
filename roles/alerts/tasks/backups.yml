@@ -66,9 +66,9 @@
     ssh_user: "{{ backups_item.ssh_user | default(omit) }}"
     ssh_pass: "{{ backups_item.ssh_pass | default(omit) }}"
     key_file: "{{ backups_item.key_file | default(omit) }}"
-    auth_token: "{{ backups.auth_token | default(omit) }}"
-    username: "{{ backups.username | default(omit) }}"
-    password: "{{ backups.password | default(omit) }}"
+    auth_token: "{{ backups_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ backups_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ backups_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
   with_items:
     "{{ axonops_backups }}"
   loop_control:

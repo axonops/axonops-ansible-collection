@@ -12,6 +12,42 @@
         warning_value: 90
         duration: 1h
         description: Detected High CPU usage
+        present: "{{ present | default(true) | bool }}"
+    axonops_log_alert_rule:
+      - name: Node Down
+        warning_value: 1
+        critical_value: 5
+        duration: 5m
+        content: \"is now DOWN\"
+        description: Detected node down
+        source: "/var/log/cassandra/system.log"
+        present: "{{ present | default(true) | bool }}"
+    axonops_shell_check:
+      - name: Ansible TEST
+        interval: 30m
+        timeout: 2m
+        shell: /bin/bash
+        present: "{{ present | default(true) | bool }}"
+        script: |-
+          echo "Hello World From Ansible"
+    axonops_slack_integrations:
+      - name: example_slack_integration_developer
+        webhook_url: https://hooks.slack.com/services/ADD/ME/HERE
+        present: "{{ present | default(true) | bool }}"
+    axonops_alert_routes:
+      - integration_name: example_slack_integration_developer
+        integration_type: slack
+        type: global
+        severity: error
+        enable_override: false
+        present: "{{ present | default(true) | bool }}"
 
   roles:
     - role: axonops.axonops.alerts
+      vars:
+        present: true
+    - role: axonops.axonops.alerts
+      vars:
+        present: false
+
+# code: language=ansible
