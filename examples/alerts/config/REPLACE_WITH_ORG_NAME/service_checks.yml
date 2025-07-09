@@ -29,9 +29,9 @@ axonops_shell_check:
     fi
 
     # Sleep up to 60 seconds to avoid simultaneous checks
-    sleep $(shuf -i 1-60 -n 1)
+    sleep $(( $RANDOM % 60 ))
 
-    schema_variations=$($NODETOOL gossipinfo | grep SCHEMA | grep -vi UNREACHABLE | sed -e 's/SCHEMA:[0-9]*://g' | uniq | wc -l)
+    schema_variations=$($NODETOOL gossipinfo | grep SCHEMA | grep -vi UNREACHABLE | sed -e 's/SCHEMA:[0-9]*://g' | sort | uniq | wc -l)
     if [ $? -gt 0 ]; then
         exit $EXIT_CRITICAL=2
     fi
@@ -67,7 +67,7 @@ axonops_shell_check:
     fi
 
     # Sleep up to 60 seconds to avoid simultaneous checks
-    sleep $(shuf -i 1-60 -n 1)
+    sleep $(( $RANDOM % 60 ))
 
     # Get the local Data Center from 'nodetool info'
     local_dc=$($NODETOOL info | awk -F: '/Data Center/{gsub(/^[ \t]+/, "", $2); print $2}')
@@ -154,12 +154,15 @@ axonops_shell_check:
 - name: SSL certificate check
   interval: 12h
   timeout: 1m
+  shell: /bin/bash
   script: |-
-    set -euo pipefail
+    #!/bin/bash
+    #set -euo pipefail
+
     EXIT_OK=0
     EXIT_WARNING=1
     EXIT_CRITICAL=2
-    if output=$(echo | openssl s_client -connect {{.comp_listen_address}}:{{.comp_native_transport_port}} 2>/dev/null); then
+    if output=$(echo -n | openssl s_client -connect {{.comp_listen_address}}:{{.comp_native_transport_port}} 2>/dev/null); then
       # Check OCSP validity
       if echo "$output" | openssl x509 -noout -ocspid > /dev/null 2>&1; then
         echo "OCSP stapling is OK."
@@ -190,6 +193,7 @@ axonops_shell_check:
   interval: 12h
   present: true
   timeout: 1m
+  shell: /bin/bash
   script: |-
     set -euo pipefail
 

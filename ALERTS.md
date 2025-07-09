@@ -25,13 +25,13 @@ The `alerts` role in the AxonOps Ansible Collection automates the configuration 
 
 Before you can run the playbook, you'll need to define the following variables. You can do the either as *environment variables* or *Ansible Variables*. If you use ansible variables, it's stronglly advised to ue Ansible Vault or similar.
 
-| Variable    | Environment Variable(s)           |
-|-------------|-----------------------------------|
-| org         | AXONOPS_OR                        |
-| cluster     | AXONOPS_CLUSTER                   |
-| auth_token  | AXONOPS_TOKEN or AXONOPS_API_TOKEN|
-| username    | AXONOPS_USERNAME                  |
-| password    | AXONOPS_PASSWORD                  |
+| Variable    | Environment Variable(s)           | Description |
+|-------------|-----------------------------------|-------------|
+| org         | AXONOPS_ORG                       | Organization name in AxonOps |
+| cluster     | AXONOPS_CLUSTER                   | Cluster name to configure alerts for |
+| auth_token  | AXONOPS_TOKEN or AXONOPS_API_TOKEN| API authentication token for AxonOps |
+| username    | AXONOPS_USERNAME                  | Username for AxonOps API authentication (if not using token) |
+| password    | AXONOPS_PASSWORD                  | Password for AxonOps API authentication (if not using token) |
 
 ## Directory Structure
 

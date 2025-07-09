@@ -24,10 +24,6 @@
   ansible.builtin.import_tasks: metrics_alerts.yml
   tags: metrics
 
-- name: Import log alerts tasks
-  ansible.builtin.import_tasks: log_alerts.yml
-  tags: logs
-
 - name: Import backup tasks
   ansible.builtin.import_tasks: backups.yml
   tags: backups
