@@ -184,3 +184,13 @@ axonops_log_alert_rule:
   source: "/var/log/cassandra/system.log"
   description: "Jemalloc shared library could not be preloaded. This can affect performance."
   present: true
+
+# WARN [ScheduledTasks:1] 2025-07-24 09:50:56,001 QueryProcessor.java:110 - 5 prepared statements discarded in the last minute because cache limit reached (20 MB)
+- name: Server Prepared Statement Cache Size
+  warning_value: 2
+  critical_value: 100
+  duration: 10m
+  content: \"WARN .*prepared statements discarded\"
+  source: "/var/log/cassandra/system.log"
+  description: "Prepared statements discarded because cache limit reached."
+  present: true
