@@ -1,9 +1,66 @@
 ---
+- name: Set package name with version for Debian
+  ansible.builtin.set_fact:
+    axon_server_versioned_package: "axon-server={{ axon_server_version }}"
+  when:
+    - ansible_os_family == 'Debian'
+    - axon_server_version is defined
+    - axon_server_version != 'latest'
+
+- name: Set package name with version for RedHat
+  ansible.builtin.set_fact:
+    axon_server_versioned_package: "axon-server-{{ axon_server_version }}"
+  when:
+    - ansible_os_family == 'RedHat'
+    - axon_server_version is defined
+    - axon_server_version != 'latest'
+
+- name: Set package name without version (for latest)
+  ansible.builtin.set_fact:
+    axon_server_versioned_package: "axon-server"
+  when:
+    - axon_server_version is not defined or axon_server_version == 'latest'
+
 - name: Ensure Axon server is installed.
   ansible.builtin.package:
-    name: axon-server
+    name: "{{ axon_server_versioned_package }}"
     state: "{{ axon_server_state }}"
   notify:
     - restart axon-server
+
+# When axon_server_version is 'latest', we need to determine the actual installed version
+- name: Get installed axon-server version
+  ansible.builtin.command: rpm -q --queryformat '%{VERSION}' axon-server
+  register: installed_server_version_rpm
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_os_family == 'RedHat'
+    - axon_server_version == 'latest'
+
+- name: Get installed axon-server version
+  ansible.builtin.shell: dpkg-query -W -f='${Version}' axon-server | cut -d'-' -f1
+  register: installed_server_version_deb
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_os_family == 'Debian'
+    - axon_server_version == 'latest'
+
+- name: Set axon_server_version fact from installed version
+  ansible.builtin.set_fact:
+    axon_server_version: "{{ installed_server_version_rpm.stdout }}"
+  when:
+    - ansible_os_family == 'RedHat'
+    - axon_server_version == 'latest'
+    - installed_server_version_rpm.rc == 0
+
+- name: Set axon_server_version fact from installed version
+  ansible.builtin.set_fact:
+    axon_server_version: "{{ installed_server_version_deb.stdout }}"
+  when:
+    - ansible_os_family == 'Debian'
+    - axon_server_version == 'latest'
+    - installed_server_version_deb.rc == 0
 
 # code: language=ansible
