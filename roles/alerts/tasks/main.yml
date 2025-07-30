@@ -1,0 +1,78 @@
+- name: Get org from env if not set already
+  ansible.builtin.set_fact:
+    org: "{{ lookup('env', 'AXONOPS_ORG') | default(omit) }}"
+  when: org is not defined
+
+- name: Get cluster from env if not set already
+  ansible.builtin.set_fact:
+    cluster: "{{ lookup('env', 'AXONOPS_CLUSTER') | default(omit) }}"
+  when: cluster is not defined
+
+- name: Assert all required variables are set
+  ansible.builtin.assert:
+    that:
+      - org is defined
+      - org | length > 0
+      - cluster is defined
+      - cluster | length > 0
+    fail_msg: >-
+      Required variables are missing or empty. Please ensure 'org' and 'cluster' are set.
+    success_msg: >-
+      All required variables for alerts are set.
+
+- name: Import metric alerts tasks
+  ansible.builtin.import_tasks: metrics_alerts.yml
+  tags: metrics
+
+- name: Import backup tasks
+  ansible.builtin.import_tasks: backups.yml
+  tags: backups
+
+- name: Import service checks tasks
+  ansible.builtin.import_tasks: service_checks.yml
+  tags: service_checks
+
+- name: Import slack tasks
+  ansible.builtin.import_tasks: slack_integration.yml
+  tags: slack
+
+- name: Import tasks from adaptive_repair.yml
+  ansible.builtin.import_tasks: adaptive_repair.yml
+  tags: adaptive_repair
+  when: adaptive_repair is defined
+
+- name: Import tasks from agent_disconnection_tolerance.yml
+  ansible.builtin.import_tasks: agent_disconnection_tolerance.yml
+  tags: agent_disconnection_tolerance
+  when: agent_disconnection_tolerance is defined and agent_disconnection_tolerance.key is defined
+
+- name: Import tasks from commitlogs_archive.yml
+  ansible.builtin.import_tasks: commitlogs_archive.yml
+  tags: commitlogs_archive
+
+- name: Import tasks from human_readableid.yml
+  ansible.builtin.import_tasks: human_readableid.yml
+  tags: human_readableid
+  when: human_readableid is defined
+
+- name: Import tasks from log_alerts.yml
+  ansible.builtin.import_tasks: log_alerts.yml
+  tags: log_alerts
+
+- name: Import tasks from logcollector.yml
+  ansible.builtin.import_tasks: logcollector.yml
+  tags: logcollector
+
+- name: Import tasks from pagerduty_integration.yml
+  ansible.builtin.import_tasks: pagerduty_integration.yml
+  tags: pagerduty_integration
+
+- name: Import dashboard
+  ansible.builtin.import_tasks: dashboards.yml
+  tags: dashboards
+
+- name: Import alert routes tasks
+  ansible.builtin.import_tasks: alert_routes.yml
+  tags: routes
+
+# code: language=ansible

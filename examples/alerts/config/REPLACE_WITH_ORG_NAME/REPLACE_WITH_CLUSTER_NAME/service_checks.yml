@@ -1,0 +1,62 @@
+######## Service Checks ########
+# This is an example set of service checks for the health of your cluster.
+# These rules are some examples of how checks can be configured for
+# your Apache Cassandra cluster. The checks defined here will be applied
+# to this specific cluster.
+
+axonops_shell_check:
+
+
+- name: Debian / Ubuntu - Check host needs reboot
+  interval: 12h
+  present: true
+  timeout: 1m
+  script: |-
+    set -euo pipefail
+
+    if [ -f /var/run/reboot-required ]
+    then
+        echo `hostname` Reboot required
+        exit 1
+    else
+        echo "Nothing to do"
+    fi
+
+- name: Check AWS events
+  interval: 12h
+  present: true
+  timeout: 1m
+  shell: '/usr/bin/python3'
+  script: |-
+    import urllib.request
+    import json
+    import sys
+
+    url = "http://169.254.169.254/latest/meta-data/events/maintenance/scheduled"
+    try:
+      response = urllib.request.urlopen(url, timeout=2).read()
+    except urllib.error.URLError as e:
+      print("Connection refused: assuming not running in AWS")
+      sys.exit(0)
+    except urllib.error.HTTPError as e:
+      if e.code == 404:
+        print("No scheduled maintenance events found or not an AWS instance")
+        sys.exit(0)
+
+    data = json.loads(response.decode('utf-8'))
+
+    if not data:
+        print("No events for this node")
+        sys.exit(0)
+    else:
+        print("Events detected:")
+        for event in data:
+            print(f"{event['NotBefore']} - {event['Description']}")
+        sys.exit(1)
+
+axonops_tcp_check:
+- name: cql_client_port
+  interval: 3m
+  timeout: 1m
+  tcp: "{{.comp_listen_address}}:{{.comp_native_transport_port}}"
+  present: true

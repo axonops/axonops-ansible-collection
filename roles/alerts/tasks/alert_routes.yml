@@ -1,0 +1,59 @@
+---
+- name: Initialize axonops_alert_routes for {{ org }}/{{ cluster }}
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_alert_routes: []
+  when: axonops_alert_routes is not defined
+
+- name: Load organization-wide alert rules from {{ org }}
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_alert_routes: "{{ axonops_alert_routes + (lookup('file', item) | from_yaml).axonops_alert_routes }}"
+  with_fileglob:
+    - "config/{{ org }}/alert_routes.yml"
+
+- name: Load cluster-specific alert rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_alert_routes: "{{ axonops_alert_routes + (lookup('file', item) | from_yaml).axonops_alert_routes }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/alert_routes.yml"
+
+- name: Include the org configs
+  tags: always
+  ansible.builtin.include_vars: "{{ item }}"
+  with_fileglob:
+    - "config/{{ org }}/alert_routes.yml"
+
+- name: Include the default configs
+  tags: always
+  ansible.builtin.include_vars: "{{ item }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/alert_routes.yml"
+
+- name: Install alerts routes on {{ org }}/{{ cluster }}
+  axonops.axonops.alert_route:
+    org: "{{ org }}"
+    cluster: "{{ cluster }}"
+    cluster_type: "{{ alert_item.cluster_type|default(omit) }}"
+    type: "{{ alert_item.type }}"
+    severity: "{{ alert_item.severity }}"
+    integration_type: "{{ alert_item.integration_type }}"
+    integration_name: "{{ alert_item.integration_name }}"
+    enable_override: "{{ alert_item.enable_override }}"
+    present: "{{ alert_item.present|default(true) }}"
+    auth_token: "{{ alert_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ alert_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ alert_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+  loop: "{{ axonops_alert_routes }}"
+  no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
+  loop_control:
+    loop_var: alert_item
+
+  tags:
+  - axonops_alert_route
+  - alert_route
+  - alert
+  - route
+
+# code: language=ansible

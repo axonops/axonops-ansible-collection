@@ -1,0 +1,14 @@
+######## Cassandra Backup Schedules ########
+# This is an example set of Commitlog Archive Settings for Cassandra.
+# These settings are some examples of how commitlog archive can be configured for
+# your Apache Cassandra cluster. The settings defined here will be applied
+# only to a specific cluster, and will override the rules defined in
+# all/commitlog_archive.yml.
+axonops_commitlog_archive:
+- cluster: testcluster
+  present: true
+  datacenters:
+  - dc1
+  remote_type: "local"
+  remote_path: "/data/commitlog_backup"
+  remote_retention: 2h

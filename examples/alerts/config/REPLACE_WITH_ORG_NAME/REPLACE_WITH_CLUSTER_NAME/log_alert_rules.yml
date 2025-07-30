@@ -1,0 +1,10 @@
+######## Cassandra Log Alert Rules ########
+# This is an example set of log alert rules for Cassandra system.log.
+# These rules are some examples of how alerts can be configured for
+# your Apache Cassandra cluster. The rules defined here will be applied
+# only to a specific cluster, and will override the rules defined in
+# all/log_alert_rules.yml.
+axonops_log_alert_rule: []
+
+
+# Place overriding or cluster specific rules here

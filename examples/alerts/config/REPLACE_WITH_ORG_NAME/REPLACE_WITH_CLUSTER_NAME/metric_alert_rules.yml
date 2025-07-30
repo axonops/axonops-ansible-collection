@@ -1,0 +1,104 @@
+######## Cassandra Performance Metrics Alert Rules ########
+# This is an example set of alert rules for Cassandra performance metrics.
+# These rules are some examples of how alerts can be configured for
+# your Apache Cassandra cluster. The rules defined here will be applied
+# only to a specific cluster, and will override the rules defined in
+# all/metric_alert_rules.yml.
+
+axonops_alert_rules:
+######## TABLE ISSUES ########
+# These are examples for creating alerts for keyspaces and tables. Replace the keyspaces and tables with your application specific tables
+- name: Tombstones Scanned per Table - 99thPercentile - system.peers table
+  dashboard: Table
+  chart: Tombstones Scanned per Table - $percentile
+  operator: '>='
+  critical_value: 1000
+  warning_value: 500
+  duration: 3h
+  description: Detected a high number of tombstones scanned during read
+  keyspace:
+  - system
+  scope:
+  - peers
+  percentile:
+  - 99thPercentile
+  routing:
+    error:
+      - example_slack_integration_developer
+    warning:
+      - example_slack_integration_developer
+    info:
+      - example_slack_integration_developer
+
+- name: Max Partition Size - system.peers table
+  dashboard: Table
+  chart: Max Table Partition Size per $groupBy
+  operator: '>='
+  critical_value: 209715200
+  warning_value: 104857600
+  duration: 6h
+  description: Detected high partition size
+  keyspace:
+  - system
+  scope:
+  - peers
+  group_by:
+  - host_id
+
+- name: Bloom Filter False Positive Ratio - system.peers table
+  dashboard: Table
+  chart: Bloom Filter False Positive Ratio
+  operator: '>='
+  critical_value: 0.05
+  warning_value: 0.03
+  duration: 3h
+  description: Detected high Bloom Filter False Positive Ratio
+  keyspace:
+  - system
+  scope:
+  - peers
+
+- name: SSTables Read Per Query - 99thPercentile - system.peers table
+  dashboard: Table
+  chart: SSTables Per Read - $percentile
+  operator: '>='
+  critical_value: 50
+  warning_value: 15
+  duration: 2h
+  description: Detected high SSTables read per query
+  keyspace:
+  - system
+  scope:
+  - peers
+  percentile:
+  - 99thPercentile
+
+- name: Live SStables
+  dashboard: Table
+  chart: Max Live SSTables per Table per $groupBy
+  operator: '>='
+  critical_value: 300
+  warning_value: 100
+  duration: 6h
+  description: Detected high SSTables count
+  group_by:
+  - host_id
+  keyspace:
+  - system
+  scope:
+  - peers
+
+- name: Speculative Retries
+  dashboard: Table
+  chart: SpeculativeRetries By Node For Table Reads Per Second
+  operator: '>='
+  critical_value: 500
+  warning_value: 200
+  duration: 2h
+  description: Detected high Speculative Retries
+  group_by:
+  - host_id
+  keyspace:
+  - system
+  scope:
+  - peers

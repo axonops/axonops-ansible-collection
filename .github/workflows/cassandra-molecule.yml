@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - molecule
   pull_request:
     branches:
       - main
