@@ -2,8 +2,14 @@
 axon_server_state: present
 axon_server_hum: false
 
-axon_server_elastic_host: http://127.0.0.1
-axon_server_elastic_port: 9200
+axon_server_elastic_hosts:
+  - http://127.0.0.1:9200
+axon_server_elastic_shards: 1
+axon_server_elastic_replicas: 0
+axon_server_elastic_tls_skip_verify: false
+# axon_server_elastic_username: elastic
+# axon_server_elastic_password: elastic
+
 
 # Override listen address and port for the axon-server API
 axon_server_listen_address: 0.0.0.0
