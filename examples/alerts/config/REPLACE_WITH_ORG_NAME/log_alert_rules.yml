@@ -99,12 +99,12 @@ axonops_log_alert_rule:
   present: true
 
 - name: Maximum memory usage reached for networking buffer pool
-  warning_value: 1
-  critical_value: 1
-  duration: 15m
+  warning_value: 3
+  critical_value: 20
+  duration: 60m
   content: '+"INFO.*Messaging-EventLoop" +NoSpamLogger.* +"for networking buffer pool" +"cannot allocate chunk"'
   source: "/var/log/cassandra/system.log"
-  description: "Maximum memory usage reached, increase file_cache_size"
+  description: "Maximum memory usage reached, networking_cache_size needs to be increased"
   present: true
 
 - name: Unable to lock JVM memory (ENOMEM)
