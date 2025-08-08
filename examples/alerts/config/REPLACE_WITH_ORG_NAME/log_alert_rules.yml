@@ -30,7 +30,7 @@ axonops_log_alert_rule:
   critical_value: 1
   operator: '<'
   duration: 24h
-  content: repair
+  content: \"Repair-Task\"
   source: "/var/log/cassandra/system.log"
   description: "Detected no repair has been seen in the last 24h"
   present: true
