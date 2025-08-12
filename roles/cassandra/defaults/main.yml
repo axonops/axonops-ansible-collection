@@ -230,7 +230,7 @@ cassandra_inter_dc_tcp_nodelay: false
 cassandra_incremental_backups: false
 cassandra_snapshot_before_compaction: false
 cassandra_auto_snapshot: true
-cassandra_snapshot_links_per_second: 16384
+cassandra_snapshot_links_per_second: 0
 
 # SSTable Configuration
 cassandra_sstable_selected_format: "bti"

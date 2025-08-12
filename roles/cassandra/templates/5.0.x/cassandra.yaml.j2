@@ -1250,7 +1250,7 @@ auto_snapshot_ttl: {{ cassandra_auto_snapshot_ttl }}
 # impact, especially on consumer grade SSDs. A non-zero value here can
 # be used to throttle these links to avoid negative performance impact of
 # taking and clearing snapshots
-snapshot_links_per_second: {{ cassandra_snapshot_links_per_second | default("16384") }}
+snapshot_links_per_second: {{ cassandra_snapshot_links_per_second | default(0) }}
 
 # The sstable formats configuration. SSTable formats implementations are
 # loaded using the service loader mechanism. In this section, one can select
