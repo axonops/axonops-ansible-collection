@@ -20,6 +20,13 @@
     cassandra_listen_address: "localhost"
     cassandra_rpc_address: "localhost"
 
+    # For AxonOps server version >= 2.0.4, set this variable to use the new Elasticsearch syntax
+    # axon_server_version: "2.0.4"
+
+    # Legacy Elasticsearch configuration (used for server versions < 2.0.4)
+    axon_server_elastic_host: "http://127.0.0.1"
+    axon_server_elastic_port: "9200"
+
 
   pre_tasks:
     # This is only for this example to work, please review your firewall settings and requirements

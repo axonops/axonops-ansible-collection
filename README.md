@@ -115,6 +115,10 @@ storage and it will also deploy Elasticsearch for the AxonOps configuration.
 
 For more information about the Elasticsearch installation options please see the following [README.md](./roles/elastic/README.md)
 
+**Note:** For AxonOps server version >= 2.0.4, the Elasticsearch configuration uses a new syntax with a `hosts` array format.
+The playbook automatically detects the server version and applies the appropriate configuration format. For older versions,
+the legacy `elastic_host` and `elastic_port` configuration is used.
+
 ```yaml
 - name: Deploy AxonOps Server
   hosts: axon-server

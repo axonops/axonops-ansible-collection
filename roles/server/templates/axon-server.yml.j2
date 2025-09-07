@@ -1,7 +1,30 @@
 host: {{ axon_server_listen_address | default('127.0.0.1') }}  # API endpoint
 port: {{ axon_server_listen_port | default('8080') }} # API port
-elastic_host: {{ axon_server_elastic_host | default('http://127.0.0.1') }} # elastic endpoint
-elastic_port: {{ axon_server_elastic_port | default('9200') }} # elastic port
+
+{% if axon_server_version == 'latest' or (axon_server_version is defined and axon_server_version is version('2.0.4', '>=')) %}
+# New syntax for axon-server version >= 2.0.4 (or latest)
+search_db:
+  hosts:
+    - {{ axon_server_elastic_host | default('http://127.0.0.1') }}:{{ axon_server_elastic_port | default('9200') }}/
+
+  # username: elastic
+  # password: secure-password
+
+  # SSL/TLS config for Elasticsearch
+  # skip_verify: false # Disables CA and Hostname verification
+
+  # Configure the number of replicas per shard. Defaults to 0 if not specified.
+  # replicas: 0
+
+  # Configure the number of shards per index.
+  # The default value of 1 is recommended for most use cases
+  # shards: 1
+{% else %}
+# Old syntax for axon-server version < 2.0.4
+elastic_host: {{ axon_server_elastic_host | default('http://127.0.0.1') }} # elastic endpoint
+elastic_port: {{ axon_server_elastic_port | default('9200') }} # elastic port
+{% endif %}
+
 {% if axon_server_hum %}
 hum: true
 {% endif %}
