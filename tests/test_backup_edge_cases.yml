@@ -1,0 +1,122 @@
+---
+- name: AxonOps Backup Module Edge Cases Test
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    base_url: "{{ base_url | default('http://localhost:3000') }}"
+    org: "{{ org | default('testorg') }}"
+    cluster: "{{ cluster | default('backup-apis') }}"
+
+  tasks:
+    - name: Test invalid cluster (should fail gracefully)
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "nonexistent-cluster"
+        present: true
+        local_retention: "7d"
+        tag: "test-invalid-cluster"
+        datacenters: ["dc1"]
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: invalid_cluster_result
+      ignore_errors: true
+
+    - name: Display invalid cluster result
+      debug:
+        var: invalid_cluster_result
+
+    - name: Test S3 backup without required parameters (should fail)
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: true
+        remote: true
+        remote_type: "s3"
+        tag: "test-incomplete-s3"
+        datacenters: ["dc1"]
+        # Missing s3_region which is required
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: incomplete_s3_result
+      ignore_errors: true
+
+    - name: Display incomplete S3 result
+      debug:
+        var: incomplete_s3_result
+
+    - name: Test check mode for existing backup
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: true
+        local_retention: "7d"
+        remote: false
+        tag: "test-check-mode"
+        datacenters: ["dc1"]
+        schedule: true
+        schedule_expr: "0 2 * * *"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      check_mode: true
+      register: check_mode_create
+
+    - name: Display check mode create result
+      debug:
+        var: check_mode_create
+
+    - name: Actually create the backup for check mode test
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: true
+        local_retention: "7d"
+        remote: false
+        tag: "test-check-mode"
+        datacenters: ["dc1"]
+        schedule: true
+        schedule_expr: "0 2 * * *"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: actual_create
+
+    - name: Test check mode for modifying existing backup
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: true
+        local_retention: "30d"  # Different retention
+        remote: false
+        tag: "test-check-mode"
+        datacenters: ["dc1"]
+        schedule: true
+        schedule_expr: "0 2 * * *"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      check_mode: true
+      register: check_mode_modify
+
+    - name: Display check mode modify result
+      debug:
+        var: check_mode_modify
+
+    - name: Clean up test backup
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: false
+        tag: "test-check-mode"
+        datacenters: ["dc1"]
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: cleanup_result
+
+    - name: Display cleanup result
+      debug:
+        var: cleanup_result

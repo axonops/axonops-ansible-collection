@@ -1,0 +1,109 @@
+---
+- name: Comprehensive AxonOps Backup Module Test
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    base_url: "{{ base_url | default('http://localhost:3000') }}"
+    org: "{{ org | default('testorg') }}"
+    cluster: "{{ cluster | default('backup-apis') }}"
+
+  tasks:
+    - name: Test 1 - Create local backup with specific keyspaces
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: true
+        local_retention: "5d"
+        remote: false
+        tag: "test-keyspace-backup"
+        datacenters: ["dc1"]
+        keyspaces: ["system_schema"]
+        schedule: false
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: keyspace_backup_result
+
+    - name: Display keyspace backup result
+      debug:
+        var: keyspace_backup_result
+
+    - name: Test 2 - Update the same backup (should show changed=true)
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: true
+        local_retention: "14d"  # Changed retention
+        remote: false
+        tag: "test-keyspace-backup"  # Same tag
+        datacenters: ["dc1"]
+        keyspaces: ["system_schema"]
+        schedule: true  # Changed to scheduled
+        schedule_expr: "0 3 * * *"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: update_backup_result
+
+    - name: Display update backup result
+      debug:
+        var: update_backup_result
+
+    - name: Test 3 - Create Azure backup configuration (dry-run)
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: true
+        local_retention: "10d"
+        remote: true
+        remote_type: "azure"
+        remote_path: "/azure-backup-path"
+        remote_retention: "60d"
+        tag: "test-azure-backup"
+        datacenters: ["dc1"]
+        schedule: true
+        schedule_expr: "0 1 * * 0"  # Weekly
+        azure_account: "teststorageaccount"
+        azure_use_msi: true
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      check_mode: true
+      register: azure_backup_check
+
+    - name: Display Azure backup check result
+      debug:
+        var: azure_backup_check
+
+    - name: Test 4 - Test backup removal
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: false
+        tag: "test-keyspace-backup"
+        datacenters: ["dc1"]
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: removal_result
+
+    - name: Display removal result
+      debug:
+        var: removal_result
+
+    - name: Test 5 - Verify backup was removed (should show no change)
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: false
+        tag: "test-keyspace-backup"
+        datacenters: ["dc1"]
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: verify_removal_result
+
+    - name: Display verify removal result
+      debug:
+        var: verify_removal_result

@@ -1,0 +1,87 @@
+---
+- name: Test AxonOps Adaptive Repair Module
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    axonops_base_url: "{{ base_url | default('http://localhost:3000') }}"
+    axonops_org: "{{ org | default('testorg') }}"
+    axonops_cluster: "{{ cluster | default('backup-apis') }}"
+
+  tasks:
+    - name: Test adaptive repair with excluded tables
+      axonops.axonops.adaptive_repair:
+        base_url: "{{ axonops_base_url }}"
+        org: "{{ axonops_org }}"
+        cluster: "{{ axonops_cluster }}"
+        active: true
+        blacklisted:
+          - "system.peers"
+          - "system.local"
+          - "keyspace1.excluded_table"
+        gc_grace: 172800  # GC Grace Threshold (seconds) - 2 days
+        parallelism: 5    # Concurrent Repair Processes
+        segments: 4       # Max Total Segments Per Table (using segments)
+        filter_twcs: true
+        retries: 3
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: adaptive_repair_segments_result
+
+    - name: Display adaptive repair with segments result
+      debug:
+        var: adaptive_repair_segments_result
+
+    - name: Test adaptive repair with segment target size
+      axonops.axonops.adaptive_repair:
+        base_url: "{{ axonops_base_url }}"
+        org: "{{ axonops_org }}"
+        cluster: "{{ axonops_cluster }}"
+        active: true
+        blacklisted:
+          - "system.peers"
+          - "system.local"
+        gc_grace: 259200  # GC Grace Threshold (seconds) - 3 days
+        parallelism: 8    # Concurrent Repair Processes
+        segment_target_size_mb: 512  # Max Total Segments Per Table (using target size)
+        filter_twcs: false
+        retries: 5
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: adaptive_repair_size_result
+
+    - name: Display adaptive repair with target size result
+      debug:
+        var: adaptive_repair_size_result
+
+    - name: Test adaptive repair minimal configuration
+      axonops.axonops.adaptive_repair:
+        base_url: "{{ axonops_base_url }}"
+        org: "{{ axonops_org }}"
+        cluster: "{{ axonops_cluster }}"
+        active: true
+        blacklisted: []               # No excluded tables
+        gc_grace: 86400               # Default GC Grace Threshold (1 day)
+        parallelism: 10               # Default Concurrent Repair Processes
+        segment_target_size_mb: 256   # Default Target Segment Size (MB)
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: adaptive_repair_minimal_result
+
+    - name: Display minimal adaptive repair result
+      debug:
+        var: adaptive_repair_minimal_result
+
+    - name: Test disabling adaptive repair
+      axonops.axonops.adaptive_repair:
+        base_url: "{{ axonops_base_url }}"
+        org: "{{ axonops_org }}"
+        cluster: "{{ axonops_cluster }}"
+        active: false
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: adaptive_repair_disabled_result
+
+    - name: Display disabled adaptive repair result
+      debug:
+        var: adaptive_repair_disabled_result
