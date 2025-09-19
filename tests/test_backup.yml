@@ -1,0 +1,58 @@
+---
+- name: Test AxonOps Backup Module
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    base_url: "{{ base_url | default('http://localhost:3000') }}"
+    org: "{{ org | default('testorg') }}"
+    cluster: "{{ cluster | default('backup-apis') }}"
+
+  tasks:
+    - name: Test local backup configuration
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: true
+        local_retention: "7d"
+        remote: false
+        tag: "test-local-backup"
+        datacenters: ["dc1"]
+        schedule: true
+        schedule_expr: "0 2 * * *"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: local_backup_result
+
+    - name: Display local backup result
+      debug:
+        var: local_backup_result
+
+    - name: Test S3 backup configuration (if credentials available)
+      axonops.axonops.backup:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        present: true
+        local_retention: "10d"
+        remote: true
+        remote_type: "s3"
+        remote_path: "/test-backup-path"
+        remote_retention: "30d"
+        tag: "test-s3-backup"
+        datacenters: ["dc1"]
+        schedule: true
+        schedule_expr: "0 1 * * *"
+        s3_region: "us-east-1"
+        s3_access_key_id: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+        s3_secret_access_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') }}"
+      register: s3_backup_result
+      when: lookup('env', 'AWS_ACCESS_KEY_ID') != ""
+
+    - name: Display S3 backup result
+      debug:
+        var: s3_backup_result
+      when: s3_backup_result is defined
