@@ -30,6 +30,25 @@ dynamic_snitch_reset_interval: 600000ms
 
 This makes coding the ansible playbook to support both versions more complex. Before running this playbook, you'll need to review the variables from [roles/cassandra/defaults/main.yml](roles/cassandra/defaults/main.yml) and compare them against [roles/cassandra/templates/5.0.x/cassandra.yaml.j2](roles/cassandra/templates/5.0.x/cassandra.yaml.j2).
 
+## Role Documentation
+
+This collection provides the following Ansible roles. Click on each role for detailed documentation, configuration options, and examples:
+
+### AxonOps Components
+- **[agent](docs/roles/agent.md)** - Install and configure AxonOps Agent for Cassandra monitoring
+- **[server](docs/roles/server.md)** - Install and configure AxonOps Server (self-hosted deployments)
+- **[dash](docs/roles/dash.md)** - Install and configure AxonOps Dashboard web interface
+- **[alerts](docs/roles/alerts.md)** - Configure alerts, integrations, and monitoring settings
+
+### Infrastructure Components
+- **[cassandra](docs/roles/cassandra.md)** - Install and configure Apache Cassandra (3.11, 4.x, 5.x)
+- **[elastic](docs/roles/elastic.md)** - Install and configure Elasticsearch for AxonOps
+- **[java](docs/roles/java.md)** - Install Java (OpenJDK or Azul Zulu)
+
+### Utilities
+- **[preflight](docs/roles/preflight.md)** - Run pre-installation system checks
+
+For a complete guide including deployment patterns and quick references, see the [Role Documentation Index](docs/roles/README.md).
 
 ## Playbooks
 
