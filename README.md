@@ -108,7 +108,7 @@ the `*_redhat_repository` URLs.
         cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | first }}"
 ```
 
-### axon-server.yml
+### axon-server.yml (note - you do not need to use this if connecting to the SaaS)
 
 This playbook deploys the AxonOps Server. It installs a local Apache Cassandra server to use a metrics
 storage and it will also deploy Elasticsearch for the AxonOps configuration.
