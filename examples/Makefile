@@ -51,3 +51,15 @@ agent: check-env ## Installs the AxonOps agent to the cassandra nodes
 server: check-env ## Installs the AxonOps server with elasticsearch and optional cassandra
 	@${PIPENVCMD} ansible-playbook -i ${INVENTORY} axon-server.yml --diff ${EXTRA} \
 		-u ${ANSIBLE_USER}
+
+cassandra-4.1: check-env ## Installs Cassandra 4.1 with AxonOps agent
+	@${PIPENVCMD} ansible-playbook -i ${INVENTORY} cassandra-4.1.yml --diff ${EXTRA} \
+		-u ${ANSIBLE_USER}
+
+cassandra-5.0: check-env ## Installs Cassandra 5.0 with AxonOps agent
+	@${PIPENVCMD} ansible-playbook -i ${INVENTORY} cassandra-5.0.yml --diff ${EXTRA} \
+		-u ${ANSIBLE_USER}
+
+rolling-restart: check-env ## Rolling restart of Cassandra nodes
+	@${PIPENVCMD} ansible-playbook -i ${INVENTORY} cassandra-rolling-start.yml --diff ${EXTRA} \
+		-u ${ANSIBLE_USER}
