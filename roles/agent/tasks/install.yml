@@ -14,14 +14,14 @@
     name: "{{ axon_agent_pkg }}"
     state: "{{ axon_agent_state }}"
   when: has_internet_access
-  notify: restart axon-agent
+  notify: Restart axon-agent
 
 - name: "Ensure AxonOps Java Agent is installed: {{ axon_agent_pkg }}"
   ansible.builtin.package:
     name: "{{ axon_java_agent_pkg }}"
     state: "{{ axon_agent_state }}"
   when: has_internet_access and axon_java_agent != '' and not axon_java_agent_force_offline_install
-  notify: restart axon-agent
+  notify: Restart axon-agent
 
 # Offline installation
 - name: Copy AxonOps Agent package to target

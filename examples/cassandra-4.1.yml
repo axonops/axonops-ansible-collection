@@ -1,12 +1,20 @@
-- name: Deploy AxonOps Server
+- name: Deploy Cassandra 4.1 with AxonOps Agent
   hosts: cassandra
   become: true
   vars:
     install_cassandra: true
-    axon_java_agent: "axon-cassandra5.0-agent"
-    axon_agent_version: ""
-    axon_java_agent_version: ""
+    axon_java_agent: "axon-cassandra4.1-agent"
+    axon_agent_version: "2.0.2"
+    axon_java_agent_version: "1.0.14"
     cassandra_version: 4.1.9
+    cassandra_cluster_name: axonops
+    cassandra_dc: default
+    cassandra_rack: rack1
+    # This is the AxonOps Server host, it can be localhost or the IP of the AxonOps Server
+    # Leave empty if you want to use the SaaS environment
+    axon_agent_server_host: "{{ groups['axon-server'] | first }}"
+    axon_agent_tls_mode: "disabled"
+    axon_agent_customer_name: "mycompany"
     cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | join(',') }}"
 
   pre_tasks:
@@ -20,10 +28,14 @@
       failed_when: false
 
   roles:
+    - name: preflight
+      tags: preflight
+      role: axonops.axonops.preflight
     - name: java
       role: axonops.axonops.java
       tags: java
     - role: axonops.axonops.agent
+      tags: agent
     - role: axonops.axonops.cassandra
       tags: cassandra
       when: install_cassandra is defined and install_cassandra

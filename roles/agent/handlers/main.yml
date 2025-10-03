@@ -8,7 +8,7 @@
   systemd:
     daemon_reload: yes
 
-- name: restart axon-agent
+- name: Restart axon-agent
   systemd:
     name: axon-agent
     state: restarted

@@ -1,4 +1,4 @@
-- name: Deploy AxonOps Server
+- name: Deploy Cassandra 5.0 with AxonOps Agent
   hosts: "{{ target | default('cassandra') }}"
   become: true
   vars:

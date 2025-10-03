@@ -1,7 +1,7 @@
 ---
 
 - name: Copy AxonOps agent config file
-  notify: restart axon-agent
+  notify: Restart axon-agent
   ansible.builtin.template:
     src: axon-agent.yml.j2
     dest: /etc/axonops/axon-agent.yml
@@ -42,7 +42,7 @@
     mode: "0644"
   notify:
     - delete local.db
-    - restart axon-agent
+    - Restart axon-agent
   when: axon_agent_hostid is defined and axon_agent_hostid != ''
 
 - name: Set up sudoers if enabled
