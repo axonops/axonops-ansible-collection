@@ -22,9 +22,20 @@
     - axon_server_version is not defined or axon_server_version == 'latest'
 
 - name: Ensure Axon server is installed.
-  ansible.builtin.package:
+  when: ansible_os_family == "Debian"
+  ansible.builtin.apt:
     name: "{{ axon_server_versioned_package }}"
     state: "{{ axon_server_state }}"
+  notify:
+    - restart axon-server
+
+- name: Ensure Axon server is installed.
+  when: ansible_os_family == "RedHat"
+  ansible.builtin.dnf:
+    name: "{{ axon_server_versioned_package }}"
+    state: "{{ axon_server_state }}"
+    enablerepo: "axonops*"
+    disablerepo: "*"
   notify:
     - restart axon-server
 

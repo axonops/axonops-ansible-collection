@@ -10,10 +10,20 @@
 
 # Online installation fixed version
 - name: Ensure Axon agent is installed.
-  ansible.builtin.package:
+  ansible.builtin.apt:
     name: "{{ axon_agent_pkg }}"
     state: "{{ axon_agent_state }}"
-  when: has_internet_access
+  when: has_internet_access and ansible_os_family == "Debian"
+  notify: Restart axon-agent
+
+# Online installation fixed version
+- name: Ensure Axon agent is installed.
+  ansible.builtin.dnf:
+    name: "{{ axon_agent_pkg }}"
+    state: "{{ axon_agent_state }}"
+    enablerepo: "axonops*"
+    disablerepo: "*"
+  when: has_internet_access and ansible_os_family == "RedHat"
   notify: Restart axon-agent
 
 - name: "Ensure AxonOps Java Agent is installed: {{ axon_agent_pkg }}"
