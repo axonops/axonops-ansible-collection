@@ -1,4 +1,9 @@
 ---
+# repository
+axon_agent_public_repository: present
+axon_agent_beta_repository: absent
+axon_agent_dev_repository: absent
+
 cqlai_version: latest
 #cqlai_package_url: "https://downloads.datastax.com/cqlai/{{ cqlai_version }}/cqlai-{{ cqlai_version }}-all.deb"
 
