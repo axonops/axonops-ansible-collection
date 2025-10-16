@@ -14,8 +14,6 @@ For more information about Ansible, visit the [Ansible project documentation](ht
 Although this example project has been implemented using Ansible, it is possible to achieve similar results using alternative tools like Chef or Puppet,
 offering flexibility for those who prefer different automation solutions.
 
-**Note: please see https://github.com/axonops/axonops-config-automation for setting up your alerts, dashboards, backsups etc...**
-
 ## Before you start
 
 Apache Cassandra 5.0 introduced significant configuration changes that affect how you structure your Ansible playbooks. The most notable change is the shift from parameter names that include units to explicit unit declarations in values. For example:
@@ -38,7 +36,7 @@ This collection provides the following Ansible roles. Click on each role for det
 - **[agent](docs/roles/agent.md)** - Install and configure AxonOps Agent for Cassandra monitoring
 - **[server](docs/roles/server.md)** - Install and configure AxonOps Server (self-hosted deployments)
 - **[dash](docs/roles/dash.md)** - Install and configure AxonOps Dashboard web interface
-- **[alerts](docs/roles/alerts.md)** - Configure alerts, integrations, and monitoring settings
+- **[configurations](docs/roles/alerts.md)** - Configure alerts, integrations, and monitoring settings
 
 ### Infrastructure Components
 - **[cassandra](docs/roles/cassandra.md)** - Install and configure Apache Cassandra (3.11, 4.x, 5.x)
@@ -71,7 +69,7 @@ ansible-galaxy collection install $LATEST
 ### Inventory
 
 Before you can start using these playbooks you'll need to add your nodes to the inventory. You can find an example
-in the [./example](./example) directory. There are two sections:
+in the [./examples](./examples) directory. There are two sections:
 
 - axon-server: list here the IP address or hostname of the server where you would like to install AxonOps
 - cassandra: these are the Apache Cassandra nodes where the agent will be installed
