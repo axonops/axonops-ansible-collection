@@ -1,0 +1,14 @@
+# This file contains sensitive information and should be protected.
+# Use Ansible Vault to encrypt this file.
+---
+vault_axon_agent_customer_name: "training"
+vault_axon_agent_key: f63397ef4059be7d33749ee08aeb7538
+
+
+# vault_axon_agent_customer_name: "example"
+# vault_axon_agent_key: 248d6d04144de3f0xxxxxx # get this from https://console.axonops.cloud/
+
+vault_cassandra_ssl_internode_keystore_pass: changeit
+vault_cassandra_ssl_keystore_pass: changeit
+vault_cassandra_ssl_client_keystore_pass: changeit
+vault_cassandra_ssl_client_truststore_pass: changeit

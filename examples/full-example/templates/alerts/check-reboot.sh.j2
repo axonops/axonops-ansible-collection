@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euo pipefail
+
+if [ -f /var/run/reboot-required ]
+then
+    echo `hostname` Reboot required
+    exit 1
+else
+    echo "Nothing to do"
+fi

@@ -1,0 +1,59 @@
+# AWS Cassandra Cluster Configuration
+# Copy this file to terraform.tfvars and customize as needed
+
+# Environment name (used in resource naming)
+environment = "prod"
+
+# AWS Region
+# Common options: us-east-1, us-west-2, eu-west-1, eu-central-1, ap-southeast-1
+aws_region = "us-east-1"
+
+# Availability Zones (leave empty to auto-select 3 AZs in the region)
+# Example: availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+availability_zones = []
+
+# EC2 Instance type (affects CPU, RAM, and pricing)
+# Development:
+#   t3.large     (2 vCPU, 8GB RAM)    - Small dev/test
+#   t3.xlarge    (4 vCPU, 16GB RAM)   - Medium dev/test
+# Production - Balanced:
+#   m5.xlarge    (4 vCPU, 16GB RAM)   - Small production
+#   m5.2xlarge   (8 vCPU, 32GB RAM)   - Standard production
+#   m5.4xlarge   (16 vCPU, 64GB RAM)  - Large production
+# Production - Memory-optimized:
+#   r5.xlarge    (4 vCPU, 32GB RAM)   - Memory-intensive
+#   r5.2xlarge   (8 vCPU, 64GB RAM)   - Heavy memory workloads
+# Production - Storage-optimized:
+#   i3.xlarge    (4 vCPU, 30.5GB RAM) - High I/O with NVMe
+instance_type = "t3.xlarge"
+
+# Data volume size in GB (EBS gp3 volume for Cassandra data)
+# Minimum: 1GB, Recommended: 100GB+
+disk_size = 100
+
+# Root volume size in GB
+root_volume_size = 20
+
+# AMI ID (leave empty to auto-select latest Ubuntu 22.04 LTS)
+# If specified, ensure the AMI is available in your selected region
+# Example: ami_id = "ami-0c55b159cbfafe1f0"
+ami_id = ""
+
+# CIDR blocks allowed to access CQL port (9042) and JMX port (7199)
+# Use ["0.0.0.0/0"] to allow from anywhere (not recommended for production)
+# Use ["YOUR_IP/32"] to restrict to your IP only
+# Example: allowed_cidrs = ["203.0.113.0/32", "198.51.100.0/24"]
+allowed_cidrs = ["0.0.0.0/0"]
+
+# SSH public key content (leave empty to auto-generate a new SSH key pair)
+# If provided, paste your SSH public key here
+# Example: ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ..."
+ssh_public_key = ""
+
+# VPC CIDR block
+vpc_cidr = "10.0.0.0/16"
+
+# Public subnet CIDR blocks (leave empty to auto-calculate)
+# If specified, provide exactly 3 CIDRs, one for each AZ
+# Example: public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+public_subnet_cidrs = []

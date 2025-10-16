@@ -1,0 +1,160 @@
+######## Cassandra Performance Metrics Alert Rules ########
+# This is an example set of alert rules for Cassandra performance metrics.
+# These rules are some examples of how alerts can be configured for
+# your Apache Cassandra cluster. The rules defined here will be applied
+# to all clusters
+
+axonops_alert_rules:
+
+######## KAFKA OVERVIEW ALERTS ########
+- name: Brokers Down
+  dashboard: Kafka Overview
+  chart: Brokers Online
+  operator: '<'
+  critical_value: 4
+  warning_value: 4
+  duration: 15m
+  description: Detected Brokers Down
+
+- name: Multiple Active Controllers
+  dashboard: Kafka Overview
+  chart: Active Controllers
+  operator: '>='
+  critical_value: 2
+  warning_value: 2
+  duration: 5m
+  description: Multiple Active Controllers Detected
+
+
+######## KAFKA PERFORMANCE ALERTS ########
+- name: Network Processor Avg Idle Percent
+  dashboard: Kafka Performance
+  chart: Network Processor Avg Idle Percent
+  operator: '<'
+  critical_value: 10
+  warning_value: 20
+  duration: 15m
+  description: Network Processor Avg Idle Percent low
+
+- name: Request Queue Size
+  dashboard: Kafka Performance
+  chart: Request Queue Size
+  operator: '>'
+  critical_value: 10
+  warning_value: 20
+  duration: 15m
+  description: Kafka Request queue warning
+
+######## KAFKA REPLICATION ALERTS ########
+- name: Offline Partitions
+  dashboard: Kafka Replication
+  chart: Offline Partitions
+  operator: '>='
+  critical_value: 10
+  warning_value: 1
+  duration: 5m
+  description: Kafka partitions offline
+
+- name: Under Min ISR Partitions
+  dashboard: Kafka Replication
+  chart: Under Min ISR Partitions
+  operator: '>='
+  critical_value: 1
+  warning_value: 1
+  duration: 5m
+  description: There are partitions under the minimum insync replicated
+
+- name: Under Replicated Partitions
+  dashboard: Kafka Replication
+  chart: Under Replicated Partitions
+  operator: '>='
+  critical_value: 1
+  warning_value: 1
+  duration: 5m
+  description: There are under replicated Kafka Partitions
+
+######## KAFKA CONTROLLER ALERTS ########
+- name: Fenced Broker Count
+  dashboard: Kafka Controller
+  chart: Fenced Broker Count
+  operator: '>='
+  critical_value: 1
+  warning_value: 1
+  duration: 5m
+  description: There are fenced off Kafka Controllers
+
+- name: Metadata Error Rate
+  dashboard: Kafka Controller
+  chart: Metadata Error Rate
+  operator: '>='
+  critical_value: 1
+  warning_value: 1
+  duration: 15m
+  description: Error in Kafka Controller Metadata
+
+- name: Failed Auth Rate
+  dashboard: Kafka Controller
+  chart: Failed Auth Rate
+  operator: '>='
+  critical_value: 50
+  warning_value: 10
+  duration: 15m
+  description: Failed Auth requests against Kafka Controller
+
+
+
+
+######## SYSTEM ALERTS ########
+- name: CPU usage per host
+  dashboard: System
+  chart: CPU usage per host
+  operator: '>='
+  critical_value: 99
+  warning_value: 90
+  duration: 1h
+  description: Detected High CPU usage
+
+- name: CPU is Underutilized
+  dashboard: System
+  chart: CPU usage per host
+  operator: <=
+  critical_value: 1
+  warning_value: 5
+  duration: 1w
+  description: CPU load has been very low for 1 week
+
+- name: Disk % Usage $mountpoint
+  dashboard: System
+  chart: Disk % Usage $mountpoint
+  operator: '>='
+  critical_value: 90
+  warning_value: 75
+  duration: 12h
+  description: Detected High disk utilization
+
+- name: Avg IO wait CPU per Host
+  dashboard: System
+  chart: Avg IO wait CPU per Host
+  operator: '>='
+  critical_value: 50
+  warning_value: 20
+  duration: 2h
+  description: Detected high Average IOWait
+
+- name: Used Memory Percentage
+  dashboard: System
+  chart: Used Memory Percentage
+  operator: '>='
+  critical_value: 85
+  warning_value: 95
+  duration: 1h
+  description: High memory utilization detected
+
+- name: Memory is Underutilized
+  dashboard: System
+  chart: Used Memory Percentage
+  operator: <=
+  critical_value: 10
+  warning_value: 20
+  duration: 1w
+  description: Node memory has been very low for 1 week. Consider reducing memory space

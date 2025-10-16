@@ -1,0 +1,22 @@
+---
+- name: Add AxonOps noarch yum repository
+  ansible.builtin.yum_repository:
+    description: "AxonOps NoArch Repository"
+    name: axonops-yum-noarch
+    baseurl: "{{ axon_agent_redhat_repository | default('https://packages.axonops.com/yum') }}"
+    repo_gpgcheck: false
+    gpgcheck: false
+
+- name: Set package names
+  ansible.builtin.set_fact:
+    cqlai_pkg: "cqlai-{{ cqlai_version }}-1"
+    pkg_ext: "{{ ansible_architecture }}.rpm"
+  when: cqlai_version != "" and cqlai_version != "latest"
+
+- name: Set package names
+  ansible.builtin.set_fact:
+    cqlai_pkg: "cqlai"
+    pkg_ext: "{{ ansible_architecture }}.rpm"
+  when: (cqlai_version == "" or cqlai_version == "latest") or cqlai_pkg is not defined
+
+# code: language=ansible

@@ -1,0 +1,4 @@
+vault_axon_agent_customer_name: "example"
+vault_axon_agent_key: 248d6d04144de3f0xxxxxx # get this from https://console.axonops.cloud/
+vault_jmx_username: thejmx
+vault_jmx_password: changeme

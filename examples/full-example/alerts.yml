@@ -1,0 +1,48 @@
+---
+- name: Converge
+  hosts: all
+  become: false
+  gather_facts: false
+  vars:
+    enable_logging: true
+  pre_tasks:
+    - name: Get the Org name
+      tags: always
+      ansible.builtin.set_fact:
+        org: "{{ vault_axon_agent_customer_name | default(lookup('env', 'AXONOPS_ORG')) }}"
+      when: org is not defined
+
+    - name: Get the cluster name
+      tags: always
+      ansible.builtin.set_fact:
+        cluster: "{{ cassandra_cluster_name | default(lookup('env', 'AXONOPS_CLUSTER')) }}"
+      when: cluster is not defined
+
+
+    - debug:
+        msg: "Org: {{ org }}, Cluster: {{ cluster }}"
+    - name: Fail if no org
+      ansible.builtin.assert:
+        that:
+          - org is defined
+          - org | length > 1
+          - cluster is defined
+
+    - name: Include the org configs
+      tags: always
+      ansible.builtin.include_vars: "{{ item }}"
+      with_fileglob:
+        - "alerts-config/{{ org }}/*.yml"
+
+    - name: Include the default configs
+      tags: always
+      ansible.builtin.include_vars: "{{ item }}"
+      with_fileglob:
+        - "alerts-config/{{ org }}/{{ cluster }}/*.yml"
+
+  roles:
+    - role: axonops.axonops.alerts
+      vars:
+        present: true
+
+# code: language=ansible

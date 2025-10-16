@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Directory containing .axon_commit_log as a subdirectory
+commit_log_dir="{{ cassandra_commitlog_directory }}"
+
+# Random sleep between 0 and 60 seconds
+sleep_time=$(( RANDOM % 61 ))
+sleep "$sleep_time"
+
+# Full path to the .axon_commit_log directory
+log_dir="${commit_log_dir}/.axon_commit_log"
+
+# Exit silently with 0 if directory does not exist
+if [[ ! -d "$log_dir" ]]; then
+    exit 0
+fi
+
+# Count the number of files (not directories) in the directory
+file_count=$(find "$log_dir" -type f | wc -l)
+
+if (( file_count > 20 )); then
+    echo "ERROR: More than 20 files ($file_count) in $log_dir."
+    exit 2
+elif (( file_count > 10 )); then
+    echo "WARNING: More than 10 files ($file_count) in $log_dir."
+    exit 1
+else
+    echo "OK: $file_count files in $log_dir."
+    exit 0
+fi

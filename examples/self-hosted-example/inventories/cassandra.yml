@@ -1,0 +1,20 @@
+all:
+  children:
+    cassandra:
+      hosts:
+        157.90.235.43:
+        188.245.42.4:
+        168.119.234.32:
+      vars:
+        axon_java_agent: "axon-cassandra5.0-agent-jdk17"
+        axon_agent_version: "2.0.7"
+        axon_java_agent_version: "1.0.10"
+        cassandra_cluster_name: mycluster000
+        cassandra_dc: default
+        cassandra_rack: rack1
+        # This is the AxonOps Server host, it can be localhost or the IP of the AxonOps Server
+        # Leave empty if you want to use the SaaS environment
+        axon_agent_server_host: "{{ groups['axon-server'] | first }}"
+        axon_agent_tls_mode: "disabled"
+        axon_agent_customer_name: "mycompany"
+        cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | join(',') }}"

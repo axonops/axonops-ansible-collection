@@ -1,0 +1,102 @@
+#!/bin/bash
+EXIT_OK=0
+EXIT_WARNING=1
+EXIT_CRITICAL=2
+
+# Sleep up to 60 seconds to avoid simultaneous checks
+sleep $(shuf -i 1-60 -n 1)
+
+if [ -x /opt/cassandra/bin/nodetool ]; then
+    NODETOOL=/opt/cassandra/bin/nodetool
+elif [ -x /usr/local/cassandra/bin/nodetool ]; then
+    NODETOOL=/usr/local/cassandra/bin/nodetool
+else
+    echo "nodetool not found"
+    exit $EXIT_CRITICAL
+fi
+NODETOOL="$NODETOOL -u thejmx -pwf /opt/cassandra/conf/jmxremote.password"
+
+WARNING_DN_COUNT=1
+CRITICAL_DN_COUNT=2
+
+# Get the local Data Center from 'nodetool info'
+local_dc=$($NODETOOL info | awk -F: '/Data Center/{gsub(/^[ \t]+/, "", $2); print $2}')
+if [ -z $local_dc ]; then
+    exit $EXIT_WARN
+fi
+
+# Initialize counts
+local_dn_count=0
+remote_dn_count=0
+
+# Declare associative arrays
+declare -A dc_dn_counts  # Counts of DN per Data Center
+declare -A dcrack_dn_counts  # Counts of DN per Data Center and Rack
+
+# Initialize variables
+current_dc=""
+in_node_section=false
+
+# Process 'nodetool status' output without using a subshell
+while read -r line; do
+    # Check for Data Center line
+    if [[ "$line" =~ ^Datacenter:\ (.*) ]]; then
+        current_dc="${BASH_REMATCH[1]}"
+        continue
+    fi
+
+    # Skip irrelevant lines
+    if [[ "$line" =~ ^\s*$ ]] || [[ "$line" =~ ^==+ ]] || [[ "$line" =~ ^Status= ]]; then
+        continue
+    fi
+
+    # Trim leading spaces
+    line=$(echo "$line" | sed 's/^[ \t]*//')
+
+    # Get the status code (first field)
+    status=$(echo "$line" | awk '{print $1}')
+
+    # Process nodes with status 'DN'
+    if [[ "$status" == "DN" ]]; then
+        # Extract the Rack (last field)
+        rack=$(echo "$line" | awk '{print $NF}')
+
+        # Update counts based on whether the node is in the local DC
+        if [[ "$current_dc" == "$local_dc" ]]; then
+            ((local_dn_count++))
+        else
+            ((remote_dn_count++))
+        fi
+
+        # Update per-DC counts
+        dc_dn_counts["$current_dc"]=$(( ${dc_dn_counts["$current_dc"]} + 1 ))
+
+        # Update per-DC:Rack counts
+        dcrack_key="${current_dc}:${rack}"
+        dcrack_dn_counts["$dcrack_key"]=$(( ${dcrack_dn_counts["$dcrack_key"]} + 1 ))
+    fi
+done < <($NODETOOL status)
+
+# Output the counts
+echo "DN in local DC ($local_dc): $local_dn_count"
+echo "DN in remote DC: $remote_dn_count"
+
+echo -e "\n'DN' node counts per Data Center:"
+for dc in "${!dc_dn_counts[@]}"; do
+    echo "DC '$dc': ${dc_dn_counts[$dc]} DN nodes"
+done
+
+echo -e "\n'DN' node counts per Data Center and Rack:"
+for dcrack in "${!dcrack_dn_counts[@]}"; do
+    echo "$dcrack: ${dcrack_dn_counts[$dcrack]} DN nodes"
+done
+
+for dc in "${!dc_dn_counts[@]}"; do
+    if [ ${dc_dn_counts[$dc]} -ge $CRITICAL_DN_COUNT ]; then
+        exit $EXIT_CRITICAL
+    elif [ ${dc_dn_counts[$dc]} -eq $WARNING_DN_COUNT ]; then
+        exit $EXIT_WARNING
+    fi
+done
+
+exit $EXIT_OK

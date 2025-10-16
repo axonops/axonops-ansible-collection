@@ -1,0 +1,29 @@
+galaxy_info:
+  author: AxonOps Limited
+  description: This role installs and configures CQLAI
+  company: AxonOps Limited
+  license: Apache 2.0
+  min_ansible_version: "2.10"
+
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+    - name: Fedora
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+    - name: Ubuntu
+      versions:
+        - all
+
+  galaxy_tags:
+  - axonops
+  - cqlai
+  - cassandra
+  dependencies: []
+  documentation: https://github.com/axonops/axonops-ansible-collection
+  issues: https://github.com/axonops/axonops-ansible-collection/issues

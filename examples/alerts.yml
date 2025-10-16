@@ -1,0 +1,81 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    enable_logging: true
+    axonops_alert_rules:
+      - name: CPU usage per host
+        dashboard: System
+        chart: CPU usage per host
+        operator: '>='
+        critical_value: 99
+        warning_value: 90
+        duration: 1h
+        description: Detected High CPU usage
+        present: "{{ present | default(true) | bool }}"
+    axonops_log_alert_rule:
+      - name: Node Down
+        warning_value: 1
+        critical_value: 5
+        duration: 5m
+        content: \"is now DOWN\"
+        description: Detected node down
+        source: "/var/log/cassandra/system.log"
+        present: "{{ present | default(true) | bool }}"
+    axonops_shell_check:
+      - name: Ansible TEST
+        interval: 30m
+        timeout: 2m
+        shell: /bin/bash
+        present: "{{ present | default(true) | bool }}"
+        script: |-
+          echo "Hello World From Ansible"
+    axonops_slack_integrations:
+      - name: example_slack_integration_developer
+        webhook_url: https://hooks.slack.com/services/ADD/ME/HERE
+        present: "{{ present | default(true) | bool }}"
+    axonops_alert_routes:
+      - integration_name: example_slack_integration_developer
+        integration_type: slack
+        type: global
+        severity: error
+        enable_override: false
+        present: "{{ present | default(true) | bool }}"
+
+  pre_tasks:
+    - name: Get the Org name
+      tags: always
+      ansible.builtin.set_fact:
+        org: "{{ lookup('env', 'AXONOPS_ORG') }}"
+      when: org is not defined
+
+    - name: Get the cluster name
+      tags: always
+      ansible.builtin.set_fact:
+        cluster: "{{ axon_agent_customer_name | default(lookup('env', 'AXONOPS_CLUSTER')) }}"
+      when: cluster is not defined
+
+    - name: Fail if no org
+      ansible.builtin.assert:
+        that:
+          - org is defined
+          - org | length > 1
+          - cluster is defined
+    - name: Include the org configs
+      tags: always
+      ansible.builtin.include_vars: "{{ item }}"
+      with_fileglob:
+        - "alerts/config/{{ org }}/alert_routes.yml"
+
+    - name: Include the default configs
+      tags: always
+      ansible.builtin.include_vars: "{{ item }}"
+      with_fileglob:
+        - "alerts/config/{{ org }}/{{ cluster }}/alert_routes.yml"
+
+  roles:
+    - role: axonops.axonops.alerts
+      vars:
+        present: true
+
+# code: language=ansible

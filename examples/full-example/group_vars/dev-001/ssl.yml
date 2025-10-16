@@ -1,0 +1,34 @@
+---
+cassandra_ssl_internode_keystore_pass: "{{ vault_cassandra_ssl_internode_keystore_pass }}"
+cassandra_ssl_keystore_pass: "{{ vault_cassandra_ssl_keystore_pass }}"
+cassandra_ssl_client_keystore_pass: "{{ vault_cassandra_ssl_client_keystore_pass }}"
+
+cassandra_ssl_client_encryption_enabled: true
+cassandra_ssl_client_encryption_optional: false
+cassandra_ssl_client_keystore_file: /opt/ssl/{{ inventory_hostname }}.jks
+cassandra_ssl_client_require_client_auth: false
+cassandra_ssl_client_truststore_file: /opt/ssl/truststore.jks
+cassandra_ssl_client_truststore_pass: "{{ vault_cassandra_ssl_client_truststore_pass }}"
+
+cassandra_ssl_internode_encryption: all
+cassandra_ssl_internode_keystore_file: "/opt/ssl/{{ inventory_hostname }}.jks"
+cassandra_ssl_truststore_file: /opt/ssl/truststore.jks
+cassandra_require_endpoint_verification: false
+
+# Create self-signed certificates and keystores for testing/development
+cassandra_ssl_create: true
+
+# if you deploy your own certs, list them here to skip creation
+# Make sure the `cassandra_ssl_client_keystore_file` and `cassandra_ssl_internode_keystore_file` variables point to the correct file names
+cassandra_ssl_files: []
+  # - files/dev-001/ssl/keystore.jks
+  # - files/dev-001/ssl/truststore.jks
+
+# Subject details for the certificates (Optional, but good practice for self-signed certs)
+# The common name (CN) will be set to the item (node name/IP)
+certificate_subject:
+  C: US
+  ST: CA
+  L: San Francisco
+  O: MyOrg
+  OU: IT

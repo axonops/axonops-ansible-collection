@@ -1,0 +1,61 @@
+all:
+  children:
+    axonops-server:
+      hosts:
+        157.90.235.43:
+    axonops-searchdb:
+      hosts:
+        157.90.235.43:
+          es_config:
+            cluster.name: "test-axonops-cluster"
+            discovery.seed_hosts: "{{ es_master_nodes }}"
+            http.host: "{{ ansible_default_ipv4.address }}"
+            http.port: 9200
+            node.data: false
+            node.master: true
+            transport.host: "{{ ansible_default_ipv4.address}}"
+            transport.port: 9300
+            bootstrap.memory_lock: false
+        188.245.42.4:
+          es_config:
+            node.name: "{{ inventory_hostname }}"
+            cluster.name: "test-axonops-cluster"
+            discovery.seed_hosts: "{{ es_master_nodes }}"
+            http.host: "{{ ansible_default_ipv4.address }}"
+            http.port: 9200
+            transport.host: "{{ ansible_default_ipv4.address}}"
+            transport.port: 9300
+            node.data: true
+            node.master: false
+            bootstrap.memory_lock: true
+        168.119.234.32:
+          es_config:
+            node.name: "{{ inventory_hostname }}"
+            cluster.name: "test-axonops-cluster"
+            discovery.seed_hosts: "{{ es_master_nodes }}"
+            http.port: 9200
+            transport.host: "{{ ansible_default_ipv4.address}}"
+            transport.port: 9300
+            node.data: true
+            node.master: false
+      vars:
+        # AxonOps Server
+        axon_server_elastic_host: "{{ groups['axonops-server'] | map('regex_replace', '^(.*)$', 'http://\\1:9200') | list }}"
+
+
+        # AxonOps Search DB
+        es_heap_size: "1g"
+        es_master_nodes: ["157.90.235.43:9300"]
+
+        cassandra_cluster_name: axonops
+        cassandra_dc: default
+        cassandra_rack: rack1
+        axon_java_agent: "axon-cassandra5.0-agent-jdk17"
+        axon_agent_server_host: localhost
+        axon_agent_tls_mode: "disabled"
+        axon_agent_customer_name: "mycompany"
+        cassandra_start_on_boot: true
+        # This example auto-discover the IP address, in production you might want to set this to a static IP
+        cassandra_listen_address: "{{ ansible_default_ipv4.address }}"
+        cassandra_rpc_address: "{{ ansible_default_ipv4.address }}"
+        cassandra_seeds: "{{ groups['axonops-cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | first }}"

@@ -1,0 +1,10 @@
+- name: Create cqlai.conf file
+  ansible.builtin.template:
+    dest: /root/.cqlai.json
+    mode: '0640'
+    owner: root
+    group: root
+    src: cqlai.json.j2
+  when: cqlai_config_global | default(true) | bool
+
+# code: language=ansible

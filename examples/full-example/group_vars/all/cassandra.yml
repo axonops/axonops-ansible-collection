@@ -1,0 +1,46 @@
+---
+# Common configuration for all environments
+
+# Cassandra Configuration
+cassandra_version: 5.0.5
+cassandra_install_format: tar
+cassandra_install_dir: /opt/cassandra
+
+# Endpoint snitch for multi-DC setups
+cassandra_endpoint_snitch: GossipingPropertyFileSnitch
+
+# Data Directories for Cassandra
+cassandra_data_root: /data/cassandra
+cassandra_data_directory: "{{ cassandra_data_root }}/data"
+cassandra_hints_directory: "{{ cassandra_data_root }}/hints"
+cassandra_gc_log_dir: /var/log/cassandra
+cassandra_saved_caches_directory: "{{ cassandra_data_root }}/saved_caches"
+cassandra_log_dir: /var/log/cassandra
+cassandra_commitlog_directory: "{{ cassandra_data_root }}/commitlog"
+
+cassandra_authenticator: PasswordAuthenticator
+cassandra_authorizer: CassandraAuthorizer
+
+cassandra_auth_write_consistency_level: EACH_QUORUM
+cassandra_use_statements_enabled: true
+
+cassandra_start_on_boot: false
+
+cassandra_audit_log_enabled: true
+cassandra_audit_logging_options:
+  enabled: true
+  logger:
+    - class_name: FileAuditLogger
+  # Audit everything except QUERY (SELECT) and DML (INSERT, UPDATE, DELETE)
+  included_categories: DDL,DCL,OTHER,AUTH,ERROR
+  excluded_categories: QUERY,DML,PREPARE
+  excluded_keyspaces: system, system_schema, system_virtual_schema
+  block: false  # Don't block operations if audit queue is full
+  max_queue_weight: 268435456  # 256MB - max audit events in memory
+
+cassandra_bash_profile: false
+
+cassandra_nodes: "{{ groups['cassandra'] | default(['cassandra1', 'cassandra2', 'cassandra3']) }}"
+cassandra_node_ips: "{{ groups['cassandra'] | map('extract', hostvars, 'inventory_hostname') | list }}"
+
+local_keystore_dir: "files/ssl/{{ env | default('dev-001') }}"

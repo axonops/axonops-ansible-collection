@@ -1,0 +1,36 @@
+---
+# THIS IS NOT RECOMMENDED FOR PRODUCTION USE. You must enter the IP address and not rely on auto-discovery
+cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | first }}"
+
+#cassandra_listen_interface: "{{ ansible_default_ipv4.interface }}"
+
+# Performance tuning (for SSD)
+cassandra_concurrent_reads: 32
+cassandra_concurrent_writes: 32
+cassandra_concurrent_counter_writes: 32
+
+cassandra_cluster_name: "{{ env }}"
+cassandra_dc: "{{ cassandra_cluster_name }}-dc1"
+# this is set in the inventory file
+#cassandra_rack: rack1
+cassandra_listen_address: "{{ ansible_default_ipv4.address }}"
+cassandra_rpc_address: "{{ ansible_default_ipv4.address }}"
+cassandra_java_tmp_dir: /opt/tmp
+
+cassandra_max_heap_size: "{%if (ansible_memtotal_mb * 0.5 / 1024) | round | int > 40 %}40{% else %}{{ (ansible_memtotal_mb * 0.5 / 1024) | round | int }}{% endif %}G"
+#cassandra_max_heap_size: 1G
+cassandra_concurrent_compactors: "4"
+cassandra_compaction_throughput: "64MiB/s"
+cassandra_counter_cache_save_period: "7200s"
+cassandra_counter_write_request_timeout: "5000s"
+
+cassandra_row_cache_save_period: 0s
+cassandra_stream_entire_sstables: true
+cassandra_trace_type_query_ttl: 1d
+cassnadra_trace_type_repair_ttl: 7d
+cassandra_user_defined_functions_enabled: false
+
+# Define the JMX user and password for Cassandra (optional)
+cassandra_jmx_user: "{{ vault_jmx_username }}"
+cassandra_jmx_password: "{{ vault_jmx_password}}"
+cassandra_jmx_password_file: "/opt/cassandra/conf/jmxremote.password"

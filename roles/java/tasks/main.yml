@@ -41,6 +41,12 @@
         state: present
         update_cache: true
 
+    - name: Add APT GPG Key
+      ansible.builtin.apt_key:
+        id: "{{ _zulu_jdk.apt_repo.key_id }}"
+        url: "{{ _zulu_jdk.apt_repo.key_url }}"
+        state: present
+
     - name: Download and dearmor key
       ansible.builtin.uri:
         url: "{{ _zulu_jdk.apt_repo.key_url }}"

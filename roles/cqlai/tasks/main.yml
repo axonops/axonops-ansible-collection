@@ -1,0 +1,8 @@
+---
+- name: Install CQLAI
+  ansible.builtin.import_tasks: install.yml
+
+- name: Configure CQLAI
+  ansible.builtin.import_tasks: configure.yml
+
+# code: language=ansible

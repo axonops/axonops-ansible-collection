@@ -1,0 +1,137 @@
+---
+- name: "Install and configure the Cassandra Cluster"
+  hosts: "{{ env }}:&cassandra"
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - cassandra_version is defined
+          - cassandra_cluster_name is defined
+          - cassandra_dc is defined
+          - cassandra_rack is defined
+          - cassandra_seeds is defined
+        fail_msg: "Required variables are not defined"
+
+    - name: Install required packages
+      ansible.builtin.package:
+        name:
+          - curl
+          - jq
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Create SSL certificates and keystores if needed
+      tags: ssl,keystore
+      import_tasks: _keystore.yml
+      when:
+        - cassandra_ssl_create | default(false) | bool
+        - (not cassandra_ssl_files is defined) or (cassandra_ssl_files is defined and cassandra_ssl_files | length == 0)
+
+  roles:
+    - role: axonops.axonops.cqlai
+      tags: cqlai
+
+    - role: axonops.axonops.java
+      tags: java
+
+    - role: axonops.axonops.agent
+      when: install_axonops_agent | default(true) | bool
+      tags: agent, axonops-agent
+
+    - role: axonops.axonops.cassandra
+      tags: cassandra
+
+  post_tasks:
+    - name: Deploy service checks
+      tags: alerts,alert_scripts
+      when: axon_agent_disable_command_exec is defined and axon_agent_disable_command_exec
+      block:
+        - name: Create scripts directory
+          ansible.builtin.file:
+            path: "{{ axon_agent_scripts_location | default('/var/lib/axonops/scripts/') }}"
+            owner: axonops
+            group: axonops
+            mode: "0750"
+            state: directory
+
+        - name: Copy over scripts
+          ansible.builtin.template:
+            src: "{{ item }}"
+            dest: "{{ axon_agent_scripts_location | default('/var/lib/axonops/scripts/') }}/{{ item | basename | replace('.j2', '') }}"
+            mode: "0750"
+            owner: axonops
+            group: axonops
+          with_fileglob:
+            - templates/alerts/*.sh.j2
+
+    - name: Create cqlshrc file (dev only)
+      tags: cqlsh,profile
+      block:
+        - name: Profile
+          ansible.builtin.copy:
+            dest: "/etc/profile.d/cassandra.sh"
+            mode: "0644"
+            owner: "root"
+            group: "root"
+            content: |
+              export CASSANDRA_HOME=/opt/cassandra
+              export PATH=$PATH:$CASSANDRA_HOME/bin
+              alias cqlsh='/opt/cassandra/bin/cqlsh --ssl --request-timeout=60 --connect-timeout=60'
+              {% if cassandra_jmx_password is defined and cassandra_jmx_password != '' %}
+              alias nodetool='/opt/cassandra/bin/nodetool -u {{ cassandra_jmx_user | default('cassandra') }} -pwf /opt/cassandra/conf/jmxremote.password'
+              {% endif %}
+
+        - name: Ensure .cassandra directory exists for each user
+          ansible.builtin.file:
+            path: "{{ item.home }}/.cassandra"
+            state: directory
+            mode: '0750'
+            owner: "{{ item.user }}"
+            group: "{{ item.user }}"
+          loop:
+            - {user: 'root', home: '/root'}
+
+        - name: Create cqlshrc credentials file
+          when:
+            - cassandra_bash_profile is not defined or not cassandra_bash_profile | bool
+            - cassandra_cqlsh_credentials is defined and cassandra_cqlsh_credentials | bool
+          ansible.builtin.copy:
+            dest: "{{ item.home }}/.cassandra/credentials"
+            mode: "0600"
+            owner: "{{ item.user }}"
+            group: "{{ item.user }}"
+            content: |
+              [PlainTextAuthProvider]
+              username = {{ cassandra_username | default('cassandra') }}
+              password = {{ cassandra_password | default('cassandra') }}
+          loop:
+            - {user: 'root', home: '/root'}
+
+        - name: Create cqlshrc file with connection details
+          when: cassandra_bash_profile is not defined or not cassandra_bash_profile | bool
+          ansible.builtin.copy:
+            dest: "{{ item.home }}/.cassandra/cqlshrc"
+            mode: "0600"
+            owner: "{{ item.user }}"
+            group: "{{ item.user }}"
+            content: |
+              {% if cassandra_cqlsh_credentials is defined and cassandra_cqlsh_credentials | bool %}
+              [authentication]
+              credentials = ~/.cassandra/credentials
+              {% endif %}
+
+              [connection]
+              hostname = {{ cassandra_rpc_address }}
+              port = 9042
+
+              [ssl]
+              factory = cqlshlib.ssl.ssl_transport_factory
+              validate = false
+          loop:
+            - {user: 'root', home: '/root'}
+
+# code: language=ansible

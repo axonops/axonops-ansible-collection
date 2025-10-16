@@ -1,0 +1,18 @@
+- hosts: all
+  gather_facts: true
+  become: true
+
+  pre_tasks:
+    - name: Ensure curl is installed
+      ansible.builtin.package:
+        name: curl
+        state: present
+        update_cache: true
+
+  roles:
+    - role: devsec.hardening.os_hardening
+      tags: hardening
+      vars:
+        os_user_pw_ageing: false
+
+# code: language=ansible

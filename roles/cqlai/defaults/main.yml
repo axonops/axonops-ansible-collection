@@ -1,0 +1,22 @@
+---
+cqlai_version: latest
+#cqlai_package_url: "https://downloads.datastax.com/cqlai/{{ cqlai_version }}/cqlai-{{ cqlai_version }}-all.deb"
+
+cqlai_host: "127.0.0.1"
+cqlai_port: 9042
+cqlai_keyspace: ""
+cqlai_username: "cassandra"
+cqlai_password: "cassandra"
+cqlai_require_confirmation: true
+cqlai_consistency: "LOCAL_ONE"
+cqlai_page_size: 100
+cqlai_history_file: "~/.cqlai/history"
+cqlai_ai_history_file: "~/.cqlai/ai_history"
+cqlai_ssl_enabled: true
+cqlai_ssl_cert_path: "/opt/ssl/{{ inventory_hostname }}.crt"
+cqlai_ssl_key_path: "/opt/ssl/{{ inventory_hostname }}.key"
+cqlai_ssl_ca_path: ""
+cqlai_ssl_host_verification: false
+cqlai_ssl_insecure_skip_verify: true
+cqlai_ai_provider: "openai"
+cqlai_ai_openai_api_key: ""
