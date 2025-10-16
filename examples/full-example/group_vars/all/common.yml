@@ -1,0 +1,2 @@
+#java_pkg: openjdk-17-jre-headless
+java_use_zulu: true

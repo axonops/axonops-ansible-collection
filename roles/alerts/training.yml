@@ -1,8 +1,0 @@
-- name: Converge
-  hosts: all
-  vars:
-    enable_logging: true
-  roles:
-    - role: axonops.axonops.alerts
-      vars:
-        present: true

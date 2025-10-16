@@ -1,0 +1,31 @@
+#!/bin/bash
+
+EXIT_OK=0
+EXIT_WARNING=1
+EXIT_CRITICAL=2
+if output=$(echo -n | openssl s_client -connect {{ cassandra_rpc_address }}:9042 2>/dev/null); then
+  # Check OCSP validity
+  if echo -n "$output" | openssl x509 -noout -ocspid > /dev/null 2>&1; then
+    echo "OCSP stapling is OK."
+  else
+    echo "OCSP stapling is NOT available or the OCSP response is INVALID."
+    exit $EXIT_CRITICAL
+  fi
+  # Check certificate expiration
+  if echo "$output" | openssl x509 -noout -checkend 432000; then
+    if echo "$output" | openssl x509 -noout -checkend 864000; then
+      echo "The certificate on {{ cassandra_rpc_address }}:9042 will NOT expire in the next 10 days!"
+    else
+      echo "Certificate will expire within 10 days!"
+      echo "(or is invalid)"
+      exit $EXIT_WARNING
+    fi
+  else
+    echo "Certificate has expired or will do so within 5 days!"
+    echo "(or is invalid)"
+    exit $EXIT_CRITICAL
+  fi
+else
+  echo "Unable to connect to {{ cassandra_rpc_address }}:9042. Endpoint is unreachable."
+  exit $EXIT_OK
+fi

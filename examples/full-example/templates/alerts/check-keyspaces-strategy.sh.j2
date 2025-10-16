@@ -1,0 +1,28 @@
+#!/bin/bash
+EXIT_OK=0
+EXIT_WARNING=1
+EXIT_CRITICAL=2
+if [ -x /opt/cassandra/bin/nodetool ]; then
+    NODETOOL=/opt/cassandra/bin/nodetool
+elif [ -x /usr/local/cassandra/bin/nodetool ]; then
+    NODETOOL=/usr/local/cassandra/bin/nodetool
+else
+    echo "nodetool not found"
+    exit $EXIT_CRITICAL
+fi
+
+NODETOOL="$NODETOOL -u thejmx -pwf /opt/cassandra/conf/jmxremote.password"
+# Sleep up to 60 seconds to avoid simultaneous checks
+sleep $(shuf -i 1-60 -n 1)
+
+COUNT=$(nodetool describecluster | grep -i 'SimpleStrategy' | wc -l)
+if [ $? -gt 0 ]; then
+    exit $EXIT_CRITICAL
+fi
+if [ $COUNT -gt 0 ]; then
+    echo "Keyspaces using SimpleStrategy found: $COUNT"
+    exit $EXIT_WARNING
+else
+    echo "No keyspaces using SimpleStrategy found."
+    exit $EXIT_OK
+fi

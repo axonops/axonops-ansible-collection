@@ -1,0 +1,13 @@
+# AxonOps Agent Configuration
+axon_agent_version: "2.0.5"
+axon_java_agent_version: "1.0.10"
+axon_java_agent: "axon-cassandra5.0-agent-jdk17"
+
+# AxonOps SaaS endpoints (replace with your actual endpoints)
+axon_agent_hosts: "agents.axonops.cloud"
+axon_agent_port: 443
+
+axon_agent_disable_command_exec: false
+
+cqlai_host: "{{ cassandra_rpc_address | default(ansible_default_ipv4.address) }}"
+cqlai_port: 9042

@@ -1,0 +1,49 @@
+---
+- name: Ensure pre-req gnupg is installed
+  ansible.builtin.apt:
+    name: ['gnupg', 'apt-transport-https', 'debian-archive-keyring']
+    state: present
+    update_cache: true
+
+- name: Add AxonOps apt repository key.
+  ansible.builtin.apt_key:
+    url: https://packages.axonops.com/apt/repo-signing-key.gpg
+    validate_certs: true
+
+
+- name: Set AxonOps apt repository to {{ axon_agent_public_repository }}.
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.axonops.com/apt axonops-apt main"
+    state: "{{ axon_agent_public_repository }}"
+    update_cache: true
+
+- name: Set AxonOps beta apt repository to {{ axon_agent_beta_repository }}.
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.axonops.com/apt axonops-apt-beta main"
+    state: "{{ axon_agent_beta_repository }}"
+    update_cache: true
+
+- name: Set AxonOps dev apt repository to {{ axon_agent_dev_repository }}.
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.axonops.com/apt axonops-apt-dev main"
+    state: "{{ axon_agent_dev_repository }}"
+    update_cache: true
+
+# It is required for when you're updating versions
+- name: Run the equivalent of "apt-get update" as a separate step
+  ansible.builtin.package:
+    update_cache: true
+
+- name: Set package names
+  ansible.builtin.set_fact:
+    cqlai_pkg: "cqlai={{ cqlai_version }}"
+    pkg_ext: "deb"
+  when: cqlai_version != "" and cqlai_version != "latest"
+
+- name: Set package names
+  ansible.builtin.set_fact:
+    cqlai_pkg: "cqlai"
+    pkg_ext: "deb"
+  when: (cqlai_version == "" or cqlai_version == "latest") or cqlai_pkg is not defined
+
+# code: language=ansible

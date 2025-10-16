@@ -1,0 +1,27 @@
+{
+  "host": "{{ cqlai_host }}",
+  "port": {{ cqlai_port }},
+  "keyspace": "{{ cqlai_keyspace }}",
+  "username": "{{ cqlai_username }}",
+  "password": "{{ cqlai_password }}",
+  "requireConfirmation": {{ cqlai_require_confirmation | lower }},
+  "consistency": "{{ cqlai_consistency }}",
+  "pageSize": {{ cqlai_page_size }},
+  "historyFile": "{{ cqlai_history_file }}",
+  "aiHistoryFile": "{{ cqlai_ai_history_file }}",
+  "ssl": {
+    "enabled": {{ cqlai_ssl_enabled | lower }},
+    "certPath": "{{ cqlai_ssl_cert_path }}",
+    "keyPath": "{{ cqlai_ssl_key_path }}",
+    "caPath": "{{ cqlai_ssl_ca_path }}",
+    "hostVerification": {{ cqlai_ssl_host_verification | lower }},
+    "insecureSkipVerify": {{ cqlai_ssl_insecure_skip_verify | lower }}
+  },
+  "ai": {
+    "provider": "{{ cqlai_ai_provider }}",
+    "openai": {
+      "apiKey": "{{ cqlai_ai_openai_api_key | default('') }}",
+      "model": "{{ cqlai_ai_openai_model | default('gpt-3.5-turbo') }}"
+    }
+  }
+}

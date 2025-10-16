@@ -1,0 +1,220 @@
+vault_cassandra_ssl_internode_keystore_pass: changeme
+vault_cassandra_ssl_keystore_pass: changeme
+vault_cassandra_ssl_client_keystore_pass: changeme
+vault_cassandra_ssl_client_truststore_pass: changeme
+
+# vault_ssl_key:
+#   cassandra-001: |
+#     Bag Attributes
+#         friendlyName: sfo3-production-cassandra-001
+#         localKeyID: 54 69 6D 65 20 31 37 35 30 37 37 35 30 35 31 37 34 37
+#     Key Attributes: <No Attributes>
+#     -----BEGIN PRIVATE KEY-----
+#     MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCNi0rdsUWn0Du4
+#     WyMA+9TSzPW57Ah3AkBij/YCI2hnba9LHfDflvy6JdF6/PPnYPx692qUI/rOEdjT
+#     K+tHMATI2NTLJ/43AHB8wpuRxrFfngg+FnbFns0Q/HrwrNdwoEKJ8MvEkeGv5zTt
+#     [...]
+#     3gEBK8ZiPWMaEEodK2lOLfMyiKhMOPbaj9X+bndBMEWzdmUMe9/whDDiB4QuQEm2
+#     L+7/CCMuzF6vKqtJNhlzJJWfvHkKCayV7cp6PE7dACG99Qlh2DJDLe/VdUqY8sH1
+#     q1V7S3K25mxL+v7kUXm9qQKv
+#     -----END PRIVATE KEY-----
+
+#   cassandra-002: |
+#     Bag Attributes
+#         friendlyName: sfo3-production-cassandra-002
+#         localKeyID: 54 69 6D 65 20 31 37 35 30 37 37 35 30 35 35 35 38 32
+#     Key Attributes: <No Attributes>
+#     -----BEGIN PRIVATE KEY-----
+#     MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCnUYycu+2bXmLF
+#     woeukMhoEFTFDdvCjoig2QyBg1/2Z6Eb/I9hb/cyQf+uXhApNLW0nPud6NzaPKMy
+#     revOn299x1UirMs12ckFPwFq8cuya9AoA+zAayJ8id+hWO7exN0/KavgJmHS/N0u
+#     OAheMvv4TLFtWV+uGyfjbEqexBJvkWWVbFlXZzNErO3mbnALp4jl2OgZi7WnBa2t
+#     yVcaCHVIsNr6NvPtWZWELhN68vnepVJ9PN/szCp1tBSRzWYOTj8lO14soCnQUpj/
+#     VPS5przEWOOH1HDqXG4f/HDy7CnSIpSSGq4vdmhqkhOXWH97TdGzY9cRa5LEqXWJ
+#     12f78fCFAgMBAAECggEBAIlIM+L1nsL38nroXYMxb/1SSPtVn5ZGdHvlGom5TSdT
+#     Z7EazFnaECzAUhSzQPdONDh5BUpPIcY+MnkGko/56PR+dK/6rtEEXBdd1r/0nHlM
+#     [...]
+#     DWrz1CS042Uzkfvw92AgfGdsqcu+ffLds4O73GmDVQeqCUxJmzXoZsbJgnFcDzuq
+#     NjXCkkBML4gH/Tfv7d6lGWkKwz5WnN2oEzjta65YsQKBgEFjE55m6GbIOc7sjncX
+#     K68DUuzF0QvpEZwe7tiDTMcPejxTvuuZ3x+qhOVwiI/mAVxW87bAD5Q/aDpBLX74
+#     cawRMr2uFh0UO0vzhXVjt+WEe5k317k7Z2LaNHZ3/Xqk+wSBgiXWHML5Nxac5tXs
+#     ZoC6SWP3aZCKLdOP7KOVq2PN
+#     -----END PRIVATE KEY-----
+
+#   cassandra-003: |
+#     Bag Attributes
+#         friendlyName: sfo3-production-cassandra-003
+#         localKeyID: 54 69 6D 65 20 31 37 35 30 37 37 35 30 35 39 34 32 37
+#     Key Attributes: <No Attributes>
+#     -----BEGIN PRIVATE KEY-----
+#     MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQCfrJfH+69ce+NA
+#     wpj9j5dXflXxPDALKnZ0++fRX1qoP1xpoRyHImfVoM01gGGlSW1o6prRN/VmgKi5
+#     sS+zfc9WN291loOwFkQsIZ21AC75Xn84VU7h7FEy5EWcrlty2Yerb7a6lurZxHmS
+#     [...]
+#     wExIbaRTme559z9mHv6R6AgNGUSxCEuC53w2BbziOIo/RZ8Utm/6Qyvv2QKBgQCE
+#     5ydCLPvFj5z8ANzcJFRYtkN14y9MnUFd+RGY1kL/1B6dfgQS3pOixcHhtGtM4uq0
+#     LmUJ66OYbWBcEL8G8NotxDcdHf0zRqXGutDpbEBAZeX6eaGJa2xUdMmYXMn/i3oV
+#     ZK2s1rm4E2HMzyyTf3NnySvLaXMv9aKTmZCXFbcfBQKBgQDtkbF1nqhwz7B4n9tY
+#     SWOZmfauqLYtQ6sppOT21DHJxus+g4eXmQpWRZs0pWPa2au8Xm4nV4KITb6eCTTj
+#     3tfB6lJ5AP0dKk6vG9VR8YlIV7jTLZ0SZj3Y/YZrdIxgbpmiPu9fh6AMKXTkcJqk
+#     K4nGlcaHNZgQ/q+X/BWDoqAotw==
+#     -----END PRIVATE KEY-----
+
+#   cassandra-004: |
+#     Bag Attributes
+#         friendlyName: sfo3-production-cassandra-004
+#         localKeyID: 54 69 6D 65 20 31 37 35 30 37 37 35 30 36 32 35 34 36
+#     Key Attributes: <No Attributes>
+#     -----BEGIN PRIVATE KEY-----
+#     MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC6kZi+eVMu759G
+#     WX/HEgCWFVaLQk11calvX7EBq8GqaExxW1aLPNN41zTzb9FMQ12lFEe2u149v08G
+#     lUJt0sLBmCaukxxwH5xiR7Kmig4x3l04DYjiRX9pa66auck8nmEWCY0IrvKa8zEI
+#     qgksI/AQl6rYNkzrdgv80Gflxq3WNASZhXIllwTO1V2GX91bkmRqXwYwnQTk1rS3
+#     [...]
+#     KD9/bGEjFDjdhxqpXkP1NTuDWxtJfI84dX1JtH+1uQKBgHVmGgRAW8Ou17OWQq+T
+#     PwqFsMMzA37EUBw0AWNz8g8hA+M6bu96WSTurpRo8HbEtE4yJA1tyiuWwIsvV8RO
+#     yAWg9OvdpubDe8lZGPgbam4kHpggxkyq1dj/vh/LsUkqhr73mw/YYMlkt3b7FnNB
+#     yHlQdAEtxpAPhbmERYfzr73Q
+#     -----END PRIVATE KEY-----
+
+#   cassandra-005: |
+#     Bag Attributes
+#         friendlyName: sfo3-production-cassandra-005
+#         localKeyID: 54 69 6D 65 20 31 37 35 30 37 37 35 30 36 35 38 31 39
+#     Key Attributes: <No Attributes>
+#     -----BEGIN PRIVATE KEY-----
+#     MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCRgMEtW8db1gft
+#     m6MnhW2dbPUxoLaeaHFwmtJlWAEFeWni7pwksJ/gmUeQAWv/P0jNzywNnC8p6mAu
+#     qKRkp3GCY21ZjLGXYeQWMuheOr6m0V9ZptZz5pTNOqGpSoIDBjgnpa3WXtdECFTT
+#     2z7wwolbdTphn/7Vnya2q2FOf/coKTaUw+TPWKXW341OjO6pOmwpB45afd8eEYLO
+#     FKGQndU05DpiPUIlpYaTABpzxb+vp4mOOGAjDHshhCYwMDDtrSJ64g+W0UFjmEvX
+#     [...]
+#     8qsWLpMpfQG3SnxQdHCnc1WuHzFCiWfJxfO9Hag7IR65/LUOLxIZMFmJcYjio4CF
+#     N4ZeF/Jua6jAKDsiHfuUu9MwFn219yw2z9zZC9gN8qWimp3mKxEkgRW+xngA7D3S
+#     D6rYsf8pO1DZhEWompCYUoP9RKcBhH1A3VcwM5VpAoGBAMG8Suf0eT3Umk9jMkwt
+#     NieJe7WmbSBy8D9s1GIQdYwL78TC8m1cJLD4ND9m+1OBNWNSly7ZnZEqVRcV9qrd
+#     88/BIwtuS4LqAvRQPmg0R/KMSOUNHjhsRPngb5ZPAB7P4i9fLdmmwXGuPQzCRjhz
+#     N8X39KucyfcnqiVH0iyQthcl
+#     -----END PRIVATE KEY-----
+
+#   cassandra-006: |
+#     Bag Attributes
+#         friendlyName: sfo3-production-cassandra-006
+#         localKeyID: 54 69 6D 65 20 31 37 35 30 37 37 35 30 37 30 34 35 36
+#     Key Attributes: <No Attributes>
+#     -----BEGIN PRIVATE KEY-----
+#     MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCahxMb7QadHjbN
+#     liPpaXZCHD0581GpVYLIvBLTJlZGd+e/Jr8c79Keew5fmrI4UuETszCuQJFyFxxB
+#     [...]
+#     ngfzEAUDQP2YO8dupRTL6QZ8DW99z0SCT2j944q17HL2W4ETn8IDD59Sy66frpYj
+#     Y5OxK4P7BI8BwPf321hg7O/xrhqpIUXcCB5/I40LUd0BEcpA6/+lKvRxAoGBAJdJ
+#     e4a6AkX0w9DURjRZ3imwzfpd91fJwcvSziNwXx90ChWz1N66XJmNO6jRqwroqwzD
+#     g19xUmjiNOZTNxYfzjiQcBBB315yxHPKbe1+H2PlWoVVTdXY4GDRKZl89ZdhYyoF
+#     yWGApt0kDQ4a9pGozrY74HBTQriBiSXu3aotYBQLAoGBAJ9LJrXk0zdLI49vdsZE
+#     ft7PcndzsQh3qSuwiVawqQmyoUkEYuxcUqXJahFWaz9EjNnpdAVQ1/Jtin2GYr2V
+#     TQNHM3jShXDHH5EC/Ve7V9qwpenNgidC2GVk8wPfrucX4sGoMl2Ls66BxfPP/Vn+
+#     6fJjcoN4z2/qvxPD5J2NlXkT
+#     -----END PRIVATE KEY-----
+
+# vault_ssl_crt:
+#   cassandra-001: |
+#     -----BEGIN CERTIFICATE-----
+#     MIIDVTCCAj0CFEzAGzIq5E+JMm2HxAhxTpKFq2uwMA0GCSqGSIb3DQEBCwUAMEQx
+#     CzAJBgNVBAYTAlVTMRAwDgYDVQQKDAdSb290YXBwMRIwEAYDVQQLDAlDYXNzYW5k
+#     cmExDzANBgNVBAMMBnJvb3RDYTAeFw0yNTA2MjQxNDI0MDlaFw0zNTA2MjIxNDI0
+#     [...]
+#     FDZZkys/BW2CJJG1EPlQ63or9sxzlAFS0DaEV6e38y45Jv1XhFioQTsmssFJeK56
+#     gJ9lMbKH73AnI9RuCPACgBpcUFOHRp4xQdgDl4bA1DdsNa91VVYMVixTdjsITi1w
+#     kQOcD4PMpxZ3bekzdUuHA4vX1diA3JCLaw7p91riQ3prd/9h3ArIPzQt/MLTH70S
+#     mxbtfv9SvVOUqLw7EgCMO9f7F7ETlyFrxt8aYti5YIH53LTMWItXE5I=
+#     -----END CERTIFICATE-----
+
+#   cassandra-002: |
+#     -----BEGIN CERTIFICATE-----
+#     MIIDVTCCAj0CFEzAGzIq5E+JMm2HxAhxTpKFq2uxMA0GCSqGSIb3DQEBCwUAMEQx
+#     CzAJBgNVBAYTAlVTMRAwDgYDVQQKDAdSb290YXBwMRIwEAYDVQQLDAlDYXNzYW5k
+#     cmExDzANBgNVBAMMBnJvb3RDYTAeFw0yNTA2MjQxNDI0MTRaFw0zNTA2MjIxNDI0
+#     MTRaMIGJMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEXMBUGA1UE
+#     [...]
+#     nAYc3nCYVe0m5y6OzOyir5xvng39mdCSpJrNcokk/sUkaZnvgRWwyv/OJZWSkKTl
+#     zQqeEiQtc746k/Q1tiToB+zT7Edu/dRaOh8q4uEbuzrwUC7WYdRabm+R4ZrUWPFa
+#     n250JRJN0vVXZCf1WD3EjSyS7JtM0YX1rqgmNNbFmHfQj+hPJsAHEDfbhxwzRbgh
+#     BDccNy0dGV+u6S2GVYdvAlSYcd9Fe+Gke/gA9HXiFA0ey5v5Q6aMXJ8=
+#     -----END CERTIFICATE-----
+
+#   cassandra-003: |
+#     -----BEGIN CERTIFICATE-----
+#     MIIDVTCCAj0CFEzAGzIq5E+JMm2HxAhxTpKFq2uyMA0GCSqGSIb3DQEBCwUAMEQx
+#     CzAJBgNVBAYTAlVTMRAwDgYDVQQKDAdSb290YXBwMRIwEAYDVQQLDAlDYXNzYW5k
+#     cmExDzANBgNVBAMMBnJvb3RDYTAeFw0yNTA2MjQxNDI0MTdaFw0zNTA2MjIxNDI0
+#     MTdaMIGJMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEXMBUGA1UE
+#     [...]
+#     oWsuz2NbBh073TemFmjoCXutu/qiM/plF60NJCKOtnn3WSCxdub2AhD6mTucTsMZ
+#     ImnyR8rp3q+20+ldLGtKgIInnom3XDGvGkyrMC2MpW1pZeYOWtFESLN0mQtXTPlu
+#     vauGVSmcXJhzTrN9Aa/0AZEudAbDRnc+dt01LL/N606pRSkxuAw+CgVx8NBonO3t
+#     SoewAHN+w8l8EkETahMlT62feiaRy+Z9C3AYQCMbKYttvoaHF/FlH0qtxKP8vPU8
+#     SLgr9AHFgk18PhdGwKqiLpfknKFHXwsDxqYxvqXAp4hBP3DrhK+AYPY=
+#     -----END CERTIFICATE-----
+
+#   cassandra-004: |
+#     -----BEGIN CERTIFICATE-----
+#     MIIDVTCCAj0CFEzAGzIq5E+JMm2HxAhxTpKFq2uzMA0GCSqGSIb3DQEBCwUAMEQx
+#     CzAJBgNVBAYTAlVTMRAwDgYDVQQKDAdSb290YXBwMRIwEAYDVQQLDAlDYXNzYW5k
+#     [...]
+#     r3UqNpDgm6ml8ifJaPdAg1powhpFjfKd48S6swBj4vlIzOxd/se0J72xlcFMipe4
+#     baCFm84cwOJunUF53CJBGH+dcvnhYG0Mq7FdmEahRrfsgaxYVdjRu5F8YHUhZvjx
+#     pDmbAS3saQrrk6E83U6O3h0moLck0c7XZP9KqP38SgDH1KQ+t16JELA=
+#     -----END CERTIFICATE-----
+
+#   cassandra-005: |
+#     -----BEGIN CERTIFICATE-----
+#     MIIDVTCCAj0CFEzAGzIq5E+JMm2HxAhxTpKFq2u0MA0GCSqGSIb3DQEBCwUAMEQx
+#     CzAJBgNVBAYTAlVTMRAwDgYDVQQKDAdSb290YXBwMRIwEAYDVQQLDAlDYXNzYW5k
+#     cmExDzANBgNVBAMMBnJvb3RDYTAeFw0yNTA2MjQxNDI0MjRaFw0zNTA2MjIxNDI0
+#     MjRaMIGJMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEXMBUGA1UE
+#     [...]
+#     fl3JmqLXBKMG6j4OEOFoQuHYhSifV2jmQc/wjGg6Z3OxSNYNv48EQokWxG4yc6cW
+#     NLBJEuNZ8hnnXDlWyCeYM/M/IZVFnZPDBlYxB55xFVphJe9GUcEqhTGM0HxqFruT
+#     Jx0i8WwUupNN50UW1DUofXMVanHoPoThXaHD6JEfG6oD3rD7WeRE0Yp/Kx1yBJ93
+#     JDrRE8xIBleoAGwjzdccN3pRR+mHAnwmS+1uuxadBDQCNyW1Wphf+bWqOtnDiHfM
+#     79Y+qLIMv+1Uez1enGsThDiWojuwO4xwBNmu2uE9nQfV9+H0P7v83s8=
+#     -----END CERTIFICATE-----
+
+#   cassandra-006: |
+#     -----BEGIN CERTIFICATE-----
+#     MIIDVTCCAj0CFEzAGzIq5E+JMm2HxAhxTpKFq2u1MA0GCSqGSIb3DQEBCwUAMEQx
+#     CzAJBgNVBAYTAlVTMRAwDgYDVQQKDAdSb290YXBwMRIwEAYDVQQLDAlDYXNzYW5k
+#     cmExDzANBgNVBAMMBnJvb3RDYTAeFw0yNTA2MjQxNDI0MjdaFw0zNTA2MjIxNDI0
+#     MjdaMIGJMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEXMBUGA1UE
+#     [...]
+#     PLo6Z36xbD2X12DWr7JT1EsYOD1vidaCNfag7r0cbLkmDpSQLySOp6Vh012DKVWi
+#     XOa9/LAoBwhdxIfkZYaI7a0c127eZm8uwV5CgxDLoH6oSg90wdLg1k0=
+#     -----END CERTIFICATE-----
+
+
+# vault_ca_key: |
+#   -----BEGIN PRIVATE KEY-----
+#   MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCmUzy74y/GHTp3
+#   c4xu0O+yxmrnRa1UMF5S3X9YNQd+ZU7TkBssU0UdDBwPBkBkFBI5jGcMx326RgpA
+#   QKtBlPp73iUs/8kzNvi4Mi6HuP5du61bcDqawOruZ/UR8USSPP+umd3JekrzCE7e
+#   hxD3URrPkTHdN7tN05y5SDsPQs7gHFFPrBJf6TwZ8EO0nxkDM/ANjLRa3LKR4hZ4
+#     [...]
+#   XVBmsrpvngV7PrvvXktn9QV04OU/2VRDXmilg7JLHq/FmITkZk0i05v1ICjl19Xj
+#   O9YDGBmOxXfYnDH73MrfIMiBeRlQljgQLTi4OHARAoGBAMes84mpRJqAe8yZ3bFR
+#   UPZ2Wa878Pdw3SG4HexGT3R8sOM1pBj+0wE4Nzoh+5JioqvUvEW3VUPf5dRTu794
+#   OWIxGPZPKNt6xKAu+FixpceRU2lwGmljtioJmhAVyM3jhXLLtSLQuhUOZ/96WPBJ
+#   HyqYmjDO/OsZc6FvkKHC4SBl
+#   -----END PRIVATE KEY-----
+
+# vault_ca_crt: |
+#   -----BEGIN CERTIFICATE-----
+#   MIIDDzCCAfcCFDD0cH473ywZBNxosD8mQ09tHL9nMA0GCSqGSIb3DQEBCwUAMEQx
+#   CzAJBgNVBAYTAlVTMRAwDgYDVQQKDAdSb290YXBwMRIwEAYDVQQLDAlDYXNzYW5k
+#   cmExDzANBgNVBAMMBnJvb3RDYTAeFw0yNTA2MjQxNDIzNTFaFw0zNTA2MjIxNDIz
+#     [...]
+#   taOOXec0FUync6Bkgt6sxXUTzC9+JPRZOLE2K1uRZuZzwpZH6TZFiQwnICnqju4/
+#   USC2zSAt/6sPe6tcb1mx5ixNR/bPamkkpNHjpRhZKZ/gz+ZYAgbpi3cky10s4ooQ
+#   MYHhtK4BtvM+c+qHgPNrNWJ1nA==
+#   -----END CERTIFICATE-----
+
+# vaul_ca_srl: 4CC01B322AE44F89326D87C408714E9285AB6BB5

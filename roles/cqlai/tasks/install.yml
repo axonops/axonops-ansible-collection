@@ -1,0 +1,17 @@
+---
+
+- name: Include Debian repos
+  ansible.builtin.import_tasks: repo/Debian.yml
+  when: ansible_os_family == "Debian"
+
+- name: Include Redhat repos
+  ansible.builtin.import_tasks: repo/RedHat.yml
+  when: ansible_os_family == "RedHat"
+
+# Online installation fixed version
+- name: Install AxonOps CQLAI package
+  ansible.builtin.package:
+    name: "{{ cqlai_pkg }}"
+  when: has_internet_access | default(true) | bool
+
+# code: language=ansible

@@ -1,0 +1,4 @@
+axon_agent_customer_name: "{{ vault_axon_agent_customer_name }}"
+axon_agent_key: "{{ vault_axon_agent_key }}"
+
+axon_agent_ntp_server: "10.1.64.4"

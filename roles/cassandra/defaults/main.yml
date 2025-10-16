@@ -16,7 +16,10 @@ cassandra_cqlsh_binary_version: 0.1.3
 cassandra_cqlsh_binary: "{{ _cassandra_cqlsh_binary }}"
 
 # It is recommended to leave this as false
-cassandra_start_on_boot: false
+cassandra_start_on_boot: true
+
+# It is recommended to leave this as false as brand new clusters of more than 1 node will not start correctly
+cassandra_start_on_install: false
 
 # valid options: tar or pkg
 cassandra_install_format: pkg

@@ -35,6 +35,7 @@
     group: "cassandra"
   when: cassandra_java_tmp_dir is defined and cassandra_java_tmp_dir != '' and cassandra_java_tmp_dir != "/tmp"
 
+
 - name: Create AxonOps User
   tags: axonops_user
   block:
@@ -51,6 +52,7 @@
       failed_when: false
 
     - name: Populate service facts
+      tags: service,always
       ansible.builtin.service_facts:
 
     - name: Stop axon-agent if axonops user doesn't belong to cassandra group
@@ -167,7 +169,8 @@
         - jvm17-clients.options
 
 - name: JMX Authentication
-  when: cassandra_jmx_password is defined and cassandra_jmx_password != ""
+  when:
+    - cassandra_jmx_password is defined and cassandra_jmx_password != ""
   tags: jmx
   block:
     - name: JMX password
@@ -189,15 +192,6 @@
         group: cassandra
         mode: "0640"
 
-- name: Systemd service for cassandra
-  ansible.builtin.template:
-    dest: /etc/systemd/system/cassandra.service
-    src: templates/cassandra.service.j2
-    mode: "0644"
-    owner: root
-    group: root
-  notify: Reload systemd
-
 - name: OS configs
   ansible.builtin.import_tasks: os-config.yml
 
@@ -214,12 +208,27 @@
     disable_gpg_check: true
   when: cassandra_cqlsh_binary is defined and ansible_os_family == "RedHat"
 
+- name: Systemd service for cassandra
+  ansible.builtin.template:
+    dest: /etc/systemd/system/cassandra.service
+    src: templates/cassandra.service.j2
+    mode: "0644"
+    owner: root
+    group: root
+  notify: Reload systemd
+  tags: service
+
+- name: Populate service facts
+  tags: service,always
+  ansible.builtin.service_facts:
+
 - name: Start cassandra
   tags: service
   ansible.builtin.systemd:
-    name: cassandra
-    enabled: true
-    state: started
-  when: cassandra_start_on_boot is defined and cassandra_start_on_boot
+    daemon_reload: true
+    name: "cassandra"
+    enabled: "{{ cassandra_start_on_boot | default(true) | bool }}"
+    state: >-
+      {% if cassandra_start_on_install %}started{% elif ansible_facts.services['cassandra.service'].state == 'running' %}started{% elif ansible_facts.services['cassandra.service'].state == 'stopped' %}stopped{% else %}started{% endif %}
 
 # code: language=ansible
