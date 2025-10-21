@@ -12,6 +12,7 @@
 - name: Install AxonOps CQLAI package
   ansible.builtin.package:
     name: "{{ cqlai_pkg }}"
+    state: "{{ cqlai_state | default('latest') }}"
   when: has_internet_access | default(true) | bool
 
 # code: language=ansible
