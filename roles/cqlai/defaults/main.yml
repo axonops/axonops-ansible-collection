@@ -10,8 +10,8 @@ cqlai_version: latest
 cqlai_host: "127.0.0.1"
 cqlai_port: 9042
 cqlai_keyspace: ""
-cqlai_username: "cassandra"
-cqlai_password: "cassandra"
+# cqlai_username: "cassandra"
+# cqlai_password: "cassandra"
 cqlai_require_confirmation: true
 cqlai_consistency: "LOCAL_ONE"
 cqlai_page_size: 100

@@ -2,8 +2,12 @@
   "host": "{{ cqlai_host }}",
   "port": {{ cqlai_port }},
   "keyspace": "{{ cqlai_keyspace }}",
+  {% if cqlai_username is defined and cqlai_username != "" %}
   "username": "{{ cqlai_username }}",
+  {% endif %}
+  {% if cqlai_password is defined and cqlai_password != "" %}
   "password": "{{ cqlai_password }}",
+  {% endif %}
   "requireConfirmation": {{ cqlai_require_confirmation | lower }},
   "consistency": "{{ cqlai_consistency }}",
   "pageSize": {{ cqlai_page_size }},
