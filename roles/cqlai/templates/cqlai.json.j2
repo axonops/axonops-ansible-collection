@@ -25,6 +25,9 @@
     "provider": "{{ cqlai_ai_provider }}",
     "openai": {
       "apiKey": "{{ cqlai_ai_openai_api_key | default('') }}",
+      {% if cqlai_ai_url is defined and cqlai_ai_url != "" %}
+      "url": "{{ cqlai_ai_url }}",
+      {% endif %}
       "model": "{{ cqlai_ai_openai_model | default('gpt-3.5-turbo') }}"
     }
   }
