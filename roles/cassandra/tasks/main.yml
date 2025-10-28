@@ -26,6 +26,11 @@
   when: cassandra_install_format == "tar"
   ansible.builtin.import_tasks: install-tar.yml
 
+- name: Remove needrestart package
+  ansible.builtin.package:
+    name: needrestart
+    state: absent
+
 - name: Create tmp dir for Cassandra if it is not /tmp
   ansible.builtin.file:
     path: "{{ cassandra_java_tmp_dir }}"
