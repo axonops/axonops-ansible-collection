@@ -43,10 +43,10 @@
         present: "{{ present | default(true) | bool }}"
 
   roles:
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
       vars:
         present: true
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
       vars:
         present: false
 

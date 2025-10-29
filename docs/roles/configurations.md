@@ -1,8 +1,8 @@
-# Alerts Role
+# Configurations Role
 
 ## Overview
 
-The `alerts` role configures alerts, integrations, and monitoring settings for your AxonOps deployment. This role manages metric alerts, backup configurations, service checks, integration with notification services (Slack, PagerDuty), log alerts, and custom dashboards.
+The `configurations` role configures alerts, integrations, and monitoring settings for your AxonOps deployment. This role manages metric alerts, backup configurations, service checks, integration with notification services (Slack, PagerDuty), log alerts, and custom dashboards.
 
 ## Requirements
 
@@ -45,7 +45,7 @@ This role requires a running AxonOps Server with API access.
     cluster: production-cluster
 
   roles:
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
 ```
 
 ### Using Environment Variables
@@ -56,10 +56,10 @@ This role requires a running AxonOps Server with API access.
   # Ensure AXONOPS_ORG and AXONOPS_CLUSTER are set in the environment
 
   roles:
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
 ```
 
-### Configure Specific Alert Types
+### Configure Specific Configs Types
 
 ```yaml
 - name: Configure Only Metric Alerts and Backups
@@ -69,7 +69,7 @@ This role requires a running AxonOps Server with API access.
     cluster: production-cluster
 
   roles:
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
       tags:
         - metrics
         - backups
@@ -85,7 +85,7 @@ This role requires a running AxonOps Server with API access.
     cluster: production-cluster
 
   roles:
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
       tags:
         - slack
 ```
@@ -100,7 +100,7 @@ This role requires a running AxonOps Server with API access.
     cluster: production-cluster
 
   roles:
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
       tags:
         - pagerduty_integration
 ```
@@ -122,7 +122,7 @@ This role requires a running AxonOps Server with API access.
       enabled: true
 
   roles:
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
 ```
 
 ## Available Tags
