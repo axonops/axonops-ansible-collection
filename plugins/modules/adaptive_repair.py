@@ -1,15 +1,15 @@
 #!/usr/bin/python
-
+from typing import Any, Dict
 
 DOCUMENTATION = r'''
 ---
 module: axonops.axonops.adaptive_repair
 
-short_description: Set the Adaptive Repair.
+short_description: Manage Adaptive Repair settings via AxonOps API
 
 version_added: "1.0.0"
 
-description: Set the Adaptive Repair for your cluster on AxonOps SaaS.
+description: Configure Adaptive Repair settings for a cluster using the AxonOps API.
 
 options:
     base_url:
@@ -69,23 +69,18 @@ options:
         type: bool
     gc_grace:
         description:
-            - The GC Grace Threshold to take in consideration.
+            - The GC Grace Threshold to take in consideration. 
+            - AxonOps will not repair any tables with gc_grace shorter than the specified.
             - The default is 86400.
         required: false
         type: int
-    segments:
-        description:
-            - The number of segments per Vnode.
-            - The default is 1.
-        required: false
-        type: int
-    parallelism:
+    tableparallelism:
         description:
             - Table Parallelism. How many tables will be repaired at the same time.
             - The default is 10.
         required: false
         type: int
-    blacklisted:
+    excludedtables:
         description:
             - The table to exclude.
             - the default is [].
@@ -97,31 +92,73 @@ options:
             - The default is TRUE.
         required: false
         type: bool
-    retries: 3
+    segmentretries: 3
         description:
-            - The maximum number retries before fail a segment
+            - The maximum number segmentretries before fail a segment
             - The default is 3
         required: false
         type: int
+    segmenttargetsizemb:
+        description:
+            - The target size in MB for each segment.
+            - The default is 0 (let AxonOps decide the best size).
+        required: false
+        type: int
+    segmenttimeout:
+        description:
+            - The timeout for each segment.
+            - The default is 2h.
+        required: false
+        type: str
+    maxsegmentspertable:
+        description:
+            - The maximum number of segments per table.
+            - The default is 0 (let AxonOps decide the best number).
+        required: false
+
 
 '''
 
 EXAMPLES = r'''
-# Activate Adaptive Repair on cluster `my_cluster` of `my_company`
-  - name: Activate Adaptive Repair on my_cluster
-    axonops.axonops.adaptive_repair:
-      auth_token: "{{ secret }}"
-      org: my_company
-      cluster: my_cluster
-      active: true
-# Make sure single_instance has no Adaptive Repair active
-  - name: Make sure single_instance has no Adaptive Repair active
-    axonops.axonops.daptive_repair:
-      auth_token: "{{ secret }}"
-      org: my_company
-      cluster: single_instance
-      active: false
+- name: Ensure adaptive repair is enabled with specific settings
+  adaptive_repair:
+    org: my-org
+    cluster: my-cluster
+    active: true
+    maxsegmentspertable: 4
+    excludedtables: []
+    filter_twcs: false
+    segmentretries: 3
+    tableparallelism: 2
+    gc_grace: 86400
+    segmenttargetsizemb: 64
+    override_saas: false
 
+- name: Disable adaptive repair
+  adaptive_repair:
+    org: my-org
+    cluster: my-cluster
+    active: false
+
+'''
+
+RETURN = r'''
+changed:
+  description: Whether the module made changes.
+  type: bool
+  returned: always
+current_setting:
+  description: The current settings fetched from the API (mapped to module option names).
+  type: dict
+  returned: when success
+original_setting:
+  description: The requested settings assembled from module parameters (mapped to module option names).
+  type: dict
+  returned: when success
+api_response:
+  description: Raw response (decoded JSON) from the API — useful for debugging.
+  type: dict
+  returned: when success
 '''
 
 from ansible.module_utils.basic import AnsibleModule
@@ -133,24 +170,22 @@ from ansible_collections.axonops.axonops.plugins.module_utils.axonops_utils impo
 def run_module():
     module_args = make_module_args({
         'active': {'type': 'bool', 'default': True},
-        'gc_grace': {'type': 'int', 'required': False, 'default': '86400'},
-        'segments': {'type': 'int', 'required': False},
-        'parallelism': {'type': 'int', 'required': False, 'default': '10'},
-        'blacklisted': {'type': 'list', 'required': False, 'default': []},
+        'excludedtables': {'type': 'list', 'required': False, 'default': []},
         'filter_twcs': {'type': 'bool', 'required': False, 'default': True},
-        'retries': {'type': 'int', 'required': False, 'default': '3'},
-        'segment_target_size_mb': {'type': 'int', 'required': False}
+        'gc_grace': {'type': 'int', 'required': False, 'default': '86400'},
+        'maxsegmentspertable': {'type': 'int', 'required': False, 'default': 0},
+        'segmentretries': {'type': 'int', 'required': False, 'default': 3},
+        'segmenttargetsizemb': {'type': 'int', 'required': False, 'default': 0},
+        'segmenttimeout': {'type': 'str', 'required': False, 'default': '2h'},
+        'tableparallelism': {'type': 'int', 'required': False, 'default': 10},
     })
 
     module = AnsibleModule(
         argument_spec=module_args,
-        supports_check_mode=True,
-        mutually_exclusive=[
-            ('segments', 'segment_target_size_mb'),
-        ]
+        supports_check_mode=True
     )
 
-    result = {
+    result: Dict[str, Any] = {
         'changed': False,
     }
 
@@ -168,47 +203,49 @@ def run_module():
     if return_error:
         module.fail_json(msg=return_error, **result)
 
+    if not saas_settings or not isinstance(saas_settings, dict) or 'Active' not in saas_settings:
+        module.fail_json(msg='Adaptive Repair settings not found for the cluster.', **result)
+
     current_setting = {
         'active': saas_settings['Active'],
-        'gc_grace': saas_settings['GcGraceThreshold'],
-        'blacklisted': saas_settings['BlacklistedTables'],
+        'excludedtables': saas_settings['BlacklistedTables'] if saas_settings['BlacklistedTables'] is not None else [],
         'filter_twcs': saas_settings['FilterTWCSTables'],
-        'retries': saas_settings['SegmentRetries'],
-        'parallelism': saas_settings['TableParallelism']
+        'gc_grace': saas_settings['GcGraceThreshold'],
+        'maxsegmentspertable': saas_settings['MaxSegmentsPerTable'],
+        'segmentretries': saas_settings['SegmentRetries'],
+        'segmenttargetsizemb': saas_settings['SegmentTargetSizeMB'],
+        'segmenttimeout': saas_settings['SegmentTimeout'],
+        'tableparallelism': saas_settings['TableParallelism'],
     }
-
-    if 'SegmentsPerVnode' in saas_settings and saas_settings['SegmentsPerVnode']:
-        current_setting['segments'] = saas_settings['SegmentsPerVnode']
-    if 'SegmentTargetSizeMB' in saas_settings and saas_settings['SegmentTargetSizeMB']:
-        current_setting['segment_target_size_mb'] = saas_settings['SegmentTargetSizeMB']
 
     requested_setting = {
         'active': module.params['active'],
-        'gc_grace': module.params['gc_grace'],
-        'blacklisted': module.params['blacklisted'],
+        'excludedtables': module.params['excludedtables'],
         'filter_twcs': module.params['filter_twcs'],
-        'retries': module.params['retries'],
-        'parallelism': module.params['parallelism']
+        'gc_grace': module.params['gc_grace'],
+        'maxsegmentspertable': module.params['maxsegmentspertable'],
+        'segmentretries': module.params['segmentretries'],
+        'segmenttargetsizemb': module.params['segmenttargetsizemb'],
+        'segmenttimeout': module.params['segmenttimeout'],
+        'tableparallelism': module.params['tableparallelism'],
     }
-
-    if 'segments' in module.params and module.params['segments']:
-        requested_setting['segments'] = module.params['segments']
-    if 'segment_target_size_mb' in module.params and module.params['segment_target_size_mb']:
-        requested_setting['segment_target_size_mb'] = module.params['segment_target_size_mb']
 
     payload = {
         'Active': requested_setting['active'],
-        'GcGraceThreshold': requested_setting['gc_grace'],
-        'TableParallelism': requested_setting['parallelism'],
-        'BlacklistedTables': requested_setting['blacklisted'],
+        'BlacklistedTables': requested_setting['excludedtables'],
         'FilterTWCSTables': requested_setting['filter_twcs'],
-        'SegmentRetries': requested_setting['retries']
+        'GcGraceThreshold': requested_setting['gc_grace'],
+        'MaxSegmentsPerTable': requested_setting['maxsegmentspertable'],
+        'SegmentRetries': requested_setting['segmentretries'],
+        'SegmentTargetSizeMB': requested_setting['segmenttargetsizemb'],
+        'SegmentTimeout': requested_setting['segmenttimeout'],
+        'TableParallelism': requested_setting['tableparallelism'],
     }
 
-    if 'segments' in requested_setting and requested_setting['segments']:
-        payload['SegmentsPerVnode'] = requested_setting['segments']
-    if 'segment_target_size_mb' in requested_setting and requested_setting['segment_target_size_mb']:
-        payload['SegmentTargetSizeMB'] = requested_setting['segment_target_size_mb']
+    result['payload'] = payload
+    result['current_setting'] = current_setting
+    result['requested_setting'] = requested_setting
+    result['saas_settings_original'] = saas_settings
 
     changed = dicts_are_different(current_setting, requested_setting)
     result['diff'] = {'before': current_setting, 'after': requested_setting}
@@ -216,7 +253,6 @@ def run_module():
 
     if module.check_mode or not changed:
         module.exit_json(**result)
-        return
 
     _, return_error = axonops.do_request(
         rel_url=adaptive_repair_url,
@@ -226,6 +262,13 @@ def run_module():
 
     if return_error:
         module.fail_json(msg=return_error, **result)
+
+    # Get the updated settings and print them for testing purposes
+    saas_settings_result, return_error = axonops.do_request(adaptive_repair_url)
+    if return_error:
+        module.fail_json(msg=return_error, **result)
+
+    result['saas_settings_result'] = saas_settings_result
 
     module.exit_json(**result)
 
