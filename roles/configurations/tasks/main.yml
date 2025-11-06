@@ -23,18 +23,22 @@
 - name: Import metric alerts tasks
   ansible.builtin.import_tasks: metrics_alerts.yml
   tags: metrics
+  when: metrics is defined
 
 - name: Import backup tasks
   ansible.builtin.import_tasks: backups.yml
   tags: backups
+  when: metrics is defined
 
 - name: Import service checks tasks
   ansible.builtin.import_tasks: service_checks.yml
   tags: service_checks
+  when: service_checks is defined
 
 - name: Import slack tasks
   ansible.builtin.import_tasks: slack_integration.yml
   tags: slack
+  when: slack is defined
 
 - name: Import tasks from adaptive_repair.yml
   ansible.builtin.import_tasks: adaptive_repair.yml
@@ -49,6 +53,7 @@
 - name: Import tasks from commitlogs_archive.yml
   ansible.builtin.import_tasks: commitlogs_archive.yml
   tags: commitlogs_archive
+  when: commitlogs_archive is defined
 
 - name: Import tasks from human_readableid.yml
   ansible.builtin.import_tasks: human_readableid.yml
@@ -58,21 +63,26 @@
 - name: Import tasks from log_alerts.yml
   ansible.builtin.import_tasks: log_alerts.yml
   tags: log_alerts
+  when: log_alerts is defined
 
 - name: Import tasks from logcollector.yml
   ansible.builtin.import_tasks: logcollector.yml
   tags: logcollector
+  when: logcollector is defined
 
 - name: Import tasks from pagerduty_integration.yml
   ansible.builtin.import_tasks: pagerduty_integration.yml
   tags: pagerduty_integration
+  when: pagerduty_integration is defined
 
 - name: Import dashboard
   ansible.builtin.import_tasks: dashboards.yml
   tags: dashboards
+  when: dashboards is defined
 
 - name: Import alert routes tasks
   ansible.builtin.import_tasks: alert_routes.yml
   tags: routes
+  when: routes is defined
 
 # code: language=ansible

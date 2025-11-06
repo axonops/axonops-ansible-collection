@@ -124,7 +124,181 @@ This role requires a running AxonOps Server with API access.
   roles:
     - role: axonops.axonops.configurations
 ```
+## Details playbook
 
+### Adaptive Repair Configuration
+
+The Adaptive Repair feature can be configured by setting the `adaptive_repair` variable directly in the playbook, 
+no need for files in the `config` directory. 
+
+This allows you to enable or disable adaptive repair settings for your cluster.
+#### List of Parameters
+| Parameter             | Description                                                                      | Type    | Default |
+|-----------------------|----------------------------------------------------------------------------------|---------|---------|
+| `enabled`             | Enable or disable adaptive repair                                                | boolean | `true`  |
+| `excludedtables`      | List of tables to exclude from adaptive repair.                                  | List    | `[]`    |
+| `gc_grace`            | Set the GC grace period.                                                         | integer | `86400` |
+| `maxsegmentspertable` | Set the maximum number of segments per table to repair in a single repair cycle. | integer | `0`     |
+| `segmentretries`      | Set the number of retries for each segment in case of failure.                   | integer | `5`     |
+| `segmenttargetsizemb` | Set the target size in MB for each segment repaired at time.                     | integer | `omit`  |
+| `segmenttimeout`      | Set the timeout in seconds for each segment repair operation.                    | String  | `2h`    |
+| `tableparallelism`    | Set the number of tables processed in parallel.                                  | integer | `10`    |
+
+#### Enable Adaptive Repair
+
+```yaml
+- name: Enable Adaptive Repair
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+    adaptive_repair:
+      enabled: true
+
+  roles:
+    - role: axonops.axonops.configurations
+```
+
+#### Disable Adaptive Repair
+
+```yaml
+- name: Disable Adaptive Repair
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+    adaptive_repair:
+      enabled: false 
+      
+    roles:
+      - role: axonops.axonops.configurations
+```
+
+#### Set GC Grace Threshold
+Set the GC grace period. AxonOps will ignore tables that have a `gc_grace_seconds` value lower than the specified threshold. 
+The default is `86400` seconds (1 day).
+
+```yaml
+- name: Set GC Grace Threshold for Adaptive Repair to 172800 seconds (2 days)
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+    adaptive_repair:
+      enabled: true
+      gc_grace: 172800
+
+  roles:
+    - role: axonops.axonops.configurations
+```
+
+#### Set Table Parallelism
+
+It is suggested to keep this value at least as the number of table in the cluster.
+```yaml
+- name: Set Table Parallelism for Adaptive Repair
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+    adaptive_repair:
+      enabled: true
+      tableparallelism: 100
+
+  roles:
+    - role: axonops.axonops.configurations
+```
+
+#### Set Segment Retries
+
+```yaml
+- name: Set Segment Retries for Adaptive Repair
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+    adaptive_repair:
+        enabled: true
+        segmentretries: 10
+
+  roles:
+    - role: axonops.axonops.configurations
+```
+
+#### Set Segment Target Size
+
+Number from 16 to 10240
+```yaml
+- name: Set Segment Target Size for Adaptive Repair
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+    adaptive_repair:
+      enabled: true
+      segmenttargetsizemb: 250
+      
+  roles:
+    - role: axonops.axonops.configurations
+```
+
+#### Exclude Tables from Adaptive Repair
+List of tables to exclude from adaptive repair. The accepted format is a list of strings in the form "keyspace.table".
+To exclude an entire keyspace, use "keyspace.*".
+The default is an empty list.
+
+```yaml
+- name: Exclude Tables from Adaptive Repair
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+    adaptive_repair:
+      enabled: true
+      excludedtables:
+      - "system.peers"
+      - "system.local"
+
+      
+  roles:  
+    - role: axonops.axonops.configurations
+```
+
+#### Set Maximum Segments per Table
+Set the maximum number of segments per table to repair in a single repair cycle. 
+Having too many segments in a table causes too many repair commands to be sent.
+
+```yaml
+- name: Set Maximum Segments per Table for Adaptive Repair
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+    adaptive_repair:
+      enabled: true
+      maxsegmentspertable: 131072
+
+  roles:
+    - role: axonops.axonops.configurations
+```
+
+#### Set Segment Timeout
+Set the timeout in seconds for each segment repair operation.
+Integer number followed by one of "s, m, h, d, w, M, y"
+
+```yaml
+- name: Set Segment Timeout for Adaptive Repair
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+    adaptive_repair:
+      enabled: true
+      segmenttimeout: "3h"
+
+  roles:
+    - role: axonops.axonops.configurations
+```
 ## Available Tags
 
 The role supports granular control through the following tags:
