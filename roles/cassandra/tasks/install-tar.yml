@@ -13,14 +13,25 @@
     shell: /bin/bash
     comment: "Created by Ansible"
 
-- name: Cassandra binaries
-  ansible.builtin.unarchive:
-    src: "{{ cassandra_download_url }}"
-    dest: "{{ cassandra_install_root }}"
-    remote_src: true
-    owner: "{{ cassandra_binary_owner | default('cassandra') }}"
-    group: "{{ cassandra_binary_group | default('cassandra') }}"
-    creates: "{{ cassandra_conf_dir }}"
+- name: Download Cassandra binaries
+  block:
+    - name: Cassandra binaries
+      ansible.builtin.unarchive:
+        src: "{{ cassandra_download_url }}"
+        dest: "{{ cassandra_install_root }}"
+        remote_src: true
+        owner: "{{ cassandra_binary_owner | default('cassandra') }}"
+        group: "{{ cassandra_binary_group | default('cassandra') }}"
+        creates: "{{ cassandra_conf_dir }}"
+  rescue:
+    - name: Cassandra binaries
+      ansible.builtin.unarchive:
+        src: "{{ cassandra_archive_url }}"
+        dest: "{{ cassandra_install_root }}"
+        remote_src: true
+        owner: "{{ cassandra_binary_owner | default('cassandra') }}"
+        group: "{{ cassandra_binary_group | default('cassandra') }}"
+        creates: "{{ cassandra_conf_dir }}"
 
 - name: "Ensure Cassandra install directory has the correct owner"
   ansible.builtin.file:
