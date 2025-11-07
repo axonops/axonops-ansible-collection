@@ -6,8 +6,9 @@
     cassandra_dc: default
     cassandra_rack: rack1
     cassandra_max_heap_size: 512M
-    cassandra_version: 5.0.5
+    cassandra_version: 5.0.6
     cassandra_start_on_boot: false
+    cassandra_install_format: tar
   pre_tasks:
     # bug in the container we use for testing
     - name: "Create /usr/share/man/man1/"

@@ -55,9 +55,11 @@ axon-agent:
     disable_command_exec: {{ axon_agent_disable_command_exec | default(false) | bool }}
     scripts_location: {{ axon_agent_scripts_location | default('/var/lib/axonops/scripts/') }}
 
+{% if axon_agent_ntp_server is defined and axon_agent_ntp_server != "" %}
 NTP:
     host: "{{ axon_agent_ntp_server }}" # Specify your NTP server IP address or hostname
     timeout: {{ axon_agent_ntp_timeout | default(6) }}
+{% endif %}
 
 {% if axon_agent_include_service_config %}
 {% if axon_java_agent.startswith('axon-dse') %}
