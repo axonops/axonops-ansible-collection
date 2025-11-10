@@ -3,9 +3,34 @@
   hosts: all
   vars:
     axon_agent_customer_name: molecule
+  pre_tasks:
+    - name: Fake cassandra conf
+      ansible.builtin.file:
+        path: /opt/cassandra/conf
+        state: directory
+        recurse: true
+    - name: Fake cassandra-env for a full test
+      ansible.builtin.copy:
+        dest: /opt/cassandra/conf/cassandra-env.sh
+        mode: "0644"
+        content: |
+          if [ "x$MX4J_PORT" != "x" ]; then
+              if [ "$(echo "$MX4J_PORT" | grep -c "\-Dmx4jport")" = "1" ]; then
+                  # Backward compatible with the older style #13578
+                  JVM_OPTS="$JVM_OPTS $MX4J_PORT"
+              else
+                  JVM_OPTS="$JVM_OPTS -Dmx4jport=$MX4J_PORT"
+              fi
+          fi
+
+          JVM_OPTS="$JVM_OPTS $JVM_EXTRA_OPTS"
   roles:
     - role: agent
       vars:
         axon_java_agent: "axon-cassandra5.0-agent-jdk17"
         axon_agent_version: "2.0.2"
         axon_java_agent_version: "1.0.10"
+        axon_agent_cassandra_config_directory: /opt/cassandra/conf
+        axon_agent_cassandra_config: '. /usr/share/axonops/axonops-jvm.options'
+
+# code: language=ansible
