@@ -16,17 +16,15 @@ offering flexibility for those who prefer different automation solutions.
 
 ## Before you start
 
-Apache Cassandra 5.0 introduced significant configuration changes that affect how you structure your Ansible playbooks. The most notable change is the shift from parameter names that include units to explicit unit declarations in values. For example:
-
-```yaml
-# Cassandra 4.1
-dynamic_snitch_reset_interval_in_ms: 600000
-
-# Cassandra 5.0
-dynamic_snitch_reset_interval: 600000ms
-```
-
-This makes coding the ansible playbook to support both versions more complex. Before running this playbook, you'll need to review the variables from [roles/cassandra/defaults/main.yml](roles/cassandra/defaults/main.yml) and compare them against [roles/cassandra/templates/5.0.x/cassandra.yaml.j2](roles/cassandra/templates/5.0.x/cassandra.yaml.j2).
+> ⚠️ **BREAKING CHANGE NOTICE**
+> **IMPORTANT**: Between releases **v0.2.x** and **v0.3.x**, the default Apache Cassandra installation method has changed.  
+> 
+> - **Previous default**: `cassandra_install_format: pkg`  
+> - **New default**: `cassandra_install_format: tar`  
+> 
+> The `tar` method is **strongly recommended** as it simplifies **upgrades and downgrades** compared to package-based installations.  
+> 
+> 🔧 If you are **upgrading from a previous version** of this role, please **review your configuration** and explicitly set the `cassandra_install_format` to match your environment.
 
 ## Role Documentation
 
