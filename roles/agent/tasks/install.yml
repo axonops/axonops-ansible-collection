@@ -18,7 +18,7 @@
 
 # Online installation fixed version
 - name: Ensure Axon agent is installed.
-  ansible.builtin.dnf:
+  ansible.builtin.package:
     name: "{{ axon_agent_pkg }}"
     state: "{{ axon_agent_state }}"
     enablerepo: "axonops*"

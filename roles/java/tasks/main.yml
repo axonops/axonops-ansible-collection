@@ -8,7 +8,7 @@
     - ansible_os_family == 'RedHat'
   block:
     - name: Add Zulu JDK repository
-      ansible.builtin.dnf:
+      ansible.builtin.package:
         name: "{{ _zulu_jdk.yum_repo }}"
         state: present
         disable_gpg_check: true
@@ -16,7 +16,7 @@
           - "*"  # Disable all other repositories to avoid conflicts
 
     - name: Install Zulu JDK
-      ansible.builtin.dnf:
+      ansible.builtin.package:
         state: "present"
         name: "{{ _zulu_jdk.package_names }}"
         disable_gpg_check: true

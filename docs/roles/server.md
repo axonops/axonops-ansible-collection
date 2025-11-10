@@ -23,6 +23,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
 | `axon_server_state` | `present` | State of the server: `present` or `absent` |
 | `axon_server_version` | `latest` | Version of AxonOps Server to install |
 | `axon_server_hum` | `false` | Enable Human Readable IDs |
+| `axon_server_license_key` | - | License key for on-premises AxonOps deployment (required for self-hosted) |
 
 ### Network Configuration
 
@@ -117,6 +118,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
   hosts: axon-server
   become: true
   vars:
+    axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
     axon_server_elastic_hosts:
@@ -154,6 +156,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
     es_heap_size: 2g
 
     # AxonOps Server Configuration
+    axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
     axon_server_elastic_hosts:
@@ -192,6 +195,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
   hosts: axon-server
   become: true
   vars:
+    axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - cassandra-1.example.com:9042
       - cassandra-2.example.com:9042
@@ -217,6 +221,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
   hosts: axon-server
   become: true
   vars:
+    axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
     axon_server_elastic_hosts:
@@ -252,6 +257,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
   hosts: axon-server
   become: true
   vars:
+    axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
     axon_server_elastic_hosts:
@@ -279,6 +285,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
   hosts: axon-server
   become: true
   vars:
+    axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
     axon_server_elastic_hosts:
@@ -298,6 +305,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
   hosts: axon-server
   become: true
   vars:
+    axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
     axon_server_elastic_hosts:
@@ -366,6 +374,7 @@ The role automatically detects the server version and applies the appropriate El
 
 ## Notes
 
+- **License Key**: A license key is required for on-premises/self-hosted AxonOps deployments. Set the `axon_server_license_key` variable with your license key. Contact AxonOps to obtain a license
 - **SaaS vs Self-Hosted**: Only use this role for self-hosted deployments. For SaaS, use `agents.axonops.cloud` as your `axon_agent_server_host`
 - **Resources**: Ensure adequate resources (minimum 4GB RAM recommended for production)
 - **Backup**: Regularly backup the Cassandra cluster storing AxonOps data

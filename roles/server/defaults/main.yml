@@ -3,6 +3,9 @@ axon_server_state: present
 axon_server_hum: false
 axon_server_version: latest
 
+# If you're setting up on-premises AxonOps you will need a License Key
+#axon_server_license_key: xxx
+
 axon_server_elastic_hosts:
   - http://127.0.0.1:9200
 axon_server_elastic_shards: 1

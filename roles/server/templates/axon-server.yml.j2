@@ -67,6 +67,9 @@ retention:
 {% if axon_server_org_name is defined %}
 org_name: {{ axon_server_org_name }}
 {% endif %}
+{% if axon_server_license_key is defined and axon_server_license_key != "" %}
+license_key: "{{ axon_server_license_key }}"
+{% endif %}
 
 {% if axon_server_cql_hosts is defined and axon_server_cql_hosts | length > 0 %}
 cql_hosts:

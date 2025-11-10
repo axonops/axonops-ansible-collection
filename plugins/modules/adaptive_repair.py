@@ -69,7 +69,7 @@ options:
         type: bool
     gc_grace:
         description:
-            - The GC Grace Threshold to take in consideration. 
+            - The GC Grace Threshold to take in consideration.
             - AxonOps will not repair any tables with gc_grace shorter than the specified.
             - The default is 86400.
         required: false

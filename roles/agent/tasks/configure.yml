@@ -54,4 +54,23 @@
     group: root
   when: axon_agent_sudoers is defined and axon_agent_sudoers != ""
 
+- name: Add AxonOps agent config to cassandra-env.sh
+  when: axon_agent_cassandra_config_directory is defined and axon_agent_cassandra_config_directory != ""
+  block:
+    - name: Check the cassandra-env.sh can be found
+      ansible.builtin.stat:
+        path: "{{ axon_agent_cassandra_config_directory }}/cassandra-env.sh"
+      register: _cass_env
+
+    - name: Fail if cassandra-env.sh not found
+      ansible.builtin.fail:
+        msg: "{{ axon_agent_cassandra_config_directory }}/cassandra-env.sh not found"
+      when: not _cass_env.stat.exists
+
+    - name: Add AxonOps agent config to cassandra-env.sh
+      ansible.builtin.lineinfile:
+        path: "{{ axon_agent_cassandra_config_directory }}/cassandra-env.sh"
+        line: "{{ axon_agent_cassandra_config }}"
+        insertafter: EOF
+
 # code: language=ansible

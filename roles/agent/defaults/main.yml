@@ -33,3 +33,14 @@ axon_agent_dev_repository: absent
 axon_agent_sudoers: |
   # Ansible Managed
   axonops ALL=NOPASSWD: /bin/systemctl start cassandra,/bin/systemctl restart cassandra,/bin/systemctl stop cassandra,/bin/systemctl status cassandra
+
+# Enable these options to let the Axon-Agent role modify the Apache Cassandra config
+# You will need to configure the path for where there cassandra-env.sh config file is as well as the
+# configuration line to be added. Please bear in mind this is different for some of the Apache Cassandra versions.
+# Check https://axonops.com/docs/get_started/agent_setup/ to confirm your correct line
+
+# axon_agent_cassandra_config_directory: /opt/cassandra/conf
+# This is usually be versions < 5
+# axon_agent_cassandra_config: 'JVM_OPTS="$JVM_OPTS -javaagent:/usr/share/axonops/axon-cassandra4.0-agent.jar=/etc/axonops/axon-agent.yml"'
+# This config is more common for Apache Cassandra >= 5
+# axon_agent_cassandra_config: '. /usr/share/axonops/axonops-jvm.options'
