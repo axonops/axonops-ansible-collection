@@ -31,7 +31,7 @@
 
 - name: Ensure Axon server is installed.
   when: ansible_os_family == "RedHat"
-  ansible.builtin.dnf:
+  ansible.builtin.package:
     name: "{{ axon_server_versioned_package }}"
     state: "{{ axon_server_state }}"
     enablerepo: "axonops*"

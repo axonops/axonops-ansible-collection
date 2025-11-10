@@ -229,6 +229,7 @@ If you need multiple Java versions, you can use alternatives:
 
 - **Headless Packages**: Use `-headless` packages (e.g., `java-11-openjdk-headless`) for server installations to avoid installing unnecessary GUI components
 - **Package Names**: Package names vary between distributions. Check your distribution's package repository for exact names
+- **Cross-Platform Support**: The role uses the generic `package` module for improved compatibility across different Linux distributions (RHEL, Debian, Ubuntu, etc.)
 - **JAVA_HOME**: Most modern installations automatically set JAVA_HOME, but verify if your application requires it
 - **Updates**: The role installs the latest available version of the specified Java package. Use package pinning if you need a specific minor version
 - **Zulu Java**: Only available on Debian-based systems through this role

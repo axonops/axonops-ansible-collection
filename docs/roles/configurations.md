@@ -128,8 +128,8 @@ This role requires a running AxonOps Server with API access.
 
 ### Adaptive Repair Configuration
 
-The Adaptive Repair feature can be configured by setting the `adaptive_repair` variable directly in the playbook, 
-no need for files in the `config` directory. 
+The Adaptive Repair feature can be configured by setting the `adaptive_repair` variable directly in the playbook,
+no need for files in the `config` directory.
 
 This allows you to enable or disable adaptive repair settings for your cluster.
 #### List of Parameters
@@ -168,14 +168,14 @@ This allows you to enable or disable adaptive repair settings for your cluster.
     org: mycompany
     cluster: production-cluster
     adaptive_repair:
-      enabled: false 
-      
+      enabled: false
+
     roles:
       - role: axonops.axonops.configurations
 ```
 
 #### Set GC Grace Threshold
-Set the GC grace period. AxonOps will ignore tables that have a `gc_grace_seconds` value lower than the specified threshold. 
+Set the GC grace period. AxonOps will ignore tables that have a `gc_grace_seconds` value lower than the specified threshold.
 The default is `86400` seconds (1 day).
 
 ```yaml
@@ -237,7 +237,7 @@ Number from 16 to 10240
     adaptive_repair:
       enabled: true
       segmenttargetsizemb: 250
-      
+
   roles:
     - role: axonops.axonops.configurations
 ```
@@ -259,13 +259,13 @@ The default is an empty list.
       - "system.peers"
       - "system.local"
 
-      
-  roles:  
+
+  roles:
     - role: axonops.axonops.configurations
 ```
 
 #### Set Maximum Segments per Table
-Set the maximum number of segments per table to repair in a single repair cycle. 
+Set the maximum number of segments per table to repair in a single repair cycle.
 Having too many segments in a table causes too many repair commands to be sent.
 
 ```yaml
