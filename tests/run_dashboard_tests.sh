@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Default values for local testing
-DEFAULT_BASE_URL="http://10.0.3.118:3000"
+DEFAULT_BASE_URL="http://localhost:3000"
 DEFAULT_ORG="testorg"
 DEFAULT_CLUSTER="test-cluster"
 DEFAULT_DASHBOARD_NAME="Overview"
