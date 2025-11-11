@@ -1,0 +1,90 @@
+---
+- name: Test AxonOps Dashboard Save
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    base_url: "{{ base_url | default('http://10.0.3.118:3000') }}"
+    org: "{{ org | default('testorg') }}"
+    cluster: "{{ cluster | default('test-cluster') }}"
+    dashboard_name: "{{ dashboard_name | default('Overview') }}"
+
+  tasks:
+    - name: Create a simple test dashboard
+      axonops.axonops.dashboard_template:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        name: "Test Dashboard Simple"
+        filters:
+          - label: "data center"
+            multi: true
+            name: "dc"
+            query: "host_CPU_Percent_Merge"
+            regex: "dc=([^:]+)"
+            type: "query"
+        panels:
+          - details:
+              eventsFilters:
+                f1: []
+                f2: []
+                host_id: []
+                level: []
+                message: ''
+                source: []
+                type: []
+              filters: {}
+              isHideNullValue: false
+              isSmoothLines: false
+              lineThickness: 1
+              max: 100
+              nullAsZero: false
+              queries: []
+              resolution: low
+              sortOrderPIE: asc
+              thresholds:
+                - color: '#4caf50'
+                  name: default
+                  value: 0
+              useCache: true
+              y: {}
+            layout:
+              h: 1
+              i: "test-row-1"
+              w: 18
+              x: 0
+              y: 0
+            title: "Test Row"
+            type: row
+            uuid: "test-row-1"
+        auth_token: "{{ lookup('env', 'AXONOPS_TOKEN') | default(omit) }}"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') | default(omit) }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default(omit) }}"
+      register: dashboard_result
+
+    - name: Display dashboard creation result
+      debug:
+        var: dashboard_result
+
+    - name: Verify dashboard was created
+      assert:
+        that:
+          - dashboard_result.changed == true
+        fail_msg: "Dashboard creation should have resulted in a change"
+        success_msg: "Dashboard created successfully"
+
+    - name: Delete test dashboard (cleanup)
+      axonops.axonops.dashboard_template:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        name: "Test Dashboard Simple"
+        present: false
+        auth_token: "{{ lookup('env', 'AXONOPS_TOKEN') | default(omit) }}"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') | default(omit) }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default(omit) }}"
+      register: delete_result
+
+    - name: Display deletion result
+      debug:
+        var: delete_result
