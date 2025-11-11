@@ -140,6 +140,10 @@ if [ $? -ne 0 ]; then ((failed_tests++)); fi
 run_test "test_dashboard_comprehensive.yml" "Comprehensive Dashboard Test"
 if [ $? -ne 0 ]; then ((failed_tests++)); fi
 
+# Dashboard modify test (save existing, modify, upload)
+run_test "test_dashboard_modify.yml" "Dashboard Modify Test"
+if [ $? -ne 0 ]; then ((failed_tests++)); fi
+
 # Summary
 echo "Test Summary"
 echo "============"

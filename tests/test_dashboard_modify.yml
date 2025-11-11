@@ -1,0 +1,140 @@
+---
+- name: Test Dashboard Save, Modify, and Upload
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    base_url: "{{ base_url | default('http://localhost:3000') }}"
+    org: "{{ org | default('testorg') }}"
+    cluster: "{{ cluster | default('test-cluster') }}"
+    dashboard_name: "{{ dashboard_name | default('Overview') }}"
+
+  tasks:
+    # Step 1: Fetch the existing dashboard from the API
+    - name: Fetch existing dashboard from AxonOps API
+      uri:
+        url: "{{ base_url }}/api/v1/dashboardtemplate/{{ org }}/cassandra/{{ cluster }}?dashver=2.0"
+        method: GET
+        headers: "{{ {'Authorization': 'Bearer ' + lookup('env', 'AXONOPS_TOKEN')} if lookup('env', 'AXONOPS_TOKEN') else {} }}"
+        user: "{{ lookup('env', 'AXONOPS_USERNAME') if not lookup('env', 'AXONOPS_TOKEN') else omit }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') if not lookup('env', 'AXONOPS_TOKEN') else omit }}"
+        force_basic_auth: "{{ true if not lookup('env', 'AXONOPS_TOKEN') else false }}"
+        return_content: true
+        status_code: 200
+      register: api_response
+
+    - name: Extract the target dashboard
+      set_fact:
+        original_dashboard: "{{ api_response.json.dashboards | selectattr('name', 'equalto', dashboard_name) | first }}"
+      when: api_response.json.dashboards | selectattr('name', 'equalto', dashboard_name) | list | length > 0
+
+    - name: Verify dashboard exists
+      assert:
+        that:
+          - original_dashboard is defined
+          - original_dashboard.name == dashboard_name
+        fail_msg: "Dashboard '{{ dashboard_name }}' not found"
+        success_msg: "✅ Step 1 PASSED - Dashboard '{{ dashboard_name }}' retrieved"
+
+    - name: Display original dashboard info
+      debug:
+        msg:
+          - "Dashboard: {{ original_dashboard.name }}"
+          - "Number of panels: {{ original_dashboard.panels | length }}"
+          - "Number of filters: {{ original_dashboard.filters | length }}"
+
+    # Step 2: Modify the dashboard (rename first panel)
+    - name: Create modified version with updated panel name
+      set_fact:
+        modified_panels: "{{ modified_panels | default([]) + [panel_item | combine({'title': panel_item.title + ' (Modified)'}) if ansible_loop.index0 == 0 else panel_item] }}"
+      loop: "{{ original_dashboard.panels }}"
+      loop_control:
+        loop_var: panel_item
+        extended: true
+
+    - name: Display modification info
+      debug:
+        msg:
+          - "✅ Step 2 PASSED - Dashboard modified"
+          - "Original first panel title: {{ original_dashboard.panels[0].title }}"
+          - "Modified first panel title: {{ modified_panels[0].title }}"
+
+    # Step 3: Upload the modified dashboard with a test name
+    - name: Upload modified dashboard as new test dashboard
+      axonops.axonops.dashboard_template:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        name: "{{ dashboard_name }} (Test Modified)"
+        filters: "{{ original_dashboard.filters }}"
+        panels: "{{ modified_panels }}"
+        auth_token: "{{ lookup('env', 'AXONOPS_TOKEN') | default(omit) }}"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') | default(omit) }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default(omit) }}"
+      register: upload_result
+
+    - name: Verify upload was successful
+      assert:
+        that:
+          - upload_result.changed == true
+        fail_msg: "Dashboard upload should have resulted in a change"
+        success_msg: "✅ Step 3 PASSED - Modified dashboard uploaded successfully"
+
+    # Step 4: Re-fetch and verify the modified dashboard
+    - name: Verify modified dashboard exists in API
+      uri:
+        url: "{{ base_url }}/api/v1/dashboardtemplate/{{ org }}/cassandra/{{ cluster }}?dashver=2.0"
+        method: GET
+        headers: "{{ {'Authorization': 'Bearer ' + lookup('env', 'AXONOPS_TOKEN')} if lookup('env', 'AXONOPS_TOKEN') else {} }}"
+        user: "{{ lookup('env', 'AXONOPS_USERNAME') if not lookup('env', 'AXONOPS_TOKEN') else omit }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') if not lookup('env', 'AXONOPS_TOKEN') else omit }}"
+        force_basic_auth: "{{ true if not lookup('env', 'AXONOPS_TOKEN') else false }}"
+        return_content: true
+        status_code: 200
+      register: verify_response
+
+    - name: Extract the modified dashboard
+      set_fact:
+        uploaded_dashboard: "{{ verify_response.json.dashboards | selectattr('name', 'equalto', dashboard_name + ' (Test Modified)') | first }}"
+      when: verify_response.json.dashboards | selectattr('name', 'equalto', dashboard_name + ' (Test Modified)') | list | length > 0
+
+    - name: Verify modified dashboard was uploaded correctly
+      assert:
+        that:
+          - uploaded_dashboard is defined
+          - uploaded_dashboard.panels[0].title == modified_panels[0].title
+        fail_msg: "Modified dashboard not found or panel title doesn't match"
+        success_msg: "✅ Step 4 PASSED - Modified dashboard verified in API"
+
+    # Step 5: Cleanup - Delete the test dashboard
+    - name: Delete test dashboard
+      axonops.axonops.dashboard_template:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        name: "{{ dashboard_name }} (Test Modified)"
+        present: false
+        auth_token: "{{ lookup('env', 'AXONOPS_TOKEN') | default(omit) }}"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') | default(omit) }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default(omit) }}"
+      register: delete_result
+
+    - name: Verify cleanup
+      assert:
+        that:
+          - delete_result.changed == true
+        fail_msg: "Dashboard deletion should have resulted in a change"
+        success_msg: "✅ Step 5 PASSED - Test dashboard cleaned up"
+
+    # Summary
+    - name: Test Summary
+      debug:
+        msg:
+          - "================================================"
+          - "🎉 Dashboard Modify Test PASSED!"
+          - "================================================"
+          - "✅ Step 1: Retrieved '{{ dashboard_name }}' dashboard"
+          - "✅ Step 2: Modified first panel title"
+          - "✅ Step 3: Uploaded modified dashboard"
+          - "✅ Step 4: Verified modification in API"
+          - "✅ Step 5: Cleaned up test dashboard"
