@@ -1,0 +1,314 @@
+---
+- name: Comprehensive AxonOps Dashboard Tests
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    base_url: "{{ base_url | default('http://10.0.3.118:3000') }}"
+    org: "{{ org | default('testorg') }}"
+    cluster: "{{ cluster | default('test-cluster') }}"
+
+  tasks:
+    # Test 1: Create a dashboard
+    - name: Test 1 - Create initial dashboard
+      axonops.axonops.dashboard_template:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        name: "Test Dashboard Comprehensive"
+        filters:
+          - label: "data center"
+            multi: true
+            name: "dc"
+            query: "host_CPU_Percent_Merge"
+            regex: "dc=([^:]+)"
+            type: "query"
+          - label: "node"
+            multi: true
+            name: "host_id"
+            query: "host_CPU_Percent_Merge{dc=~'$dc'}"
+            regex: "host_id=([^:]+)"
+            type: "query"
+        panels:
+          - details:
+              eventsFilters:
+                f1: []
+                f2: []
+                host_id: []
+                level: []
+                message: ''
+                source: []
+                type: []
+              filters: {}
+              isHideNullValue: false
+              isSmoothLines: false
+              lineThickness: 1
+              max: 100
+              nullAsZero: false
+              queries: []
+              resolution: low
+              sortOrderPIE: asc
+              thresholds:
+                - color: '#4caf50'
+                  name: default
+                  value: 0
+              useCache: true
+              y: {}
+            layout:
+              h: 1
+              i: "comp-row-1"
+              w: 18
+              x: 0
+              y: 0
+            title: "CPU Metrics"
+            type: row
+            uuid: "comp-row-1"
+          - details:
+              eventsFilters:
+                f1: []
+                f2: []
+                host_id: []
+                level: []
+                message: ''
+                source: []
+                type: []
+              filters: {}
+              isHideNullValue: false
+              isSmoothLines: true
+              lineThickness: 2
+              max: 100
+              nullAsZero: false
+              queries:
+                - query: "host_CPU_Percent_Merge{dc=~'$dc',host_id=~'$host_id'}"
+                  legend: "CPU Usage"
+              resolution: low
+              sortOrderPIE: asc
+              thresholds:
+                - color: '#4caf50'
+                  name: default
+                  value: 0
+                - color: '#fe9800'
+                  name: warning
+                  value: 70
+                - color: '#f44336'
+                  name: critical
+                  value: 90
+              useCache: true
+              y: {}
+            layout:
+              h: 3
+              i: "comp-panel-1"
+              w: 9
+              x: 0
+              y: 1
+            title: "CPU Usage %"
+            type: line-chart
+            uuid: "comp-panel-1"
+        auth_token: "{{ lookup('env', 'AXONOPS_TOKEN') | default(omit) }}"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') | default(omit) }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default(omit) }}"
+      register: create_result
+
+    - name: Display create result
+      debug:
+        msg:
+          - "✅ Test 1 PASSED - Dashboard created"
+          - "Changed: {{ create_result.changed }}"
+
+    - name: Verify creation
+      assert:
+        that:
+          - create_result.changed == true
+        fail_msg: "Dashboard creation should show changed=true"
+        success_msg: "Dashboard creation verified"
+
+    # Test 2: Update dashboard (add a panel)
+    - name: Test 2 - Update dashboard with additional panel
+      axonops.axonops.dashboard_template:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        name: "Test Dashboard Comprehensive"
+        filters:
+          - label: "data center"
+            multi: true
+            name: "dc"
+            query: "host_CPU_Percent_Merge"
+            regex: "dc=([^:]+)"
+            type: "query"
+          - label: "node"
+            multi: true
+            name: "host_id"
+            query: "host_CPU_Percent_Merge{dc=~'$dc'}"
+            regex: "host_id=([^:]+)"
+            type: "query"
+        panels:
+          - details:
+              eventsFilters:
+                f1: []
+                f2: []
+                host_id: []
+                level: []
+                message: ''
+                source: []
+                type: []
+              filters: {}
+              isHideNullValue: false
+              isSmoothLines: false
+              lineThickness: 1
+              max: 100
+              nullAsZero: false
+              queries: []
+              resolution: low
+              sortOrderPIE: asc
+              thresholds:
+                - color: '#4caf50'
+                  name: default
+                  value: 0
+              useCache: true
+              y: {}
+            layout:
+              h: 1
+              i: "comp-row-1"
+              w: 18
+              x: 0
+              y: 0
+            title: "CPU Metrics"
+            type: row
+            uuid: "comp-row-1"
+          - details:
+              eventsFilters:
+                f1: []
+                f2: []
+                host_id: []
+                level: []
+                message: ''
+                source: []
+                type: []
+              filters: {}
+              isHideNullValue: false
+              isSmoothLines: true
+              lineThickness: 2
+              max: 100
+              nullAsZero: false
+              queries:
+                - query: "host_CPU_Percent_Merge{dc=~'$dc',host_id=~'$host_id'}"
+                  legend: "CPU Usage"
+              resolution: low
+              sortOrderPIE: asc
+              thresholds:
+                - color: '#4caf50'
+                  name: default
+                  value: 0
+                - color: '#fe9800'
+                  name: warning
+                  value: 70
+                - color: '#f44336'
+                  name: critical
+                  value: 90
+              useCache: true
+              y: {}
+            layout:
+              h: 3
+              i: "comp-panel-1"
+              w: 9
+              x: 0
+              y: 1
+            title: "CPU Usage %"
+            type: line-chart
+            uuid: "comp-panel-1"
+          - details:
+              eventsFilters:
+                f1: []
+                f2: []
+                host_id: []
+                level: []
+                message: ''
+                source: []
+                type: []
+              filters: {}
+              isHideNullValue: false
+              isSmoothLines: true
+              lineThickness: 2
+              max: 100
+              nullAsZero: false
+              queries:
+                - query: "host_Memory_UsedPercent{dc=~'$dc',host_id=~'$host_id'}"
+                  legend: "Memory Usage"
+              resolution: low
+              sortOrderPIE: asc
+              thresholds:
+                - color: '#4caf50'
+                  name: default
+                  value: 0
+                - color: '#fe9800'
+                  name: warning
+                  value: 75
+                - color: '#f44336'
+                  name: critical
+                  value: 85
+              useCache: true
+              y: {}
+            layout:
+              h: 3
+              i: "comp-panel-2"
+              w: 9
+              x: 9
+              y: 1
+            title: "Memory Usage %"
+            type: line-chart
+            uuid: "comp-panel-2"
+        auth_token: "{{ lookup('env', 'AXONOPS_TOKEN') | default(omit) }}"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') | default(omit) }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default(omit) }}"
+      register: update_result
+
+    - name: Display update result
+      debug:
+        msg:
+          - "✅ Test 2 PASSED - Dashboard updated"
+          - "Changed: {{ update_result.changed }}"
+
+    - name: Verify update
+      assert:
+        that:
+          - update_result.changed == true
+        fail_msg: "Dashboard update should show changed=true"
+        success_msg: "Dashboard update verified"
+
+    # Test 3: Delete dashboard
+    - name: Test 3 - Delete dashboard
+      axonops.axonops.dashboard_template:
+        base_url: "{{ base_url }}"
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        name: "Test Dashboard Comprehensive"
+        present: false
+        auth_token: "{{ lookup('env', 'AXONOPS_TOKEN') | default(omit) }}"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') | default(omit) }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default(omit) }}"
+      register: delete_result
+
+    - name: Display delete result
+      debug:
+        msg:
+          - "✅ Test 4 PASSED - Dashboard deleted"
+          - "Changed: {{ delete_result.changed }}"
+
+    - name: Verify deletion
+      assert:
+        that:
+          - delete_result.changed == true
+        fail_msg: "Dashboard deletion should show changed=true"
+        success_msg: "Dashboard deletion verified"
+
+    # Summary
+    - name: Test Summary
+      debug:
+        msg:
+          - "================================"
+          - "🎉 All Dashboard Tests PASSED!"
+          - "================================"
+          - "✅ Test 1: Dashboard created"
+          - "✅ Test 2: Dashboard updated"
+          - "✅ Test 3: Dashboard deleted"

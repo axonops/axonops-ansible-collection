@@ -122,12 +122,15 @@ def run_module():
         old_data = {
             'present': True,
             'name': old_template_found['name'],
-            'filters': old_template_found['filters'],
-            'panels': old_template_found['panels'],
+            'filters': old_template_found.get('filters'),
+            'panels': old_template_found.get('panels'),
         }
     else:
         old_data = {
             'present': False,
+            'name': None,
+            'filters': None,
+            'panels': None,
         }
 
     new_data = {
