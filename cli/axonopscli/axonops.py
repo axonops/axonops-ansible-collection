@@ -31,8 +31,7 @@ class AxonOps:
         if not base_url:
             self.base_url = f'https://dash.axonops.cloud/{org_name}'
         else:
-            # If base_url is defined then its most likely a standalone axonserver instance which doesn't need /{org_name}
-            # for axonsaas dev environment can still set the org_name in the base_url env var
+            # If base_url is defined,then its most likely a standalone axon-server instance which doesn't need /{org_name}
             self.base_url = f'{base_url.rstrip("/")}'
 
         # if you have username and password, it will be used as login
