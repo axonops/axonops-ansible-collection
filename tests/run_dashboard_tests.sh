@@ -144,6 +144,11 @@ if [ $? -ne 0 ]; then ((failed_tests++)); fi
 run_test "test_dashboard_modify.yml" "Dashboard Modify Test"
 if [ $? -ne 0 ]; then ((failed_tests++)); fi
 
+# Dashboard cluster migration test (export from cluster 1, import to cluster 2)
+# Skipping by default as it requires two clusters - uncomment to test
+# run_test "test_dashboard_cluster_migration.yml" "Dashboard Cluster Migration Test"
+# if [ $? -ne 0 ]; then ((failed_tests++)); fi
+
 # Summary
 echo "Test Summary"
 echo "============"

@@ -1,0 +1,172 @@
+---
+- name: Test Dashboard Migration Between Clusters
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    base_url_source: "{{ base_url_source | default('http://localhost:3000') }}"
+    base_url_destination: "{{ base_url_destination | default('http://localhost:3000') }}"
+    org_source: "{{ org_source | default('testorg') }}"
+    org_destination: "{{ org_destination | default('testorg') }}"
+    cluster_source: "{{ cluster_source | default('cluster-1') }}"
+    cluster_destination: "{{ cluster_destination | default('cluster-2') }}"
+    delete_dest_dashboards: "{{ delete_destination_dashboards | default(true) }}"
+
+  tasks:
+    # Step 1: Fetch all dashboards from source cluster
+    - name: Fetch all dashboards from source cluster
+      uri:
+        url: "{{ base_url_source }}/api/v1/dashboardtemplate/{{ org_source }}/cassandra/{{ cluster_source }}?dashver=2.0"
+        method: GET
+        headers: "{{ {'Authorization': 'Bearer ' + lookup('env', 'AXONOPS_TOKEN')} if lookup('env', 'AXONOPS_TOKEN') else {} }}"
+        user: "{{ lookup('env', 'AXONOPS_USERNAME') if not lookup('env', 'AXONOPS_TOKEN') else omit }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') if not lookup('env', 'AXONOPS_TOKEN') else omit }}"
+        force_basic_auth: "{{ true if not lookup('env', 'AXONOPS_TOKEN') else false }}"
+        return_content: true
+        status_code: 200
+      register: source_response
+
+    - name: Extract source dashboards
+      set_fact:
+        source_dashboards: "{{ source_response.json.dashboards | default([]) }}"
+
+    - name: Verify source dashboards exist
+      assert:
+        that:
+          - source_dashboards | length > 0
+        fail_msg: "No dashboards found in source cluster '{{ cluster_source }}'"
+        success_msg: "✅ Step 1 PASSED - Found {{ source_dashboards | length }} dashboard(s) in source cluster"
+
+    - name: Display source dashboards info
+      debug:
+        msg:
+          - "Source URL: {{ base_url_source }}"
+          - "Source org: {{ org_source }}"
+          - "Source cluster: {{ cluster_source }}"
+          - "Number of dashboards to migrate: {{ source_dashboards | length }}"
+          - "Dashboard names: {{ source_dashboards | map(attribute='name') | list }}"
+
+    # Step 2: Optionally delete all dashboards from destination cluster
+    - name: Fetch all dashboards from destination cluster
+      uri:
+        url: "{{ base_url_destination }}/api/v1/dashboardtemplate/{{ org_destination }}/cassandra/{{ cluster_destination }}?dashver=2.0"
+        method: GET
+        headers: "{{ {'Authorization': 'Bearer ' + lookup('env', 'AXONOPS_TOKEN')} if lookup('env', 'AXONOPS_TOKEN') else {} }}"
+        user: "{{ lookup('env', 'AXONOPS_USERNAME') if not lookup('env', 'AXONOPS_TOKEN') else omit }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') if not lookup('env', 'AXONOPS_TOKEN') else omit }}"
+        force_basic_auth: "{{ true if not lookup('env', 'AXONOPS_TOKEN') else false }}"
+        return_content: true
+        status_code: 200
+      register: dest_response
+      when: delete_dest_dashboards
+
+    - name: Extract destination dashboards
+      set_fact:
+        destination_dashboards: "{{ dest_response.json.dashboards | default([]) }}"
+      when: delete_dest_dashboards
+
+    - name: Display destination dashboards before deletion
+      debug:
+        msg:
+          - "Destination URL: {{ base_url_destination }}"
+          - "Destination org: {{ org_destination }}"
+          - "Destination cluster: {{ cluster_destination }}"
+          - "Number of existing dashboards: {{ destination_dashboards | length }}"
+          - "Dashboard names: {{ destination_dashboards | map(attribute='name') | list }}"
+      when: delete_dest_dashboards and destination_dashboards | length > 0
+
+    - name: Delete all dashboards from destination cluster
+      axonops.axonops.dashboard_template:
+        base_url: "{{ base_url_destination }}"
+        org: "{{ org_destination }}"
+        cluster: "{{ cluster_destination }}"
+        name: "{{ item.name }}"
+        present: false
+        filters: []
+        panels: []
+        auth_token: "{{ lookup('env', 'AXONOPS_TOKEN') | default(omit) }}"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') | default(omit) }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default(omit) }}"
+      loop: "{{ destination_dashboards }}"
+      when: delete_dest_dashboards and destination_dashboards | length > 0
+      register: delete_results
+
+    - name: Verify deletion completed
+      debug:
+        msg: "✅ Step 2 PASSED - Deleted {{ destination_dashboards | length }} dashboard(s) from destination cluster"
+      when: delete_dest_dashboards and destination_dashboards | length > 0
+
+    - name: Skip deletion message
+      debug:
+        msg: "⏭️  Step 2 SKIPPED - delete_destination_dashboards is false or no dashboards to delete"
+      when: not delete_dest_dashboards or (destination_dashboards | default([]) | length == 0)
+
+    # Step 3: Import all dashboards to destination cluster
+    - name: Import dashboards to destination cluster
+      axonops.axonops.dashboard_template:
+        base_url: "{{ base_url_destination }}"
+        org: "{{ org_destination }}"
+        cluster: "{{ cluster_destination }}"
+        name: "{{ item.name }}"
+        filters: "{{ item.filters | default([]) }}"
+        panels: "{{ item.panels | default([]) }}"
+        auth_token: "{{ lookup('env', 'AXONOPS_TOKEN') | default(omit) }}"
+        username: "{{ lookup('env', 'AXONOPS_USERNAME') | default(omit) }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default(omit) }}"
+      loop: "{{ source_dashboards }}"
+      register: import_results
+
+    - name: Verify import completed
+      assert:
+        that:
+          - import_results.results | length == source_dashboards | length
+          - import_results.results | selectattr('changed', 'equalto', true) | list | length == source_dashboards | length
+        fail_msg: "Not all dashboards were successfully imported"
+        success_msg: "✅ Step 3 PASSED - Imported {{ source_dashboards | length }} dashboard(s) to destination cluster"
+
+    # Step 4: Verify all dashboards exist in destination cluster
+    - name: Verify all dashboards in destination cluster
+      uri:
+        url: "{{ base_url_destination }}/api/v1/dashboardtemplate/{{ org_destination }}/cassandra/{{ cluster_destination }}?dashver=2.0"
+        method: GET
+        headers: "{{ {'Authorization': 'Bearer ' + lookup('env', 'AXONOPS_TOKEN')} if lookup('env', 'AXONOPS_TOKEN') else {} }}"
+        user: "{{ lookup('env', 'AXONOPS_USERNAME') if not lookup('env', 'AXONOPS_TOKEN') else omit }}"
+        password: "{{ lookup('env', 'AXONOPS_PASSWORD') if not lookup('env', 'AXONOPS_TOKEN') else omit }}"
+        force_basic_auth: "{{ true if not lookup('env', 'AXONOPS_TOKEN') else false }}"
+        return_content: true
+        status_code: 200
+      register: verify_response
+
+    - name: Extract verified dashboards
+      set_fact:
+        verified_dashboards: "{{ verify_response.json.dashboards | default([]) }}"
+
+    - name: Verify all source dashboards are in destination
+      assert:
+        that:
+          - verified_dashboards | length >= source_dashboards | length
+          - item.name in (verified_dashboards | map(attribute='name') | list)
+        fail_msg: "Dashboard '{{ item.name }}' not found in destination cluster"
+      loop: "{{ source_dashboards }}"
+
+    - name: Display verification result
+      debug:
+        msg: "✅ Step 4 PASSED - All {{ source_dashboards | length }} dashboard(s) verified in destination cluster"
+
+    # Summary
+    - name: Test Summary
+      debug:
+        msg:
+          - "================================================"
+          - "🎉 Dashboard Migration Test PASSED!"
+          - "================================================"
+          - "Source: {{ base_url_source }} | {{ org_source }}/{{ cluster_source }}"
+          - "Destination: {{ base_url_destination }} | {{ org_destination }}/{{ cluster_destination }}"
+          - ""
+          - "✅ Step 1: Retrieved {{ source_dashboards | length }} dashboard(s) from source"
+          - "{{ '✅ Step 2: Deleted ' + (destination_dashboards | default([]) | length | string) + ' dashboard(s) from destination' if delete_dest_dashboards and (destination_dashboards | default([]) | length > 0) else '⏭️  Step 2: Skipped deletion' }}"
+          - "✅ Step 3: Imported {{ source_dashboards | length }} dashboard(s) to destination"
+          - "✅ Step 4: Verified all dashboards in destination"
+          - ""
+          - "Migrated dashboards:"
+          - "{{ source_dashboards | map(attribute='name') | list }}"
