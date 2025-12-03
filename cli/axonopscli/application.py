@@ -90,10 +90,6 @@ class Application:
             "scheduledrepair",
             help="Manage the Scheduled Repair in AxonOps")
         scheduledrepair_parser.set_defaults(func=self.run_scheduled_repair)
-        # # {"keyspace":"","tables":[],"blacklistedTables":[],"nodes":[],"segmentsPerNode":2,"segmented":false,
-        # # "incremental":false,"jobThreads":1,"schedule":false,"scheduleExpr":"0 * * 1 *","primaryRange":false,
-        # # "parallelism":"Parallel","optimiseStreams":false,"specificDataCenters":[],"tag":"","paxos":"Default",
-        # # "skipPaxos":false,"paxosOnly":false}
 
         scheduledrepair_parser.add_argument('--keyspace', type=str, required=False,
                                             help='Keyspace to repair. If empty, all keyspaces are repaired')
