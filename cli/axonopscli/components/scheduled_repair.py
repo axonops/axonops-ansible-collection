@@ -1,8 +1,3 @@
-# {"keyspace":"","tables":[],"blacklistedTables":[],"nodes":[],"segmentsPerNode":2,"segmented":false,
-# "incremental":false,"jobThreads":1,"schedule":false,"scheduleExpr":"0 * * 1 *","primaryRange":false,
-# "parallelism":"Parallel","optimiseStreams":false,"specificDataCenters":[],"tag":"","paxos":"Default",
-# "skipPaxos":false,"paxosOnly":false}
-
 class ScheduledRepair:
     """ Class to manage the Scheduled Repair in AxonOps """
     schedule_repair_add_url = "/api/v1/addrepair"
@@ -18,23 +13,22 @@ class ScheduledRepair:
         if self.args.v:
             print("Setting scheduled repair options")
 
-
         self.repair_data = {
             "keyspace": self.args.keyspace or "",
             "tables": self.args.tables.split(",") if self.args.tables else [],
             "blacklistedTables": self.args.excludedtables.split(",") if self.args.excludedtables else [],
             "nodes": self.args.nodes.split(",") if self.args.nodes else [],
-            "segmentsPerNode": self.args.segmentspernode or 2,
+            "segmentsPerNode": self.args.segmentspernode or 1,
             "segmented": self.args.segmented or False,
             "incremental": self.args.incremental or False,
-            "jobThreads": 1,
+            "jobThreads": self.args.jobthreads or 1,
             "schedule": True,
             "scheduleExpr": "0 * * 1 *",  # Default to run monthly at midnight
-            "primaryRange": False,
-            "parallelism": "Parallel",
-            "optimiseStreams": False,
-            "specificDataCenters": [],
-            "tag": "",
+            "primaryRange": self.args.partitionerrange or False,
+            "parallelism": self.args.parallelism or "Parallel",
+            "optimiseStreams": self.args.optimisestreams or False,
+            "specificDataCenters": self.args.datacenters.split(",") if self.args.datacenters else [],
+            "tag": self.args.tags or "",
             "paxos": "Default",
             "skipPaxos": False,
             "paxosOnly": False

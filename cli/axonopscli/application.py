@@ -6,6 +6,7 @@ from typing import Sequence
 from .axonops import AxonOps
 from .components.repair import AdaptiveRepair
 from .components.scheduled_repair import ScheduledRepair
+from .utils import remove_not_alphanumeric
 
 
 class Application:
@@ -50,9 +51,8 @@ class Application:
 
         commands_subparser = parser.add_subparsers(help="commands")
 
-
         adaptive_repair_parser = commands_subparser.add_parser(
-            "repair",aliases=['adaptiverepair'],
+            "repair", aliases=['adaptiverepair'],
             help="Manage the Adaptive Repair in AxonOps")
         adaptive_repair_parser.set_defaults(func=self.run_adaptive_repair)
 
@@ -103,7 +103,7 @@ class Application:
                                             help='Comma-separated list of tables to exclude from repair')
         scheduledrepair_parser.add_argument('--nodes', type=str, required=False,
                                             help='Comma-separated list of nodes to repair')
-        scheduledrepair_parser.add_argument('--segmentspernode', type=int, required=False, default=2,
+        scheduledrepair_parser.add_argument('--segmentspernode', type=int, required=False,
                                             help='Number of segments per node')
         scheduledrepair_parser.add_argument('--segmented', action='store_true',
                                             help='Enable segmented repair')
@@ -113,13 +113,17 @@ class Application:
                                             help='Number of job threads')
         scheduledrepair_parser.add_argument('--scheduleexpr', type=str, required=False,
                                             help='Cron expression for scheduling the repair')
-        scheduledrepair_parser.add_argument('--primaryrange', action='store_true',
-                                            help='Enable primary range repair')
-        scheduledrepair_parser.add_argument('--parallelism', type=str, required=False,
+        scheduledrepair_parser.add_argument('--partitionerrange', action='store_true',
+                                            help='Enable partitioner range repair')
+        scheduledrepair_parser.add_argument('--parallelism', type=self._normalize_parallelism, required=False,
                                             default="Parallel",
                                             help='Parallelism type: Sequential, Parallel, DC-Aware')
         scheduledrepair_parser.add_argument('--optimisestreams', action='store_true',
                                             help='Enable stream optimization (only for Cassandra 4.1 and above)')
+        scheduledrepair_parser.add_argument('--datacenters', type=str, required=False,
+                                            help='Comma-separated list of datacenters to repair, if not specified all datacenters are included')
+        scheduledrepair_parser.add_argument('--tags', type=str, required=False,
+                                            help='Tag for the repair job')
 
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
@@ -138,13 +142,13 @@ class Application:
         else:
             parser.print_help()
 
-    # def _normalize_parallelism(value: str) -> str:
-    #     """ Normalize and validate parallelism input """
-    #     choices = ["Sequential", "Parallel", "DC-Aware"]
-    #     for c in choices:
-    #         if value.lower() == c.lower():
-    #             return c
-    #     raise argparse.ArgumentTypeError(f"Invalid parallelism: {value}. Choose one of: {', '.join(choices)}")
+    def _normalize_parallelism(self, value: str) -> str:
+        """ Normalize and validate parallelism input """
+        choices = ["Sequential", "Parallel", "DC-Aware"]
+        for c in choices:
+            if remove_not_alphanumeric(value.lower()) == remove_not_alphanumeric(c.lower()):
+                return c
+        raise argparse.ArgumentTypeError(f"Invalid parallelism: {value}. Choose one of: {', '.join(choices)}")
 
     def run_mandatory_args_check(self, args: argparse.Namespace):
         """ Check if mandatory variable are present """
@@ -198,4 +202,3 @@ class Application:
         scheduled_repair.set_options()
 
         scheduled_repair.set_repair()
-
