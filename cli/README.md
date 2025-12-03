@@ -23,7 +23,20 @@ All commands accept those attributes
 * `--password` Password used for AxonOps Self-Hosted when authentication is enabled.
 * `--url` Specify the AxonOps URL if not using the AxonOps Cloud environment.
 
-### `repair` Subcommand
+### Connections
+The CLI uses the same connection methods as the Ansible module. Please refer to the connection section of the main project for more information.
+
+The following examples are for the organisation `test` and the cluster `thingscluster` on AxonOps Cloud.
+For self-hosted authentication, refer to the authentication section of the main project.
+
+Authenticate to the cluster: 
+```shell
+export AXONOPS_ORG='test'
+export AXONOPS_CLUSTER="thingscluster"
+export AXONOPS_TOKEN='aaaaabbbbccccddddeeee'
+```
+
+### `adaptiverepair` Subcommand
 
 Manages **Adaptive Repair** in AxonOps.
 
@@ -40,16 +53,6 @@ Manages **Adaptive Repair** in AxonOps.
 * `--tableparallelism` Concurrent Repair Processes.
 
 #### Examples: 
-
-The following Activating Adaptive Repair examples are for the organisation `test` and the cluster `thingscluster` on AxonOps Cloud.
-For self-hosted authentication, refer to the authentication section of the main project.
-
-Authenticate to the cluster: 
-```shell
-export AXONOPS_ORG='test'
-export AXONOPS_CLUSTER="thingscluster"
-export AXONOPS_TOKEN='aaaaabbbbccccddddeeee'
-```
 
 Print the list of options for the repair command:
 ```shell
@@ -81,14 +84,53 @@ $ pipenv run python axonops.py repair --enable --segmenttargetsizemb 250
 ```
 Exclude specific tables from repair (comma separated list of `keyspace.table`):
 ```shell
-pipenv run python axonops.py repair --enable --excludedtables system_auth.roles,system_auth.role_permissions
+$ pipenv run python axonops.py repair --enable --excludedtables system_auth.roles,system_auth.role_permissions
 ```
 Set the Maximum Segments Per Table to 131,072:
 ```shell
-pipenv run python axonops.py repair --enable --maxsegmentspertable 131072
+$ pipenv run python axonops.py repair --enable --maxsegmentspertable 131072
 ```
 
 Set the timeout per Segment to 3 hours:
 ```shell
 pipenv run python axonops.py repair --enable --segmenttimeout 3h
+```
+
+### `scheduledrepair` Subcommand
+
+Manages **Scheduled Repair** in AxonOps.
+
+#### Options:
+
+* `--keyspace` Keyspace to repair. If not set, all keyspaces will be repaired.
+* `--tables` Comma-separated list of tables to repair within the specified keyspace. If not set, all tables in the keyspace will be repaired.
+* `--excludedtables` Excluded Tables. This parameter accepts a comma-separated list in the format `keyspace.table1,keyspace.table2`.
+* `--scheduleexpr` Cron Expression for Scheduled Repair. If not set, Scheduled Repair will run immediately.
+
+#### Examples: 
+
+Print the list of options for the scheduled repair command:
+```shell
+$ pipenv run python axonops.py scheduledrepair -h
+```
+Run a scheduled repair immediately:
+```shell
+$ pipenv run python axonops.py scheduledrepair
+```
+Run a scheduled repair with a cron expression (this example runs the repair every Sunday at midnight):
+```shell
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0'
+```
+Run a scheduled repair for a specific keyspace with a cron expression (this example runs the repair for the `axonopslove` keyspace every Sunday at midnight):
+```shell
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --keyspace axonopslove
+```
+Run a scheduled repair for specific tables in a keyspace with a cron expression (this example runs the repair for the `steps5` and `steps60` tables in the `axonopslove` keyspace every Sunday at midnight):
+```shell
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --keyspace axonopslove --tables steps5,steps60
+```
+Run a scheduled repair for a specific keyspace excluding certain tables with a cron expression (this example runs the repair for the `axonopslove` keyspace every Sunday at midnight, excluding the `bad1` and `bad6` tables):
+```shell
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --keyspace axonopslove --excludedtables axonopslove.bad1,axonopslove.bad6
+
 ```

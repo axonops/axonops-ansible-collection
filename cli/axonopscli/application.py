@@ -5,6 +5,7 @@ from typing import Sequence
 
 from .axonops import AxonOps
 from .components.repair import AdaptiveRepair
+from .components.scheduled_repair import ScheduledRepair
 
 
 class Application:
@@ -49,8 +50,9 @@ class Application:
 
         commands_subparser = parser.add_subparsers(help="commands")
 
+
         adaptive_repair_parser = commands_subparser.add_parser(
-            "repair",
+            "repair",aliases=['adaptiverepair'],
             help="Manage the Adaptive Repair in AxonOps")
         adaptive_repair_parser.set_defaults(func=self.run_adaptive_repair)
 
@@ -84,7 +86,50 @@ class Application:
         adaptive_repair_parser.add_argument('--segmenttimeout', type=str, required=False,
                                             help='Segment Timeout. Integer number followed by one of "s, m, h, d, w, M, y"')
 
+        scheduledrepair_parser = commands_subparser.add_parser(
+            "scheduledrepair",
+            help="Manage the Scheduled Repair in AxonOps")
+        scheduledrepair_parser.set_defaults(func=self.run_scheduled_repair)
+        # # {"keyspace":"","tables":[],"blacklistedTables":[],"nodes":[],"segmentsPerNode":2,"segmented":false,
+        # # "incremental":false,"jobThreads":1,"schedule":false,"scheduleExpr":"0 * * 1 *","primaryRange":false,
+        # # "parallelism":"Parallel","optimiseStreams":false,"specificDataCenters":[],"tag":"","paxos":"Default",
+        # # "skipPaxos":false,"paxosOnly":false}
+
+        scheduledrepair_parser.add_argument('--keyspace', type=str, required=False,
+                                            help='Keyspace to repair. If empty, all keyspaces are repaired')
+        scheduledrepair_parser.add_argument('--tables', type=str, required=False,
+                                            help='Comma-separated list of tables to repair in the selected keyspace. If empty, all tables are repaired')
+        scheduledrepair_parser.add_argument('--excludedtables', type=str, required=False,
+                                            help='Comma-separated list of tables to exclude from repair')
+        scheduledrepair_parser.add_argument('--nodes', type=str, required=False,
+                                            help='Comma-separated list of nodes to repair')
+        scheduledrepair_parser.add_argument('--segmentspernode', type=int, required=False, default=2,
+                                            help='Number of segments per node')
+        scheduledrepair_parser.add_argument('--segmented', action='store_true',
+                                            help='Enable segmented repair')
+        scheduledrepair_parser.add_argument('--incremental', action='store_true',
+                                            help='Enable incremental repair')
+        scheduledrepair_parser.add_argument('--jobthreads', type=int, required=False, default=1,
+                                            help='Number of job threads')
+        scheduledrepair_parser.add_argument('--scheduleexpr', type=str, required=False,
+                                            help='Cron expression for scheduling the repair')
+        scheduledrepair_parser.add_argument('--primaryrange', action='store_true',
+                                            help='Enable primary range repair')
+        scheduledrepair_parser.add_argument('--parallelism', type=str, required=False,
+                                            default="Parallel",
+                                            help='Parallelism type: Sequential, Parallel, DC-Aware')
+        scheduledrepair_parser.add_argument('--optimisestreams', action='store_true',
+                                            help='Enable stream optimization (only for Cassandra 4.1 and above)')
+
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
+
+        # ensure --tables is only used together with --keyspace
+        if getattr(parsed_result, "tables", None) and not getattr(parsed_result, "keyspace", None):
+            parser.error("--tables requires --keyspace")
+
+        # ensure --excludedtables is only used together with --keyspace
+        if getattr(parsed_result, "excludedtables", None) and not getattr(parsed_result, "keyspace", None):
+            parser.error("--excludedtables requires --keyspace")
 
         # if func() is not present it means that no command was inserted
         if hasattr(parsed_result, 'func'):
@@ -92,6 +137,14 @@ class Application:
             parsed_result.func(parsed_result)
         else:
             parser.print_help()
+
+    # def _normalize_parallelism(value: str) -> str:
+    #     """ Normalize and validate parallelism input """
+    #     choices = ["Sequential", "Parallel", "DC-Aware"]
+    #     for c in choices:
+    #         if value.lower() == c.lower():
+    #             return c
+    #     raise argparse.ArgumentTypeError(f"Invalid parallelism: {value}. Choose one of: {', '.join(choices)}")
 
     def run_mandatory_args_check(self, args: argparse.Namespace):
         """ Check if mandatory variable are present """
@@ -131,3 +184,18 @@ class Application:
         adaptive_repair.set_options()
 
         adaptive_repair.set_repair()
+
+    def run_scheduled_repair(self, args: argparse.Namespace):
+        """ Run the scheduled repair """
+        if args.v:
+            print(f"Running scheduled repairs on {args.org}")
+            print(args)
+
+        axonops = self.get_axonops(args)
+
+        scheduled_repair = ScheduledRepair(axonops, args)
+
+        scheduled_repair.set_options()
+
+        scheduled_repair.set_repair()
+
