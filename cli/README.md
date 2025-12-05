@@ -145,6 +145,8 @@ Manages **Scheduled Repair** in AxonOps.
 * `--datacenters` Comma-separated list of datacenters to include in the repair. If not set, all datacenters will be
   included.
 * `--tags` Tags to associate with the scheduled repair job.
+* `--paxosonly` Run paxos repair only. Default is false.
+* `--skippaxos` Skip paxos repair. Default is false.
 
 #### Examples:
 
@@ -246,5 +248,17 @@ $ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --data
 Run a scheduled repair with tags with a cron expression:
 
 ```shell
-$ pipenv run python axonops.py -v scheduledrepair --scheduleexpr '0 0 * * 0' --tags 'Weekly repair'
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --tags 'Weekly repair'
+```
+
+Run a scheduled paxos-only repair with a cron expression:
+
+```shell
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --skippaxos
+```
+
+Run a scheduled repair skipping paxos repair with a cron expression:
+
+```shell
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --paxosonly
 ```

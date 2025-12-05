@@ -121,6 +121,12 @@ class Application:
         scheduledrepair_parser.add_argument('--tags', type=str, required=False,
                                             help='Tag for the repair job')
 
+        paxos_group = scheduledrepair_parser.add_mutually_exclusive_group()
+        paxos_group.add_argument('--paxosonly', action='store_true', default=False,
+                                            help='Run only Paxos repairs')
+        paxos_group.add_argument('--skippaxos', action='store_true', default=False,
+                                            help='Skip Paxos repairs')
+
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
         # ensure --tables is only used together with --keyspace
@@ -130,6 +136,8 @@ class Application:
         # ensure --excludedtables is only used together with --keyspace
         if getattr(parsed_result, "excludedtables", None) and not getattr(parsed_result, "keyspace", None):
             parser.error("--excludedtables requires --keyspace")
+
+
 
         # if func() is not present it means that no command was inserted
         if hasattr(parsed_result, 'func'):

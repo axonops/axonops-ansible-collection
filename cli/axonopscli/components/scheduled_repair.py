@@ -46,6 +46,18 @@ class ScheduledRepair:
                 print("Setting Schedule to False")
             self.repair_data['schedule'] = False
 
+        if self.args.skippaxos:
+            if self.args.v:
+                print("Setting SkipPaxos to True")
+            self.repair_data['skipPaxos'] = True
+            self.repair_data['paxos'] = "Skip Paxos"
+
+        if self.args.paxosonly:
+            if self.args.v:
+                print("Setting PaxosOnly to True")
+            self.repair_data['paxosOnly'] = True
+            self.repair_data['paxos'] = "Paxos Only"
+
     def set_repair(self):
         full_url = f"{self.axonops.dash_url()}{self.schedule_repair_add_url}"
         print("Setting the scheduled repair")
