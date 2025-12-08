@@ -144,9 +144,12 @@ Manages **Scheduled Repair** in AxonOps.
 * `--optimisestreams` Optimize Streams during repair (require Cassandra 4.1+).
 * `--datacenters` Comma-separated list of datacenters to include in the repair. If not set, all datacenters will be
   included.
-* `--tags` Tags to associate with the scheduled repair job.
+* `--tags` Tags to associate with the scheduled repair job. Tags are used to identify repair jobs in AxonOps.
+  This parameter accepts a string value.
 * `--paxosonly` Run paxos repair only. Default is false.
 * `--skippaxos` Skip paxos repair. Default is false.
+* `--delete` Delete Scheduled Repair. This option needs to be paired with a tags value to identify which scheduled
+  repair job to disable.
 
 #### Examples:
 
@@ -261,4 +264,10 @@ Run a scheduled repair skipping paxos repair with a cron expression:
 
 ```shell
 $ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --paxosonly
+```
+
+Delete a scheduled repair job with specific tags:
+
+```shell
+$ pipenv run python axonops.py scheduledrepair --delete --tags 'Weekly repair'
 ```

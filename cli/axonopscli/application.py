@@ -119,13 +119,15 @@ class Application:
         scheduledrepair_parser.add_argument('--datacenters', type=str, required=False,
                                             help='Comma-separated list of datacenters to repair, if not specified all datacenters are included')
         scheduledrepair_parser.add_argument('--tags', type=str, required=False,
-                                            help='Tag for the repair job')
+                                            help='Tag for the repair job', default="")
+        scheduledrepair_parser.add_argument('--delete', action='store_true',
+                                            help='Delete the scheduled repair instead of enabling it')
 
         paxos_group = scheduledrepair_parser.add_mutually_exclusive_group()
         paxos_group.add_argument('--paxosonly', action='store_true', default=False,
-                                            help='Run only Paxos repairs')
+                                 help='Run only Paxos repairs')
         paxos_group.add_argument('--skippaxos', action='store_true', default=False,
-                                            help='Skip Paxos repairs')
+                                 help='Skip Paxos repairs')
 
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
@@ -133,11 +135,13 @@ class Application:
         if getattr(parsed_result, "tables", None) and not getattr(parsed_result, "keyspace", None):
             parser.error("--tables requires --keyspace")
 
+        # ensure --disabled is only used together with tags
+        if getattr(parsed_result, "delete", None) and not getattr(parsed_result, "tags", None):
+            parser.error("--delete requires --tags")
+
         # ensure --excludedtables is only used together with --keyspace
         if getattr(parsed_result, "excludedtables", None) and not getattr(parsed_result, "keyspace", None):
             parser.error("--excludedtables requires --keyspace")
-
-
 
         # if func() is not present it means that no command was inserted
         if hasattr(parsed_result, 'func'):
@@ -202,6 +206,8 @@ class Application:
         axonops = self.get_axonops(args)
 
         scheduled_repair = ScheduledRepair(axonops, args)
+
+        scheduled_repair.remove_old_repairs_from_axonops()
 
         scheduled_repair.set_options()
 

@@ -1,12 +1,9 @@
 import json
 import urllib.parse
 from typing import List
-
 import requests
 
-
-class HTTPCodeError(Exception):
-    pass
+from .utils import HTTPCodeError
 
 
 class AxonOps:
