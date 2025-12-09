@@ -93,32 +93,36 @@ class ScheduledRepair:
         if self.args.v:
             print("POST", self.full_add_repair_url, self.repair_data)
 
-        if self.args.delete:
-            if self.args.tags != "":
-                response = self.axonops.do_request(
-                    url=self.full_repair_url,
-                    method='GET',
-                )
-                if not response:
-                    if self.args.v:
-                        print("No response received when checking for existing scheduled repair")
-                    return
-                elif 'ScheduledRepairs' in response and response['ScheduledRepairs']:
-                    for repair in response['ScheduledRepairs']:
-                        if self.args.tags != repair['Params'][0]['tag']:
-                            continue
-                        if self.args.v:
-                            print(f"Deleting scheduled repair: {repair['ID']}")
-                        self.remove_repair(repair['ID'])
-                        if 'Params' in repair:
-                            print(repair['Params'])
-                else:
-                    print("No scheduled repairs found")
-            else:
+        #if self.args.delete:
+        if self.args.tags != "":
+            response = self.axonops.do_request(
+                url=self.full_repair_url,
+                method='GET',
+            )
+            if not response:
                 if self.args.v:
-                    print("Tags are always required for deletions")
-                    raise
-            return
+                    print("No response received when checking for existing scheduled repair")
+                return
+            elif 'ScheduledRepairs' in response and response['ScheduledRepairs']:
+                for repair in response['ScheduledRepairs']:
+                    if 'tag' not in repair['Params'][0]:
+                        if self.args.v:
+                            print(f"Scheduled repair {repair['ID']} has no tag, skipping")
+                        continue
+                    if self.args.tags != repair['Params'][0]['tag']:
+                        if self.args.v:
+                            print(f"Scheduled repair {repair['ID']} tag does not match, skipping")
+                        continue
+                    if self.args.v:
+                        print(f"Deleting scheduled repair: {repair['ID']}")
+                    self.remove_repair(repair['ID'])
+                    if 'Params' in repair and self.args.v:
+                        print(repair['Params'])
+            else:
+                print("No scheduled repairs found")
+        else:
+            if self.args.v:
+                print("Tags are always required for deletions")
 
         self.axonops.do_request(
             url=self.full_add_repair_url,
