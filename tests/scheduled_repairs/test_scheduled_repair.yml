@@ -983,6 +983,85 @@
       ignore_errors: true
 
     # ===========================================================================
+    # Test 21: Delete scheduled repair
+    # ===========================================================================
+    - name: "Confirm Test 21: Delete scheduled repair"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 21 (Delete scheduled repair) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: "Test 21 - Step 1: Create a scheduled repair to delete"
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --tags 'Test 21'
+      register: delete_test_create_result
+      ignore_errors: true
+
+    - name: Display create result for delete test
+      ansible.builtin.debug:
+        var: delete_test_create_result
+
+    - name: "Test 21 - Step 2: Verify repair was created"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_21_before
+      when: delete_test_create_result.rc == 0
+
+    - name: "Test 21 - Step 2: Assert repair exists before deletion"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_21_before.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 21') | list | length) > 0
+        fail_msg: "Repair with tag 'Test 21' was not created"
+        success_msg: "Repair with tag 'Test 21' exists, proceeding with deletion"
+      register: verify_result_21_before
+      when: delete_test_create_result.rc == 0 and repairs_response_21_before.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    - name: "Test 21 - Step 3: Delete the scheduled repair"
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --delete \
+          --tags 'Test 21'
+      register: delete_repair_result
+      when: delete_test_create_result.rc == 0 and (verify_result_21_before is not defined or not verify_result_21_before.failed)
+      ignore_errors: true
+
+    - name: Display delete repair result
+      ansible.builtin.debug:
+        var: delete_repair_result
+
+    - name: "Test 21 - Step 4: Fetch scheduled repairs from API after deletion"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_21_after
+      when: delete_repair_result is defined and delete_repair_result.rc == 0
+
+    - name: "Verify Test 21: Check scheduled repair was deleted"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_21_after.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 21') | list | length) == 0
+        fail_msg: "Repair with tag 'Test 21' still exists after deletion"
+        success_msg: "Repair with tag 'Test 21' was successfully deleted"
+      register: verify_result_21
+      when: delete_repair_result is defined and delete_repair_result.rc == 0 and repairs_response_21_after.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
     # Summary and Final Assertion
     # ===========================================================================
     - name: Calculate test results
@@ -1009,7 +1088,8 @@
             ([] if tags_repair_result.rc == 0 and (verify_result_17 is not defined or not verify_result_17.failed) else ['Test 17 - Tags']) +
             ([] if paxos_only_result.rc == 0 and (verify_result_18 is not defined or not verify_result_18.failed) else ['Test 18 - Paxos only']) +
             ([] if skip_paxos_result.rc == 0 and (verify_result_19 is not defined or not verify_result_19.failed) else ['Test 19 - Skip paxos']) +
-            ([] if comprehensive_repair_result.rc == 0 and (verify_result_20 is not defined or not verify_result_20.failed) else ['Test 20 - Comprehensive'])
+            ([] if comprehensive_repair_result.rc == 0 and (verify_result_20 is not defined or not verify_result_20.failed) else ['Test 20 - Comprehensive']) +
+            ([] if (delete_test_create_result.rc == 0 and (delete_repair_result is defined and delete_repair_result.rc == 0) and (verify_result_21 is not defined or not verify_result_21.failed)) else ['Test 21 - Delete repair'])
           }}
 
     - name: Test summary
@@ -1039,6 +1119,7 @@
           Test 18 - Paxos only:                {{ 'PASS' if paxos_only_result.rc == 0 and (verify_result_18 is not defined or not verify_result_18.failed) else 'FAIL' }}
           Test 19 - Skip paxos:                {{ 'PASS' if skip_paxos_result.rc == 0 and (verify_result_19 is not defined or not verify_result_19.failed) else 'FAIL' }}
           Test 20 - Comprehensive:             {{ 'PASS' if comprehensive_repair_result.rc == 0 and (verify_result_20 is not defined or not verify_result_20.failed) else 'FAIL' }}
+          Test 21 - Delete repair:             {{ 'PASS' if (delete_test_create_result.rc == 0 and (delete_repair_result is defined and delete_repair_result.rc == 0) and (verify_result_21 is not defined or not verify_result_21.failed)) else 'FAIL' }}
           ============================================
           Total: {{ (22 if clean_mode else 21) - (failed_tests | length) }}/{{ 22 if clean_mode else 21 }} passed
           ============================================
