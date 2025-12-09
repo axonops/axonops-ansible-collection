@@ -64,11 +64,11 @@
     - name: "Verify Test 0: Check all scheduled repairs were deleted"
       ansible.builtin.assert:
         that:
-          - repairs_response_0.json.ScheduledRepairs | length == 0
-        fail_msg: "Not all scheduled repairs were deleted. {{ repairs_response_0.json.ScheduledRepairs | length }} remain."
+          - (repairs_response_0.json.ScheduledRepairs or []) | length == 0
+        fail_msg: "Not all scheduled repairs were deleted"
         success_msg: "All scheduled repairs were successfully deleted"
       register: verify_result_0
-      when: clean_mode | bool and deleteall_result.rc == 0 and repairs_response_0.json.ScheduledRepairs is defined
+      when: clean_mode | bool and deleteall_result.rc == 0
       ignore_errors: true
 
     # ===========================================================================
