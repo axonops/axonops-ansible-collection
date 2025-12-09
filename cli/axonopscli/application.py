@@ -122,6 +122,8 @@ class Application:
                                             help='Tag for the repair job', default="")
         scheduledrepair_parser.add_argument('--delete', action='store_true',
                                             help='Delete the scheduled repair instead of enabling it')
+        scheduledrepair_parser.add_argument('--deleteall', action='store_true',
+                                            help='Delete all scheduled repairs')
 
         paxos_group = scheduledrepair_parser.add_mutually_exclusive_group()
         paxos_group.add_argument('--paxosonly', action='store_true', default=False,
@@ -207,7 +209,9 @@ class Application:
 
         scheduled_repair = ScheduledRepair(axonops, args)
 
-        scheduled_repair.remove_old_repairs_from_axonops()
+        if args.deleteall:
+            scheduled_repair.remove_all_repairs_from_axonops()
+            return
 
         scheduled_repair.set_options()
 

@@ -15,35 +15,28 @@ class ScheduledRepair:
         self.full_repair_url = f"{self.repair_url}/{args.org}/cassandra/{args.cluster}"
         self.full_cassandrascheduledrepair_url = f"{self.cassandrascheduledrepair_url}/{args.org}/cassandra/{args.cluster}"
 
-    def remove_old_repairs_from_axonops(self):
-        """ Check if the scheduled repair already exists in AxonOps, if so, remove it. """
+    def remove_all_repairs_from_axonops(self):
+        """ Remove all scheduled repairs from AxonOps. """
         if self.args.v:
-            print("Checking if scheduled repair already exists")
+            print("Removing all scheduled repairs")
 
-        if self.args.tags != "":
+        response = self.axonops.do_request(
+            url=self.full_repair_url,
+            method='GET',
+        )
+        if not response:
             if self.args.v:
-                print("Getting scheduled repair with tag:", self.args.tags)
-            response = self.axonops.do_request(
-                url=self.full_repair_url,
-                method='GET',
-            )
-            if not response:
+                print("No response received when checking for existing scheduled repair")
+            return
+        elif 'ScheduledRepairs' in response and response['ScheduledRepairs']:
+            for repair in response['ScheduledRepairs']:
                 if self.args.v:
-                    print("No response received when checking for existing scheduled repair")
-                return
-            elif 'ScheduledRepairs' in response and response['ScheduledRepairs']:
-                for repair in response['ScheduledRepairs']:
-                    if self.args.v:
-                        print(f"Checking scheduled repair: {repair['ID']}")
-                    self.remove_repair(repair['ID'])
-                    if 'Params' in repair:
-                        print(repair['Params'])
-
-            else:
-                print("Repair tag not found, this will be threaded as a new scheduled repair")
+                    print(f"Deleting scheduled repair: {repair['ID']}")
+                self.remove_repair(repair['ID'])
+                if 'Params' in repair:
+                    print(repair['Params'])
         else:
-            if self.args.v:
-                print("No tag provided, this will be threaded as a new scheduled repair")
+            print("No scheduled repairs found")
 
     def set_options(self):
         """Apply optional CLI parameters into the payload before sending it."""
@@ -100,10 +93,35 @@ class ScheduledRepair:
         if self.args.v:
             print("POST", self.full_add_repair_url, self.repair_data)
 
-        if self.args.delete:
+        if self.args.tags != "":
+            response = self.axonops.do_request(
+                url=self.full_repair_url,
+                method='GET',
+            )
+            if not response:
+                if self.args.v:
+                    print("No response received when checking for existing scheduled repair")
+                return
+            elif 'ScheduledRepairs' in response and response['ScheduledRepairs']:
+                for repair in response['ScheduledRepairs']:
+                    if 'tag' not in repair['Params'][0]:
+                        if self.args.v:
+                            print(f"Scheduled repair {repair['ID']} has no tag, skipping")
+                        continue
+                    if self.args.tags != repair['Params'][0]['tag']:
+                        if self.args.v:
+                            print(f"Scheduled repair {repair['ID']} tag does not match, skipping")
+                        continue
+                    if self.args.v:
+                        print(f"Deleting scheduled repair: {repair['ID']}")
+                    self.remove_repair(repair['ID'])
+                    if 'Params' in repair and self.args.v:
+                        print(repair['Params'])
+            else:
+                print("No scheduled repairs found")
+        else:
             if self.args.v:
-                print("This scheduled repair is delete, not sending to AxonOps")
-            return
+                print("Tags are always required for deletions")
 
         self.axonops.do_request(
             url=self.full_add_repair_url,
