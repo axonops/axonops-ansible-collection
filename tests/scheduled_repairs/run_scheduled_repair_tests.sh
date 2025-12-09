@@ -11,6 +11,7 @@ DEFAULT_URL="http://localhost:3000"
 DEFAULT_ORG="testorg"
 DEFAULT_CLUSTER="testcluster"
 INTERACTIVE=false
+CLEAN=false
 
 # Use environment variables or defaults
 URL="${AXONOPS_URL:-$DEFAULT_URL}"
@@ -36,6 +37,10 @@ while [[ $# -gt 0 ]]; do
       INTERACTIVE=true
       shift
       ;;
+    --clean)
+      CLEAN=true
+      shift
+      ;;
     --help)
       echo "Usage: $0 [options]"
       echo "Options:"
@@ -43,6 +48,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --org ORG       Organization name (default: $DEFAULT_ORG)"
       echo "  --cluster NAME  Cluster name (default: $DEFAULT_CLUSTER)"
       echo "  --confirm, -i   Interactive mode - pause before each test for confirmation"
+      echo "  --clean         Run Test 0 to delete all scheduled repairs before running tests"
       echo ""
       echo "You can also set environment variables:"
       echo "  AXONOPS_URL, AXONOPS_ORG, AXONOPS_CLUSTER"
@@ -54,6 +60,7 @@ while [[ $# -gt 0 ]]; do
       echo "  $0 --url https://dash.axonops.cloud  # Use SaaS"
       echo "  $0 --org myorg --cluster mycluster   # Different org/cluster"
       echo "  $0 --confirm                         # Interactive mode"
+      echo "  $0 --clean                           # Clean all repairs before tests"
       exit 0
       ;;
     *)
@@ -84,6 +91,7 @@ run_test() {
         -e "org=$ORG" \
         -e "cluster=$CLUSTER" \
         -e "interactive=$INTERACTIVE" \
+        -e "clean=$CLEAN" \
         -v
     local exit_code=$?
     set +x

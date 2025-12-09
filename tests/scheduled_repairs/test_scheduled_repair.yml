@@ -12,6 +12,7 @@
     axonops_username: "{{ lookup('env', 'AXONOPS_USERNAME') | default('', true) }}"
     axonops_password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default('', true) }}"
     interactive_mode: "{{ interactive | default('false') | bool }}"
+    clean_mode: "{{ clean | default('false') | bool }}"
     repairs_api_url: "{{ axonops_url }}/api/v1/repair/{{ axonops_org }}/cassandra/{{ axonops_cluster }}"
     # Build the common auth/connection args (must come before subcommand)
     common_args: >-
@@ -26,6 +27,50 @@
     uri_headers: "{{ {'Authorization': 'Bearer ' + axonops_token} if axonops_token else {} }}"
 
   tasks:
+    # ===========================================================================
+    # Test 0: Clean all scheduled repairs (only when --clean is used)
+    # ===========================================================================
+    - name: "Confirm Test 0: Delete all scheduled repairs"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 0 (Delete all scheduled repairs) or Ctrl+C to abort"
+      when: clean_mode | bool and interactive_mode | bool
+
+    - name: "Test 0: Delete all scheduled repairs"
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --deleteall
+      register: deleteall_result
+      when: clean_mode | bool
+      ignore_errors: true
+
+    - name: Display deleteall result
+      ansible.builtin.debug:
+        var: deleteall_result
+      when: clean_mode | bool
+
+    - name: "Verify Test 0: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_0
+      when: clean_mode | bool and deleteall_result.rc == 0
+
+    - name: "Verify Test 0: Check all scheduled repairs were deleted"
+      ansible.builtin.assert:
+        that:
+          - repairs_response_0.json.ScheduledRepairs | length == 0
+        fail_msg: "Not all scheduled repairs were deleted. {{ repairs_response_0.json.ScheduledRepairs | length }} remain."
+        success_msg: "All scheduled repairs were successfully deleted"
+      register: verify_result_0
+      when: clean_mode | bool and deleteall_result.rc == 0 and repairs_response_0.json.ScheduledRepairs is defined
+      ignore_errors: true
+
     # ===========================================================================
     # Test 1: Basic scheduled repair (run immediately)
     # ===========================================================================
@@ -944,6 +989,7 @@
       ansible.builtin.set_fact:
         failed_tests: >-
           {{
+            ([] if not clean_mode or (deleteall_result is defined and deleteall_result.rc == 0 and (verify_result_0 is not defined or not verify_result_0.failed)) else ['Test 0 - Delete all repairs']) +
             ([] if basic_repair_result.rc == 0 and (verify_result_1 is not defined or not verify_result_1.failed) else ['Test 1 - Basic repair']) +
             ([] if cron_repair_result.rc == 0 and (verify_result_2 is not defined or not verify_result_2.failed) else ['Test 2 - Cron expression']) +
             ([] if keyspace_repair_result.rc == 0 and (verify_result_3 is not defined or not verify_result_3.failed) else ['Test 3 - Specific keyspace']) +
@@ -972,7 +1018,8 @@
           ============================================
           Scheduled Repair Tests Summary
           ============================================
-          Test 1  - Basic repair:              {{ 'PASS' if basic_repair_result.rc == 0 and (verify_result_1 is not defined or not verify_result_1.failed) else 'FAIL' }}
+          {% if clean_mode %}Test 0  - Delete all repairs:         {{ 'PASS' if (deleteall_result is defined and deleteall_result.rc == 0 and (verify_result_0 is not defined or not verify_result_0.failed)) else 'FAIL' }}
+          {% endif %}Test 1  - Basic repair:              {{ 'PASS' if basic_repair_result.rc == 0 and (verify_result_1 is not defined or not verify_result_1.failed) else 'FAIL' }}
           Test 2  - Cron expression:           {{ 'PASS' if cron_repair_result.rc == 0 and (verify_result_2 is not defined or not verify_result_2.failed) else 'FAIL' }}
           Test 3  - Specific keyspace:         {{ 'PASS' if keyspace_repair_result.rc == 0 and (verify_result_3 is not defined or not verify_result_3.failed) else 'FAIL' }}
           Test 4  - Specific tables:           {{ 'PASS' if tables_repair_result.rc == 0 and (verify_result_4 is not defined or not verify_result_4.failed) else 'FAIL' }}
@@ -993,7 +1040,7 @@
           Test 19 - Skip paxos:                {{ 'PASS' if skip_paxos_result.rc == 0 and (verify_result_19 is not defined or not verify_result_19.failed) else 'FAIL' }}
           Test 20 - Comprehensive:             {{ 'PASS' if comprehensive_repair_result.rc == 0 and (verify_result_20 is not defined or not verify_result_20.failed) else 'FAIL' }}
           ============================================
-          Total: {{ 20 - (failed_tests | length) }}/20 passed
+          Total: {{ (22 if clean_mode else 21) - (failed_tests | length) }}/{{ 22 if clean_mode else 21 }} passed
           ============================================
 
     - name: Fail if any tests failed

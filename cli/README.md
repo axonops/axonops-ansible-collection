@@ -149,7 +149,8 @@ Manages **Scheduled Repair** in AxonOps.
 * `--paxosonly` Run paxos repair only. Default is false.
 * `--skippaxos` Skip paxos repair. Default is false.
 * `--delete` Delete Scheduled Repair. This option needs to be paired with a tags value to identify which scheduled
-  repair job to disable.
+  repair job to delete.
+* `--deleteall` Delete all Scheduled Repairs. This removes all scheduled repair jobs from the cluster.
 
 #### Examples:
 
@@ -270,4 +271,10 @@ Delete a scheduled repair job with specific tags:
 
 ```shell
 $ pipenv run python axonops.py scheduledrepair --delete --tags 'Weekly repair'
+```
+
+Delete all scheduled repair jobs:
+
+```shell
+$ pipenv run python axonops.py scheduledrepair --deleteall
 ```
