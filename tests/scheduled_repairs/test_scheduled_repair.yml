@@ -1,0 +1,1136 @@
+---
+- name: Test AxonOps Scheduled Repair CLI Commands
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    cli_dir: "{{ playbook_dir }}/../../cli"
+    axonops_org: "{{ org | default(lookup('env', 'AXONOPS_ORG') | default('testorg', true)) }}"
+    axonops_cluster: "{{ cluster | default(lookup('env', 'AXONOPS_CLUSTER') | default('testcluster', true)) }}"
+    axonops_url: "{{ url | default(lookup('env', 'AXONOPS_URL') | default('http://localhost:3000', true)) }}"
+    axonops_token: "{{ lookup('env', 'AXONOPS_TOKEN') | default('', true) }}"
+    axonops_username: "{{ lookup('env', 'AXONOPS_USERNAME') | default('', true) }}"
+    axonops_password: "{{ lookup('env', 'AXONOPS_PASSWORD') | default('', true) }}"
+    interactive_mode: "{{ interactive | default('false') | bool }}"
+    clean_mode: "{{ clean | default('false') | bool }}"
+    repairs_api_url: "{{ axonops_url }}/api/v1/repair/{{ axonops_org }}/cassandra/{{ axonops_cluster }}"
+    # Build the common auth/connection args (must come before subcommand)
+    common_args: >-
+      --org "{{ axonops_org }}"
+      --cluster "{{ axonops_cluster }}"
+      --url "{{ axonops_url }}"
+      {% if axonops_token %}--token "{{ axonops_token }}"{% endif %}
+      {% if axonops_username %}--username "{{ axonops_username }}"{% endif %}
+      {% if axonops_password %}--password "{{ axonops_password }}"{% endif %}
+      -v
+    # Common URI parameters for API calls
+    uri_headers: "{{ {'Authorization': 'Bearer ' + axonops_token} if axonops_token else {} }}"
+
+  tasks:
+    # ===========================================================================
+    # Test 0: Clean all scheduled repairs (only when --clean is used)
+    # ===========================================================================
+    - name: "Confirm Test 0: Delete all scheduled repairs"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 0 (Delete all scheduled repairs) or Ctrl+C to abort"
+      when: clean_mode | bool and interactive_mode | bool
+
+    - name: "Test 0: Delete all scheduled repairs"
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --deleteall
+      register: deleteall_result
+      when: clean_mode | bool
+      ignore_errors: true
+
+    - name: Display deleteall result
+      ansible.builtin.debug:
+        var: deleteall_result
+      when: clean_mode | bool
+
+    - name: "Verify Test 0: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_0
+      when: clean_mode | bool and deleteall_result.rc == 0
+
+    - name: "Verify Test 0: Check all scheduled repairs were deleted"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_0.json.ScheduledRepairs or []) | length == 0
+        fail_msg: "Not all scheduled repairs were deleted"
+        success_msg: "All scheduled repairs were successfully deleted"
+      register: verify_result_0
+      when: clean_mode | bool and deleteall_result.rc == 0
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 1: Basic scheduled repair (run immediately)
+    # ===========================================================================
+    - name: "Confirm Test 1: Basic scheduled repair"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 1 (Basic scheduled repair) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test basic scheduled repair (run immediately)
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --tags 'Test 1'
+      register: basic_repair_result
+      ignore_errors: true
+
+    - name: Display basic scheduled repair result
+      ansible.builtin.debug:
+        var: basic_repair_result
+
+    - name: "Verify Test 1: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_1
+      when: basic_repair_result.rc == 0
+
+    - name: "Verify Test 1: Check repair with tag 'Test 1' exists in running repairs"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_1.json.Repairs | selectattr('tag', 'equalto', 'Test 1') | list | length) > 0
+        fail_msg: "Repair with tag 'Test 1' not found in Repairs (running repairs)"
+        success_msg: "Repair with tag 'Test 1' verified successfully in running repairs"
+      register: verify_result_1
+      when: basic_repair_result.rc == 0 and repairs_response_1.json.Repairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 2: Scheduled repair with cron expression (every Sunday at midnight)
+    # ===========================================================================
+    - name: "Confirm Test 2: Cron expression"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 2 (Cron expression) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test scheduled repair with cron expression
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --tags 'Test 2'
+      register: cron_repair_result
+      ignore_errors: true
+
+    - name: Display cron scheduled repair result
+      ansible.builtin.debug:
+        var: cron_repair_result
+
+    - name: "Verify Test 2: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_2
+      when: cron_repair_result.rc == 0
+
+    - name: "Verify Test 2: Check cron expression was set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_2.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 2') | list | length) > 0
+          - (repairs_response_2.json.ScheduledRepairs | selectattr('CronExpr', 'equalto', '0 0 * * 0') | list | length) > 0
+        fail_msg: "Repair with tag 'Test 2' not found or CronExpr != '0 0 * * 0'"
+        success_msg: "Repair with tag 'Test 2' verified with correct CronExpr"
+      register: verify_result_2
+      when: cron_repair_result.rc == 0 and repairs_response_2.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 3: Scheduled repair for a specific keyspace
+    # ===========================================================================
+    - name: "Confirm Test 3: Specific keyspace"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 3 (Specific keyspace) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test scheduled repair for specific keyspace
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --keyspace system_auth \
+          --tags 'Test 3'
+      register: keyspace_repair_result
+      ignore_errors: true
+
+    - name: Display keyspace scheduled repair result
+      ansible.builtin.debug:
+        var: keyspace_repair_result
+
+    - name: "Verify Test 3: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_3
+      when: keyspace_repair_result.rc == 0
+
+    - name: "Verify Test 3: Check keyspace was set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_3.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 3') | list | length) > 0
+          - (repairs_response_3.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 3') | first).keyspace == 'system_auth'
+        fail_msg: "Repair with tag 'Test 3' not found or keyspace != 'system_auth'"
+        success_msg: "Repair with tag 'Test 3' verified with correct keyspace"
+      register: verify_result_3
+      when: keyspace_repair_result.rc == 0 and repairs_response_3.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 4: Scheduled repair for specific tables in a keyspace
+    # ===========================================================================
+    - name: "Confirm Test 4: Specific tables"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 4 (Specific tables) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test scheduled repair for specific tables
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --keyspace system_auth \
+          --tables roles,role_members \
+          --tags 'Test 4'
+      register: tables_repair_result
+      ignore_errors: true
+
+    - name: Display tables scheduled repair result
+      ansible.builtin.debug:
+        var: tables_repair_result
+
+    - name: "Verify Test 4: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_4
+      when: tables_repair_result.rc == 0
+
+    - name: "Verify Test 4: Check tables were set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_4.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 4') | list | length) > 0
+          - "'roles' in (repairs_response_4.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 4') | first).tables"
+          - "'role_members' in (repairs_response_4.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 4') | first).tables"
+        fail_msg: "Repair with tag 'Test 4' not found or tables not set correctly"
+        success_msg: "Repair with tag 'Test 4' verified with correct tables"
+      register: verify_result_4
+      when: tables_repair_result.rc == 0 and repairs_response_4.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 5: Scheduled repair excluding specific tables
+    # ===========================================================================
+    - name: "Confirm Test 5: Excluded tables"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 5 (Excluded tables) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test scheduled repair with excluded tables
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --keyspace system_auth \
+          --excludedtables role_permissions \
+          --tags 'Test 5'
+      register: excluded_repair_result
+      ignore_errors: true
+
+    - name: Display excluded tables repair result
+      ansible.builtin.debug:
+        var: excluded_repair_result
+
+    - name: "Verify Test 5: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_5
+      when: excluded_repair_result.rc == 0
+
+    - name: "Verify Test 5: Check excluded tables were set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_5.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 5') | list | length) > 0
+          - "'role_permissions' in (repairs_response_5.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 5') | first).blacklistedTables"
+        fail_msg: "Repair with tag 'Test 5' not found or blacklistedTables not set correctly"
+        success_msg: "Repair with tag 'Test 5' verified with correct blacklistedTables"
+      register: verify_result_5
+      when: excluded_repair_result.rc == 0 and repairs_response_5.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 6: Scheduled repair for specific nodes
+    # ===========================================================================
+    - name: "Confirm Test 6: Specific nodes"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 6 (Specific nodes) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test scheduled repair for specific nodes
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --nodes 'node1,node2' \
+          --tags 'Test 6'
+      register: nodes_repair_result
+      ignore_errors: true
+
+    - name: Display nodes repair result
+      ansible.builtin.debug:
+        var: nodes_repair_result
+
+    - name: "Verify Test 6: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_6
+      when: nodes_repair_result.rc == 0
+
+    - name: "Verify Test 6: Check nodes were set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_6.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 6') | list | length) > 0
+          - "'node1' in (repairs_response_6.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 6') | first).nodes"
+          - "'node2' in (repairs_response_6.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 6') | first).nodes"
+        fail_msg: "Repair with tag 'Test 6' not found or nodes not set correctly"
+        success_msg: "Repair with tag 'Test 6' verified with correct nodes"
+      register: verify_result_6
+      when: nodes_repair_result.rc == 0 and repairs_response_6.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 7: Segmented repair
+    # ===========================================================================
+    - name: "Confirm Test 7: Segmented repair"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 7 (Segmented repair) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test segmented scheduled repair
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --segmented \
+          --tags 'Test 7'
+      register: segmented_repair_result
+      ignore_errors: true
+
+    - name: Display segmented repair result
+      ansible.builtin.debug:
+        var: segmented_repair_result
+
+    - name: "Verify Test 7: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_7
+      when: segmented_repair_result.rc == 0
+
+    - name: "Verify Test 7: Check segmented was set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_7.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 7') | list | length) > 0
+          - (repairs_response_7.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 7') | first).segmented == true
+        fail_msg: "Repair with tag 'Test 7' not found or segmented != true"
+        success_msg: "Repair with tag 'Test 7' verified with segmented=true"
+      register: verify_result_7
+      when: segmented_repair_result.rc == 0 and repairs_response_7.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 8: Segments per node
+    # ===========================================================================
+    - name: "Confirm Test 8: Segments per node"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 8 (Segments per node) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test scheduled repair with segments per node
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --segmented \
+          --segmentspernode 4 \
+          --tags 'Test 8'
+      register: segments_per_node_result
+      ignore_errors: true
+
+    - name: Display segments per node result
+      ansible.builtin.debug:
+        var: segments_per_node_result
+
+    - name: "Verify Test 8: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_8
+      when: segments_per_node_result.rc == 0
+
+    - name: "Verify Test 8: Check segmentsPerNode was set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_8.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 8') | list | length) > 0
+          - (repairs_response_8.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 8') | first).segmentspernode == 4
+        fail_msg: "Repair with tag 'Test 8' not found or segmentspernode != 4"
+        success_msg: "Repair with tag 'Test 8' verified with segmentspernode=4"
+      register: verify_result_8
+      when: segments_per_node_result.rc == 0 and repairs_response_8.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 9: Incremental repair
+    # ===========================================================================
+    - name: "Confirm Test 9: Incremental repair"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 9 (Incremental repair) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test incremental scheduled repair
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --incremental \
+          --tags 'Test 9'
+      register: incremental_repair_result
+      ignore_errors: true
+
+    - name: Display incremental repair result
+      ansible.builtin.debug:
+        var: incremental_repair_result
+
+    - name: "Verify Test 9: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_9
+      when: incremental_repair_result.rc == 0
+
+    - name: "Verify Test 9: Check incremental was set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_9.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 9') | list | length) > 0
+          - (repairs_response_9.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 9') | first).incremental == true
+        fail_msg: "Repair with tag 'Test 9' not found or incremental != true"
+        success_msg: "Repair with tag 'Test 9' verified with incremental=true"
+      register: verify_result_9
+      when: incremental_repair_result.rc == 0 and repairs_response_9.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 10: Job threads
+    # ===========================================================================
+    - name: "Confirm Test 10: Job threads"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 10 (Job threads) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test scheduled repair with job threads
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --jobthreads 4 \
+          --tags 'Test 10'
+      register: jobthreads_repair_result
+      ignore_errors: true
+
+    - name: Display job threads result
+      ansible.builtin.debug:
+        var: jobthreads_repair_result
+
+    - name: "Verify Test 10: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_10
+      when: jobthreads_repair_result.rc == 0
+
+    - name: "Verify Test 10: Check jobThreads was set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_10.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 10') | list | length) > 0
+          - (repairs_response_10.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 10') | first).jobThreads == 4
+        fail_msg: "Repair with tag 'Test 10' not found or jobThreads != 4"
+        success_msg: "Repair with tag 'Test 10' verified with jobThreads=4"
+      register: verify_result_10
+      when: jobthreads_repair_result.rc == 0 and repairs_response_10.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 11: Partitioner range repair
+    # ===========================================================================
+    - name: "Confirm Test 11: Partitioner range"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 11 (Partitioner range) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test partitioner range scheduled repair
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --partitionerrange \
+          --tags 'Test 11'
+      register: partitioner_repair_result
+      ignore_errors: true
+
+    - name: Display partitioner range result
+      ansible.builtin.debug:
+        var: partitioner_repair_result
+
+    - name: "Verify Test 11: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_11
+      when: partitioner_repair_result.rc == 0
+
+    - name: "Verify Test 11: Check primaryRange was set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_11.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 11') | list | length) > 0
+          - (repairs_response_11.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 11') | first).primaryRange == true
+        fail_msg: "Repair with tag 'Test 11' not found or primaryRange != true"
+        success_msg: "Repair with tag 'Test 11' verified with primaryRange=true"
+      register: verify_result_11
+      when: partitioner_repair_result.rc == 0 and repairs_response_11.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 12: Sequential parallelism
+    # ===========================================================================
+    - name: "Confirm Test 12: Sequential parallelism"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 12 (Sequential parallelism) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test sequential parallelism
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --parallelism Sequential \
+          --tags 'Test 12'
+      register: sequential_repair_result
+      ignore_errors: true
+
+    - name: Display sequential parallelism result
+      ansible.builtin.debug:
+        var: sequential_repair_result
+
+    - name: "Verify Test 12: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_12
+      when: sequential_repair_result.rc == 0
+
+    - name: "Verify Test 12: Check parallelism was set to Sequential"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_12.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 12') | list | length) > 0
+          - (repairs_response_12.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 12') | first).parallelism == 'Sequential'
+        fail_msg: "Repair with tag 'Test 12' not found or parallelism != 'Sequential'"
+        success_msg: "Repair with tag 'Test 12' verified with parallelism=Sequential"
+      register: verify_result_12
+      when: sequential_repair_result.rc == 0 and repairs_response_12.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 13: Parallel parallelism
+    # ===========================================================================
+    - name: "Confirm Test 13: Parallel parallelism"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 13 (Parallel parallelism) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test parallel parallelism
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --parallelism Parallel \
+          --tags 'Test 13'
+      register: parallel_repair_result
+      ignore_errors: true
+
+    - name: Display parallel parallelism result
+      ansible.builtin.debug:
+        var: parallel_repair_result
+
+    - name: "Verify Test 13: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_13
+      when: parallel_repair_result.rc == 0
+
+    - name: "Verify Test 13: Check parallelism was set to Parallel"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_13.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 13') | list | length) > 0
+          - (repairs_response_13.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 13') | first).parallelism == 'Parallel'
+        fail_msg: "Repair with tag 'Test 13' not found or parallelism != 'Parallel'"
+        success_msg: "Repair with tag 'Test 13' verified with parallelism=Parallel"
+      register: verify_result_13
+      when: parallel_repair_result.rc == 0 and repairs_response_13.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 14: DC-Aware parallelism
+    # ===========================================================================
+    - name: "Confirm Test 14: DC-Aware parallelism"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 14 (DC-Aware parallelism) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test DC-Aware parallelism
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --parallelism DC-Aware \
+          --tags 'Test 14'
+      register: dc_aware_repair_result
+      ignore_errors: true
+
+    - name: Display DC-Aware parallelism result
+      ansible.builtin.debug:
+        var: dc_aware_repair_result
+
+    - name: "Verify Test 14: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_14
+      when: dc_aware_repair_result.rc == 0
+
+    - name: "Verify Test 14: Check parallelism was set to DC-Aware"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_14.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 14') | list | length) > 0
+          - (repairs_response_14.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 14') | first).parallelism == 'DC-Aware'
+        fail_msg: "Repair with tag 'Test 14' not found or parallelism != 'DC-Aware'"
+        success_msg: "Repair with tag 'Test 14' verified with parallelism=DC-Aware"
+      register: verify_result_14
+      when: dc_aware_repair_result.rc == 0 and repairs_response_14.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 15: Optimize streams
+    # ===========================================================================
+    - name: "Confirm Test 15: Optimize streams"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 15 (Optimize streams) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test optimize streams
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --optimisestreams \
+          --tags 'Test 15'
+      register: optimise_streams_result
+      ignore_errors: true
+
+    - name: Display optimize streams result
+      ansible.builtin.debug:
+        var: optimise_streams_result
+
+    - name: "Verify Test 15: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_15
+      when: optimise_streams_result.rc == 0
+
+    - name: "Verify Test 15: Check optimiseStreams was set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_15.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 15') | list | length) > 0
+          - (repairs_response_15.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 15') | first).optimiseStreams == true
+        fail_msg: "Repair with tag 'Test 15' not found or optimiseStreams != true"
+        success_msg: "Repair with tag 'Test 15' verified with optimiseStreams=true"
+      register: verify_result_15
+      when: optimise_streams_result.rc == 0 and repairs_response_15.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 16: Specific datacenters
+    # ===========================================================================
+    - name: "Confirm Test 16: Specific datacenters"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 16 (Specific datacenters) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test specific datacenters
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --datacenters 'dc1,dc2' \
+          --tags 'Test 16'
+      register: datacenters_repair_result
+      ignore_errors: true
+
+    - name: Display specific datacenters result
+      ansible.builtin.debug:
+        var: datacenters_repair_result
+
+    - name: "Verify Test 16: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_16
+      when: datacenters_repair_result.rc == 0
+
+    - name: "Verify Test 16: Check specificDataCenters were set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_16.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 16') | list | length) > 0
+          - "'dc1' in (repairs_response_16.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 16') | first).specificDataCenters"
+          - "'dc2' in (repairs_response_16.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 16') | first).specificDataCenters"
+        fail_msg: "Repair with tag 'Test 16' not found or specificDataCenters not set correctly"
+        success_msg: "Repair with tag 'Test 16' verified with correct specificDataCenters"
+      register: verify_result_16
+      when: datacenters_repair_result.rc == 0 and repairs_response_16.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 17: Tags
+    # ===========================================================================
+    - name: "Confirm Test 17: Tags"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 17 (Tags) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test tags
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --tags 'Test 17'
+      register: tags_repair_result
+      ignore_errors: true
+
+    - name: Display tags result
+      ansible.builtin.debug:
+        var: tags_repair_result
+
+    - name: "Verify Test 17: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_17
+      when: tags_repair_result.rc == 0
+
+    - name: "Verify Test 17: Check repair with tag 'Test 17' exists"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_17.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 17') | list | length) > 0
+        fail_msg: "Repair with tag 'Test 17' not found in ScheduledRepairs"
+        success_msg: "Repair with tag 'Test 17' verified successfully"
+      register: verify_result_17
+      when: tags_repair_result.rc == 0 and repairs_response_17.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 18: Paxos only repair
+    # ===========================================================================
+    - name: "Confirm Test 18: Paxos only"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 18 (Paxos only) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test paxos only repair
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --paxosonly \
+          --tags 'Test 18'
+      register: paxos_only_result
+      ignore_errors: true
+
+    - name: Display paxos only result
+      ansible.builtin.debug:
+        var: paxos_only_result
+
+    - name: "Verify Test 18: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_18
+      when: paxos_only_result.rc == 0
+
+    - name: "Verify Test 18: Check paxosOnly was set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_18.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 18') | list | length) > 0
+          - (repairs_response_18.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 18') | first).paxosOnly == true
+        fail_msg: "Repair with tag 'Test 18' not found or paxosOnly != true"
+        success_msg: "Repair with tag 'Test 18' verified with paxosOnly=true"
+      register: verify_result_18
+      when: paxos_only_result.rc == 0 and repairs_response_18.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 19: Skip paxos repair
+    # ===========================================================================
+    - name: "Confirm Test 19: Skip paxos"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 19 (Skip paxos) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test skip paxos repair
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --skippaxos \
+          --tags 'Test 19'
+      register: skip_paxos_result
+      ignore_errors: true
+
+    - name: Display skip paxos result
+      ansible.builtin.debug:
+        var: skip_paxos_result
+
+    - name: "Verify Test 19: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_19
+      when: skip_paxos_result.rc == 0
+
+    - name: "Verify Test 19: Check skipPaxos was set correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_19.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 19') | list | length) > 0
+          - (repairs_response_19.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 19') | first).skipPaxos == true
+        fail_msg: "Repair with tag 'Test 19' not found or skipPaxos != true"
+        success_msg: "Repair with tag 'Test 19' verified with skipPaxos=true"
+      register: verify_result_19
+      when: skip_paxos_result.rc == 0 and repairs_response_19.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 20: Comprehensive test with multiple options
+    # ===========================================================================
+    - name: "Confirm Test 20: Comprehensive test"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 20 (Comprehensive test) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: Test comprehensive scheduled repair
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 2 * * 0' \
+          --keyspace system_auth \
+          --segmented \
+          --segmentspernode 2 \
+          --jobthreads 2 \
+          --parallelism DC-Aware \
+          --optimisestreams \
+          --tags 'Test 20'
+      register: comprehensive_repair_result
+      ignore_errors: true
+
+    - name: Display comprehensive repair result
+      ansible.builtin.debug:
+        var: comprehensive_repair_result
+
+    - name: "Verify Test 20: Fetch scheduled repairs from API"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_20
+      when: comprehensive_repair_result.rc == 0
+
+    - name: "Verify Test 20: Check comprehensive settings were applied correctly"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_20.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 20') | list | length) > 0
+          - (repairs_response_20.json.ScheduledRepairs | selectattr('CronExpr', 'equalto', '0 2 * * 0') | list | length) > 0
+          - (repairs_response_20.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 20') | first).keyspace == 'system_auth'
+          - (repairs_response_20.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 20') | first).segmented == true
+          - (repairs_response_20.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 20') | first).segmentspernode == 2
+          - (repairs_response_20.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 20') | first).jobThreads == 2
+          - (repairs_response_20.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 20') | first).parallelism == 'DC-Aware'
+          - (repairs_response_20.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 20') | first).optimiseStreams == true
+        fail_msg: "Repair with tag 'Test 20' not found or comprehensive settings not applied correctly"
+        success_msg: "Repair with tag 'Test 20' verified with all comprehensive settings"
+      register: verify_result_20
+      when: comprehensive_repair_result.rc == 0 and repairs_response_20.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Test 21: Delete scheduled repair
+    # ===========================================================================
+    - name: "Confirm Test 21: Delete scheduled repair"
+      ansible.builtin.pause:
+        prompt: "Press Enter to run Test 21 (Delete scheduled repair) or Ctrl+C to abort"
+      when: interactive_mode | bool
+
+    - name: "Test 21 - Step 1: Create a scheduled repair to delete"
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --scheduleexpr '0 0 * * 0' \
+          --tags 'Test 21'
+      register: delete_test_create_result
+      ignore_errors: true
+
+    - name: Display create result for delete test
+      ansible.builtin.debug:
+        var: delete_test_create_result
+
+    - name: "Test 21 - Step 2: Verify repair was created"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_21_before
+      when: delete_test_create_result.rc == 0
+
+    - name: "Test 21 - Step 2: Assert repair exists before deletion"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_21_before.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 21') | list | length) > 0
+        fail_msg: "Repair with tag 'Test 21' was not created"
+        success_msg: "Repair with tag 'Test 21' exists, proceeding with deletion"
+      register: verify_result_21_before
+      when: delete_test_create_result.rc == 0 and repairs_response_21_before.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    - name: "Test 21 - Step 3: Delete the scheduled repair"
+      ansible.builtin.shell: |
+        cd {{ cli_dir }} && pipenv run python axonops.py {{ common_args }} scheduledrepair \
+          --delete \
+          --tags 'Test 21'
+      register: delete_repair_result
+      when: delete_test_create_result.rc == 0 and (verify_result_21_before is not defined or not verify_result_21_before.failed)
+      ignore_errors: true
+
+    - name: Display delete repair result
+      ansible.builtin.debug:
+        var: delete_repair_result
+
+    - name: "Test 21 - Step 4: Fetch scheduled repairs from API after deletion"
+      ansible.builtin.uri:
+        url: "{{ repairs_api_url }}"
+        method: GET
+        headers: "{{ uri_headers }}"
+        user: "{{ axonops_username if not axonops_token and axonops_username else omit }}"
+        password: "{{ axonops_password if not axonops_token and axonops_password else omit }}"
+        force_basic_auth: "{{ true if not axonops_token and axonops_username else false }}"
+        return_content: true
+        status_code: [200, 201]
+      register: repairs_response_21_after
+      when: delete_repair_result is defined and delete_repair_result.rc == 0
+
+    - name: "Verify Test 21: Check scheduled repair was deleted"
+      ansible.builtin.assert:
+        that:
+          - (repairs_response_21_after.json.ScheduledRepairs | map(attribute='Params') | map('first') | selectattr('tag', 'equalto', 'Test 21') | list | length) == 0
+        fail_msg: "Repair with tag 'Test 21' still exists after deletion"
+        success_msg: "Repair with tag 'Test 21' was successfully deleted"
+      register: verify_result_21
+      when: delete_repair_result is defined and delete_repair_result.rc == 0 and repairs_response_21_after.json.ScheduledRepairs is defined
+      ignore_errors: true
+
+    # ===========================================================================
+    # Summary and Final Assertion
+    # ===========================================================================
+    - name: Calculate test results
+      ansible.builtin.set_fact:
+        failed_tests: >-
+          {{
+            ([] if not clean_mode or (deleteall_result is defined and deleteall_result.rc == 0 and (verify_result_0 is not defined or not verify_result_0.failed)) else ['Test 0 - Delete all repairs']) +
+            ([] if basic_repair_result.rc == 0 and (verify_result_1 is not defined or not verify_result_1.failed) else ['Test 1 - Basic repair']) +
+            ([] if cron_repair_result.rc == 0 and (verify_result_2 is not defined or not verify_result_2.failed) else ['Test 2 - Cron expression']) +
+            ([] if keyspace_repair_result.rc == 0 and (verify_result_3 is not defined or not verify_result_3.failed) else ['Test 3 - Specific keyspace']) +
+            ([] if tables_repair_result.rc == 0 and (verify_result_4 is not defined or not verify_result_4.failed) else ['Test 4 - Specific tables']) +
+            ([] if excluded_repair_result.rc == 0 and (verify_result_5 is not defined or not verify_result_5.failed) else ['Test 5 - Excluded tables']) +
+            ([] if nodes_repair_result.rc == 0 and (verify_result_6 is not defined or not verify_result_6.failed) else ['Test 6 - Specific nodes']) +
+            ([] if segmented_repair_result.rc == 0 and (verify_result_7 is not defined or not verify_result_7.failed) else ['Test 7 - Segmented repair']) +
+            ([] if segments_per_node_result.rc == 0 and (verify_result_8 is not defined or not verify_result_8.failed) else ['Test 8 - Segments per node']) +
+            ([] if incremental_repair_result.rc == 0 and (verify_result_9 is not defined or not verify_result_9.failed) else ['Test 9 - Incremental repair']) +
+            ([] if jobthreads_repair_result.rc == 0 and (verify_result_10 is not defined or not verify_result_10.failed) else ['Test 10 - Job threads']) +
+            ([] if partitioner_repair_result.rc == 0 and (verify_result_11 is not defined or not verify_result_11.failed) else ['Test 11 - Partitioner range']) +
+            ([] if sequential_repair_result.rc == 0 and (verify_result_12 is not defined or not verify_result_12.failed) else ['Test 12 - Sequential parallelism']) +
+            ([] if parallel_repair_result.rc == 0 and (verify_result_13 is not defined or not verify_result_13.failed) else ['Test 13 - Parallel parallelism']) +
+            ([] if dc_aware_repair_result.rc == 0 and (verify_result_14 is not defined or not verify_result_14.failed) else ['Test 14 - DC-Aware parallelism']) +
+            ([] if optimise_streams_result.rc == 0 and (verify_result_15 is not defined or not verify_result_15.failed) else ['Test 15 - Optimize streams']) +
+            ([] if datacenters_repair_result.rc == 0 and (verify_result_16 is not defined or not verify_result_16.failed) else ['Test 16 - Specific datacenters']) +
+            ([] if tags_repair_result.rc == 0 and (verify_result_17 is not defined or not verify_result_17.failed) else ['Test 17 - Tags']) +
+            ([] if paxos_only_result.rc == 0 and (verify_result_18 is not defined or not verify_result_18.failed) else ['Test 18 - Paxos only']) +
+            ([] if skip_paxos_result.rc == 0 and (verify_result_19 is not defined or not verify_result_19.failed) else ['Test 19 - Skip paxos']) +
+            ([] if comprehensive_repair_result.rc == 0 and (verify_result_20 is not defined or not verify_result_20.failed) else ['Test 20 - Comprehensive']) +
+            ([] if (delete_test_create_result.rc == 0 and (delete_repair_result is defined and delete_repair_result.rc == 0) and (verify_result_21 is not defined or not verify_result_21.failed)) else ['Test 21 - Delete repair'])
+          }}
+
+    - name: Test summary
+      ansible.builtin.debug:
+        msg: |
+          ============================================
+          Scheduled Repair Tests Summary
+          ============================================
+          {% if clean_mode %}Test 0  - Delete all repairs:         {{ 'PASS' if (deleteall_result is defined and deleteall_result.rc == 0 and (verify_result_0 is not defined or not verify_result_0.failed)) else 'FAIL' }}
+          {% endif %}Test 1  - Basic repair:              {{ 'PASS' if basic_repair_result.rc == 0 and (verify_result_1 is not defined or not verify_result_1.failed) else 'FAIL' }}
+          Test 2  - Cron expression:           {{ 'PASS' if cron_repair_result.rc == 0 and (verify_result_2 is not defined or not verify_result_2.failed) else 'FAIL' }}
+          Test 3  - Specific keyspace:         {{ 'PASS' if keyspace_repair_result.rc == 0 and (verify_result_3 is not defined or not verify_result_3.failed) else 'FAIL' }}
+          Test 4  - Specific tables:           {{ 'PASS' if tables_repair_result.rc == 0 and (verify_result_4 is not defined or not verify_result_4.failed) else 'FAIL' }}
+          Test 5  - Excluded tables:           {{ 'PASS' if excluded_repair_result.rc == 0 and (verify_result_5 is not defined or not verify_result_5.failed) else 'FAIL' }}
+          Test 6  - Specific nodes:            {{ 'PASS' if nodes_repair_result.rc == 0 and (verify_result_6 is not defined or not verify_result_6.failed) else 'FAIL' }}
+          Test 7  - Segmented repair:          {{ 'PASS' if segmented_repair_result.rc == 0 and (verify_result_7 is not defined or not verify_result_7.failed) else 'FAIL' }}
+          Test 8  - Segments per node:         {{ 'PASS' if segments_per_node_result.rc == 0 and (verify_result_8 is not defined or not verify_result_8.failed) else 'FAIL' }}
+          Test 9  - Incremental repair:        {{ 'PASS' if incremental_repair_result.rc == 0 and (verify_result_9 is not defined or not verify_result_9.failed) else 'FAIL' }}
+          Test 10 - Job threads:               {{ 'PASS' if jobthreads_repair_result.rc == 0 and (verify_result_10 is not defined or not verify_result_10.failed) else 'FAIL' }}
+          Test 11 - Partitioner range:         {{ 'PASS' if partitioner_repair_result.rc == 0 and (verify_result_11 is not defined or not verify_result_11.failed) else 'FAIL' }}
+          Test 12 - Sequential parallelism:    {{ 'PASS' if sequential_repair_result.rc == 0 and (verify_result_12 is not defined or not verify_result_12.failed) else 'FAIL' }}
+          Test 13 - Parallel parallelism:      {{ 'PASS' if parallel_repair_result.rc == 0 and (verify_result_13 is not defined or not verify_result_13.failed) else 'FAIL' }}
+          Test 14 - DC-Aware parallelism:      {{ 'PASS' if dc_aware_repair_result.rc == 0 and (verify_result_14 is not defined or not verify_result_14.failed) else 'FAIL' }}
+          Test 15 - Optimize streams:          {{ 'PASS' if optimise_streams_result.rc == 0 and (verify_result_15 is not defined or not verify_result_15.failed) else 'FAIL' }}
+          Test 16 - Specific datacenters:      {{ 'PASS' if datacenters_repair_result.rc == 0 and (verify_result_16 is not defined or not verify_result_16.failed) else 'FAIL' }}
+          Test 17 - Tags:                      {{ 'PASS' if tags_repair_result.rc == 0 and (verify_result_17 is not defined or not verify_result_17.failed) else 'FAIL' }}
+          Test 18 - Paxos only:                {{ 'PASS' if paxos_only_result.rc == 0 and (verify_result_18 is not defined or not verify_result_18.failed) else 'FAIL' }}
+          Test 19 - Skip paxos:                {{ 'PASS' if skip_paxos_result.rc == 0 and (verify_result_19 is not defined or not verify_result_19.failed) else 'FAIL' }}
+          Test 20 - Comprehensive:             {{ 'PASS' if comprehensive_repair_result.rc == 0 and (verify_result_20 is not defined or not verify_result_20.failed) else 'FAIL' }}
+          Test 21 - Delete repair:             {{ 'PASS' if (delete_test_create_result.rc == 0 and (delete_repair_result is defined and delete_repair_result.rc == 0) and (verify_result_21 is not defined or not verify_result_21.failed)) else 'FAIL' }}
+          ============================================
+          Total: {{ (22 if clean_mode else 21) - (failed_tests | length) }}/{{ 22 if clean_mode else 21 }} passed
+          ============================================
+
+    - name: Fail if any tests failed
+      ansible.builtin.fail:
+        msg: |
+          {{ failed_tests | length }} test(s) failed:
+          {% for test in failed_tests %}
+          - {{ test }}
+          {% endfor %}
+
+          Check the output above for details on what went wrong.
+      when: failed_tests | length > 0

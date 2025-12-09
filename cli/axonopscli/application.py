@@ -5,6 +5,8 @@ from typing import Sequence
 
 from .axonops import AxonOps
 from .components.repair import AdaptiveRepair
+from .components.scheduled_repair import ScheduledRepair
+from .utils import remove_not_alphanumeric
 
 
 class Application:
@@ -50,7 +52,7 @@ class Application:
         commands_subparser = parser.add_subparsers(help="commands")
 
         adaptive_repair_parser = commands_subparser.add_parser(
-            "repair",
+            "repair", aliases=['adaptiverepair'],
             help="Manage the Adaptive Repair in AxonOps")
         adaptive_repair_parser.set_defaults(func=self.run_adaptive_repair)
 
@@ -84,7 +86,64 @@ class Application:
         adaptive_repair_parser.add_argument('--segmenttimeout', type=str, required=False,
                                             help='Segment Timeout. Integer number followed by one of "s, m, h, d, w, M, y"')
 
+        scheduledrepair_parser = commands_subparser.add_parser(
+            "scheduledrepair",
+            help="Manage the Scheduled Repair in AxonOps")
+        scheduledrepair_parser.set_defaults(func=self.run_scheduled_repair)
+
+        scheduledrepair_parser.add_argument('--keyspace', type=str, required=False,
+                                            help='Keyspace to repair. If empty, all keyspaces are repaired')
+        scheduledrepair_parser.add_argument('--tables', type=str, required=False,
+                                            help='Comma-separated list of tables to repair in the selected keyspace. If empty, all tables are repaired')
+        scheduledrepair_parser.add_argument('--excludedtables', type=str, required=False,
+                                            help='Comma-separated list of tables to exclude from repair')
+        scheduledrepair_parser.add_argument('--nodes', type=str, required=False,
+                                            help='Comma-separated list of nodes to repair')
+        scheduledrepair_parser.add_argument('--segmentspernode', type=int, required=False,
+                                            help='Number of segments per node')
+        scheduledrepair_parser.add_argument('--segmented', action='store_true',
+                                            help='Enable segmented repair')
+        scheduledrepair_parser.add_argument('--incremental', action='store_true',
+                                            help='Enable incremental repair')
+        scheduledrepair_parser.add_argument('--jobthreads', type=int, required=False, default=1,
+                                            help='Number of job threads')
+        scheduledrepair_parser.add_argument('--scheduleexpr', type=str, required=False,
+                                            help='Cron expression for scheduling the repair')
+        scheduledrepair_parser.add_argument('--partitionerrange', action='store_true',
+                                            help='Enable partitioner range repair')
+        scheduledrepair_parser.add_argument('--parallelism', type=self._normalize_parallelism, required=False,
+                                            default="Parallel",
+                                            help='Parallelism type: Sequential, Parallel, DC-Aware')
+        scheduledrepair_parser.add_argument('--optimisestreams', action='store_true',
+                                            help='Enable stream optimization (only for Cassandra 4.1 and above)')
+        scheduledrepair_parser.add_argument('--datacenters', type=str, required=False,
+                                            help='Comma-separated list of datacenters to repair, if not specified all datacenters are included')
+        scheduledrepair_parser.add_argument('--tags', type=str, required=False,
+                                            help='Tag for the repair job', default="")
+        scheduledrepair_parser.add_argument('--delete', action='store_true',
+                                            help='Delete the scheduled repair instead of enabling it')
+        scheduledrepair_parser.add_argument('--deleteall', action='store_true',
+                                            help='Delete all scheduled repairs')
+
+        paxos_group = scheduledrepair_parser.add_mutually_exclusive_group()
+        paxos_group.add_argument('--paxosonly', action='store_true', default=False,
+                                 help='Run only Paxos repairs')
+        paxos_group.add_argument('--skippaxos', action='store_true', default=False,
+                                 help='Skip Paxos repairs')
+
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
+
+        # ensure --tables is only used together with --keyspace
+        if getattr(parsed_result, "tables", None) and not getattr(parsed_result, "keyspace", None):
+            parser.error("--tables requires --keyspace")
+
+        # ensure --disabled is only used together with tags
+        if getattr(parsed_result, "delete", None) and not getattr(parsed_result, "tags", None):
+            parser.error("--delete requires --tags")
+
+        # ensure --excludedtables is only used together with --keyspace
+        if getattr(parsed_result, "excludedtables", None) and not getattr(parsed_result, "keyspace", None):
+            parser.error("--excludedtables requires --keyspace")
 
         # if func() is not present it means that no command was inserted
         if hasattr(parsed_result, 'func'):
@@ -92,6 +151,14 @@ class Application:
             parsed_result.func(parsed_result)
         else:
             parser.print_help()
+
+    def _normalize_parallelism(self, value: str) -> str:
+        """ Normalize and validate parallelism input """
+        choices = ["Sequential", "Parallel", "DC-Aware"]
+        for c in choices:
+            if remove_not_alphanumeric(value.lower()) == remove_not_alphanumeric(c.lower()):
+                return c
+        raise argparse.ArgumentTypeError(f"Invalid parallelism: {value}. Choose one of: {', '.join(choices)}")
 
     def run_mandatory_args_check(self, args: argparse.Namespace):
         """ Check if mandatory variable are present """
@@ -131,3 +198,21 @@ class Application:
         adaptive_repair.set_options()
 
         adaptive_repair.set_repair()
+
+    def run_scheduled_repair(self, args: argparse.Namespace):
+        """ Run the scheduled repair """
+        if args.v:
+            print(f"Running scheduled repairs on {args.org}")
+            print(args)
+
+        axonops = self.get_axonops(args)
+
+        scheduled_repair = ScheduledRepair(axonops, args)
+
+        if args.deleteall:
+            scheduled_repair.remove_all_repairs_from_axonops()
+            return
+
+        scheduled_repair.set_options()
+
+        scheduled_repair.set_repair()
