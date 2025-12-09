@@ -93,7 +93,6 @@ class ScheduledRepair:
         if self.args.v:
             print("POST", self.full_add_repair_url, self.repair_data)
 
-        #if self.args.delete:
         if self.args.tags != "":
             response = self.axonops.do_request(
                 url=self.full_repair_url,
