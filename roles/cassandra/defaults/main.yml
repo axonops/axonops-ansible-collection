@@ -300,7 +300,7 @@ cassandra_transparent_data_encryption_options:
           key_password: "cassandra"
 
 # JVM
-cassandra_jvm_use_shenandoah: false
+cassandra_jvm_use_shenandoah: true
 cassandra_max_queued_native_transport_requests: 1024
 cassandra_jvm_g1_rset_updating_pause_time_percent: 5
 cassandra_jvm_max_gc_pause_ms: 500
