@@ -290,7 +290,7 @@ Manages the AxonOps Dashboards.
 * `--list` List all dashboards in the cluster.
 * `--deletedashboard` Delete a dashboard by its name.
 * `--dashboardname` Name of the dashboard to delete or export.
-* `--position` X position of the dashboard used during import.
+* `--position` X position of the dashboard used during import. Accepted value are integers from 1 to n or -1 to -n (negative number indicates position from the end). If not set, the dashboard will be imported at the end.
 * `--overwrite` Overwrite an existing dashboard during import if a dashboard with the same name exists.
 
 #### Examples:
