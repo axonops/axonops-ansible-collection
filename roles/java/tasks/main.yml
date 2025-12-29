@@ -41,26 +41,26 @@
         state: present
         update_cache: true
 
-    - name: Add APT GPG Key
-      ansible.builtin.apt_key:
-        id: "{{ _zulu_jdk.apt_repo.key_id }}"
-        url: "{{ _zulu_jdk.apt_repo.key_url }}"
-        state: present
+    - name: Ensure keyrings directory exists
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: '0755'
 
-    - name: Download and dearmor key
-      ansible.builtin.uri:
+    - name: Download Azul repository key
+      ansible.builtin.get_url:
         url: "{{ _zulu_jdk.apt_repo.key_url }}"
-        return_content: true
-      register: key_content
+        dest: /tmp/azul-repo.key
+        mode: '0644'
 
-    - name: "Dearmor and save the key"
+    - name: Dearmor and save the key
       ansible.builtin.shell:
-        cmd: echo "{{ key_content.content }}" | gpg --dearmor -o /usr/share/keyrings/azul.gpg
+        cmd: gpg --dearmor < /tmp/azul-repo.key > /usr/share/keyrings/azul.gpg
         creates: /usr/share/keyrings/azul.gpg
 
-    - name: "Add Repository URL"
+    - name: Add Zulu repository with signed-by
       ansible.builtin.apt_repository:
-        repo: "{{ _zulu_jdk.apt_repo.repo_line }}"
+        repo: "deb [signed-by=/usr/share/keyrings/azul.gpg] https://repos.azul.com/zulu/deb stable main"
         state: present
         filename: zulu
 
