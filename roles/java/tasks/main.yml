@@ -58,6 +58,13 @@
         cmd: gpg --dearmor < /tmp/azul-repo.key > /usr/share/keyrings/azul.gpg
         creates: /usr/share/keyrings/azul.gpg
 
+    - name: Set correct permissions on keyring file
+      ansible.builtin.file:
+        path: /usr/share/keyrings/azul.gpg
+        mode: '0644'
+        owner: root
+        group: root
+
     - name: Add Zulu repository with signed-by
       ansible.builtin.apt_repository:
         repo: "deb [signed-by=/usr/share/keyrings/azul.gpg] https://repos.azul.com/zulu/deb stable main"
