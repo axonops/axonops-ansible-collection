@@ -17,13 +17,13 @@ offering flexibility for those who prefer different automation solutions.
 ## Before you start
 
 > ⚠️ **BREAKING CHANGE NOTICE**
-> **IMPORTANT**: Between releases **v0.2.x** and **v0.3.x**, the default Apache Cassandra installation method has changed.  
-> 
-> - **Previous default**: `cassandra_install_format: pkg`  
-> - **New default**: `cassandra_install_format: tar`  
-> 
-> The `tar` method is **strongly recommended** as it simplifies **upgrades and downgrades** compared to package-based installations.  
-> 
+> **IMPORTANT**: Between releases **v0.2.x** and **v0.3.x**, the default Apache Cassandra installation method has changed.
+>
+> - **Previous default**: `cassandra_install_format: pkg`
+> - **New default**: `cassandra_install_format: tar`
+>
+> The `tar` method is **strongly recommended** as it simplifies **upgrades and downgrades** compared to package-based installations.
+>
 > 🔧 If you are **upgrading from a previous version** of this role, please **review your configuration** and explicitly set the `cassandra_install_format` to match your environment.
 
 ## Role Documentation
