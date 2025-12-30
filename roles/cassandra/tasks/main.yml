@@ -132,7 +132,6 @@
         group: cassandra
         mode: '0640'
       loop: "{{ cassandra_ssl_files }}"
-      no_log: true
       when: item is defined
 
 - name: Deploy configuration

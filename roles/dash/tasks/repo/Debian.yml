@@ -15,9 +15,20 @@
 - name: Download AxonOps apt repository key
   ansible.builtin.get_url:
     url: https://packages.axonops.com/apt/repo-signing-key.gpg
-    dest: /usr/share/keyrings/axonops-archive-keyring.gpg
+    dest: /tmp/axonops-repo-signing-key.gpg
     mode: '0644'
-    force: true
+
+- name: Dearmor and save the AxonOps key
+  ansible.builtin.shell:
+    cmd: gpg --dearmor < /tmp/axonops-repo-signing-key.gpg > /usr/share/keyrings/axonops-archive-keyring.gpg
+    creates: /usr/share/keyrings/axonops-archive-keyring.gpg
+
+- name: Set correct permissions on AxonOps keyring file
+  ansible.builtin.file:
+    path: /usr/share/keyrings/axonops-archive-keyring.gpg
+    mode: '0644'
+    owner: root
+    group: root
 
 - name: "Set AxonOps apt repository to {{ axon_agent_public_repository }}"
   ansible.builtin.apt_repository:
