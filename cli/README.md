@@ -133,13 +133,13 @@ Manages **Scheduled Repair** in AxonOps.
   `keyspace.table1,keyspace.table2`.
 * `--nodes` Comma-separated list of node IP addresses to run the repair on. If not set, all nodes in the cluster will be
   included.
-* `--scheduleexpr` Cron Expression for Scheduled Repair. If not set, Scheduled Repair will run immediately.
+* `--scheduleexpr` Cron Expression for Scheduled Repair. If not set, Scheduled Repair will run immediately. Crontab are in UTC time.
 * `--segmented` Enables Segmented Repair.
 * `--segmentspernode` Number of Segments Per Token Range (only applicable if `--segmented` is set).
 * `--incremental` Enables Incremental Repair. If not set, a full repair will be performed.
 * `--jobthreads` Number of Job Threads to use for the repair process. If not set, the default value of 1 will be used.
 * `--partitionerrange` Repair Partitioner Range Only.
-* `--parallelism` Repair Parallelism. Accepted values are `sequential`, `parallel`, and `dc_parallel`. If not set, the
+* `--parallelism` Repair Parallelism. Accepted values are `sequential`, `parallel`, and `dc_aware`. If not set, the
   default value of `sequential` will be used.
 * `--optimisestreams` Optimize Streams during repair (require Cassandra 4.1+).
 * `--datacenters` Comma-separated list of datacenters to include in the repair. If not set, all datacenters will be
