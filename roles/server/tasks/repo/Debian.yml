@@ -5,14 +5,33 @@
     state: present
     update_cache: true
 
-- name: Add AxonOps apt repository key.
-  ansible.builtin.apt_key:
+- name: Ensure keyrings directory exists
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download AxonOps apt repository key
+  ansible.builtin.get_url:
     url: https://packages.axonops.com/apt/repo-signing-key.gpg
-    validate_certs: true
+    dest: /tmp/axonops-repo-signing-key.gpg
+    mode: '0644'
+
+- name: Dearmor and save the AxonOps key
+  ansible.builtin.shell:
+    cmd: gpg --dearmor < /tmp/axonops-repo-signing-key.gpg > /usr/share/keyrings/axonops-archive-keyring.gpg
+    creates: /usr/share/keyrings/axonops-archive-keyring.gpg
+
+- name: Set correct permissions on AxonOps keyring file
+  ansible.builtin.file:
+    path: /usr/share/keyrings/axonops-archive-keyring.gpg
+    mode: '0644'
+    owner: root
+    group: root
 
 - name: Set AxonOps apt repository
   ansible.builtin.apt_repository:
-    repo: "{{ axonops_debian_repository }}"
+    repo: "deb [signed-by=/usr/share/keyrings/axonops-archive-keyring.gpg] {{ axonops_debian_repository.split('deb ')[1] }}"
     state: "present"
     update_cache: true
     validate_certs: "{{ axon_server_validate_certs | default(true) }}"
