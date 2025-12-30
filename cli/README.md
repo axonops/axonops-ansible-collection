@@ -278,3 +278,68 @@ Delete all scheduled repair jobs:
 ```shell
 $ pipenv run python axonops.py scheduledrepair --deleteall
 ```
+
+### `dashboard` Subcommand
+
+Manages the AxonOps Dashboards.
+
+#### Options:
+
+* `--importfile` Path to the dashboard JSON file to import.
+* `--exportpath` Path to save the exported dashboard JSON file.
+* `--list` List all dashboards in the cluster.
+* `--deletedashboard` Delete a dashboard by its name.
+* `--dashboardname` Name of the dashboard to delete or export.
+* `--position` X position of the dashboard used during import. Accepted value are integers from 1 to n or -1 to -n (negative number indicates position from the end). If not set, the dashboard will be imported at the end.
+* `--overwrite` Overwrite an existing dashboard during import if a dashboard with the same name exists.
+
+#### Examples:
+
+Print the list of options for the dashboard command:
+
+```shell
+$ pipenv run python axonops.py dashboard -h
+```
+
+List all dashboards in the cluster:
+
+```shell
+$ pipenv run python axonops.py dashboard --list
+```
+
+Export a dashboard by its name to the current directory:
+
+```shell
+$ pipenv run python axonops.py dashboard -h --exportpath . --dashboardname Table
+```
+
+Export all dashboards to the current directory:
+
+```shell
+$ pipenv run python axonops.py dashboard --exportpath .
+```
+
+Override an existing dashboard with one from a JSON file:
+
+```shell
+$ pipenv run python axonops.py dashboard --dashboardname Table --importfile ./Table_dashboard.json  --overwrite
+```
+
+Override an existing dashboard with one from a JSON file, taking the name from the file:
+
+```shell
+$ pipenv run python axonops.py dashboard --importfile ./Table_dashboard.json  --overwrite
+```
+
+Override an existing dashboard with one from a JSON file, taking the name from the file and setting its X position to 3:
+
+```shell
+$ pipenv run python axonops.py dashboard --importfile ./Table_dashboard.json  --overwrite --position 3
+```
+
+Override an existing dashboard with one from a JSON file, taking the name from the file and setting its X position to
+-1 (fist from the bottom):
+
+```shell
+$ pipenv run python axonops.py dashboard --importfile ./Table_dashboard.json  --overwrite --position -1
+```

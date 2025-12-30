@@ -4,6 +4,7 @@ import sys
 from typing import Sequence
 
 from .axonops import AxonOps
+from .components.dashboard import Dashboard
 from .components.repair import AdaptiveRepair
 from .components.scheduled_repair import ScheduledRepair
 from .utils import remove_not_alphanumeric
@@ -131,6 +132,28 @@ class Application:
         paxos_group.add_argument('--skippaxos', action='store_true', default=False,
                                  help='Skip Paxos repairs')
 
+        dashboard_parser = commands_subparser.add_parser(
+            "dashboard",
+            help="Manage the AxonOps Dashboards")
+
+        dashboard_parser.set_defaults(func=self.run_dashboard)
+
+        dashboard_parser.add_argument('--list', action='store_true',
+                                      help='List all dashboards for the specified cluster')
+        file_dash_group = dashboard_parser.add_mutually_exclusive_group()
+        file_dash_group.add_argument('--exportpath', type=str, required=False,
+                                     help='Path to export dashboards to JSON files')
+        file_dash_group.add_argument('--importfile', type=str, required=False,
+                                     help='File path to import dashboard from a JSON file')
+        dashboard_parser.add_argument('--dashboardname', type=str, required=False,
+                                      help='Name of the dashboard to export or delete')
+        dashboard_parser.add_argument('--deletedashboard', type=str, required=False,
+                                      help='Delete the specified dashboard from AxonOps')
+        dashboard_parser.add_argument('--position', type=int, required=False,
+                                      help='Position of the dashboard in the list (used for import)')
+        dashboard_parser.add_argument('--overwrite', action='store_true',
+                                      help='Overwrite existing dashboard when importing')
+
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
         # ensure --tables is only used together with --keyspace
@@ -169,6 +192,27 @@ class Application:
             if args.v:
                 print(f"Org: {args.org}")
                 print(f"Cluster: {args.cluster}")
+
+    def run_dashboard(self, args: argparse.Namespace):
+        """ Run the dashboard management """
+        if args.v:
+            print(f"Running dashboard management on {args.org}")
+            print(args)
+
+        axonops = self.get_axonops(args)
+
+        dashboard = Dashboard(axonops, args)
+        dashboard.get_actual_dashboards()
+        if args.list:
+            dashboard.list_dashboards()
+        elif args.exportpath:
+            dashboard.export_dashboard(args.exportpath, args.dashboardname)
+        elif args.importfile:
+            dashboard.import_dashboard(args.importfile, args.dashboardname, args.position, args.overwrite)
+        elif args.deletedashboard:
+            dashboard.delete_dashboard(args.deletedashboard)
+        else:
+            print("No action specified for dashboard management.")
 
     def run_adaptive_repair(self, args: argparse.Namespace):
         """ Run the adaptive repair """
