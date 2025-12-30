@@ -69,7 +69,7 @@ class Dashboard:
     def import_dashboard(self, file_path: str, dashboard_name: str | None = None, position: int | None = None,
                          overwrite: bool = False):
         """ Import a specific dashboard to AxonOps. If no name is given, import all dashboards found in the file. """
-        old_position = -1
+        old_position = None
         # Load dashboard(s) from the specified file
         with open(file_path, 'r') as f:
             dashboard_data = json.load(f)
@@ -112,7 +112,10 @@ class Dashboard:
                 if self.args.v:
                     print(f"Inserting dashboard '{dashboard['name']}' at specified position {insert_position + 1}")
             else:
-                insert_position = old_position
+                if old_position is None:
+                    insert_position = len(self.dashboard_data)
+                else:
+                    insert_position = old_position
                 if self.args.v:
                     print(f"Inserting dashboard '{dashboard['name']}' at old position {insert_position + 1}")
             # Insert the new dashboard at the specified position
