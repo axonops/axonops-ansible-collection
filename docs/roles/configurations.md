@@ -2,7 +2,9 @@
 
 ## Overview
 
-The `configurations` role configures alerts, integrations, and monitoring settings for your AxonOps deployment. This role manages metric alerts, backup configurations, service checks, integration with notification services (Slack, PagerDuty), log alerts, and custom dashboards.
+The `configurations` role configures alerts, integrations, and monitoring settings for your AxonOps deployment. This
+role manages metric alerts, backup configurations, service checks, integration with notification services (Slack,
+PagerDuty), log alerts, and custom dashboards.
 
 ## Requirements
 
@@ -14,20 +16,20 @@ The `configurations` role configures alerts, integrations, and monitoring settin
 
 ### Required Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `org` | Organization name in AxonOps | `mycompany` |
+| Variable  | Description                          | Example              |
+|-----------|--------------------------------------|----------------------|
+| `org`     | Organization name in AxonOps         | `mycompany`          |
 | `cluster` | Cluster name to configure alerts for | `production-cluster` |
 
 **Note**: These variables can also be set via environment variables `AXONOPS_ORG` and `AXONOPS_CLUSTER`.
 
 ### Optional Feature Flags
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `adaptive_repair` | Configuration for adaptive repair settings | undefined |
-| `agent_disconnection_tolerance` | Agent disconnection tolerance settings | undefined |
-| `human_readableid` | Human-readable ID configuration | undefined |
+| Variable                        | Description                                | Default   |
+|---------------------------------|--------------------------------------------|-----------|
+| `adaptive_repair`               | Configuration for adaptive repair settings | undefined |
+| `agent_disconnection_tolerance` | Agent disconnection tolerance settings     | undefined |
+| `human_readableid`              | Human-readable ID configuration            | undefined |
 
 ## Dependencies
 
@@ -124,6 +126,7 @@ This role requires a running AxonOps Server with API access.
   roles:
     - role: axonops.axonops.configurations
 ```
+
 ## Details playbook
 
 ### Adaptive Repair Configuration
@@ -132,7 +135,9 @@ The Adaptive Repair feature can be configured by setting the `adaptive_repair` v
 no need for files in the `config` directory.
 
 This allows you to enable or disable adaptive repair settings for your cluster.
+
 #### List of Parameters
+
 | Parameter             | Description                                                                      | Type    | Default |
 |-----------------------|----------------------------------------------------------------------------------|---------|---------|
 | `enabled`             | Enable or disable adaptive repair                                                | boolean | `true`  |
@@ -175,7 +180,9 @@ This allows you to enable or disable adaptive repair settings for your cluster.
 ```
 
 #### Set GC Grace Threshold
-Set the GC grace period. AxonOps will ignore tables that have a `gc_grace_seconds` value lower than the specified threshold.
+
+Set the GC grace period. AxonOps will ignore tables that have a `gc_grace_seconds` value lower than the specified
+threshold.
 The default is `86400` seconds (1 day).
 
 ```yaml
@@ -195,6 +202,7 @@ The default is `86400` seconds (1 day).
 #### Set Table Parallelism
 
 It is suggested to keep this value at least as the number of table in the cluster.
+
 ```yaml
 - name: Set Table Parallelism for Adaptive Repair
   hosts: localhost
@@ -218,8 +226,8 @@ It is suggested to keep this value at least as the number of table in the cluste
     org: mycompany
     cluster: production-cluster
     adaptive_repair:
-        enabled: true
-        segmentretries: 10
+      enabled: true
+      segmentretries: 10
 
   roles:
     - role: axonops.axonops.configurations
@@ -228,6 +236,7 @@ It is suggested to keep this value at least as the number of table in the cluste
 #### Set Segment Target Size
 
 Number from 16 to 10240
+
 ```yaml
 - name: Set Segment Target Size for Adaptive Repair
   hosts: localhost
@@ -243,6 +252,7 @@ Number from 16 to 10240
 ```
 
 #### Exclude Tables from Adaptive Repair
+
 List of tables to exclude from adaptive repair. The accepted format is a list of strings in the form "keyspace.table".
 To exclude an entire keyspace, use "keyspace.*".
 The default is an empty list.
@@ -256,8 +266,8 @@ The default is an empty list.
     adaptive_repair:
       enabled: true
       excludedtables:
-      - "system.peers"
-      - "system.local"
+        - "system.peers"
+        - "system.local"
 
 
   roles:
@@ -265,6 +275,7 @@ The default is an empty list.
 ```
 
 #### Set Maximum Segments per Table
+
 Set the maximum number of segments per table to repair in a single repair cycle.
 Having too many segments in a table causes too many repair commands to be sent.
 
@@ -283,6 +294,7 @@ Having too many segments in a table causes too many repair commands to be sent.
 ```
 
 #### Set Segment Timeout
+
 Set the timeout in seconds for each segment repair operation.
 Integer number followed by one of "s, m, h, d, w, M, y"
 
@@ -299,25 +311,106 @@ Integer number followed by one of "s, m, h, d, w, M, y"
   roles:
     - role: axonops.axonops.configurations
 ```
+
+### Service Checks
+
+Service checks can be configured by providing YAML a file called `service_checks.yml` in the directory
+`config/[YOUR_ORG_NAME]`
+to make them available for all clusters in the organization, or in `config/[YOUR_ORG_NAME]/[YOUR_CLUSTER_NAME]` to make
+them available for a specific cluster.
+
+The file is optional, if the file is not provided, no service checks will be configured.
+
+The format of the file is as follows:
+
+```yaml
+axonops_shell_check: [ ]
+
+axonops_tcp_check: [ ]
+```
+
+both `axonops_shell_check` and `axonops_tcp_checks` are optionals.
+
+#### list of parameters for axonops_shell_check
+
+| Parameter  | Description                           | Type    | Default     |
+|------------|---------------------------------------|---------|-------------|
+| `name`     | Name of the shell check               | String  |             |
+| `present`  | Whether the check is present or not   | Boolean | True        |
+| `interval` | How much ofthen the check need to run | String  |             |
+| `timeout`  | Timeout for the check                 | String  |             |
+| `shell`    | Shell used by the script              | String  | '/bin/bash' |
+| `script`   | Script of the check                   | String  |             |
+
+List of outcome codes for shell checks:
+
+- `0`: OK
+- `1`: WARNING
+- `2`: CRITICAL
+
+#### Dummy example of axonops_shell_check
+
+This is example of a dummy shell check that always returns CRITICAL:
+
+```yaml
+axonops_shell_check:
+  - name: "Dummy check"
+    present: true
+    interval: "5m"
+    timeout: "10s"
+    script: |
+      #!/bin/bash
+      echo "This is a dummy check"
+      exit 2"
+```
+
+#### Example of a shell check to monitor if a Debian/Ubuntu host needs a reboot
+
+This check looks for the presence of the file `/var/run/reboot-required`, which is created by the system when a reboot
+is needed after package installations or updates.
+
+```yaml
+axonops_shell_check:
+  - name: Debian / Ubuntu - Check host needs reboot
+    interval: 12h
+    present: true
+    timeout: 1m
+    script: |-
+      set -euo pipefail
+
+      if [ -f /var/run/reboot-required ]
+      then
+          echo `hostname` Reboot required
+          exit 1
+      else
+          echo "Nothing to do"
+      fi
+```
+
+**Note:** More examples of service checks can be found in the org level
+[service_checks.yml](../../examples/configurations/config/REPLACE_WITH_ORG_NAME/service_checks.yml) or the cluster level
+[service_checks.yml](../../examples/configurations/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/service_checks.yml)
+example files.
+
 ## Available Tags
 
 The role supports granular control through the following tags:
 
-| Tag | Description |
-|-----|-------------|
-| `metrics` | Configure metric alerts |
-| `backups` | Configure backup settings |
-| `service_checks` | Configure service check alerts |
-| `slack` | Configure Slack integration |
-| `pagerduty_integration` | Configure PagerDuty integration |
-| `adaptive_repair` | Configure adaptive repair settings |
+| Tag                             | Description                             |
+|---------------------------------|-----------------------------------------|
+| `metrics`                       | Configure metric alerts                 |
+| `backups`                       | Configure backup settings               |
+| `service_checks`                | Configure service check alerts          |
+| `slack`                         | Configure Slack integration             |
+| `pagerduty_integration`         | Configure PagerDuty integration         |
+| `adaptive_repair`               | Configure adaptive repair settings      |
 | `agent_disconnection_tolerance` | Configure agent disconnection tolerance |
-| `commitlogs_archive` | Configure commit log archiving |
-| `human_readableid` | Configure human-readable IDs |
-| `log_alerts` | Configure log-based alerts |
-| `logcollector` | Configure log collector |
-| `dashboards` | Import custom dashboards |
-| `routes` | Configure alert routing rules |
+| `commitlogs_archive`            | Configure commit log archiving          |
+| `human_readableid`              | Configure human-readable IDs            |
+| `log_alerts`                    | Configure log-based alerts              |
+| `logcollector`                  | Configure log collector                 |
+| `dashboards`                    | Import custom dashboards                |
+| `routes`                        | Configure alert routing rules           |
 
 ## Tasks Overview
 
@@ -359,11 +452,13 @@ The role performs the following tasks based on the enabled tags:
 - **API Access**: Ensure you have proper API credentials configured for the AxonOps Server
 - **Organization and Cluster**: The `org` and `cluster` variables must match existing entries in your AxonOps deployment
 - **Idempotency**: The role is designed to be idempotent and can be run multiple times safely
-- **Configuration Files**: Alert definitions can be customized by providing your own configuration files in the appropriate directories
+- **Configuration Files**: Alert definitions can be customized by providing your own configuration files in the
+  appropriate directories
 
 ## Additional Resources
 
 For more information about AxonOps alerts and configuration, see:
+
 - [ALERTS.md](../../ALERTS.md) in the repository root
 - [AxonOps Documentation](https://docs.axonops.com/)
 
