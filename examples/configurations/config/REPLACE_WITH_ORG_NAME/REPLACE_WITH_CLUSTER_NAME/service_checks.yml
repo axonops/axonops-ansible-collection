@@ -1,0 +1,220 @@
+######## Service Checks ########
+# This is an example set of service checks for the health of your cluster.
+# These rules are some examples of how checks can be configured for
+# your Apache Cassandra cluster. The checks defined here will be applied
+# to this specific cluster.
+
+axonops_shell_check:
+  # This check verifies if a Debian/Ubuntu host requires a reboot, checking for the presence of the
+  # /var/run/reboot-required file. If the file exists, it indicates that a reboot is necessary,
+  # and the check will fail with a warning.
+  - name: Debian / Ubuntu - Check host needs reboot
+    interval: "12h"
+    present: true
+    timeout: 1m
+    script: |-
+      set -euo pipefail
+      
+      if [ -f /var/run/reboot-required ]
+      then
+          echo `hostname` Reboot required
+          exit 1
+      else
+          echo "Nothing to do"
+      fi
+
+    # This check verifies if the host is running in AWS and checks for any scheduled maintenance events.
+    # This is done by querying the AWS instance metadata service for scheduled maintenance events.
+    # If any events are found, the check will fail, indicating that maintenance is scheduled.
+    # If the host is not running in AWS or no events are found, the check will pass.
+    # Note: This check assumes that the instance has access to the AWS metadata service.
+  - name: Check AWS events
+    interval: "12h"
+    present: true
+    timeout: 1m
+    shell: '/usr/bin/python3'
+    script: |-
+      import urllib.request
+      import json
+      import sys
+      
+      url = "http://169.254.169.254/latest/meta-data/events/maintenance/scheduled"
+      try:
+        response = urllib.request.urlopen(url, timeout=2).read()
+      except urllib.error.URLError as e:
+        print("Connection refused: assuming not running in AWS")
+        sys.exit(0)
+      except urllib.error.HTTPError as e:
+        if e.code == 404:
+          print("No scheduled maintenance events found or not an AWS instance")
+          sys.exit(0)
+      
+      data = json.loads(response.decode('utf-8'))
+      
+      if not data:
+          print("No events for this node")
+          sys.exit(0)
+      else:
+          print("Events detected:")
+          for event in data:
+              print(f"{event['NotBefore']} - {event['Description']}")
+          sys.exit(1)
+
+    # This check verifies if there are any schema disagreements in the Cassandra cluster.
+    # It uses the `nodetool describecluster` command to retrieve the schema versions
+    # and checks if there is more than one unique schema version among the nodes.
+    # If multiple schema versions are detected, it indicates a schema disagreement,
+    # and the check will fail. If the command fails to execute or retrieve the schema versions
+    # reliably, the check will issue a warning.
+    # A random jitter is added to the execution time to avoid simultaneous execution.interval.
+    # This helps to prevent potential load spikes on the cluster.
+  - name: Check for schema disagreements
+    interval: "1d"
+    present: true
+    timeout: 1m
+    script: |-
+      #!/bin/bash
+      
+      EXIT_OK=0
+      EXIT_WARNING=1
+      EXIT_CRITICAL=2
+      
+      # Locate nodetool
+      if command -v nodetool >/dev/null 2>&1; then
+          NODETOOL=nodetool
+      elif [ -x /opt/cassandra/bin/nodetool ]; then
+          NODETOOL=/opt/cassandra/bin/nodetool
+      elif [ -x /usr/local/cassandra/bin/nodetool ]; then
+          NODETOOL=/usr/local/cassandra/bin/nodetool
+      else
+          echo "nodetool not found"
+          exit $EXIT_CRITICAL
+      fi
+      
+      # Jitter to avoid herd effect
+      sleep $(( RANDOM % 60 ))
+      
+      check_schema() {
+          $NODETOOL describecluster 2>/dev/null \
+            | awk '/Schema versions:/,/^$/' \
+            | grep -v "Schema versions" \
+            | grep -v "UNREACHABLE" \
+            | grep -v "^\s*$" \
+            | grep -v ":" \
+            | wc -l
+      }
+      
+      # First attempt
+      schema_versions=$(check_schema)
+      rc=$?
+      
+      # Retry once if nodetool struggled
+      if [ $rc -ne 0 ] || [ -z "$schema_versions" ]; then
+          sleep 10
+          schema_versions=$(check_schema)
+          rc=$?
+      fi
+      
+      # nodetool/JMX problem → WARNING
+      if [ $rc -ne 0 ] || [ -z "$schema_versions" ]; then
+          echo "Unable to reliably query schema versions (node under load?)"
+          exit $EXIT_WARNING
+      fi
+      
+      # Actual schema disagreement
+      if [ "$schema_versions" -gt 1 ]; then
+          echo "Schema disagreement detected ($schema_versions versions)"
+          exit $EXIT_CRITICAL
+      fi
+      
+      exit $EXIT_OK
+
+    # This check verifies that all files and directories under the Cassandra data directory
+    # (/opt/cassandra/data) are owned by the 'cassandra' user and group.
+    # It recursively traverses the data directory, excluding any 'snapshots' subdirectories,
+    # and checks the ownership of each file and directory.
+    # If any files or directories are found that are not owned by 'cassandra:cassandra',
+    # the check will fail and list those items. If there are permission issues preventing
+    # a full scan, a warning will be issued.
+    # the data directory, the user and group ownership are in a variable for easy modification.
+    # note that this script performs a full scan of the data directory, which may take some time and resources.
+  - name: Checkout cassandra data ownership
+    interval: "1d"
+    present: true
+    timeout: "3m"
+    shell: "/usr/bin/python3"
+    script: |-
+      #!/usr/bin/env python3
+
+      import os
+      import sys
+      import pwd
+      import grp
+      
+      DATA_DIR = "/opt/cassandra/data"
+      EXPECTED_USER = "cassandra"
+      EXPECTED_GROUP = "cassandra"
+      EXCLUDE_DIR = "snapshots"
+      
+      def main():
+          try:
+              expected_uid = pwd.getpwnam(EXPECTED_USER).pw_uid
+              expected_gid = grp.getgrnam(EXPECTED_GROUP).gr_gid
+          except KeyError as e:
+              print(f"WARNING: User or group not found: {e}")
+              sys.exit(1)
+      
+          ownership_issues = []
+          permission_issues = []
+      
+          for root, dirs, files in os.walk(DATA_DIR, topdown=True):
+              # Exclude snapshots directories
+              dirs[:] = [d for d in dirs if d != EXCLUDE_DIR]
+      
+              # Check directory itself
+              try:
+                  st = os.stat(root)
+                  if st.st_uid != expected_uid or st.st_gid != expected_gid:
+                      ownership_issues.append(root)
+              except PermissionError as e:
+                  permission_issues.append(f"{root}: {e}")
+                  continue
+      
+              # Check files
+              for name in files:
+                  path = os.path.join(root, name)
+                  try:
+                      st = os.stat(path)
+                      if st.st_uid != expected_uid or st.st_gid != expected_gid:
+                          ownership_issues.append(path)
+                  except PermissionError as e:
+                      permission_issues.append(f"{path}: {e}")
+      
+          if permission_issues:
+              print("WARNING: Unable to fully scan the data directory due to permission issues")
+              for msg in permission_issues:
+                  print(msg)
+              sys.exit(1)
+      
+          if ownership_issues:
+              print(f"CRITICAL: Found files or directories not owned by "
+                    f"{EXPECTED_USER}:{EXPECTED_GROUP}")
+              for path in ownership_issues:
+                  print(path)
+              sys.exit(2)
+      
+          print(f"OK: All accessible files under {DATA_DIR} are owned by "
+                f"{EXPECTED_USER}:{EXPECTED_GROUP}")
+          sys.exit(0)
+
+
+      if __name__ == "__main__":
+          main()
+
+
+axonops_tcp_check:
+  - name: cql_client_port
+    interval: 3m
+    timeout: 1m
+    tcp: "{{.comp_listen_address}}:{{.comp_native_transport_port}}"
+    present: true

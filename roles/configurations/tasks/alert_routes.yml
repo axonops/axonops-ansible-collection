@@ -8,14 +8,14 @@
 - name: Load organization-wide alert rules from {{ org }}
   tags: always
   ansible.builtin.set_fact:
-    axonops_alert_routes: "{{ axonops_alert_routes + (lookup('file', item) | from_yaml).axonops_alert_routes }}"
+    axonops_alert_routes: "{{ axonops_alert_routes + ((lookup('file', item) | from_yaml).axonops_alert_routes | default([])) }}"
   with_fileglob:
     - "config/{{ org }}/alert_routes.yml"
 
 - name: Load cluster-specific alert rules
   tags: always
   ansible.builtin.set_fact:
-    axonops_alert_routes: "{{ axonops_alert_routes + (lookup('file', item) | from_yaml).axonops_alert_routes }}"
+    axonops_alert_routes: "{{ axonops_alert_routes + ((lookup('file', item) | from_yaml).axonops_alert_routes | default([])) }}"
   with_fileglob:
     - "config/{{ org }}/{{ cluster }}/alert_routes.yml"
 

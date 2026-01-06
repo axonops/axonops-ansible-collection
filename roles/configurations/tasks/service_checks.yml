@@ -2,39 +2,39 @@
 - name: Initialize axonops_shell_check
   tags: always
   ansible.builtin.set_fact:
-    axonops_shell_check: []
+    axonops_shell_check: [ ]
   when: axonops_shell_check is not defined
 
 - name: Load organization-wide shell check rules
   tags: always
   ansible.builtin.set_fact:
-    axonops_shell_check: "{{ axonops_shell_check + (lookup('file', item) | from_yaml).axonops_shell_check }}"
+    axonops_shell_check: "{{ axonops_shell_check + ((lookup('file', item) | from_yaml).axonops_shell_check | default([])) }}"
   with_fileglob:
     - "config/{{ org }}/service_checks.yml"
 
 - name: Load cluster-specific shell check rules
   tags: always
   ansible.builtin.set_fact:
-    axonops_shell_check: "{{ axonops_shell_check + (lookup('file', item) | from_yaml).axonops_shell_check }}"
+    axonops_shell_check: "{{ axonops_shell_check + ((lookup('file', item) | from_yaml).axonops_shell_check | default([])) }}"
   with_fileglob:
     - "config/{{ org }}/{{ cluster }}/service_checks.yml"
 
 - name: Initialize axonops_tcp_check
   tags: always
   ansible.builtin.set_fact:
-    axonops_tcp_check: []
+    axonops_tcp_check: [ ]
 
 - name: Load organization-wide tcp check rules
   tags: always
   ansible.builtin.set_fact:
-    axonops_tcp_check: "{{ axonops_tcp_check + (lookup('file', item) | from_yaml).axonops_tcp_check }}"
+    axonops_tcp_check: "{{ axonops_tcp_check + (lookup('file', item) | from_yaml).axonops_tcp_check | default([]) }}"
   with_fileglob:
     - "config/{{ org }}/service_checks.yml"
 
 - name: Load cluster-specific tcp check rules
   tags: always
   ansible.builtin.set_fact:
-    axonops_tcp_check: "{{ axonops_tcp_check + (lookup('file', item) | from_yaml).axonops_tcp_check }}"
+    axonops_tcp_check: "{{ axonops_tcp_check + (lookup('file', item) | from_yaml).axonops_tcp_check | default([]) }}"
   with_fileglob:
     - "config/{{ org }}/{{ cluster }}/service_checks.yml"
 
@@ -53,10 +53,10 @@
   loop_control:
     loop_var: tcpcheck_item
   tags:
-  - axonops_tcp_check
-  - tcp_check
-  - check
-  - tcp
+    - axonops_tcp_check
+    - tcp_check
+    - check
+    - tcp
 
 - name: "Apply Shell Check on {{ org }}/{{ cluster }}"
   axonops.axonops.shell_check:
@@ -78,9 +78,9 @@
   loop_control:
     loop_var: shellcheck_item
   tags:
-  - axonops_shell_check
-  - shell_check
-  - check
-  - shell
+    - axonops_shell_check
+    - shell_check
+    - check
+    - shell
 
 # code: language=ansible

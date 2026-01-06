@@ -8,7 +8,7 @@
 - name: Load cluster-specific backups
   tags: always
   ansible.builtin.set_fact:
-    axonops_backups: "{{ axonops_backups + (lookup('file', item) | from_yaml).backups }}"
+    axonops_backups: "{{ axonops_backups + ((lookup('file', item) | from_yaml).backups | default([])) }}"
   with_fileglob:
     - "config/{{ org }}/{{ cluster }}/backups.yml"
 
