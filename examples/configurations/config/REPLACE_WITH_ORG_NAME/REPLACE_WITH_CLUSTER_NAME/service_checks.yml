@@ -127,6 +127,8 @@ axonops_shell_check:
           exit $EXIT_CRITICAL
       fi
       
+      echo "No schema disagreement detected"
+      
       exit $EXIT_OK
 
     # This check verifies that all files and directories under the Cassandra data directory
