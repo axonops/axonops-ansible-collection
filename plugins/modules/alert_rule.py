@@ -74,8 +74,8 @@ TODO
 
 import re
 import uuid
-from ansible.module_utils.basic import AnsibleModule
 
+from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.axonops.axonops.plugins.module_utils.axonops import AxonOps
 from ansible_collections.axonops.axonops.plugins.module_utils.axonops_utils import dicts_are_different, \
     find_by_field, get_integration_id_by_name, get_value_by_name, make_module_args, normalize_numbers
@@ -88,7 +88,7 @@ def run_module():
         'dashboard': {'type': 'str', 'required': True},
         'chart': {'type': 'str', 'required': True},
         'metric': {'type': 'str', 'default': ''},
-        'operator': {'type': 'str', 'choices': ['=', '>=', '>', '<=', '<', '!=']},
+        'operator': {'type': 'str', 'choices': ['==', '>=', '>', '<=', '<', '!=']},
         'warning_value': {'type': 'float'},
         'critical_value': {'type': 'float'},
         'duration': {'type': 'str'},
