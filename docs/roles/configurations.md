@@ -312,9 +312,86 @@ Integer number followed by one of "s, m, h, d, w, M, y"
     - role: axonops.axonops.configurations
 ```
 
+### Metric Alerts
+Metric alerts can be configured by providing a YAML file called `metric_alert_rules.yml` in the directory
+`config/[YOUR_ORG_NAME]`
+to make them available for all clusters in the organization, or in `config/[YOUR_ORG_NAME]/[YOUR_CLUSTER_NAME]` to make
+them available for a specific cluster.
+
+The file is optional, if the file is not provided, no metric alerts will be configured.
+The format of the file is as follows:
+
+```yaml
+metric_alert_rules:
+  - name: name of the check
+    dashboard: dashboard name
+    chart: chart name 
+    operator: '>='
+    critical_value: 2
+    warning_value: 1
+    duration: 15m
+    description: my example metric alert
+    enabled: true
+```
+
+The variable `metric_alert_rules` is a list of metric alert definitions. The variable is optional.
+
+#### list of parameters for metric_alert_rules
+
+| Parameter    | Description                                                                                    | Type    | Default |
+|--------------|------------------------------------------------------------------------------------------------|---------|---------|
+| `name`       | Name of the alert                                                                              | String  |         |
+| `description`| Description of the alert                                                                       | String  |         | 
+| `chart`      | Name of the chart to monitor                                                                   | String  |         |
+| `dashboard`  | Name of the dashboard containing the chart                                                     | String  |         |
+| `operator`   | Comparison operator for the alert condition. Value accepted: '==', '>=', '>', '<=', '<', '!='. | String  |         |
+| `critical_value` | Value to trigger a critical alert                                                          | Float   |         |
+| `warning_value`  | Value to trigger a warning alert                                                            | Float   |         |
+| `duration`   | Duration for which the condition must be met before triggering the alert                           | String  |         |
+| `enabled`    | Whether the alert is enabled or not                                                            | Boolean | True    |
+
+#### Check for DOWN nodes
+
+This is an example of a metric alert that triggers a critical alert when the number of DOWN nodes per cluster
+is greater than or equal to 2, and a warning alert when it is greater than or equal to 1, for a duration of 15 minutes.
+```yaml 
+metric_alert_rules:
+  - name: DOWN count per node
+    dashboard: Overview
+    chart: Number of Endpoints Down Per Node Point Of View
+    operator: '>='
+    critical_value: 2
+    warning_value: 1
+    duration: 15m
+    description: Detected DOWN nodes
+
+```
+
+#### Check for High Disk Utilization
+This is an example of a metric alert that triggers a critical alert when the disk usage percentage for any mount point
+is greater than or equal to 90%, and a warning alert when it is greater than or equal to 75%, for a duration of 12 hours.
+
+```yaml
+metric_alert_rules:
+  - name: Disk % Usage $mountpoint
+    dashboard: System
+    chart: Disk % Usage $mountpoint
+    operator: '>='
+    critical_value: 90
+    warning_value: 75
+    duration: 12h
+    description: Detected High disk utilization
+```
+
+**Note:** More examples of metric checks can be found in the org level
+[metric_alert_rules.yml](../../examples/configurations/config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml) or the cluster level
+[metric_alert_rules.yml](../../examples/configurations/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/metric_alert_rules.yml)
+example files.
+
+
 ### Service Checks
 
-Service checks can be configured by providing YAML a file called `service_checks.yml` in the directory
+Service checks can be configured by providing a YAML file called `service_checks.yml` in the directory
 `config/[YOUR_ORG_NAME]`
 to make them available for all clusters in the organization, or in `config/[YOUR_ORG_NAME]/[YOUR_CLUSTER_NAME]` to make
 them available for a specific cluster.
