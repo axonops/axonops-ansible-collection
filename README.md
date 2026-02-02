@@ -34,7 +34,7 @@ This collection provides the following Ansible roles. Click on each role for det
 - **[agent](docs/roles/agent.md)** - Install and configure AxonOps Agent for Cassandra monitoring
 - **[server](docs/roles/server.md)** - Install and configure AxonOps Server (self-hosted deployments)
 - **[dash](docs/roles/dash.md)** - Install and configure AxonOps Dashboard web interface
-- **[configurations](docs/roles/alerts.md)** - Configure alerts, integrations, and monitoring settings
+- **[configurations](docs/roles/configurations.md)** - Configure alerts, integrations, and monitoring settings
 
 ### Infrastructure Components
 - **[cassandra](docs/roles/cassandra.md)** - Install and configure Apache Cassandra (3.11, 4.x, 5.x)
