@@ -76,9 +76,8 @@ import re
 import uuid
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.axonops.axonops.plugins.module_utils.axonops import AxonOps
 from ansible_collections.axonops.axonops.plugins.module_utils.axonops_utils import dicts_are_different, \
-    find_by_field, get_integration_id_by_name, get_value_by_name, make_module_args, normalize_numbers
+    find_by_field, get_integration_id_by_name, get_value_by_name, make_module_args, normalize_numbers, get_axonops_instance
 
 
 def run_module():
@@ -129,10 +128,7 @@ def run_module():
     alert_name = module.params['name'] or module.params['chart']
     url_filter = module.params['url_filter'] or 'time=30'
 
-    axonops = AxonOps(module.params['org'], auth_token=module.params['auth_token'], base_url=module.params['base_url'],
-                      username=module.params['username'], password=module.params['password'],
-                      cluster_type=module.params['cluster_type'], api_token=module.params['api_token'],
-                      override_saas=module.params['override_saas'])
+    axonops = get_axonops_instance(module.params)
 
     if axonops.errors:
         module.fail_json(msg=' '.join(axonops.errors), **result)

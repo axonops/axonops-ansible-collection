@@ -113,9 +113,8 @@ import json
 import uuid
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.axonops.axonops.plugins.module_utils.axonops import AxonOps
-from ansible_collections.axonops.axonops.plugins.module_utils.axonops_utils import make_module_args, \
-    dicts_are_different, string_to_bool, string_or_none, bool_to_string
+from ansible_collections.axonops.axonops.plugins.module_utils.axonops_utils import bool_to_string, dicts_are_different, \
+    get_axonops_instance, make_module_args, string_or_none, string_to_bool
 
 
 def run_module():
@@ -124,7 +123,8 @@ def run_module():
         'local_retention': {'type': 'str', 'default': "10d"},
         'remote_path': {'type': 'str', 'required': False, 'default': ''},
         'remote_retention': {'type': 'str', 'default': "60d"},
-        'remote_type': {'type': 'str', 'required': False, 'default': 'local', 'choices': ['local', 's3', 'sftp', 'azure']},
+        'remote_type': {'type': 'str', 'required': False, 'default': 'local',
+                        'choices': ['local', 's3', 'sftp', 'azure']},
         'timeout': {'type': 'str', 'default': "10h"},
         'transfers': {'type': 'int', 'default': 1},
         'remote': {'type': 'bool', 'default': False},
@@ -189,10 +189,7 @@ def run_module():
         'changed': False,
     }
 
-    axonops = AxonOps(module.params['org'], auth_token=module.params['auth_token'], base_url=module.params['base_url'],
-                      username=module.params['username'], password=module.params['password'],
-                      cluster_type=module.params['cluster_type'], api_token=module.params['api_token'],
-                      override_saas=module.params['override_saas'])
+    axonops = get_axonops_instance(module.params)
 
     if axonops.errors:
         module.fail_json(msg=' '.join(axonops.errors), **result)

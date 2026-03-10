@@ -1,5 +1,7 @@
 from ansible.module_utils.basic import env_fallback
 
+from .axonops import AxonOps
+
 
 def make_module_args(module_args: dict) -> dict:
     return {**base_module_args(), **module_args}
@@ -18,8 +20,23 @@ def base_module_args() -> dict:
         "api_token": {"type": 'str', "required": False, "fallback": (env_fallback, ['AXONOPS_API_TOKEN'])},
         "override_saas": {"type": 'bool', "required": False, "fallback": (env_fallback, ['AXONOPS_OVERRIDE_SAAS']),
                           'default': False},
+        "use_saml": {"type": 'bool', "required": False, "fallback": (env_fallback, ['AXONOPS_USE_SAML']),
+                     'default': False},
 
     }
+
+def get_axonops_instance(params):
+    return AxonOps(
+        org_name=params['org'],
+        auth_token=params.get('auth_token', ''),
+        base_url=params.get('base_url', ''),
+        username=params.get('username', ''),
+        password=params.get('password', ''),
+        cluster_type=params.get('cluster_type', 'cassandra'),
+        api_token=params.get('api_token', ''),
+        override_saas=params.get('override_saas', False),
+        use_saml=params.get('use_saml', False)
+    )
 
 
 def dicts_are_different(a: dict, b: dict) -> bool:

@@ -1,14 +1,15 @@
 import json
 import urllib.parse
+from urllib.error import HTTPError
+
 from ansible.module_utils.urls import open_url
 from typing import List
 
 
 class AxonOps:
-    cloud_url: str = "https://dash.axonops.cloud"
 
     def __init__(self, org_name: str, auth_token: str = '', base_url: str = '', username: str = '', password: str = '',
-                 cluster_type: str = 'cassandra', api_token: str = '', override_saas: bool = False):
+                 cluster_type: str = 'cassandra', api_token: str = '', override_saas: bool = False, use_saml: bool = False):
         self.org_name = org_name
         self.auth_token = auth_token
         self.api_token = api_token
@@ -16,6 +17,7 @@ class AxonOps:
         self.password = password
         self.cluster_type = cluster_type
         self.jwt = ''
+        self.use_saml = use_saml
 
         # save the integration output to a var so we can use it multiple times
         self.integrations_output = {}
@@ -27,18 +29,30 @@ class AxonOps:
         if base_url:
             # if saas is overridden, the url will always be treated as saas
             if override_saas:
-                self.base_url = base_url.rstrip("/") + "/" + org_name
+                if use_saml:
+                    self.base_url = base_url.rstrip("/") + "/dashboard"
+                else:
+                    self.base_url = base_url.rstrip("/") + "/" + org_name
             else:
                 # if saas is not overridden, it is treated as on-prem
                 self.base_url = base_url.rstrip("/")
 
         else:
             # if nothing is specified, it is AxonOps Cloud
-            self.base_url = AxonOps.cloud_url + "/" + org_name
+            if use_saml:
+                self.base_url = f"{self.cloud_url}/dashboard"
+            else:
+                self.base_url = f"{self.cloud_url}/{org_name}"
 
         # if you have a username and password, it will be used for the login
         if self.username and self.password:
             self.jwt = self.get_jwt()
+
+    @property
+    def cloud_url(self):
+        if self.use_saml:
+            return f"https://{self.org_name}.axonops.cloud/"
+        return "https://dash.axonops.cloud"
 
     def get_cluster_type(self) -> str:
         """
@@ -126,10 +140,12 @@ class AxonOps:
                     data=data
             ) as res:
                 if res.status not in ok_codes:
-                    return None, f'{full_url} return code is {res.status}'
+                    return None, f'{method.upper()}: {full_url} return code is {res.status} headers: {res.headers} \n body: {res.read()}'
                 content = res.read()
+        except HTTPError as e:
+            return None, str(e) + f" HTTPError {method.upper()} {full_url} headers: {headers} data: {data} body: {e.fp.read()}"
         except Exception as e:
-            return None, str(e) + f" {full_url}"
+            return None, str(e) + f" Exception {method.upper()} {full_url} headers: {headers} data: {data}"
         finally:
             if res is not None:
                 res.close()

@@ -162,9 +162,8 @@ api_response:
 '''
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.axonops.axonops.plugins.module_utils.axonops import AxonOps
 from ansible_collections.axonops.axonops.plugins.module_utils.axonops_utils import make_module_args, \
-    dicts_are_different
+    dicts_are_different, get_axonops_instance
 
 
 def run_module():
@@ -189,10 +188,8 @@ def run_module():
         'changed': False,
     }
 
-    axonops = AxonOps(module.params['org'], auth_token=module.params['auth_token'], base_url=module.params['base_url'],
-                      username=module.params['username'], password=module.params['password'],
-                      cluster_type=module.params['cluster_type'], api_token=module.params['api_token'],
-                      override_saas=module.params['override_saas'])
+    axonops = get_axonops_instance(module.params)
+
     if axonops.errors:
         module.fail_json(msg=' '.join(axonops.errors), **result)
 

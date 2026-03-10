@@ -163,8 +163,8 @@ import json
 import uuid
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.axonops.axonops.plugins.module_utils.axonops import AxonOps
-from ansible_collections.axonops.axonops.plugins.module_utils.axonops_utils import make_module_args, find_by_field, dicts_are_different, get_value_by_name, normalize_numbers, get_integration_id_by_name
+from ansible_collections.axonops.axonops.plugins.module_utils.axonops_utils import make_module_args, find_by_field, \
+    dicts_are_different, get_value_by_name, normalize_numbers, get_integration_id_by_name, get_axonops_instance
 
 
 
@@ -205,10 +205,7 @@ def run_module():
     org = module.params['org']
     cluster = module.params['cluster']
 
-    axonops = AxonOps(module.params['org'], auth_token=module.params['auth_token'], base_url=module.params['base_url'],
-                      username=module.params['username'], password=module.params['password'],
-                      cluster_type=module.params['cluster_type'], api_token=module.params['api_token'],
-                      override_saas=module.params['override_saas'])
+    axonops = get_axonops_instance(module.params)
 
     if axonops.errors:
         module.fail_json(msg=' '.join(axonops.errors), **result)
