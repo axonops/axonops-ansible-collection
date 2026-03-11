@@ -1,5 +1,6 @@
 import json
 import urllib.parse
+import os
 from ansible.module_utils.urls import open_url
 from typing import List
 
@@ -8,7 +9,8 @@ class AxonOps:
     cloud_url: str = "https://dash.axonops.cloud"
 
     def __init__(self, org_name: str, auth_token: str = '', base_url: str = '', username: str = '', password: str = '',
-                 cluster_type: str = 'cassandra', api_token: str = '', override_saas: bool = False):
+                 cluster_type: str = 'cassandra', api_token: str = '', override_saas: bool = False,
+                 validate_certs: bool = True):
         self.org_name = org_name
         self.auth_token = auth_token
         self.api_token = api_token
@@ -16,6 +18,9 @@ class AxonOps:
         self.password = password
         self.cluster_type = cluster_type
         self.jwt = ''
+
+        env_val = os.getenv('AXONOPS_VALIDATE_CERTS')
+        self.validate_certs = env_val.lower() in ('true', '1', 't') if env_val is not None else validate_certs
 
         # save the integration output to a var so we can use it multiple times
         self.integrations_output = {}
@@ -123,7 +128,8 @@ class AxonOps:
                     method=method.upper(),
                     url=full_url,
                     headers=headers,
-                    data=data
+                    data=data,
+                    validate_certs=self.validate_certs
             ) as res:
                 if res.status not in ok_codes:
                     return None, f'{full_url} return code is {res.status}'
