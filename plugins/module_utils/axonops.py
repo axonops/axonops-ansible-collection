@@ -9,7 +9,8 @@ from typing import List
 class AxonOps:
 
     def __init__(self, org_name: str, auth_token: str = '', base_url: str = '', username: str = '', password: str = '',
-                 cluster_type: str = 'cassandra', api_token: str = '', override_saas: bool = False, use_saml: bool = False):
+                 cluster_type: str = 'cassandra', api_token: str = '', override_saas: bool = False, use_saml: bool = False,
+                 validate_certs: bool = True):
         self.org_name = org_name
         self.auth_token = auth_token
         self.api_token = api_token
@@ -137,7 +138,9 @@ class AxonOps:
                     method=method.upper(),
                     url=full_url,
                     headers=headers,
-                    data=data
+                    data=data,
+                    timeout=30,
+                    validate_certs=self.validate_certs
             ) as res:
                 if res.status not in ok_codes:
                     return None, f'{method.upper()}: {full_url} return code is {res.status} headers: {res.headers} \n body: {res.read()}'

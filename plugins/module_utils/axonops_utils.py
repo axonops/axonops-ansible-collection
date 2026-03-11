@@ -22,6 +22,8 @@ def base_module_args() -> dict:
                           'default': False},
         "use_saml": {"type": 'bool', "required": False, "fallback": (env_fallback, ['AXONOPS_USE_SAML']),
                      'default': False},
+        "validate_certs": {"type": 'bool', "required": False, "fallback": (env_fallback, ['AXONOPS_VALIDATE_CERTS']),
+                          'default': True},
 
     }
 
@@ -35,7 +37,8 @@ def get_axonops_instance(params):
         cluster_type=params.get('cluster_type', 'cassandra'),
         api_token=params.get('api_token', ''),
         override_saas=params.get('override_saas', False),
-        use_saml=params.get('use_saml', False)
+        use_saml=params.get('use_saml', False),
+        validate_certs=params.get('validate_certs', True)
     )
 
 
