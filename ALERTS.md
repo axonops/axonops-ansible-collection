@@ -32,6 +32,9 @@ Before you can run the playbook, you'll need to define the following variables. 
 | auth_token  | AXONOPS_TOKEN or AXONOPS_API_TOKEN| API authentication token for AxonOps |
 | username    | AXONOPS_USERNAME                  | Username for AxonOps API authentication (if not using token) |
 | password    | AXONOPS_PASSWORD                  | Password for AxonOps API authentication (if not using token) |
+| enable_logging | AXONOPS_ENABLE_LOGGING | Optional flag to enable logging of API responses and errors (default: false) |
+| use_saml    | AXONOPS_USE_SAML                  | Optional flag to indicate if SAML authentication should be used (default: false) |
+
 
 ## Directory Structure
 

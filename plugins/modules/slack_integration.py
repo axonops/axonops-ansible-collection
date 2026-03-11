@@ -72,9 +72,8 @@ TODO
 '''
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.axonops.axonops.plugins.module_utils.axonops import AxonOps
 from ansible_collections.axonops.axonops.plugins.module_utils.axonops_utils import make_module_args, \
-    dicts_are_different
+    dicts_are_different, get_axonops_instance
 
 
 def run_module():
