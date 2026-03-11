@@ -19,6 +19,7 @@ class AxonOps:
         self.cluster_type = cluster_type
         self.jwt = ''
         self.use_saml = use_saml
+        self.validate_certs = validate_certs
 
         # save the integration output to a var so we can use it multiple times
         self.integrations_output = {}
