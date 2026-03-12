@@ -42,8 +42,8 @@
 
 - name: Import tasks from agent_disconnection_tolerance.yml
   ansible.builtin.import_tasks: agent_disconnection_tolerance.yml
+  when: agent_disconnection_tolerance is defined
   tags: agent_disconnection_tolerance
-
 
 - name: Import tasks from commitlogs_archive.yml
   ansible.builtin.import_tasks: commitlogs_archive.yml
@@ -51,6 +51,7 @@
 
 - name: Import tasks from human_readableid.yml
   ansible.builtin.import_tasks: human_readableid.yml
+  when: human_readableid is defined
   tags: human_readableid
 
 - name: Import tasks from log_alerts.yml

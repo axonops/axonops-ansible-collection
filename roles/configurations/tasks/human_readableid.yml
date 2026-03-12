@@ -1,15 +1,13 @@
 ---
-- name: Apply Human ReadableID on {{ human_readableid.key }}
+- name: Apply Human ReadableID on {{ cluster }}
   axonops.axonops.human_readableid:
     org: "{{ org }}"
-    cluster: "{{ human_readableid.key }}"
+    cluster: "{{ cluster }}"
     present: "{{ human_readableid.present | default(true) }}"
     id: "{{ human_readableid.id | default('axon_agent_hostname') }}"
     auth_token: "{{ human_readableid.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
     username: "{{ human_readableid.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
     password: "{{ human_readableid.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
-  with_items:
-    "{{ human_readableid.value }}"
   tags:
   - axonops_human_readableid
   - human_readableid
