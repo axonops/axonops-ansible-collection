@@ -1,0 +1,42 @@
+---
+- name: Initialize axonops_teams_integrations
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_teams_integrations: []
+  when: axonops_teams_integrations is not defined
+
+- name: Load organization-wide Teams integration rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_teams_integrations: "{{ axonops_teams_integrations + (lookup('file', item) | from_yaml).axonops_teams_integrations }}"
+  with_fileglob:
+    - "config/{{ org }}/teams_integrations.yml"
+
+- name: Load cluster-specific Teams integration rules
+  tags: always
+  ansible.builtin.set_fact:
+    axonops_teams_integrations: "{{ axonops_teams_integrations + (lookup('file', item) | from_yaml).axonops_teams_integrations }}"
+  with_fileglob:
+    - "config/{{ org }}/{{ cluster }}/teams_integrations.yml"
+
+- name: "Install Teams integrations {{ org }}/{{ cluster }}"
+  axonops.axonops.teams_integration:
+    org: "{{ org }}"
+    cluster: "{{ cluster }}"
+    present: "{{ teams_item.present | default(true) }}"
+    name: "{{ teams_item.name }}"
+    webhook_url: "{{ teams_item.webhook_url }}"
+    auth_token: "{{ teams_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    username: "{{ teams_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ teams_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+  loop: "{{ axonops_teams_integrations }}"
+  loop_control:
+    loop_var: teams_item
+  tags:
+    - axonops_teams_integrations
+    - teams_integrations
+    - teams_integration
+    - integration
+    - teams
+
+# code: language=ansible

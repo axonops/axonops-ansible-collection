@@ -102,7 +102,7 @@ axonops_log_alert_rule:
   warning_value: 3
   critical_value: 20
   duration: 60m
-  content: '+"INFO.*Messaging-EventLoop" +NoSpamLogger.* +"for networking buffer pool" +"cannot allocate chunk"'
+  content: '+\"INFO.*Messaging-EventLoop\" +NoSpamLogger.* +\"for networking buffer pool\" +\"cannot allocate chunk\"'
   source: "/var/log/cassandra/system.log"
   description: "Maximum memory usage reached, networking_cache_size needs to be increased"
   present: true

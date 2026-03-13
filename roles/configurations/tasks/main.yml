@@ -36,6 +36,10 @@
   ansible.builtin.import_tasks: slack_integration.yml
   tags: slack
 
+- name: Import teams tasks
+  ansible.builtin.import_tasks: teams_integration.yml
+  tags: teams
+
 - name: Import tasks from adaptive_repair.yml
   ansible.builtin.import_tasks: adaptive_repair.yml
   tags: adaptive_repair
