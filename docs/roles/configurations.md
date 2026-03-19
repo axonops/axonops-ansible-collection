@@ -4,7 +4,8 @@
 
 The `configurations` role configures alerts, integrations, and monitoring settings for your AxonOps deployment. This
 role manages metric alerts, backup configurations, service checks, integration with notification services (Slack,
-PagerDuty), log alerts, and custom dashboards.
+PagerDuty, Microsoft Teams), log alerts, and custom dashboards. The role supports both Apache Cassandra and Apache
+Kafka clusters, controlled by the `cluster_type` variable.
 
 ## Requirements
 
@@ -16,20 +17,29 @@ PagerDuty), log alerts, and custom dashboards.
 
 ### Required Variables
 
-| Variable  | Description                          | Example              |
-|-----------|--------------------------------------|----------------------|
-| `org`     | Organization name in AxonOps         | `mycompany`          |
-| `cluster` | Cluster name to configure alerts for | `production-cluster` |
+| Variable  | Description                          | Environment Variable   | Example              |
+|-----------|--------------------------------------|------------------------|----------------------|
+| `org`     | Organization name in AxonOps         | `AXONOPS_ORG`          | `mycompany`          |
+| `cluster` | Cluster name to configure alerts for | `AXONOPS_CLUSTER`      | `production-cluster` |
 
-**Note**: These variables can also be set via environment variables `AXONOPS_ORG` and `AXONOPS_CLUSTER`.
+**Note**: These variables can also be set via the environment variables shown above.
+
+### Cluster Type
+
+| Variable       | Description                                               | Environment Variable    | Default      |
+|----------------|-----------------------------------------------------------|-------------------------|--------------|
+| `cluster_type` | Type of cluster being configured (`cassandra` or `kafka`) | `AXONOPS_CLUSTER_TYPE`  | `cassandra`  |
+
+The `cluster_type` variable controls which tasks run. Tasks specific to Apache Cassandra
+(`adaptive_repair`, `commitlogs_archive`, `human_readableid`) are skipped when `cluster_type` is set to `kafka`.
 
 ### Optional Feature Flags
 
-| Variable                        | Description                                | Default   |
-|---------------------------------|--------------------------------------------|-----------|
-| `adaptive_repair`               | Configuration for adaptive repair settings | undefined |
-| `agent_disconnection_tolerance` | Agent disconnection tolerance settings     | undefined |
-| `human_readableid`              | Human-readable ID configuration            | undefined |
+| Variable                        | Description                                | Cluster Type   | Default   |
+|---------------------------------|--------------------------------------------|----------------|-----------|
+| `adaptive_repair`               | Configuration for adaptive repair settings | Cassandra only | undefined |
+| `agent_disconnection_tolerance` | Agent disconnection tolerance settings     | All            | undefined |
+| `human_readableid`              | Human-readable ID configuration            | Cassandra only | undefined |
 
 ## Dependencies
 
@@ -105,6 +115,37 @@ This role requires a running AxonOps Server with API access.
     - role: axonops.axonops.configurations
       tags:
         - pagerduty_integration
+```
+
+### Configure Microsoft Teams Integration
+
+```yaml
+- name: Configure Alerts with Teams Integration
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+
+  roles:
+    - role: axonops.axonops.configurations
+      tags:
+        - teams
+```
+
+### Configure a Kafka Cluster
+
+Set `cluster_type` to `kafka` to skip Cassandra-specific tasks and apply Kafka-appropriate alert rules.
+
+```yaml
+- name: Configure AxonOps Alerts for Kafka
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-kafka
+    cluster_type: kafka
+
+  roles:
+    - role: axonops.axonops.configurations
 ```
 
 ### Full Alert Stack Configuration
@@ -312,20 +353,54 @@ Integer number followed by one of "s, m, h, d, w, M, y"
     - role: axonops.axonops.configurations
 ```
 
+### Kafka Cluster Support
+
+When monitoring Apache Kafka clusters, set `cluster_type` to `kafka` either as a playbook variable or via the
+`AXONOPS_CLUSTER_TYPE` environment variable. This prevents Cassandra-specific tasks (`adaptive_repair`,
+`commitlogs_archive`, `human_readableid`) from running against a Kafka cluster.
+
+Metric alert rules for Kafka use the same `axonops_alert_rules` variable and `metric_alert_rules.yml` file format as
+Cassandra. Reference Kafka-specific dashboards and charts in your alert definitions.
+
+Example Kafka alert rule:
+
+```yaml
+axonops_alert_rules:
+  - name: Brokers Down
+    dashboard: Kafka Overview
+    chart: Brokers Online
+    operator: '<'
+    critical_value: 1
+    warning_value: 2
+    duration: 15m
+    description: Detected Brokers Down
+
+  - name: Offline Partitions
+    dashboard: Kafka Replication
+    chart: Offline Partitions
+    operator: '>='
+    critical_value: 10
+    warning_value: 1
+    duration: 5m
+    description: Kafka partitions offline
+```
+
+A full set of example Kafka alert rules is available at
+[examples/configurations/kafka/alert_rules.yml](../../examples/configurations/kafka/alert_rules.yml).
+
 ### Metric Alerts
 Metric alerts can be configured by providing a YAML file called `metric_alert_rules.yml` in the directory
-`config/[YOUR_ORG_NAME]`
-to make them available for all clusters in the organization, or in `config/[YOUR_ORG_NAME]/[YOUR_CLUSTER_NAME]` to make
-them available for a specific cluster.
+`config/[YOUR_ORG_NAME]` to make them available for all clusters in the organization, or in
+`config/[YOUR_ORG_NAME]/[YOUR_CLUSTER_NAME]` to make them available for a specific cluster.
 
-The file is optional, if the file is not provided, no metric alerts will be configured.
+The file is optional. If the file is not provided, no metric alerts will be configured.
 The format of the file is as follows:
 
 ```yaml
-metric_alert_rules:
+axonops_alert_rules:
   - name: name of the check
     dashboard: dashboard name
-    chart: chart name 
+    chart: chart name
     operator: '>='
     critical_value: 2
     warning_value: 1
@@ -334,14 +409,14 @@ metric_alert_rules:
     enabled: true
 ```
 
-The variable `metric_alert_rules` is a list of metric alert definitions. The variable is optional.
+The variable `axonops_alert_rules` is a list of metric alert definitions. The variable is optional.
 
 #### list of parameters for metric_alert_rules
 
 | Parameter    | Description                                                                                    | Type    | Default |
 |--------------|------------------------------------------------------------------------------------------------|---------|---------|
 | `name`       | Name of the alert                                                                              | String  |         |
-| `description`| Description of the alert                                                                       | String  |         | 
+| `description`| Description of the alert                                                                       | String  |         |
 | `chart`      | Name of the chart to monitor                                                                   | String  |         |
 | `dashboard`  | Name of the dashboard containing the chart                                                     | String  |         |
 | `operator`   | Comparison operator for the alert condition. Value accepted: '==', '>=', '>', '<=', '<', '!='. | String  |         |
@@ -354,8 +429,9 @@ The variable `metric_alert_rules` is a list of metric alert definitions. The var
 
 This is an example of a metric alert that triggers a critical alert when the number of DOWN nodes per cluster
 is greater than or equal to 2, and a warning alert when it is greater than or equal to 1, for a duration of 15 minutes.
-```yaml 
-metric_alert_rules:
+
+```yaml
+axonops_alert_rules:
   - name: DOWN count per node
     dashboard: Overview
     chart: Number of Endpoints Down Per Node Point Of View
@@ -364,15 +440,15 @@ metric_alert_rules:
     warning_value: 1
     duration: 15m
     description: Detected DOWN nodes
-
 ```
 
 #### Check for High Disk Utilization
+
 This is an example of a metric alert that triggers a critical alert when the disk usage percentage for any mount point
 is greater than or equal to 90%, and a warning alert when it is greater than or equal to 75%, for a duration of 12 hours.
 
 ```yaml
-metric_alert_rules:
+axonops_alert_rules:
   - name: Disk % Usage $mountpoint
     dashboard: System
     chart: Disk % Usage $mountpoint
@@ -384,9 +460,10 @@ metric_alert_rules:
 ```
 
 **Note:** More examples of metric checks can be found in the org level
-[metric_alert_rules.yml](../../examples/configurations/config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml) or the cluster level
-[metric_alert_rules.yml](../../examples/configurations/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/metric_alert_rules.yml)
-example files.
+[metric_alert_rules.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml) or the cluster level
+[metric_alert_rules.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/metric_alert_rules.yml)
+example files. For Kafka-specific alert rules, see
+[kafka/alert_rules.yml](../../examples/configurations/kafka/alert_rules.yml).
 
 
 ### Service Checks
@@ -465,41 +542,72 @@ axonops_shell_check:
 ```
 
 **Note:** More examples of service checks can be found in the org level
-[service_checks.yml](../../examples/configurations/config/REPLACE_WITH_ORG_NAME/service_checks.yml) or the cluster level
-[service_checks.yml](../../examples/configurations/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/service_checks.yml)
+[service_checks.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/service_checks.yml) or the cluster level
+[service_checks.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/service_checks.yml)
 example files.
+
+### Microsoft Teams Integration
+
+Teams integration can be configured by providing a YAML file called `teams_integrations.yml` in the directory
+`config/[YOUR_ORG_NAME]` to apply to all clusters in the organization, or in
+`config/[YOUR_ORG_NAME]/[YOUR_CLUSTER_NAME]` to apply to a specific cluster.
+
+The file is optional. If the file is not provided, no Teams integrations will be configured.
+The format of the file is as follows:
+
+```yaml
+axonops_teams_integrations:
+  - name: my_teams_channel
+    webhook_url: https://abcx360.webhook.office.com/webhookb2/YOUR_WEBHOOK_URL
+    present: true
+```
+
+#### Parameters for axonops_teams_integrations
+
+| Parameter     | Description                                               | Type    | Default |
+|---------------|-----------------------------------------------------------|---------|---------|
+| `name`        | Name of the integration (used to reference it in routing) | String  |         |
+| `webhook_url` | Incoming webhook URL for the Teams channel                | String  |         |
+| `present`     | Whether the integration should exist                      | Boolean | `true`  |
 
 ## Available Tags
 
 The role supports granular control through the following tags:
 
-| Tag                             | Description                             |
-|---------------------------------|-----------------------------------------|
-| `metrics`                       | Configure metric alerts                 |
-| `backups`                       | Configure backup settings               |
-| `service_checks`                | Configure service check alerts          |
-| `slack`                         | Configure Slack integration             |
-| `pagerduty_integration`         | Configure PagerDuty integration         |
-| `adaptive_repair`               | Configure adaptive repair settings      |
-| `agent_disconnection_tolerance` | Configure agent disconnection tolerance |
-| `commitlogs_archive`            | Configure commit log archiving          |
-| `human_readableid`              | Configure human-readable IDs            |
-| `log_alerts`                    | Configure log-based alerts              |
-| `logcollector`                  | Configure log collector                 |
-| `dashboards`                    | Import custom dashboards                |
-| `routes`                        | Configure alert routing rules           |
+| Tag                             | Description                             | Cluster Type   |
+|---------------------------------|-----------------------------------------|----------------|
+| `metrics`                       | Configure metric alerts                 | All            |
+| `backups`                       | Configure backup settings               | All            |
+| `service_checks`                | Configure service check alerts          | All            |
+| `slack`                         | Configure Slack integration             | All            |
+| `pagerduty_integration`         | Configure PagerDuty integration         | All            |
+| `teams`                         | Configure Microsoft Teams integration   | All            |
+| `adaptive_repair`               | Configure adaptive repair settings      | Cassandra only |
+| `agent_disconnection_tolerance` | Configure agent disconnection tolerance | All            |
+| `commitlogs_archive`            | Configure commit log archiving          | Cassandra only |
+| `human_readableid`              | Configure human-readable IDs            | Cassandra only |
+| `log_alerts`                    | Configure log-based alerts              | All            |
+| `logcollector`                  | Configure log collector                 | All            |
+| `dashboards`                    | Import custom dashboards                | All            |
+| `routes`                        | Configure alert routing rules           | All            |
 
 ## Tasks Overview
 
-The role performs the following tasks based on the enabled tags:
+The role performs the following tasks based on the enabled tags. Integrations are configured before metric alerts to
+allow alert routing rules to reference integration names.
 
-1. **Metrics Alerts**: Configure threshold-based alerts for Cassandra metrics
-2. **Backup Configuration**: Set up backup schedules and retention policies
-3. **Service Checks**: Configure service availability monitoring
-4. **Integrations**: Set up notification channels (Slack, PagerDuty)
-5. **Log Alerts**: Configure alerts based on log patterns
-6. **Dashboards**: Import and configure custom dashboards
-7. **Alert Routes**: Configure routing rules for alerts
+1. **Integrations**: Set up notification channels (Slack, PagerDuty, Microsoft Teams)
+2. **Metrics Alerts**: Configure threshold-based alerts for cluster metrics
+3. **Backup Configuration**: Set up backup schedules and retention policies
+4. **Service Checks**: Configure service availability monitoring
+5. **Adaptive Repair** (Cassandra only): Configure automated repair scheduling
+6. **Agent Disconnection Tolerance**: Configure tolerance for agent disconnections
+7. **Commit Log Archiving** (Cassandra only): Configure commit log archive settings
+8. **Human-Readable IDs** (Cassandra only): Configure human-readable node identifiers
+9. **Log Alerts**: Configure alerts based on log patterns
+10. **Log Collector**: Configure log collection settings
+11. **Dashboards**: Import and configure custom dashboards
+12. **Alert Routes**: Configure routing rules for alerts
 
 ## Example Use Cases
 

@@ -2,7 +2,7 @@
 - name: Initialize axonops_shell_check
   tags: always
   ansible.builtin.set_fact:
-    axonops_shell_check: [ ]
+    axonops_shell_check: []
   when: axonops_shell_check is not defined
 
 - name: Load organization-wide shell check rules
@@ -22,7 +22,7 @@
 - name: Initialize axonops_tcp_check
   tags: always
   ansible.builtin.set_fact:
-    axonops_tcp_check: [ ]
+    axonops_tcp_check: []
 
 - name: Load organization-wide tcp check rules
   tags: always
