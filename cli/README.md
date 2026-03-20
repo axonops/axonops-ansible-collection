@@ -343,3 +343,118 @@ Override an existing dashboard with one from a JSON file, taking the name from t
 ```shell
 $ pipenv run python axonops.py dashboard --importfile ./Table_dashboard.json  --overwrite --position -1
 ```
+
+### `silence` subcommand
+
+Manage the AxonOps Alert Silences.
+
+#### Options:
+* `--list` List all active silences in the cluster.
+* `--create` Create a new silence.
+* `--deletesilence` Delete a silence by its ID.
+* `--cronexpr` Cron Expression for Recurring Silence. If not set, the silence will be created immediately. Crontab are in UTC time.
+* `--duration` Duration of the silence. Accepted values are a number followed by a time unit (s for seconds, m for minutes, h for hours, d for days). If not set, the default duration of the silence will be 1 hour.
+* `--dcs` JSON array of datacenters to include in the silence. If not set, all datacenters will be included. 
+The format of the JSON array should be `{"Name": "dc1","Racks": [{"Name": "RAC1","Nodes": ["b167aca6-b6b1-4bd5-bc45-3e27632e844d"]}]}`.
+* `--silencemetricsalerts` Silence Metrics Alerts. If not set, all alerts will be silenced.
+* `--silenceservicechecksalerts` Silence Service Checks Alerts. If not set, all alerts will be silenced.
+* `--silenceeventalerts` Silence Event Alerts. If not set, all alerts will be silenced.
+* `--silencebackupalerts` Silence Backup Alerts. If not set, all alerts will be silenced.
+* `--silencebackuprestorealerts` Silence Backup Restore Alerts. If not set, all alerts will be silenced.
+* `--silenceauditalerts` Silence Audit Alerts. If not set, all alerts will be silenced.
+* `--silenceadaptiverepairalerts` Silence Adaptive Repair Alerts. If not set, all alerts will be silenced.
+* `--silencegenericalerts` Silence Generic Alerts. If not set, all alerts will be silenced.
+* `--silencegenerictaskalerts` Silence Generic Task Alerts. If not set, all alerts will be silenced.
+* `--silencelogalerts` Silence Log Alerts. If not set, all alerts will be silenced.
+* `--silencenodealerts` Silence Node Alerts. If not set, all alerts will be silenced.
+* `--silencerepairalerts` Silence Repair Alerts. If not set, all alerts will be silenced.
+* `--silencerollingrestartalerts` Silence Rolling Restart Alerts. If not set, all alerts will be silenced.
+* `--silencescheduledreportsalerts` Silence Scheduled Reports Alerts. If not set, all alerts will be silenced.
+
+#### Examples:
+
+Print the list of options for the silence command:
+
+```shell
+$ pipenv run python axonops.py silence -h
+```
+List all active silences in the cluster:
+```shell
+$ pipenv run python axonops.py silence --list
+```
+Create a new silence with a duration of 1 hour (default) to the entire cluster:
+```shell
+$ pipenv run python axonops.py silence --create
+```
+Delete a silence by its ID: 0974a3e0-d552-4d65-a96b-c7439c90cd7b
+```shell
+$ pipenv run python axonops.py silence --deletesilence 0974a3e0-d552-4d65-a96b-c7439c90cd7b
+```
+Create a new recurring silence with a cron expression (this example creates a silence every day at 4 AM UTC):
+```shell
+$ pipenv run python axonops.py silence --create --cronexpr '0 4 * * *'
+```
+Create a new silence with a duration of 1 day to the entire cluster:
+```shell
+$ pipenv run python axonops.py silence --create --duration '1d'
+```
+Create a new instant silence on the metric alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silencemetricsalerts
+```
+Create a new instant silence on the service checks alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silenceservicechecksalerts
+```
+Create a new instant silence on the event alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silenceeventalerts
+```
+Create a new instant silence on the backup alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silencebackupalerts
+```
+Create a new instant silence on the backup restore alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silencebackuprestorealerts
+```
+Create a new instant silence on the audit alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silenceauditalerts
+```
+Create a new instant silence on the adaptive repair alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silenceadaptiverepairalerts
+```
+Create a new instant silence on the generic alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silencegenericalerts
+```
+Create a new instant silence on the generic task alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silencegenerictaskalerts
+```
+Create a new instant silence on the log alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silencelogalerts
+```
+Create a new instant silence on the node alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silencenodealerts
+```
+Create a new instant silence on the repair alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silencerepairalerts
+```
+Create a new instant silence on the rolling restart alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silencerollingrestartalerts
+```
+Create a new instant silence on the scheduled reports alerts:
+```shell
+$ pipenv run python axonops.py silence --create --silencescheduledreportsalerts
+```
+Create a new silence with a duration of 1 hour to a specific datacenter, rack and node:
+```shell
+$ pipenv run python axonops.py silence --create --dcs '[{"Name": "dc2","Racks": [{"Name": "rack1","Nodes": ["a107315b-2cc1-4650-8363-386460421bcd"]}]}]'
+```
