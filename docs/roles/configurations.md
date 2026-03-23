@@ -1,5 +1,53 @@
 # Configurations Role
 
+## Contents
+
+- [Overview](#overview)
+- [Requirements](#requirements)
+- [Install the collection](#install-the-collection)
+  - [Install from a release (recommended)](#install-from-a-release-recommended)
+  - [Install directly from Git](#install-directly-from-git)
+  - [Development mode (clone the repository)](#development-mode-clone-the-repository)
+- [Authentication \& Settings](#authentication--settings)
+  - [List of Variables](#list-of-variables)
+- [Example Playbooks](#example-playbooks)
+  - [Basic Alert Configuration](#basic-alert-configuration)
+  - [Using Environment Variables](#using-environment-variables)
+  - [Configure Specific Configs Types](#configure-specific-configs-types)
+  - [Configure Slack Integration](#configure-slack-integration)
+  - [Configure PagerDuty Integration](#configure-pagerduty-integration)
+  - [Configure Microsoft Teams Integration](#configure-microsoft-teams-integration)
+  - [Configure a Kafka Cluster](#configure-a-kafka-cluster)
+  - [Full Alert Stack Configuration](#full-alert-stack-configuration)
+- [Details playbook](#details-playbook)
+  - [Adaptive Repair Configuration](#adaptive-repair-configuration)
+    - [Enable Adaptive Repair](#enable-adaptive-repair)
+    - [Disable Adaptive Repair](#disable-adaptive-repair)
+    - [Set GC Grace Threshold](#set-gc-grace-threshold)
+    - [Set Table Parallelism](#set-table-parallelism)
+    - [Set Segment Retries](#set-segment-retries)
+    - [Set Segment Target Size](#set-segment-target-size)
+    - [Exclude Tables from Adaptive Repair](#exclude-tables-from-adaptive-repair)
+    - [Set Maximum Segments per Table](#set-maximum-segments-per-table)
+    - [Set Segment Timeout](#set-segment-timeout)
+- [Kafka Cluster Support](#kafka-cluster-support)
+- [Metric Alerts](#metric-alerts)
+  - [List of parameters for metric_alert_rules](#list-of-parameters-for-metric_alert_rules)
+  - [Check for DOWN nodes](#check-for-down-nodes)
+  - [Check for High Disk Utilization](#check-for-high-disk-utilization)
+- [Service Checks](#service-checks)
+  - [List of parameters for axonops_shell_check](#list-of-parameters-for-axonops_shell_check)
+  - [Dummy example of axonops_shell_check](#dummy-example-of-axonops_shell_check)
+  - [Example: Debian/Ubuntu reboot check](#example-debianubuntu-reboot-check)
+- [Microsoft Teams Integration](#microsoft-teams-integration)
+- [Available Tags](#available-tags)
+- [Tasks Overview](#tasks-overview)
+- [Example Use Cases](#example-use-cases)
+- [Notes](#notes)
+- [Additional Resources](#additional-resources)
+- [License](#license)
+- [Author](#author)
+
 ## Overview
 
 The `configurations` role configures alerts, integrations, and monitoring settings for your AxonOps deployment. This
@@ -13,37 +61,111 @@ Kafka clusters, controlled by the `cluster_type` variable.
 - AxonOps Server installed and running
 - AxonOps API access
 
-## Role Variables
+## Install the collection
 
-### Required Variables
+There are several ways to install the AxonOps Ansible Collection depending on your use case.
 
-| Variable  | Description                          | Environment Variable   | Example              |
-|-----------|--------------------------------------|------------------------|----------------------|
-| `org`     | Organization name in AxonOps         | `AXONOPS_ORG`          | `mycompany`          |
-| `cluster` | Cluster name to configure alerts for | `AXONOPS_CLUSTER`      | `production-cluster` |
+---
 
-**Note**: These variables can also be set via the environment variables shown above.
+### Install from a release (recommended)
 
-### Cluster Type
+Download the latest release from GitHub and install it using `ansible-galaxy`:
 
-| Variable       | Description                                               | Environment Variable    | Default      |
-|----------------|-----------------------------------------------------------|-------------------------|--------------|
-| `cluster_type` | Type of cluster being configured (`cassandra` or `kafka`) | `AXONOPS_CLUSTER_TYPE`  | `cassandra`  |
+```sh
+ansible-galaxy collection install <downloaded_tar>
+```
 
-The `cluster_type` variable controls which tasks run. Tasks specific to Apache Cassandra
-(`adaptive_repair`, `commitlogs_archive`, `human_readableid`) are skipped when `cluster_type` is set to `kafka`.
+You may also use the following script to automatically download and install the latest version:
 
-### Optional Feature Flags
+```sh
+LATEST=$(curl -s https://api.github.com/repos/axonops/axonops-ansible-collection/releases/latest | jq -r '.assets[0].browser_download_url')
+ansible-galaxy collection install $LATEST
+```
 
-| Variable                        | Description                                | Cluster Type   | Default   |
-|---------------------------------|--------------------------------------------|----------------|-----------|
-| `adaptive_repair`               | Configuration for adaptive repair settings | Cassandra only | undefined |
-| `agent_disconnection_tolerance` | Agent disconnection tolerance settings     | All            | undefined |
-| `human_readableid`              | Human-readable ID configuration            | Cassandra only | undefined |
+**Note**: the tarball will be installed into the directory configured
+in [COLLECTIONS_PATHS](https://docs.ansible.com/ansible/latest/reference_appendices/config.html#collections-paths).
 
-## Dependencies
+**Verify installation:**
+To verify the installation you can use the command:
+`ansible-galaxy collection list | grep axonops`.
+---
 
-This role requires a running AxonOps Server with API access.
+### Install directly from Git
+
+To install the latest version from the repository:
+
+```sh
+ansible-galaxy collection install git+https://github.com/axonops/axonops-ansible-collection.git
+```
+
+To install from a specific branch:
+
+```sh
+ansible-galaxy collection install git+https://github.com/axonops/axonops-ansible-collection.git,main
+```
+
+**Verify installation:**
+To verify the installation you can use the command:
+`ansible-galaxy collection list | grep axonops`.
+
+
+---
+
+### Development mode (clone the repository)
+
+For development or testing changes locally, you can clone the repository into a standard development directory (e.g.
+`~/git`) and create a symbolic link so Ansible can detect it.
+
+Clone the repository:
+
+```shell
+git clone https://github.com/axonops/axonops-ansible-collection.git ~/git/axonops-ansible-collection
+```
+
+Create the required Ansible collection path and link the repository:
+
+```shell
+mkdir -p ~/git/ansible_collections/axonops
+ln -s ~/git/axonops-ansible-collection ~/git/ansible_collections/axonops/axonops
+```
+
+Ensure the parent directory is included in ANSIBLE_COLLECTIONS_PATHS:
+
+```shell
+export ANSIBLE_COLLECTIONS_PATHS=~/git:$ANSIBLE_COLLECTIONS_PATHS
+```
+
+To make this change persistent, add the above line to your shell configuration file (e.g. ~/.bashrc or ~/.zshrc).
+
+**Verify installation:**
+To verify the installation you can use the command:
+
+```shell
+ls -l ~/git/ansible_collections/axonops
+```
+
+---
+
+## Authentication & Settings
+
+The ansible role accepts configuration via both environment variables and Ansible variables.
+The required variables are `org` and `cluster`, which can be set in either way.
+
+### List of Variables
+
+| Variable         | Description                                                                                                      | Environment Variable     | Example                 |
+|------------------|------------------------------------------------------------------------------------------------------------------|--------------------------|-------------------------|
+| `org`            | Organization name in AxonOps                                                                                     | `AXONOPS_ORG`            | `mycompany`             |
+| `cluster`        | Cluster name to configure                                                                                        | `AXONOPS_CLUSTER`        | `production-cluster`    |
+| `cluster_type`   | Type of cluster being configured (`cassandra`, `kafka` or `dse`). Default `cassandra`                            | `AXONOPS_CLUSTER_TYPE`   | `cassandra`             |
+| `auth_token`     | API authentication token for AxonOps                                                                             | `AXONOPS_TOKEN`          | `aaaabbbbccccddddd`     |
+| `username`       | Username for AxonOps API authentication (if LDAP authentication is enabled, self-hosted only)                    | `AXONOPS_USERNAME`       | `admin`                 |
+| `password`       | Password for AxonOps API authentication (if LDAP authentication is enabled, self-hosted only)                    | `AXONOPS_PASSWORD`       | `I <3 AxonOps!`         |
+| `enable_logging` | Optional flag to enable logging of API responses and errors (default: false)                                     | `AXONOPS_ENABLE_LOGGING` | `true`                  |
+| `base_url`       | Base URL for the AxonOps (If you are not using AxonOps Cloud)                                                    | `AXONOPS_URL`            | `http://127.0.0.1:3000` |
+| `validate_certs` | Optional flag to indicate if SSL certificates should be validated when connecting to the AxonOps (default: true) | `AXONOPS_VALIDATE_CERTS` | `true`                  |
+| `use_saml`       | Set this to true if your AxonOps Cloud account has SAML authentication enabled (default: false)                  | `AXONOPS_USE_SAML`       | `false`                 |
+| `api_token`      | API token for authentication. This is used when you have api token for AxonOps Self-Hosted.                      | `AXONOPS_API_TOKEN`      |                         |
 
 ## Example Playbooks
 
@@ -389,6 +511,7 @@ A full set of example Kafka alert rules is available at
 [examples/configurations/kafka/alert_rules.yml](../../examples/configurations/kafka/alert_rules.yml).
 
 ### Metric Alerts
+
 Metric alerts can be configured by providing a YAML file called `metric_alert_rules.yml` in the directory
 `config/[YOUR_ORG_NAME]` to make them available for all clusters in the organization, or in
 `config/[YOUR_ORG_NAME]/[YOUR_CLUSTER_NAME]` to make them available for a specific cluster.
@@ -413,17 +536,17 @@ The variable `axonops_alert_rules` is a list of metric alert definitions. The va
 
 #### list of parameters for metric_alert_rules
 
-| Parameter    | Description                                                                                    | Type    | Default |
-|--------------|------------------------------------------------------------------------------------------------|---------|---------|
-| `name`       | Name of the alert                                                                              | String  |         |
-| `description`| Description of the alert                                                                       | String  |         |
-| `chart`      | Name of the chart to monitor                                                                   | String  |         |
-| `dashboard`  | Name of the dashboard containing the chart                                                     | String  |         |
-| `operator`   | Comparison operator for the alert condition. Value accepted: '==', '>=', '>', '<=', '<', '!='. | String  |         |
-| `critical_value` | Value to trigger a critical alert                                                          | Float   |         |
-| `warning_value`  | Value to trigger a warning alert                                                            | Float   |         |
-| `duration`   | Duration for which the condition must be met before triggering the alert                           | String  |         |
-| `enabled`    | Whether the alert is enabled or not                                                            | Boolean | True    |
+| Parameter        | Description                                                                                    | Type    | Default |
+|------------------|------------------------------------------------------------------------------------------------|---------|---------|
+| `name`           | Name of the alert                                                                              | String  |         |
+| `description`    | Description of the alert                                                                       | String  |         |
+| `chart`          | Name of the chart to monitor                                                                   | String  |         |
+| `dashboard`      | Name of the dashboard containing the chart                                                     | String  |         |
+| `operator`       | Comparison operator for the alert condition. Value accepted: '==', '>=', '>', '<=', '<', '!='. | String  |         |
+| `critical_value` | Value to trigger a critical alert                                                              | Float   |         |
+| `warning_value`  | Value to trigger a warning alert                                                               | Float   |         |
+| `duration`       | Duration for which the condition must be met before triggering the alert                       | String  |         |
+| `enabled`        | Whether the alert is enabled or not                                                            | Boolean | True    |
 
 #### Check for DOWN nodes
 
@@ -445,7 +568,8 @@ axonops_alert_rules:
 #### Check for High Disk Utilization
 
 This is an example of a metric alert that triggers a critical alert when the disk usage percentage for any mount point
-is greater than or equal to 90%, and a warning alert when it is greater than or equal to 75%, for a duration of 12 hours.
+is greater than or equal to 90%, and a warning alert when it is greater than or equal to 75%, for a duration of 12
+hours.
 
 ```yaml
 axonops_alert_rules:
@@ -460,11 +584,11 @@ axonops_alert_rules:
 ```
 
 **Note:** More examples of metric checks can be found in the org level
-[metric_alert_rules.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml) or the cluster level
+[metric_alert_rules.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml) or
+the cluster level
 [metric_alert_rules.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/metric_alert_rules.yml)
 example files. For Kafka-specific alert rules, see
 [kafka/alert_rules.yml](../../examples/configurations/kafka/alert_rules.yml).
-
 
 ### Service Checks
 
@@ -542,7 +666,8 @@ axonops_shell_check:
 ```
 
 **Note:** More examples of service checks can be found in the org level
-[service_checks.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/service_checks.yml) or the cluster level
+[service_checks.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/service_checks.yml) or the
+cluster level
 [service_checks.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/service_checks.yml)
 example files.
 
