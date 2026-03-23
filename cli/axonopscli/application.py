@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import sys
 from typing import Sequence
@@ -7,6 +8,7 @@ from .axonops import AxonOps
 from .components.dashboard import Dashboard
 from .components.repair import AdaptiveRepair
 from .components.scheduled_repair import ScheduledRepair
+from .components.silence import Silence
 from .utils import remove_not_alphanumeric
 
 
@@ -154,6 +156,54 @@ class Application:
         dashboard_parser.add_argument('--overwrite', action='store_true',
                                       help='Overwrite existing dashboard when importing')
 
+        silence_parser = commands_subparser.add_parser(
+            "silence",
+            help="Manage Silences in AxonOps")
+
+        silence_parser.set_defaults(func=self.run_silence)
+
+        silence_parser.add_argument('--list', action='store_true',
+                                    help='List all silences for the specified cluster')
+        silence_parser.add_argument('--create', action='store_true',
+                                    help='Create a new silence')
+        silence_parser.add_argument('--deletesilence', type=str, required=False,
+                                    help='Delete silences by ID')
+        silence_parser.add_argument('--duration', type=str, required=False,
+                                    help='Duration of the silence. Integer number followed by one of "s, m, h, d, w, M, y", default 1h',
+                                    default="1h")
+        silence_parser.add_argument('--cronexpr', type=str, required=False,
+                                    help='Cron expression for scheduling the silence')
+        silence_parser.add_argument('--dcs', type=json.loads, required=False,
+                                    help='Json string representing the datacenters, racks and nodes to silence. Example: {"Name": "fsn1", "Racks": [{"Name": "RAC1", "Nodes": ["b167aca6-b6b1-4bd5-bc45-3e27632e844d"]}]}')
+        silence_parser.add_argument('--silencemetricsalerts', action='store_true',
+                                    help='Silence Metrics Alerts', default=False)
+        silence_parser.add_argument('--silenceservicechecksalerts', action='store_true',
+                                    help='Silence Service Checks Alerts', default=False)
+        silence_parser.add_argument('--silenceeventalerts', action='store_true',
+                                    help='Silence Event Alerts', default=False)
+        silence_parser.add_argument('--silencebackupalerts', action='store_true',
+                                    help='Silence Backup Alerts', default=False)
+        silence_parser.add_argument('--silencebackuprestorealerts', action='store_true',
+                                    help='Silence Backup Restore Alerts', default=False)
+        silence_parser.add_argument('--silenceauditalerts', action='store_true',
+                                    help='Silence Audit Alerts', default=False)
+        silence_parser.add_argument('--silenceadaptiverepairalerts', action='store_true',
+                                    help='Silence Adaptive Repair Alerts', default=False)
+        silence_parser.add_argument('--silencegenericalerts', action='store_true',
+                                    help='Silence Generic Alerts', default=False)
+        silence_parser.add_argument('--silencegenerictaskalerts', action='store_true',
+                                    help='Silence Generic Task Alerts', default=False)
+        silence_parser.add_argument('--silencelogalerts', action='store_true',
+                                    help='Silence Log Alerts', default=False)
+        silence_parser.add_argument('--silencenodealerts', action='store_true',
+                                    help='Silence Node Alerts', default=False)
+        silence_parser.add_argument('--silencerepairalerts', action='store_true',
+                                    help='Silence Repair Alerts', default=False)
+        silence_parser.add_argument('--silencerollingrestartalerts', action='store_true',
+                                    help='Silence Rolling Restart Alerts', default=False)
+        silence_parser.add_argument('--silencescheduledreportsalerts', action='store_true',
+                                    help='Silence Scheduled Reports Alerts', default=False)
+
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
         # ensure --tables is only used together with --keyspace
@@ -202,6 +252,7 @@ class Application:
         axonops = self.get_axonops(args)
 
         dashboard = Dashboard(axonops, args)
+
         dashboard.get_actual_dashboards()
         if args.list:
             dashboard.list_dashboards()
@@ -260,3 +311,22 @@ class Application:
         scheduled_repair.set_options()
 
         scheduled_repair.set_repair()
+
+    def run_silence(self, args: argparse.Namespace):
+        """ Run the silence management """
+        if args.v:
+            print(f"Running silence management on {args.org}")
+            print(args)
+
+        axonops = self.get_axonops(args)
+
+        silence = Silence(axonops, args)
+
+        if args.list:
+            silence.list_silences()
+        elif args.create:
+            silence.create_silence()
+        elif args.deletesilence:
+            silence.delete_silence(args.deletesilence)
+        else:
+            print("No action specified for silence management.")

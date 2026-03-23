@@ -119,7 +119,10 @@ class AxonOps:
 
             if response.status_code not in ok_codes:
                 raise HTTPCodeError(f"Call to {full_url} returned {response.status_code}")
-            return response.json()
+            if not response.text or response.text.strip() == "":
+                return {}
+            else:
+                return response.json()
         except json.decoder.JSONDecodeError:
             print(f"url: {full_url} header: {headers} return: {response.status_code}")
             raise
