@@ -1,5 +1,5 @@
 ---
-- name: Apply Human ReadableID on {{ cluster }}
+- name: Apply Human ReadableID on {{ cluster }} in {{ org }}
   axonops.axonops.human_readableid:
     org: "{{ org }}"
     cluster: "{{ cluster }}"

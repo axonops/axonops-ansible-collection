@@ -10,8 +10,10 @@
 
 - name: Get cluster type
   ansible.builtin.set_fact:
-    cluster_type: "{{ lookup('env', 'AXONOPS_CLUSTER_TYPE') | default('cassandra') }}"
-  when: cluster_type is not defined
+    cluster_type: "{{  lookup('env', 'AXONOPS_CLUSTER_TYPE') 
+     if lookup('env', 'AXONOPS_CLUSTER_TYPE') | length > 0 
+     else 'cassandra' }}"
+  when: cluster_type is not defined or cluster_type | length == 0
 
 - name: Assert all required variables are set
   ansible.builtin.assert:
