@@ -2,3 +2,7 @@ example/inventory
 examples/full-example/files/ssl
 examples/full-example/collections
 examples/full-example/roles
+
+# Ignore Python Virtual Environment
+venv/
+.venv

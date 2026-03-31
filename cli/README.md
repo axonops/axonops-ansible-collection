@@ -4,11 +4,52 @@ This CLI is designed to extend the AxonOps Configuration Automation Ansible modu
 
 ## Installation
 
-This CLI uses the same Python environment as the Ansible module and does not require any additional configuration.
+### Install Python dependencies
 
-### Export Environment Variables
+This project provides multiple ways to install Python dependencies.  
+Choose the method that best fits your workflow.
 
-This CLI accepts both command-line parameters and environment variables, just like the Ansible module.
+All install commands should be run from the root of the project directory.
+The application should instead be run from the `cli` directory to avoid import issues with the Ansible module.
+
+---
+
+#### Option 1: Using pipenv (recommended)
+
+Pipenv is a popular tool for managing Python dependencies and virtual environments. 
+It provides an easy way to create isolated environments and manage dependencies.
+
+```shell
+pip install pipenv
+pipenv install
+```
+To run commands inside the environment:
+```shell
+pipenv shell
+python3 <command.py>
+```
+Or:
+```shell
+pipenv run python <command.py>
+```
+
+#### Option 2: Using `venv` and `pip`
+
+This is the most portable and widely supported method.
+
+```shell
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+Run the application:
+```shell
+python3 <command.py>
+````
+
+### Authentication and Settings
+
+This CLI accepts both command-line parameters and environment variables.
 
 ## Using of CLI
 
@@ -16,12 +57,12 @@ This CLI accepts both command-line parameters and environment variables, just li
 
 All commands accept those attributes
 
-* `--org` Name of your organisation.
-* `--cluster` Name of your cluster.
-* `--token` AUTH_TOKEN used to authenticate with the API in AxonOps Cloud.
-* `--username` Username used for AxonOps Self-Hosted when authentication is enabled.
-* `--password` Password used for AxonOps Self-Hosted when authentication is enabled.
-* `--url` Specify the AxonOps URL if not using the AxonOps Cloud environment.
+* `--org` Name of your organisation (environment variable `AXONOPS_ORG`).
+* `--cluster` Name of your cluster (environment variable `AXONOPS_CLUSTER`).
+* `--token` AUTH_TOKEN used to authenticate with the API in AxonOps Cloud (environment variable `AXONOPS_TOKEN`).
+* `--username` Username used for AxonOps Self-Hosted when authentication is enabled (environment variable `AXONOPS_USERNAME`).
+* `--password` Password used for AxonOps Self-Hosted when authentication is enabled (environment variable `AXONOPS_PASSWORD`).
+* `--url` Specify the AxonOps URL if not using the AxonOps Cloud environment (environment variable `AXONOPS_URL`).
 
 ### Connections
 

@@ -23,14 +23,14 @@ class Nodes:
             if self.args.v:
                 print("Response node:", response)
             if response:
-                self.data = response
+                Nodes.data = response
             else:
                 print("No nodes found")
-        return self.data
+        return Nodes.data
 
     def print_by_id(self, node_id):
-        if self.data:
-            for node in self.data:
+        if Nodes.data:
+            for node in Nodes.data:
                 if node['host_id'] == node_id:
                     if 'Details' in node and node['Details'] and 'human_readable_identifier' in node['Details']:
                         return node['Details']['human_readable_identifier']
@@ -39,3 +39,17 @@ class Nodes:
                     else:
                         return node_id
         return node_id
+
+    def __str__(self) -> str:
+        result = "Nodes:\n"
+        if Nodes.data:
+            for node in Nodes.data:
+                if 'Details' in node and node['Details'] and 'human_readable_identifier' in node['Details']:
+                    result += f"- {node['Details']['human_readable_identifier']} (ID: {node['host_id']})\n"
+                elif 'HostIP' in node:
+                    result += f"- {node['HostIP']} (ID: {node['host_id']})\n"
+                else:
+                    result += f"- {node['host_id']}\n"
+        else:
+            result += "No nodes found\n"
+        return result
