@@ -51,6 +51,42 @@ python3 <command.py>
 
 This CLI accepts both command-line parameters and environment variables.
 
+For easy of use; an environment configuration file was created to set the required environment variables for authentication and connection settings.
+You can find the template for this file in `cli/.env.axonops.example`. You can copy this file to `.env.example` and set the required values for your environment.
+
+You can load the environment variables from the file using the following command:
+
+```shell
+source .env.axonops
+``` 
+Now we specify the required environment variables for the most common cases of connecting to AxonOps.
+
+#### connect to AxonOps Cloud
+AxonOps clouds require the `AXONOPS_ORG`, `AXONOPS_CLUSTER`, and `AXONOPS_TOKEN` environment variables to be set for authentication.
+The token can be obtained from the AxonOps Cloud UI by navigating to the "API Tokens" section in the left menu of the Organization main page.
+
+Example of variables for AxonOps Cloud:
+```shell
+export AXONOPS_ORG='test'
+export AXONOPS_CLUSTER="thingscluster"
+export AXONOPS_TOKEN='aaaaabbbbccccddddeeee'
+```
+
+#### connect to AxonOps Self-Hosted
+AxonOps Self-Hosted requires the `AXONOPS_URL` to specify the URL of your AxonOps instance. 
+If authentication is enabled, you also need to set the `AXONOPS_USERNAME` and `AXONOPS_PASSWORD` environment variables.
+
+Example of variables for AxonOps Self-Hosted with authentication enabled:
+```shell
+export AXONOPS_URL='http://localhost:3000'
+export AXONOPS_USERNAME='john.doe'
+export AXONOPS_PASSWORD='I<3AxonOps!'
+```
+Example of variables for AxonOps Self-Hosted with authentication disabled:
+```shell
+export AXONOPS_URL='http://localhost:3000'
+```
+
 ## Using of CLI
 
 ### Global Options
