@@ -116,6 +116,15 @@ export AXONOPS_CLUSTER="thingscluster"
 export AXONOPS_TOKEN='aaaaabbbbccccddddeeee'
 ```
 
+### `info` Subcommand
+Prints general information about the cluster.
+This can be used to verify that the connection to the cluster is working and to get some basic information about the cluster.
+#### Examples:
+
+```shell
+$ pipenv run python axonops.py info
+```
+
 ### `adaptiverepair` Subcommand
 
 Manages **Adaptive Repair** in AxonOps.
