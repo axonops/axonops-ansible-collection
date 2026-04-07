@@ -515,7 +515,7 @@ commit_failure_policy: {{ cassandra_commit_failure_policy | default("die") }}
 # Default value ("auto") is 1/256th of the heap or 10MiB, whichever is greater
 # Min unit: MiB
 # prepared_statements_cache_size:
-prepared_statements_cache_size: {{ cassandra_prepared_statements_cache_size_mb | default(cassandra_prepared_statements_cache_size) | default("24MiB") }} # AxonOps Recommended
+prepared_statements_cache_size: {{ cassandra_prepared_statements_cache_size | default("24MiB") }} # AxonOps Recommended
 
 # Maximum size of the key cache in memory.
 #
@@ -580,7 +580,7 @@ row_cache_class_name: {{ cassandra_row_cache_class_name | default("org.apache.ca
 # Default value is 0, to disable row caching.
 # Min unit: MiB
 # row_cache_size: 0MiB
-row_cache_size: {{ cassandra_row_cache_size_in_mb | default(cassandra_row_cache_size) | default("0MiB") }}
+row_cache_size: {{ cassandra_row_cache_size | default("0MiB") }}
 
 # Duration in seconds after which Cassandra should save the row cache.
 # Caches are saved to saved_caches_directory as specified in this configuration file.
@@ -619,7 +619,7 @@ row_cache_keys_to_save: {{ cassandra_row_cache_keys_to_save }}
 # Default value is empty to make it "auto" (min(2.5% of Heap (in MiB), 50MiB)). Set to 0 to disable counter cache.
 # NOTE: if you perform counter deletes and rely on low gcgs, you should disable the counter cache.
 # Min unit: MiB
-counter_cache_size: {{ cassandra_counter_cache_size_in_mb | default(cassandra_counter_cache_size) | default("") }}
+counter_cache_size: {{ cassandra_counter_cache_size | default("") }}
 
 # Duration in seconds after which Cassandra should
 # save the counter cache (keys only). Caches are saved to saved_caches_directory as
@@ -711,7 +711,7 @@ periodic_commitlog_sync_lag_block: {{ cassandra_periodic_commitlog_sync_lag_bloc
 #
 # Min unit: MiB
 #commitlog_segment_size: 32MiB
-commitlog_segment_size: {{ cassandra_commitlog_segment_size_in_mb | default(cassandra_commitlog_segment_size) | default("32MiB") }}
+commitlog_segment_size: {{ cassandra_commitlog_segment_size | default("32MiB") }}
 
 # Compression to apply to the commit log. If omitted, the commit log
 # will be written uncompressed.  LZ4, Snappy, and Deflate compressors
@@ -836,11 +836,11 @@ disk_optimization_strategy: {{ cassandra_disk_optimization_strategy | default("s
 # memtable_heap_space: 2048MiB
 # Min unit: MiB
 # memtable_offheap_space: 2048MiB
-{% if cassandra_memtable_heap_space is defined or cassandra_memtable_heap_space_in_mb is defined %}
-memtable_heap_space: {{ cassandra_memtable_heap_space_in_mb | default(cassandra_memtable_heap_space) }}
+{% if cassandra_memtable_heap_space is defined %}
+memtable_heap_space: {{ cassandra_memtable_heap_space }}
 {% endif %}
-{% if cassandra_memtable_offheap_space is defined or cassandra_memtable_offheap_space_in_mb is defined %}
-memtable_offheap_space: {{ cassandra_memtable_offheap_space_in_mb | default(cassandra_memtable_offheap_space) }}
+{% if cassandra_memtable_offheap_space is defined %}
+memtable_offheap_space: {{ cassandra_memtable_offheap_space }}
 {% endif %}
 
 # memtable_cleanup_threshold is deprecated. The default calculation
@@ -881,8 +881,8 @@ memtable_allocation_type: {{ cassandra_memtable_allocation_type | default("offhe
 #
 # Min unit: MiB
 # repair_session_space:
-{% if cassandra_repair_session_space is defined or cassandra_repair_session_space_in_mb is defined %}
-repair_session_space: {{ cassandra_repair_session_space_in_mb | default(cassandra_repair_session_space) }}
+{% if cassandra_repair_session_space is defined %}
+repair_session_space: {{ cassandra_repair_session_space }}
 {% endif %}
 
 # Total space to use for commit logs on disk.
@@ -895,8 +895,8 @@ repair_session_space: {{ cassandra_repair_session_space_in_mb | default(cassandr
 # of the commitlog volume.
 #
 # commitlog_total_space: 8192MiB
-{% if cassandra_commitlog_total_space is defined or cassandra_commitlog_total_space_in_mb is defined %}
-commitlog_total_space: {{ cassandra_commitlog_total_space_in_mb | default(cassandra_commitlog_total_space) }}
+{% if cassandra_commitlog_total_space is defined %}
+commitlog_total_space: {{ cassandra_commitlog_total_space }}
 {% endif %}
 
 # This sets the number of memtable flush writer threads per disk
@@ -1351,7 +1351,7 @@ concurrent_materialized_view_builders: {{ cassandra_concurrent_materialized_view
 # of compaction, including validation compaction (building Merkle trees
 # for repairs).
 #compaction_throughput: 64MiB/s
-compaction_throughput: {{ cassandra_compaction_throughput_mb_per_sec | default(cassandra_compaction_throughput) | default('64MiB/s') }}
+compaction_throughput: {{ cassandra_compaction_throughput | default('64MiB/s') }}
 
 # When compacting, the replacement sstable(s) can be opened before they
 # are completely written, and used in place of the prior sstables for
@@ -1361,7 +1361,7 @@ compaction_throughput: {{ cassandra_compaction_throughput_mb_per_sec | default(c
 # sstable_preemptive_open_interval_in_mb being negative
 # Min unit: MiB
 # sstable_preemptive_open_interval: 50MiB
-sstable_preemptive_open_interval: {{ cassandra_sstable_preemptive_open_interval_in_mb | default(cassandra_sstable_preemptive_open_interval) | default("64MiB") }}
+sstable_preemptive_open_interval: {{ cassandra_sstable_preemptive_open_interval | default("64MiB") }}
 
 # Starting from 4.1 sstables support UUID based generation identifiers. They are disabled by default
 # because once enabled, there is no easy way to downgrade. When the node is restarted with this option
@@ -1415,15 +1415,7 @@ entire_sstable_inter_dc_stream_throughput_outbound: {{ cassandra_entire_sstable_
 # can lead to saturating the network connection and degrading rpc performance.
 # When unset, the default is 200 Mbps or 24 MiB/s.
 # stream_throughput_outbound: 24MiB/s
-{% if cassandra_stream_throughput_outbound is defined and cassandra_stream_throughput_outbound != '' %}
-{% if cassandra_stream_throughput_outbound.endswith('s') %}
 stream_throughput_outbound: {{ cassandra_stream_throughput_outbound | default("24MiB/s") }}
-{% else %}
-stream_throughput_outbound: {{ cassandra_stream_throughput_outbound }}MiB/s
-{% endif %}
-{% elif cassandra_stream_throughput_outbound_megabits_per_sec is defined and cassandra_stream_throughput_outbound_megabits_per_sec != '' %}
-stream_throughput_outbound: {{ cassandra_stream_throughput_outbound_megabits_per_sec }}MiB/s
-{% endif %}
 
 # Throttles all streaming file transfer between the datacenters,
 # this setting allows users to throttle inter dc stream throughput in addition
@@ -1431,13 +1423,7 @@ stream_throughput_outbound: {{ cassandra_stream_throughput_outbound_megabits_per
 # stream_throughput_outbound_megabits_per_sec
 # When unset, the default is 200 Mbps or 24 MiB/s.
 # inter_dc_stream_throughput_outbound: 24MiB/s
-{% if cassandra_inter_dc_stream_throughput_outbound is defined and cassandra_inter_dc_stream_throughput_outbound.endswith('s') %}
 inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound | default("24MiB/s") }}
-{% elif cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec is defined and cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec != '' %}
-inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec }}MiB/s
-{% elif cassandra_inter_dc_stream_throughput_outbound is defined and cassandra_inter_dc_stream_throughput_outbound != '' %}
-inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_outbound }}MiB/s
-{% endif %}
 
 # Server side timeouts for requests. The server will return a timeout exception
 # to the client if it can't complete an operation within the corresponding
@@ -1456,40 +1442,40 @@ inter_dc_stream_throughput_outbound: {{ cassandra_inter_dc_stream_throughput_out
 # Lowest acceptable value is 10 ms.
 # Min unit: ms
 #read_request_timeout: 5000ms
-read_request_timeout: {{ cassandra_read_request_timeout_in_ms | default(cassandra_read_request_timeout) | default("5s") }}
+read_request_timeout: {{ cassandra_read_request_timeout | default("5s") }}
 # How long the coordinator should wait for seq or index scans to complete.
 # Lowest acceptable value is 10 ms.
 # Min unit: ms
 #range_request_timeout: 10000ms
-range_request_timeout: {{ cassandra_range_request_timeout_ins_ms | default(cassandra_range_request_timeout) | default("10s") }}
+range_request_timeout: {{ cassandra_range_request_timeout | default("10s") }}
 # How long the coordinator should wait for writes to complete.
 # Lowest acceptable value is 10 ms.
 # Min unit: ms
 #write_request_timeout: 2000ms
-write_request_timeout: {{ cassandra_write_request_timeout_in_ms | default(cassandra_write_request_timeout) | default("2s") }}
+write_request_timeout: {{ cassandra_write_request_timeout | default("2s") }}
 # How long the coordinator should wait for counter writes to complete.
 # Lowest acceptable value is 10 ms.
 # Min unit: ms
 #counter_write_request_timeout: 5000ms
-counter_write_request_timeout: {{ cassandra_counter_write_request_timeout_in_ms | default(cassandra_counter_write_request_timeout) | default("5s") }}
+counter_write_request_timeout: {{ cassandra_counter_write_request_timeout | default("5s") }}
 # How long a coordinator should continue to retry a CAS operation
 # that contends with other proposals for the same row.
 # Lowest acceptable value is 10 ms.
 # Min unit: ms
 #cas_contention_timeout: 1000ms
-cas_contention_timeout: {{ cassandra_cas_contention_timeout_in_ms | default(cassandra_cas_contention_timeout) | default("1s") }}
+cas_contention_timeout: {{ cassandra_cas_contention_timeout | default("1s") }}
 # How long the coordinator should wait for truncates to complete
 # (This can be much longer, because unless auto_snapshot is disabled
 # we need to flush first so we can snapshot before removing the data.)
 # Lowest acceptable value is 10 ms.
 # Min unit: ms
 #truncate_request_timeout: 60000ms
-truncate_request_timeout: {{ cassandra_truncate_request_timeout_in_ms | default(cassandra_truncate_request_timeout) | default("60s") }}
+truncate_request_timeout: {{ cassandra_truncate_request_timeout | default("60s") }}
 # The default timeout for other, miscellaneous operations.
 # Lowest acceptable value is 10 ms.
 # Min unit: ms
 #request_timeout: 10000ms
-request_timeout: {{ cassandra_request_timeout_in_ms | default(cassandra_request_timeout) | default("10s") }}
+request_timeout: {{ cassandra_request_timeout | default("10s") }}
 
 # Defensive settings for protecting Cassandra from true network partitions.
 # See (CASSANDRA-14358) for details.
@@ -1497,7 +1483,7 @@ request_timeout: {{ cassandra_request_timeout_in_ms | default(cassandra_request_
 # The amount of time to wait for internode tcp connections to establish.
 # Min unit: ms
 # internode_tcp_connect_timeout: 2000ms
-internode_tcp_connect_timeout: {{ cassandra_internode_tcp_connect_timeout_in_ms | default(cassandra_internode_tcp_connect_timeout) | default('2000ms') }}
+internode_tcp_connect_timeout: {{ cassandra_internode_tcp_connect_timeout | default('2000ms') }}
 #
 # The amount of time unacknowledged data is allowed on a connection before we throw out the connection
 # Note this is only supported on Linux + epoll, and it appears to behave oddly above a setting of 30000
@@ -1541,7 +1527,7 @@ internode_streaming_tcp_user_timeout: {{ cassandra_internode_streaming_tcp_user_
 # this timeout to execute, will generate an aggregated log message, so that slow queries
 # can be identified. Set this value to zero to disable slow query logging.
 # Min unit: ms
-slow_query_log_timeout: {{ cassandra_slow_query_log_timeout_in_ms | default(cassandra_slow_query_log_timeout) | default("500ms") }}
+slow_query_log_timeout: {{ cassandra_slow_query_log_timeout | default("500ms") }}
 
 # Enable operation timeout information exchange between nodes to accurately
 # measure request timeouts.  If disabled, replicas will assume that requests

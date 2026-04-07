@@ -1,25 +1,4 @@
 ---
-# Derived variables for Cassandra 5.0.x
-# These convert human-readable values (e.g. "10s", "128MiB") to the numeric
-# legacy formats so that playbooks using the old _in_ms/_in_mb variable names
-# continue to work alongside the 5.0.x templates.
-
-cassandra_prepared_statements_cache_size_mb: "{{ cassandra_prepared_statements_cache_size | default('24MiB') | regex_replace('[^0-9]', '') }}"
-cassandra_compaction_throughput_mb_per_sec: "{{ cassandra_compaction_throughput | default('64MiB/s') | regex_replace('[^0-9]', '') }}"
-cassandra_stream_throughput_outbound_megabits_per_sec: "{{ cassandra_stream_throughput_outbound | default('24MiB/s') | regex_replace('[^0-9]', '') }}"
-cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec: "{{ cassandra_inter_dc_stream_throughput_outbound | default('24MiB/s') | regex_replace('[^0-9]', '') }}"
-cassandra_row_cache_size_in_mb: "{{ cassandra_row_cache_size | default('0MiB') | regex_replace('[^0-9]', '') }}"
-cassandra_counter_cache_size_in_mb: "{{ cassandra_counter_cache_size | default('') | regex_replace('[^0-9]', '') }}"
-cassandra_commitlog_segment_size_in_mb: "{{ cassandra_commitlog_segment_size | default('32MiB') | regex_replace('[^0-9]', '') }}"
-cassandra_commitlog_total_space_in_mb: "{{ cassandra_commitlog_total_space | default('16384') | regex_replace('[^0-9]', '') }}"
-cassandra_sstable_preemptive_open_interval_in_mb: "{{ cassandra_sstable_preemptive_open_interval | default('64MiB') | regex_replace('[^0-9]', '') }}"
-cassandra_memtable_heap_space_in_mb: "{{ cassandra_memtable_heap_space | default('1024') | regex_replace('[^0-9]', '') }}"
-cassandra_memtable_offheap_space_in_mb: "{{ cassandra_memtable_offheap_space | default('4096') | regex_replace('[^0-9]', '') }}"
-cassandra_read_request_timeout_in_ms: "{{ cassandra_read_request_timeout | default('5s') | regex_replace('[^0-9]', '') }}"
-cassandra_write_request_timeout_in_ms: "{{ cassandra_write_request_timeout | default('2s') | regex_replace('[^0-9]', '') }}"
-cassandra_counter_write_request_timeout_in_ms: "{{ cassandra_counter_write_request_timeout | default('5s') | regex_replace('[^0-9]', '') }}"
-cassandra_cas_contention_timeout_in_ms: "{{ cassandra_cas_contention_timeout | default('1s') | regex_replace('[^0-9]', '') }}"
-cassandra_truncate_request_timeout_in_ms: "{{ cassandra_truncate_request_timeout | default('60s') | regex_replace('[^0-9]', '') }}"
-cassandra_request_timeout_in_ms: "{{ cassandra_request_timeout | default('10s') | regex_replace('[^0-9]', '') }}"
-cassandra_internode_tcp_connect_timeout_in_ms: "{{ cassandra_internode_tcp_connect_timeout | default('2000ms') | regex_replace('[^0-9]', '') }}"
-cassandra_slow_query_log_timeout_in_ms: "{{ cassandra_slow_query_log_timeout | default('500ms') | regex_replace('[^0-9]', '') }}"
+# Cassandra 5.0.x uses human-readable values with units (e.g. "24MiB", "5s").
+# All required variables are defined in defaults/main.yml with the correct format.
+# No derived conversions needed here — the 5.0.x templates use the primary variables directly.
