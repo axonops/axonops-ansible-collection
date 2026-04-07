@@ -3,8 +3,8 @@
 - name: Install numactl
   ansible.builtin.package:
     name: numactl
-    state: latest
-  ignore_errors: true
+    state: present
+  failed_when: false
 
 - name: Configure sysctl settings for Cassandra
   ansible.posix.sysctl:

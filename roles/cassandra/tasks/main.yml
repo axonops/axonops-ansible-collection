@@ -1,3 +1,13 @@
+- name: Validate cassandra_version is supported
+  ansible.builtin.assert:
+    that:
+      - cassandra_version is defined
+      - cassandra_version.startswith('4.1') or cassandra_version.startswith('5.')
+    fail_msg: >-
+      Unsupported cassandra_version '{{ cassandra_version }}'. This role supports versions
+      starting with '4.1' or '5.'. Please set cassandra_version to a supported value.
+  tags: always
+
 - name: Import vars for 4.1
   ansible.builtin.include_vars: cassandra-4.1.yml
   when: cassandra_version.startswith('4.1')
@@ -5,7 +15,7 @@
 
 - name: Import vars for 5.0
   ansible.builtin.include_vars: cassandra-5.0.yml
-  when: cassandra_version.startswith('5.0')
+  when: cassandra_version.startswith('5.')
   tags: always
 
 - name: Import vars for Debian
@@ -27,6 +37,7 @@
   ansible.builtin.import_tasks: install-tar.yml
 
 - name: Remove needrestart package
+  when: ansible_os_family == "Debian"
   ansible.builtin.package:
     name: needrestart
     state: absent
@@ -103,7 +114,7 @@
     owner: "cassandra"
     group: "cassandra"
     state: directory
-  with_items:
+  loop:
     - "{{ cassandra_log_dir }}"
     - "{{ cassandra_hints_directory }}"
     - "{{ cassandra_gc_log_dir }}"
@@ -151,8 +162,10 @@
       ansible.builtin.template:
         src: "{{ tmpl_dir }}/{{ item }}.j2"
         dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
-        mode: "0644"
-      with_items:
+        mode: "0640"
+        owner: cassandra
+        group: cassandra
+      loop:
         - cassandra-env.sh
         - cassandra-rackdc.properties
         - cassandra.yaml
@@ -161,16 +174,20 @@
         - jvm11-server.options
         - jvm-clients.options
         - jvm11-clients.options
+      notify: Restart Cassandra
 
     - name: Ensure Cassandra node configured (5.x only)
       when: cassandra_version.startswith('5.')
       ansible.builtin.template:
         src: "{{ tmpl_dir }}/{{ item }}.j2"
         dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
-        mode: "0644"
-      with_items:
+        mode: "0640"
+        owner: cassandra
+        group: cassandra
+      loop:
         - jvm17-server.options
         - jvm17-clients.options
+      notify: Restart Cassandra
 
 - name: JMX Authentication
   when:

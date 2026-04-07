@@ -311,8 +311,8 @@ roles_update_interval: {{ cassandra_roles_update_interval | default("10s") }} # 
 # become eligible for refresh after their update interval. Upon next access,
 # an async reload is scheduled and the old value returned until it completes.
 # roles_cache_active_update: false
-{% if cassandra_traverse_auth_from_root is defined %}
-roles_cache_active_update: {{ cassandra_traverse_auth_from_root }}
+{% if cassandra_roles_cache_active_update is defined %}
+roles_cache_active_update: {{ cassandra_roles_cache_active_update }}
 {% endif %}
 
 # Validity period for permissions cache (fetching permissions can be an
@@ -592,7 +592,7 @@ row_cache_size: {{ cassandra_row_cache_size_in_mb | default(cassandra_row_cache_
 # Default is 0 to disable saving the row cache.
 # Min unit: s
 # row_cache_save_period: 0s
-{% if cassandra_row_cache_save_period is defined and cassandra_row_cache_save_period.endswith('s') or cassandra_row_cache_save_period.endswith('m') or cassandra_row_cache_save_period.endswith('h') %}
+{% if cassandra_row_cache_save_period is defined and (cassandra_row_cache_save_period.endswith('s') or cassandra_row_cache_save_period.endswith('m') or cassandra_row_cache_save_period.endswith('h')) %}
 row_cache_save_period: {{ cassandra_row_cache_save_period | default("0s") }}
 {% else %}
 row_cache_save_period: {{ cassandra_row_cache_save_period }}s
@@ -627,7 +627,7 @@ counter_cache_size: {{ cassandra_counter_cache_size_in_mb | default(cassandra_co
 #
 # Default is 7200 or 2 hours.
 # Min unit: s
-{% if cassandra_counter_cache_save_period is defined and cassandra_counter_cache_save_period.endswith('s') or cassandra_counter_cache_save_period.endswith('m') or cassandra_counter_cache_save_period.endswith('h') %}
+{% if cassandra_counter_cache_save_period is defined and (cassandra_counter_cache_save_period.endswith('s') or cassandra_counter_cache_save_period.endswith('m') or cassandra_counter_cache_save_period.endswith('h')) %}
 counter_cache_save_period: {{ cassandra_counter_cache_save_period | default('2h') }}
 {% else %}
 counter_cache_save_period: {{ cassandra_counter_cache_save_period }}s
@@ -652,7 +652,7 @@ saved_caches_directory: {{ cassandra_saved_caches_directory }}
 # while still having the cache during runtime.
 # Min unit: s
 # cache_load_timeout: 30s
-{% if cassandra_cache_load_timeout is defined and cassandra_cache_load_timeout.endswith('s') or cassandra_cache_load_timeout.endswith('m') or cassandra_cache_load_timeout.endswith('h') %}
+{% if cassandra_cache_load_timeout is defined and (cassandra_cache_load_timeout.endswith('s') or cassandra_cache_load_timeout.endswith('m') or cassandra_cache_load_timeout.endswith('h')) %}
 cache_load_timeout: {{ cassandra_cache_load_timeout | default("2m") }}
 {% else %}
 cache_load_timeout: {{ cassandra_cache_load_timeout }}s
@@ -679,8 +679,8 @@ commitlog_sync_group_window: {{ cassandra_commitlog_sync_group_window | default(
 commitlog_sync: {{ cassandra_commitlog_sync | default("periodic") }}
 # Min unit: ms
 # commitlog_sync_period: 10000ms
-{% if cassandr_commitlog_sync_period is defined and cassandr_commitlog_sync_period.endswith('s') or cassandr_commitlog_sync_period.endswith('m') or cassandr_commitlog_sync_period.endswith('h') %}
-commitlog_sync_period: {{ cassandr_commitlog_sync_period | default("10s") }}
+{% if cassandra_commitlog_sync_period is defined and (cassandra_commitlog_sync_period.endswith('s') or cassandra_commitlog_sync_period.endswith('m') or cassandra_commitlog_sync_period.endswith('h')) %}
+commitlog_sync_period: {{ cassandra_commitlog_sync_period | default("10s") }}
 {% else %}
 commitlog_sync_period: {{ cassandr_commitlog_sync_period }}s
 {% endif %}
@@ -971,8 +971,8 @@ index_summary_capacity: {{ cassandra_index_summary_capacity | default("") }}
 # process, leaving existing index summaries at their current sampling level.
 # Min unit: m
 #index_summary_resize_interval: 60m
-{% if cassadra_index_summary_resize_interval is defined and cassadra_index_summary_resize_interval != '' %}
-index_summary_resize_interval: {{ cassadra_index_summary_resize_interval | default("60m") }}
+{% if cassandra_index_summary_resize_interval is defined and cassandra_index_summary_resize_interval != '' %}
+index_summary_resize_interval: {{ cassandra_index_summary_resize_interval | default("60m") }}
 {% endif %}
 
 # Whether to, when doing sequential writing, fsync() at intervals in
@@ -1844,7 +1844,7 @@ server_encryption_options:
   require_client_auth: {{ cassandra_ssl_client_require_client_auth }}
   # Set to a valid trustore if require_client_auth is true
   truststore: {{ cassandra_ssl_truststore_file | default("") }}
-  truststore_password: {{ cassandra_ssl_internode_keystore_pass | default("") }}
+  truststore_password: {{ cassandra_ssl_truststore_pass | default("") }}
   # Verify that the host name in the certificate matches the connected host
   require_endpoint_verification: {{ cassandra_require_endpoint_verification }}
   # More advanced defaults:

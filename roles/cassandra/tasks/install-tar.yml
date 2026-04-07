@@ -9,7 +9,7 @@
 - name: Create the Cassandra user
   ansible.builtin.user:
     name: cassandra
-    home: "{{ cassandra_log_dir }}"
+    home: /var/lib/cassandra
     shell: /bin/bash
     comment: "Created by Ansible"
 
