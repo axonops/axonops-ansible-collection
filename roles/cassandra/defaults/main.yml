@@ -12,8 +12,8 @@ cassandra_binary_group: root
 
 cassandra_version: 5.0.7
 
-cassandra_cqlsh_binary_version: 0.1.5
-cassandra_cqlsh_binary: "{{ _cassandra_cqlsh_binary }}"
+cassandra_cqlai_version: 0.1.5
+cassandra_cqlai_binary: "{{ _cassandra_cqlai_binary }}"
 
 # It is recommended to leave this as false
 cassandra_start_on_boot: false

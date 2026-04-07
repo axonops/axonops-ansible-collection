@@ -13,6 +13,11 @@
     shell: /bin/bash
     comment: "Created by Ansible"
 
+- name: Ensure unzip is installed
+  ansible.builtin.package:
+    name: unzip
+    state: present
+
 - name: Download Cassandra binaries
   block:
     - name: Cassandra binaries

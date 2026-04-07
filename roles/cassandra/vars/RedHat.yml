@@ -1,1 +1,1 @@
-_cassandra_cqlsh_binary: "https://github.com/axonops/cqlai/releases/download/v{{ cassandra_cqlsh_binary_version }}/cqlai-{{ cassandra_cqlsh_binary_version }}-1.{{ ansible_architecture }}.rpm"
+_cassandra_cqlai_binary: "https://github.com/axonops/cqlai/releases/download/v{{ cassandra_cqlai_version }}/cqlai-{{ cassandra_cqlai_version }}-1.{{ ansible_architecture }}.rpm"

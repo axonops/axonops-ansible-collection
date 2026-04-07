@@ -109,13 +109,13 @@ the `*_redhat_repository` URLs.
     install_cassandra: true
 
   roles:
-    - role: cassandra
+    - role: axonops.axonops.cassandra
       tags: cassandra
       when: install_cassandra
       vars:
         cassandra_dc: "example"
 
-    - role: agent
+    - role: axonops.axonops.agent
       tags: agent, axonops-agent
       vars:
         axon_agent_server_host: "{{ groups['axon-server'] | first }}"
@@ -149,15 +149,15 @@ the legacy `elastic_host` and `elastic_port` configuration is used.
     es_redhat_repository_url: https://artifacts.elastic.co/packages/7.x/yum
 
   roles:
-    - role: cassandra
+    - role: axonops.axonops.cassandra
       tags: cassandra
       when: install_cassandra is defined and install_cassandra
-    - role: elastic
+    - role: axonops.axonops.elastic
       tags: elastic
       when: install_elastic is defined and install_elastic
-    - role: server
+    - role: axonops.axonops.server
       tags: server, axonops-server
-    - role: dash
+    - role: axonops.axonops.dash
       tags: dash, axonops-dashboard
 ```
 

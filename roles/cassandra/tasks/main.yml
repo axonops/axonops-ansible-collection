@@ -216,18 +216,18 @@
 - name: OS configs
   ansible.builtin.import_tasks: os-config.yml
 
-- name: Installed the compiled cqlsh binary
-  tags: cqlsh
+- name: Install cqlai
+  tags: cqlai
   ansible.builtin.apt:
-    deb: "{{ cassandra_cqlsh_binary }}"
-  when: cassandra_cqlsh_binary is defined and ansible_os_family == "Debian"
+    deb: "{{ cassandra_cqlai_binary }}"
+  when: cassandra_cqlai_binary is defined and ansible_os_family == "Debian"
 
-- name: Installed the compiled cqlsh binary
-  tags: cqlsh
+- name: Install cqlai
+  tags: cqlai
   ansible.builtin.yum:
-    name: "{{ cassandra_cqlsh_binary }}"
+    name: "{{ cassandra_cqlai_binary }}"
     disable_gpg_check: true
-  when: cassandra_cqlsh_binary is defined and ansible_os_family == "RedHat"
+  when: cassandra_cqlai_binary is defined and ansible_os_family == "RedHat"
 
 - name: Systemd service for cassandra
   ansible.builtin.template:

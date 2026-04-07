@@ -21,7 +21,7 @@ Installs and configures the AxonOps Dashboard web interface.
 
 **Use when**: You're deploying a self-hosted AxonOps Server and need the web UI (typically installed alongside the server).
 
-#### [alerts](alerts.md)
+#### [configurations](configurations.md)
 Configures alerts, integrations, and monitoring settings for AxonOps.
 
 **Use when**: You need to automate the configuration of alerts, Slack/PagerDuty integrations, or backup policies.
@@ -57,7 +57,7 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **agent** | Monitor Cassandra clusters | Cassandra nodes |
 | **server** | Self-hosted AxonOps backend | Elastic, Cassandra (optional) |
 | **dash** | Web UI for AxonOps | Server |
-| **alerts** | Alert configuration | Server |
+| **configurations** | Alert configuration | Server |
 | **cassandra** | Apache Cassandra installation | Agent, Java |
 | **elastic** | Elasticsearch installation | Server |
 | **java** | Java installation | Cassandra, Elastic |
@@ -72,10 +72,10 @@ Deploy AxonOps Agent on existing Cassandra nodes to monitor with AxonOps SaaS:
 ```yaml
 - hosts: cassandra
   roles:
-    - agent
+    - role: axonops.axonops.agent
 ```
 
-**Roles needed**: `agent`
+**Roles needed**: `axonops.axonops.agent`
 
 **See**: [agent.md](agent.md)
 
@@ -88,13 +88,13 @@ Deploy new Cassandra cluster with AxonOps monitoring:
 ```yaml
 - hosts: cassandra
   roles:
-    - preflight
-    - java
-    - agent
-    - cassandra
+    - role: axonops.axonops.preflight
+    - role: axonops.axonops.java
+    - role: axonops.axonops.agent
+    - role: axonops.axonops.cassandra
 ```
 
-**Roles needed**: `preflight`, `java`, `agent`, `cassandra`
+**Roles needed**: `axonops.axonops.preflight`, `axonops.axonops.java`, `axonops.axonops.agent`, `axonops.axonops.cassandra`
 
 **See**: [cassandra.md](cassandra.md), [agent.md](agent.md), [java.md](java.md), [preflight.md](preflight.md)
 
@@ -107,14 +107,14 @@ Deploy complete self-hosted AxonOps stack:
 ```yaml
 - hosts: axon-server
   roles:
-    - java
-    - elastic
-    - cassandra  # Optional: for metrics storage
-    - server
-    - dash
+    - role: axonops.axonops.java
+    - role: axonops.axonops.elastic
+    - role: axonops.axonops.cassandra  # Optional: for metrics storage
+    - role: axonops.axonops.server
+    - role: axonops.axonops.dash
 ```
 
-**Roles needed**: `java`, `elastic`, `server`, `dash`, optionally `cassandra`
+**Roles needed**: `axonops.axonops.java`, `axonops.axonops.elastic`, `axonops.axonops.server`, `axonops.axonops.dash`, optionally `axonops.axonops.cassandra`
 
 **See**: [server.md](server.md), [elastic.md](elastic.md), [dash.md](dash.md)
 
@@ -128,22 +128,22 @@ Deploy both AxonOps Server and monitored Cassandra cluster:
 ```yaml
 - hosts: axon-server
   roles:
-    - java
-    - elastic
-    - cassandra
-    - agent
-    - server
-    - dash
+    - role: axonops.axonops.java
+    - role: axonops.axonops.elastic
+    - role: axonops.axonops.cassandra
+    - role: axonops.axonops.agent
+    - role: axonops.axonops.server
+    - role: axonops.axonops.dash
 ```
 
 **Cassandra hosts**:
 ```yaml
 - hosts: cassandra
   roles:
-    - preflight
-    - java
-    - agent
-    - cassandra
+    - role: axonops.axonops.preflight
+    - role: axonops.axonops.java
+    - role: axonops.axonops.agent
+    - role: axonops.axonops.cassandra
 ```
 
 **Roles needed**: All roles
@@ -157,12 +157,12 @@ Configure alerts and integrations for existing AxonOps deployment:
 ```yaml
 - hosts: localhost
   roles:
-    - alerts
+    - role: axonops.axonops.configurations
 ```
 
-**Roles needed**: `alerts`
+**Roles needed**: `axonops.axonops.configurations`
 
-**See**: [alerts.md](alerts.md)
+**See**: [configurations.md](configurations.md)
 
 ## Getting Started
 
