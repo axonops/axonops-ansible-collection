@@ -1,3 +1,22 @@
+- name: Warn if cassandra_seeds is set to 127.0.0.1
+  ansible.builtin.fail:
+    msg: >-
+      WARNING: cassandra_seeds is set to '127.0.0.1'. This is only suitable for
+      single-node development clusters. For production deployments, set
+      cassandra_seeds to the actual seed node addresses.
+  when: cassandra_seeds is defined and cassandra_seeds == "127.0.0.1"
+  ignore_errors: true
+  tags: always
+
+- name: Warn if cassandra_cluster_name is set to default
+  ansible.builtin.fail:
+    msg: >-
+      WARNING: cassandra_cluster_name is set to 'default'. For production
+      deployments, set cassandra_cluster_name to a meaningful cluster name.
+  when: cassandra_cluster_name is defined and cassandra_cluster_name == "default"
+  ignore_errors: true
+  tags: always
+
 - name: Validate cassandra_version is supported
   ansible.builtin.assert:
     that:

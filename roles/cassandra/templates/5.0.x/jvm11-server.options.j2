@@ -145,4 +145,8 @@
 -Dio.netty.allocator.useCacheForAllThreads=true
 -Dio.netty.allocator.maxOrder=11
 
+{% for setting in cassandra_jvm11_server_settings %}
+{{ setting }}
+{% endfor %}
+
 # The newline in the end of file is intentional

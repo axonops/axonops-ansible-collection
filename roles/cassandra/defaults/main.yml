@@ -327,6 +327,10 @@ cassandra_jvm_gc_log_enabled: true
 cassandra_jvm_gc_log_file_number: 10
 cassandra_jvm_gc_log_file_max_size_mb: 10
 
+# Any other arbitrary JVM settings to add to the end of the jvm options file, one line per array entry
+cassandra_jvm11_server_settings: []
+cassandra_jvm17_server_settings: []
+
 cassandra_audit_log_enabled: false
 audit_logging_options:
   enabled: false
