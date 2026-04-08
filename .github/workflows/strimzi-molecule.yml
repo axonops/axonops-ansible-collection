@@ -1,0 +1,105 @@
+---
+name: Strimzi Molecule
+
+on:
+  push:
+    branches:
+      - main
+      - feat/k8ssandra
+  pull_request:
+
+defaults:
+  run:
+    working-directory: roles/strimzi
+
+jobs:
+  # Lightweight: validates template rendering and input validation (no K8s needed)
+  validate:
+    name: Molecule Strimzi (validate)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the codebase.
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install test dependencies.
+        run: pip3 install ansible molecule
+
+      - name: Run Molecule converge (validate scenario)
+        run: molecule -v converge -s validate
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+
+  # Full integration: deploys into a Kind cluster
+  integration:
+    name: Molecule Strimzi (integration)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the codebase.
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install test dependencies.
+        run: pip3 install ansible molecule molecule-plugins[docker] docker kubernetes
+
+      - name: Install Ansible collections.
+        run: ansible-galaxy collection install kubernetes.core
+
+      - name: Install Kind.
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Install kubectl.
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x ./kubectl
+          sudo mv ./kubectl /usr/local/bin/kubectl
+
+      - name: Install Helm.
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.20.1
+
+      - name: Run Molecule destroy (ignore failures)
+        run: molecule -v destroy
+        continue-on-error: true
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+
+      - name: Run Molecule converge
+        run: molecule -v converge
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+
+      - name: Run Molecule verify
+        run: molecule -v verify
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+
+      - name: Run Molecule cleanup
+        run: molecule -v cleanup
+        if: always()
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
