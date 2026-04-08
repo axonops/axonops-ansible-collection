@@ -70,11 +70,8 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **server** | Self-hosted AxonOps backend | Elastic, Cassandra (optional) |
 | **dash** | Web UI for AxonOps | Server |
 | **configurations** | Alert configuration | Server |
-<<<<<<< HEAD
 | **k8ssandra** | Cassandra on Kubernetes | Kubernetes cluster |
 | **strimzi** | Kafka on Kubernetes | Kubernetes cluster |
-=======
->>>>>>> origin/main
 | **cassandra** | Apache Cassandra installation | Agent, Java |
 | **elastic** | Elasticsearch installation | Server |
 | **java** | Java installation | Cassandra, Elastic |
