@@ -5,9 +5,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'roles/server/**'
+      - '.github/workflows/server-molecule.yml'
   pull_request:
-    branches:
-      - main
+    paths:
+      - 'roles/server/**'
+      - '.github/workflows/server-molecule.yml'
 
 defaults:
   run:

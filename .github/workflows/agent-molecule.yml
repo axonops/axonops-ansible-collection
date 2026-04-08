@@ -5,9 +5,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'roles/agent/**'
+      - '.github/workflows/agent-molecule.yml'
   pull_request:
-    branches:
-      - main
+    paths:
+      - 'roles/agent/**'
+      - '.github/workflows/agent-molecule.yml'
 
 defaults:
   run:

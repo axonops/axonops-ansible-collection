@@ -5,8 +5,13 @@ on:
   push:
     branches:
       - main
-      - feat/opensearch
+    paths:
+      - 'roles/opensearch/**'
+      - '.github/workflows/opensearch-molecule.yml'
   pull_request:
+    paths:
+      - 'roles/opensearch/**'
+      - '.github/workflows/opensearch-molecule.yml'
 
 defaults:
   run:

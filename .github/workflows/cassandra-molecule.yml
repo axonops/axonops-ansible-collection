@@ -5,7 +5,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'roles/cassandra/**'
+      - '.github/workflows/cassandra-molecule.yml'
   pull_request:
+    paths:
+      - 'roles/cassandra/**'
+      - '.github/workflows/cassandra-molecule.yml'
 
 defaults:
   run:

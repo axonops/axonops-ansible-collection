@@ -5,9 +5,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'roles/elastic/**'
+      - '.github/workflows/elastic-molecule.yml'
   pull_request:
-    branches:
-      - main
+    paths:
+      - 'roles/elastic/**'
+      - '.github/workflows/elastic-molecule.yml'
 
 defaults:
   run:

@@ -5,8 +5,13 @@ on:
   push:
     branches:
       - main
-      - feat/k8ssandra
+    paths:
+      - 'roles/strimzi/**'
+      - '.github/workflows/strimzi-molecule.yml'
   pull_request:
+    paths:
+      - 'roles/strimzi/**'
+      - '.github/workflows/strimzi-molecule.yml'
 
 defaults:
   run:
