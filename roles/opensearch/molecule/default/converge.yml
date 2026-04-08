@@ -2,14 +2,14 @@
 - name: Converge
   hosts: all
   vars:
-    opensearch_version: "3.0.0"
+    opensearch_version: "3.6.0"
     opensearch_cluster_name: molecule-test
     opensearch_cluster_type: single-node
     opensearch_heap_size: "512m"
     opensearch_security_enabled: false
     opensearch_populate_etc_hosts: false
     opensearch_start_on_boot: false
-    opensearch_start_on_install: true
+    opensearch_start_on_install: false
 
   roles:
     - role: opensearch

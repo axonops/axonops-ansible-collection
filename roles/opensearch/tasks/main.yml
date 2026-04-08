@@ -55,6 +55,8 @@
     daemon_reload: true
     state: started
     enabled: "{{ opensearch_start_on_boot }}"
+  when: opensearch_start_on_install
+  tags: service
 
 - name: Wait for OpenSearch to be ready
   ansible.builtin.wait_for:
@@ -63,6 +65,8 @@
     delay: 5
     connect_timeout: 1
     timeout: 120
+  when: opensearch_start_on_install
+  tags: service
 
 - name: Check OpenSearch cluster health
   ansible.builtin.uri:
@@ -71,7 +75,7 @@
     password: "{{ opensearch_admin_password }}"
     validate_certs: false
   register: _opensearch_health
-  when: opensearch_security_enabled
+  when: opensearch_start_on_install and opensearch_security_enabled
   tags: health
 
 - name: Check OpenSearch cluster health (no security)
@@ -79,7 +83,7 @@
     url: "http://{{ opensearch_network_host }}:{{ opensearch_api_port }}/_cluster/health?pretty"
     validate_certs: false
   register: _opensearch_health
-  when: not opensearch_security_enabled
+  when: opensearch_start_on_install and not opensearch_security_enabled
   tags: health
 
 - name: Show OpenSearch cluster health
