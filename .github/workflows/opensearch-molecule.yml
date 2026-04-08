@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - feat/k8ssandra
+      - feat/opensearch
   pull_request:
 
 defaults:
