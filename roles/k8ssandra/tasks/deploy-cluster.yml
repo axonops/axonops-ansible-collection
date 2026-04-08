@@ -1,0 +1,18 @@
+---
+# ============================================================================
+# Deploy a single K8ssandraCluster CR
+# ============================================================================
+
+- name: "{{ cluster.name }} - Deploy custom K8ssandraCluster spec"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ cluster.custom_spec }}"
+  when: cluster.custom_spec is defined
+
+- name: "{{ cluster.name }} - Deploy K8ssandraCluster from template"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'k8ssandra-cluster.yaml.j2') }}"
+  when: cluster.custom_spec is not defined
+
+# code: language=ansible

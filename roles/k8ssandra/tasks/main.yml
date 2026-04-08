@@ -1,0 +1,125 @@
+---
+# ============================================================================
+# K8ssandra Operator Role - Main Tasks
+# ============================================================================
+
+# --- Validation ------------------------------------------------------------
+
+- name: Validate Cassandra version is 5.x
+  ansible.builtin.assert:
+    that:
+      - (item.cassandra_version | default(k8ssandra_cassandra_version)) is version('5.0', '>=')
+      - (item.cassandra_version | default(k8ssandra_cassandra_version)) is version('6.0', '<')
+    fail_msg: >-
+      Only Cassandra 5.x is supported by this role.
+      Got '{{ item.cassandra_version | default(k8ssandra_cassandra_version) }}'
+      for cluster '{{ item.name }}'.
+  loop: "{{ k8ssandra_clusters }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.custom_spec is not defined
+  tags: always
+
+- name: Warn when no clusters are defined
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: k8ssandra_clusters is empty. The operator will be installed
+      but no Cassandra clusters will be created.
+  when: k8ssandra_clusters | length == 0
+  tags: always
+
+- name: Validate AxonOps agent configuration
+  ansible.builtin.assert:
+    that:
+      - (item.axon_agent_org | default(k8ssandra_axon_agent_org)) | length > 0
+      - (item.axon_agent_key | default(k8ssandra_axon_agent_key)) | length > 0
+    fail_msg: >-
+      AxonOps agent configuration is required. Set axon_agent_org and
+      axon_agent_key for cluster '{{ item.name }}' or set the global
+      k8ssandra_axon_agent_org and k8ssandra_axon_agent_key variables.
+  loop: "{{ k8ssandra_clusters }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.custom_spec is not defined
+  tags: always
+
+# --- cert-manager -----------------------------------------------------------
+
+- name: Install cert-manager
+  when: k8ssandra_install_cert_manager
+  tags: cert-manager
+  block:
+    - name: Install cert-manager via Helm
+      kubernetes.core.helm:
+        name: cert-manager
+        chart_ref: "{{ k8ssandra_cert_manager_chart }}"
+        chart_version: "{{ k8ssandra_cert_manager_version }}"
+        release_namespace: "{{ k8ssandra_cert_manager_namespace }}"
+        create_namespace: true
+        values:
+          crds:
+            enabled: true
+        wait: true
+
+    - name: Wait for cert-manager webhook to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: cert-manager-webhook
+        namespace: "{{ k8ssandra_cert_manager_namespace }}"
+      register: _cert_manager_webhook
+      until:
+        - _cert_manager_webhook.resources | length > 0
+        - (_cert_manager_webhook.resources[0].status.readyReplicas | default(0)) >= 1
+      retries: 30
+      delay: 10
+
+# --- k8ssandra-operator -----------------------------------------------------
+
+- name: Install k8ssandra-operator
+  when: k8ssandra_install_operator
+  tags: operator
+  block:
+    - name: Add k8ssandra Helm repository
+      kubernetes.core.helm_repository:
+        name: "{{ k8ssandra_operator_helm_repo_name }}"
+        repo_url: "{{ k8ssandra_operator_helm_repo }}"
+
+    - name: Install k8ssandra-operator via Helm
+      kubernetes.core.helm:
+        name: k8ssandra-operator
+        chart_ref: "{{ k8ssandra_operator_helm_repo_name }}/k8ssandra-operator"
+        release_namespace: "{{ k8ssandra_operator_namespace }}"
+        create_namespace: true
+        values:
+          image:
+            tag: "{{ k8ssandra_operator_version }}"
+          global:
+            clusterScoped: "{{ k8ssandra_operator_cluster_scoped }}"
+        wait: true
+
+    - name: Wait for k8ssandra-operator to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: k8ssandra-operator
+        namespace: "{{ k8ssandra_operator_namespace }}"
+      register: _k8ssandra_operator
+      until:
+        - _k8ssandra_operator.resources | length > 0
+        - (_k8ssandra_operator.resources[0].status.readyReplicas | default(0)) >= 1
+      retries: "{{ (k8ssandra_operator_wait_timeout / 10) | int }}"
+      delay: 10
+      when: k8ssandra_wait_for_operator
+
+# --- Deploy Cassandra Clusters -----------------------------------------------
+
+- name: Deploy K8ssandra clusters
+  ansible.builtin.include_tasks: deploy-cluster.yml
+  loop: "{{ k8ssandra_clusters }}"
+  loop_control:
+    loop_var: cluster
+    label: "{{ cluster.name }}"
+  tags: clusters
+
+# code: language=ansible

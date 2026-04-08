@@ -1,0 +1,33 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - role: k8ssandra
+      vars:
+        # Install cert-manager and operator into the Kind cluster
+        k8ssandra_install_cert_manager: true
+        k8ssandra_install_operator: true
+
+        # Deploy a minimal test cluster
+        k8ssandra_clusters:
+          - name: molecule-test
+            namespace: k8ssandra-operator
+            cassandra_version: "5.0.6"
+            dc_name: dc1
+            dc_size: 1
+            storage_size: 1Gi
+            heap_size: 512M
+            cpu_limit: 1
+            cpu_request: 500m
+            memory_limit: 1Gi
+            memory_request: 512Mi
+
+        # AxonOps agent config (test values)
+        k8ssandra_axon_agent_org: "molecule-test-org"
+        k8ssandra_axon_agent_key: "molecule-test-key"
+        k8ssandra_axon_agent_server_host: "agents.axonops.cloud"
+
+# code: language=ansible

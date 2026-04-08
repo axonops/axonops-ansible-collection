@@ -1,0 +1,85 @@
+---
+- name: Verify
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    # --- Verify cert-manager is running -------------------------------------
+    - name: Check cert-manager deployment
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: cert-manager
+        namespace: cert-manager
+      register: _cert_manager
+      failed_when:
+        - _cert_manager.resources | length == 0
+        - (_cert_manager.resources[0].status.readyReplicas | default(0)) < 1
+
+    - name: Verify cert-manager is ready
+      ansible.builtin.assert:
+        that:
+          - _cert_manager.resources | length > 0
+          - _cert_manager.resources[0].status.readyReplicas >= 1
+        fail_msg: "cert-manager is not ready"
+
+    # --- Verify k8ssandra-operator is running --------------------------------
+    - name: Check k8ssandra-operator deployment
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: k8ssandra-operator
+        namespace: k8ssandra-operator
+      register: _k8ssandra_op
+
+    - name: Verify k8ssandra-operator is ready
+      ansible.builtin.assert:
+        that:
+          - _k8ssandra_op.resources | length > 0
+          - _k8ssandra_op.resources[0].status.readyReplicas >= 1
+        fail_msg: "k8ssandra-operator is not ready"
+
+    # --- Verify K8ssandraCluster CR was created ------------------------------
+    - name: Check K8ssandraCluster CR exists
+      kubernetes.core.k8s_info:
+        api_version: k8ssandra.io/v1alpha1
+        kind: K8ssandraCluster
+        name: molecule-test
+        namespace: k8ssandra-operator
+      register: _cluster_cr
+
+    - name: Verify K8ssandraCluster CR exists
+      ansible.builtin.assert:
+        that:
+          - _cluster_cr.resources | length == 1
+        fail_msg: "K8ssandraCluster CR 'molecule-test' was not created"
+
+    - name: Verify cluster spec values
+      ansible.builtin.assert:
+        that:
+          - _cluster_cr.resources[0].spec.cassandra.serverVersion == "5.0.6"
+          - _cluster_cr.resources[0].spec.cassandra.serverImage == "ghcr.io/axonops/k8ssandra/cassandra:5.0.6"
+          - _cluster_cr.resources[0].spec.cassandra.datacenters | length == 1
+          - _cluster_cr.resources[0].spec.cassandra.datacenters[0].metadata.name == "dc1"
+          - _cluster_cr.resources[0].spec.cassandra.datacenters[0].size == 1
+        fail_msg: "K8ssandraCluster CR spec does not match expected values"
+
+    # --- Verify AxonOps env vars are set ------------------------------------
+    - name: Verify AxonOps environment variables in CR
+      ansible.builtin.assert:
+        that:
+          - _cluster_cr.resources[0].spec.cassandra.datacenters[0].containers[0].env | selectattr('name', 'equalto', 'AXON_AGENT_ORG') | list | length == 1
+          - _cluster_cr.resources[0].spec.cassandra.datacenters[0].containers[0].env | selectattr('name', 'equalto', 'AXON_AGENT_KEY') | list | length == 1
+          - _cluster_cr.resources[0].spec.cassandra.datacenters[0].containers[0].env | selectattr('name', 'equalto', 'AXON_AGENT_SERVER_HOST') | list | length == 1
+          - _cluster_cr.resources[0].spec.cassandra.datacenters[0].containers[0].env | selectattr('name', 'equalto', 'AXON_AGENT_SERVER_PORT') | list | length == 1
+        fail_msg: "AxonOps environment variables are missing from the CR"
+
+    # --- Verify axonops-data PVC spec is present ----------------------------
+    - name: Verify axonops-data extra volume in CR
+      ansible.builtin.assert:
+        that:
+          - _cluster_cr.resources[0].spec.cassandra.datacenters[0].extraVolumes.pvcs | selectattr('name', 'equalto', 'axonops-data') | list | length == 1
+        fail_msg: "axonops-data extra volume PVC is missing from the CR"
+
+# code: language=ansible
