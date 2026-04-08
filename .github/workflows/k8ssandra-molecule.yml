@@ -71,6 +71,8 @@ jobs:
 
       - name: Install Helm.
         uses: azure/setup-helm@v4
+        with:
+          version: v3.30.1
 
       - name: Run Molecule destroy (ignore failures)
         run: molecule -v destroy
