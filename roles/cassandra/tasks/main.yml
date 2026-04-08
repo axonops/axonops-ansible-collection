@@ -149,7 +149,7 @@
     - name: Ensure Cassandra SSL directories exist
       ansible.builtin.file:
         state: directory
-        path: /opt/ssl
+        path: "{{ cassandra_ssl_path | default('/opt/ssl') }}"
         mode: '0750'
         owner: cassandra
         group: cassandra
@@ -157,7 +157,7 @@
     - name: Copy Cassandra SSL keystore
       ansible.builtin.copy:
         src: "{{ item }}"
-        dest: /opt/ssl/
+        dest: "{{ cassandra_ssl_path | default('/opt/ssl') }}/{{ item | basename }}"
         owner: cassandra
         group: cassandra
         mode: '0640'
