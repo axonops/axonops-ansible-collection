@@ -1,0 +1,119 @@
+---
+# ============================================================================
+# Strimzi Kafka with AxonOps - Example Playbook
+# ============================================================================
+#
+# This playbook installs the Strimzi operator and deploys one or more
+# Kafka clusters (KRaft mode) using AxonOps container images.
+#
+# Prerequisites:
+#   - A running Kubernetes cluster with kubectl configured
+#   - Ansible kubernetes.core collection: ansible-galaxy collection install kubernetes.core
+#   - Python kubernetes package: pip install kubernetes
+#
+# Usage:
+#   ansible-playbook examples/strimzi.yml
+#
+# ============================================================================
+
+- name: Deploy Strimzi Kafka clusters with AxonOps
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    # --- Simple mode: one Kafka cluster with basic settings -----------------
+    strimzi_clusters:
+      - name: axonops-kafka
+        namespace: kafka
+        kafka_version: "4.1.1"
+        broker_replicas: 3
+        controller_replicas: 3
+        broker_storage_size: 10Gi
+        controller_storage_size: 10Gi
+        # broker_storage_class: ""  # Leave empty for cluster default
+        # controller_storage_class: ""
+
+    # --- AxonOps Agent Configuration ----------------------------------------
+    # Set these to your AxonOps organisation and API key.
+    # For SaaS, use agents.axonops.cloud:443 with TLS
+    # For on-prem, use your server hostname:1888 with TLS disabled
+    strimzi_axon_agent_org: "YOUR-ORG"
+    strimzi_axon_agent_key: "YOUR-KEY"
+    strimzi_axon_agent_server_host: agents.axonops.cloud
+    # Port and TLS mode are auto-detected from the host
+
+  roles:
+    - axonops.axonops.strimzi
+
+
+# ============================================================================
+# Alternative: Production cloud deployment
+# ============================================================================
+# - name: Deploy production Kafka on cloud
+#   hosts: localhost
+#   connection: local
+#   gather_facts: false
+#
+#   vars:
+#     strimzi_axon_agent_org: "MY-ORG"
+#     strimzi_axon_agent_key: "MY-KEY"
+#
+#     strimzi_clusters:
+#       - name: prod-kafka
+#         namespace: kafka
+#         kafka_version: "4.1.1"
+#         broker_replicas: 6
+#         controller_replicas: 3
+#         broker_storage_size: 100Gi
+#         broker_storage_class: gp3
+#         controller_storage_size: 10Gi
+#         controller_storage_class: gp3
+#         default_replication_factor: 3
+#         min_insync_replicas: 2
+#
+#   roles:
+#     - axonops.axonops.strimzi
+
+# ============================================================================
+# Alternative: On-prem AxonOps with Kafka Connect
+# ============================================================================
+# - name: Deploy Kafka with Connect and on-prem AxonOps
+#   hosts: localhost
+#   connection: local
+#   gather_facts: false
+#
+#   vars:
+#     strimzi_axon_agent_org: "MY-ORG"
+#     strimzi_axon_agent_key: "MY-KEY"
+#     strimzi_axon_agent_server_host: "axonops.internal.example.com"
+#
+#     strimzi_clusters:
+#       - name: data-pipeline
+#         namespace: kafka
+#         broker_replicas: 3
+#         controller_replicas: 3
+#         broker_storage_size: 50Gi
+#         kafka_connect_enabled: true
+#         kafka_connect_replicas: 2
+#
+#   roles:
+#     - axonops.axonops.strimzi
+
+# ============================================================================
+# Alternative: Custom spec mode
+# ============================================================================
+# Provide full Kafka/KafkaNodePool manifests when you need options not
+# exposed by simple mode:
+#
+#   vars:
+#     strimzi_clusters:
+#       - name: custom-kafka
+#         custom_specs:
+#           kafka: "{{ lookup('file', 'kafka.yaml') | from_yaml }}"
+#           broker_pool: "{{ lookup('file', 'brokers.yaml') | from_yaml }}"
+#           controller_pool: "{{ lookup('file', 'controllers.yaml') | from_yaml }}"
+#           kafka_connect: "{{ lookup('file', 'connect.yaml') | from_yaml }}"
+#
+#   roles:
+#     - axonops.axonops.strimzi

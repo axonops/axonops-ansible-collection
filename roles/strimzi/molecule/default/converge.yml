@@ -1,0 +1,29 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - role: strimzi
+      vars:
+        # Install operator into the Kind cluster
+        strimzi_install_operator: true
+        strimzi_operator_version: "0.51.0"
+
+        # Deploy a minimal test cluster
+        strimzi_clusters:
+          - name: molecule-test
+            namespace: kafka
+            kafka_version: "4.1.1"
+            broker_replicas: 1
+            controller_replicas: 1
+            broker_storage_size: 1Gi
+            controller_storage_size: 1Gi
+
+        # AxonOps agent config (test values)
+        strimzi_axon_agent_org: "molecule-test-org"
+        strimzi_axon_agent_key: "molecule-test-key"
+        strimzi_axon_agent_server_host: "agents.axonops.cloud"
+
+# code: language=ansible

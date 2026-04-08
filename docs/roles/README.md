@@ -33,6 +33,11 @@ Deploys and manages Cassandra 5.x clusters on Kubernetes using the K8ssandra ope
 
 **Use when**: You want to run Cassandra on Kubernetes with AxonOps monitoring. Handles cert-manager, k8ssandra-operator, and cluster CR deployment.
 
+#### [strimzi](strimzi.md)
+Deploys and manages Apache Kafka clusters on Kubernetes using the Strimzi operator with AxonOps container images.
+
+**Use when**: You want to run Kafka on Kubernetes with AxonOps monitoring. Handles Strimzi operator, broker/controller node pools, and optional Kafka Connect.
+
 ### Infrastructure Components
 
 #### [cassandra](cassandra.md)
@@ -66,6 +71,7 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **dash** | Web UI for AxonOps | Server |
 | **configurations** | Alert configuration | Server |
 | **k8ssandra** | Cassandra on Kubernetes | Kubernetes cluster |
+| **strimzi** | Kafka on Kubernetes | Kubernetes cluster |
 | **cassandra** | Apache Cassandra installation | Agent, Java |
 | **elastic** | Elasticsearch installation | Server |
 | **java** | Java installation | Cassandra, Elastic |
@@ -182,7 +188,32 @@ Deploy Cassandra 5.x on Kubernetes with AxonOps monitoring:
 
 ---
 
-### Pattern 6: Alert Configuration
+### Pattern 6: Kafka on Kubernetes (Strimzi)
+
+Deploy Kafka on Kubernetes with AxonOps monitoring:
+
+```yaml
+- hosts: localhost
+  connection: local
+  vars:
+    strimzi_axon_agent_org: "MY-ORG"
+    strimzi_axon_agent_key: "MY-KEY"
+    strimzi_clusters:
+      - name: my-kafka
+        namespace: kafka
+        broker_replicas: 3
+        controller_replicas: 3
+  roles:
+    - role: axonops.axonops.strimzi
+```
+
+**Roles needed**: `axonops.axonops.strimzi`
+
+**See**: [strimzi.md](strimzi.md)
+
+---
+
+### Pattern 7: Alert Configuration
 
 Configure alerts and integrations for existing AxonOps deployment:
 

@@ -1,0 +1,76 @@
+---
+# ============================================================================
+# Strimzi Kafka Role - Main Tasks
+# ============================================================================
+
+# --- Validation ------------------------------------------------------------
+
+- name: Warn when no clusters are defined
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: strimzi_clusters is empty. The operator will be installed
+      but no Kafka clusters will be created.
+  when: strimzi_clusters | length == 0
+  tags: always
+
+- name: Validate AxonOps agent configuration
+  ansible.builtin.assert:
+    that:
+      - (item.axon_agent_org | default(strimzi_axon_agent_org)) | length > 0
+      - (item.axon_agent_key | default(strimzi_axon_agent_key)) | length > 0
+    fail_msg: >-
+      AxonOps agent configuration is required. Set axon_agent_org and
+      axon_agent_key for cluster '{{ item.name }}' or set the global
+      strimzi_axon_agent_org and strimzi_axon_agent_key variables.
+  loop: "{{ strimzi_clusters }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.custom_specs is not defined
+  tags: always
+
+# --- Strimzi Operator -------------------------------------------------------
+
+- name: Install Strimzi operator
+  when: strimzi_install_operator
+  tags: operator
+  block:
+    - name: Add Strimzi Helm repository
+      kubernetes.core.helm_repository:
+        name: "{{ strimzi_operator_helm_repo_name }}"
+        repo_url: "{{ strimzi_operator_helm_repo }}"
+
+    - name: Install strimzi-kafka-operator via Helm
+      kubernetes.core.helm:
+        name: strimzi-kafka-operator
+        chart_ref: "{{ strimzi_operator_helm_repo_name }}/strimzi-kafka-operator"
+        chart_version: "{{ strimzi_operator_version }}"
+        release_namespace: "{{ strimzi_operator_namespace }}"
+        create_namespace: true
+        values: "{{ strimzi_operator_helm_values | default({}) }}"
+        wait: true
+
+    - name: Wait for strimzi-cluster-operator to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: strimzi-cluster-operator
+        namespace: "{{ strimzi_operator_namespace }}"
+      register: _strimzi_operator
+      until:
+        - _strimzi_operator.resources | length > 0
+        - (_strimzi_operator.resources[0].status.readyReplicas | default(0)) >= 1
+      retries: "{{ (strimzi_operator_wait_timeout / 10) | int }}"
+      delay: 10
+      when: strimzi_wait_for_operator
+
+# --- Deploy Kafka Clusters ---------------------------------------------------
+
+- name: Deploy Strimzi Kafka clusters
+  ansible.builtin.include_tasks: deploy-cluster.yml
+  loop: "{{ strimzi_clusters }}"
+  loop_control:
+    loop_var: cluster
+    label: "{{ cluster.name }}"
+  tags: clusters
+
+# code: language=ansible

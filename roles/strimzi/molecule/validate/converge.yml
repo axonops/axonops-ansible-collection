@@ -1,0 +1,234 @@
+---
+# Validates template rendering and variable logic without a K8s cluster.
+- name: Converge - Validate strimzi role logic
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    # Load role defaults
+    strimzi_kafka_version: "4.1.1"
+    strimzi_strimzi_version: "0.50.0"
+    strimzi_image: "ghcr.io/axonops/strimzi/kafka"
+    strimzi_image_tag: "0.50.0-4.1.1-2.0.19-0.1.12"
+    strimzi_broker_replicas: 3
+    strimzi_broker_storage_size: "10Gi"
+    strimzi_broker_storage_class: ""
+    strimzi_controller_replicas: 3
+    strimzi_controller_storage_size: "10Gi"
+    strimzi_controller_storage_class: ""
+    strimzi_default_replication_factor: 3
+    strimzi_min_insync_replicas: 2
+    strimzi_offsets_topic_replication_factor: 3
+    strimzi_transaction_state_log_replication_factor: 3
+    strimzi_transaction_state_log_min_isr: 2
+    strimzi_rack_topology_key: "topology.kubernetes.io/zone"
+    strimzi_listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+    strimzi_kafka_connect_enabled: false
+    strimzi_kafka_connect_replicas: 2
+    strimzi_operator_namespace: "strimzi-system"
+    strimzi_axon_agent_org: "test-org"
+    strimzi_axon_agent_key: "test-key"
+    strimzi_axon_agent_server_host: "agents.axonops.cloud"
+    strimzi_axon_agent_server_port: "443"
+    strimzi_axon_agent_tls_mode: "TLS"
+
+  tasks:
+    # --- Test 1: Kafka cluster template renders valid YAML -------------------
+    - name: "TEST 1 - Render Kafka cluster template"
+      vars:
+        cluster:
+          name: template-test
+          namespace: kafka
+          kafka_version: "4.1.1"
+      ansible.builtin.set_fact:
+        _kafka_cr: "{{ lookup('template', '../../templates/kafka-cluster.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 1 - Verify Kafka CR"
+      ansible.builtin.assert:
+        that:
+          - _kafka_cr.apiVersion == "kafka.strimzi.io/v1beta2"
+          - _kafka_cr.kind == "Kafka"
+          - _kafka_cr.metadata.name == "template-test"
+          - _kafka_cr.metadata.namespace == "kafka"
+          - _kafka_cr.metadata.annotations['strimzi.io/kraft'] == "enabled"
+          - _kafka_cr.metadata.annotations['strimzi.io/node-pools'] == "enabled"
+          - _kafka_cr.spec.kafka.version == "4.1.1"
+          - _kafka_cr.spec.kafka.image == "ghcr.io/axonops/strimzi/kafka:0.50.0-4.1.1-2.0.19-0.1.12"
+          - _kafka_cr.spec.kafka.listeners | length == 2
+          - _kafka_cr.spec.kafka.config['default.replication.factor'] == 3
+          - _kafka_cr.spec.kafka.config['min.insync.replicas'] == 2
+        success_msg: "PASS: Kafka CR renders correctly"
+
+    # --- Test 2: Controller node pool template -------------------------------
+    - name: "TEST 2 - Render controller node pool"
+      vars:
+        cluster:
+          name: template-test
+          namespace: kafka
+      ansible.builtin.set_fact:
+        _controller_pool: "{{ lookup('template', '../../templates/kafka-node-pool-controller.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 2 - Verify controller node pool"
+      ansible.builtin.assert:
+        that:
+          - _controller_pool.kind == "KafkaNodePool"
+          - _controller_pool.metadata.name == "template-test-controller"
+          - _controller_pool.metadata.labels['strimzi.io/cluster'] == "template-test"
+          - _controller_pool.spec.replicas == 3
+          - _controller_pool.spec.roles == ["controller"]
+          - _controller_pool.spec.storage.type == "jbod"
+          - _controller_pool.spec.storage.volumes[0].id == 0
+          - _controller_pool.spec.storage.volumes[0].kraftMetadata == "shared"
+        success_msg: "PASS: Controller node pool renders correctly"
+
+    # --- Test 3: Broker node pool template -----------------------------------
+    - name: "TEST 3 - Render broker node pool"
+      vars:
+        cluster:
+          name: template-test
+          namespace: kafka
+      ansible.builtin.set_fact:
+        _broker_pool: "{{ lookup('template', '../../templates/kafka-node-pool-brokers.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 3 - Verify broker node pool"
+      ansible.builtin.assert:
+        that:
+          - _broker_pool.kind == "KafkaNodePool"
+          - _broker_pool.metadata.name == "template-test-brokers"
+          - _broker_pool.metadata.labels['strimzi.io/cluster'] == "template-test"
+          - _broker_pool.spec.replicas == 3
+          - _broker_pool.spec.roles == ["broker"]
+          - _broker_pool.spec.storage.volumes[0].id == 0
+        success_msg: "PASS: Broker node pool renders correctly"
+
+    # --- Test 4: AxonOps env vars in all node pools --------------------------
+    - name: "TEST 4 - Verify AxonOps env vars in controller"
+      vars:
+        _env: "{{ _controller_pool.spec.template.kafkaContainer.env }}"
+      ansible.builtin.assert:
+        that:
+          - _env | selectattr('name', 'equalto', 'KAFKA_NODE_TYPE') | map(attribute='value') | first == "kraft-controller"
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_ORG') | map(attribute='value') | first == "test-org"
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_KEY') | map(attribute='value') | first == "test-key"
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_SERVER_HOST') | map(attribute='value') | first == "agents.axonops.cloud"
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_SERVER_PORT') | map(attribute='value') | first == "443"
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_TLS_MODE') | map(attribute='value') | first == "TLS"
+        success_msg: "PASS: Controller AxonOps env vars correct"
+
+    - name: "TEST 4b - Verify AxonOps env vars in broker"
+      vars:
+        _env: "{{ _broker_pool.spec.template.kafkaContainer.env }}"
+      ansible.builtin.assert:
+        that:
+          - _env | selectattr('name', 'equalto', 'KAFKA_NODE_TYPE') | map(attribute='value') | first == "kraft-broker"
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_ORG') | list | length == 1
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_KEY') | list | length == 1
+        success_msg: "PASS: Broker AxonOps env vars correct"
+
+    # --- Test 5: Per-cluster overrides work ----------------------------------
+    - name: "TEST 5 - Render cluster with overrides"
+      vars:
+        cluster:
+          name: override-test
+          namespace: custom-ns
+          kafka_version: "4.0.1"
+          broker_replicas: 6
+          controller_replicas: 5
+          broker_storage_size: 100Gi
+          controller_storage_size: 20Gi
+          axon_agent_org: "override-org"
+          axon_agent_key: "override-key"
+          axon_agent_server_host: "my-server.local"
+          axon_agent_server_port: "1888"
+          axon_agent_tls_mode: "disabled"
+      ansible.builtin.set_fact:
+        _override_kafka: "{{ lookup('template', '../../templates/kafka-cluster.yaml.j2') | from_yaml }}"
+        _override_broker: "{{ lookup('template', '../../templates/kafka-node-pool-brokers.yaml.j2') | from_yaml }}"
+        _override_controller: "{{ lookup('template', '../../templates/kafka-node-pool-controller.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 5 - Verify overrides"
+      ansible.builtin.assert:
+        that:
+          - _override_kafka.metadata.name == "override-test"
+          - _override_kafka.metadata.namespace == "custom-ns"
+          - _override_kafka.spec.kafka.version == "4.0.1"
+          - _override_broker.spec.replicas == 6
+          - _override_controller.spec.replicas == 5
+          - _override_broker.spec.storage.volumes[0].size == "100Gi"
+          - _override_controller.spec.storage.volumes[0].size == "20Gi"
+        success_msg: "PASS: Per-cluster overrides work correctly"
+
+    # --- Test 6: Storage class omitted when empty ----------------------------
+    - name: "TEST 6 - Verify storageClassName omitted when empty"
+      ansible.builtin.assert:
+        that:
+          - _broker_pool.spec.storage.volumes[0]['class'] is not defined
+          - _controller_pool.spec.storage.volumes[0]['class'] is not defined
+        success_msg: "PASS: Storage class correctly omitted when empty"
+
+    # --- Test 7: Storage class set when provided -----------------------------
+    - name: "TEST 7 - Render cluster with storage class"
+      vars:
+        cluster:
+          name: sc-test
+          broker_storage_class: gp3
+          controller_storage_class: gp3-ctrl
+      ansible.builtin.set_fact:
+        _sc_broker: "{{ lookup('template', '../../templates/kafka-node-pool-brokers.yaml.j2') | from_yaml }}"
+        _sc_controller: "{{ lookup('template', '../../templates/kafka-node-pool-controller.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 7 - Verify storage class set"
+      ansible.builtin.assert:
+        that:
+          - _sc_broker.spec.storage.volumes[0]['class'] == "gp3"
+          - _sc_controller.spec.storage.volumes[0]['class'] == "gp3-ctrl"
+        success_msg: "PASS: Storage class correctly set"
+
+    # --- Test 8: Kafka Connect template --------------------------------------
+    - name: "TEST 8 - Render Kafka Connect"
+      vars:
+        cluster:
+          name: connect-test
+          namespace: kafka
+          kafka_connect_replicas: 4
+      ansible.builtin.set_fact:
+        _connect: "{{ lookup('template', '../../templates/kafka-connect.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 8 - Verify Kafka Connect"
+      ansible.builtin.assert:
+        that:
+          - _connect.kind == "KafkaConnect"
+          - _connect.metadata.name == "connect-test-connect"
+          - _connect.spec.replicas == 4
+          - _connect.spec.bootstrapServers == "connect-test-kafka-bootstrap:9092"
+          - _connect.spec.template.connectContainer.env | selectattr('name', 'equalto', 'KAFKA_NODE_TYPE') | map(attribute='value') | first == "connect"
+        success_msg: "PASS: Kafka Connect renders correctly"
+
+    # --- Test 9: Topology spread on controllers ------------------------------
+    - name: "TEST 9 - Verify topology spread constraints"
+      ansible.builtin.assert:
+        that:
+          - _controller_pool.spec.template.pod.topologySpreadConstraints | length == 1
+          - _controller_pool.spec.template.pod.topologySpreadConstraints[0].topologyKey == "topology.kubernetes.io/zone"
+          - _controller_pool.spec.template.pod.topologySpreadConstraints[0].maxSkew == 1
+        success_msg: "PASS: Topology spread constraints correct"
+
+    # --- Test 10: AXON_AGENT_CLUSTER_NAME defaults to cluster name -----------
+    - name: "TEST 10 - Verify agent cluster name defaults"
+      vars:
+        _env: "{{ _broker_pool.spec.template.kafkaContainer.env }}"
+      ansible.builtin.assert:
+        that:
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_CLUSTER_NAME') | map(attribute='value') | first == "template-test"
+        success_msg: "PASS: Agent cluster name defaults to cluster name"
+
+# code: language=ansible

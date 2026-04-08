@@ -1,0 +1,70 @@
+---
+# ============================================================================
+# Deploy a single Strimzi Kafka cluster (Kafka CR + KafkaNodePool CRs)
+# ============================================================================
+
+# --- Custom specs mode -------------------------------------------------------
+
+- name: "{{ cluster.name }} - Deploy custom Kafka specs"
+  when: cluster.custom_specs is defined
+  block:
+    - name: "{{ cluster.name }} - Deploy custom controller node pool"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ cluster.custom_specs.controller_pool }}"
+      when: cluster.custom_specs.controller_pool is defined
+
+    - name: "{{ cluster.name }} - Deploy custom broker node pool"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ cluster.custom_specs.broker_pool }}"
+      when: cluster.custom_specs.broker_pool is defined
+
+    - name: "{{ cluster.name }} - Deploy custom Kafka CR"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ cluster.custom_specs.kafka }}"
+      when: cluster.custom_specs.kafka is defined
+
+    - name: "{{ cluster.name }} - Deploy custom Kafka Connect"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ cluster.custom_specs.kafka_connect }}"
+      when: cluster.custom_specs.kafka_connect is defined
+
+# --- Template mode -----------------------------------------------------------
+
+- name: "{{ cluster.name }} - Deploy Kafka cluster from templates"
+  when: cluster.custom_specs is not defined
+  block:
+    - name: "{{ cluster.name }} - Create namespace"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{ cluster.namespace | default('kafka') }}"
+
+    - name: "{{ cluster.name }} - Deploy controller node pool"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', 'kafka-node-pool-controller.yaml.j2') }}"
+
+    - name: "{{ cluster.name }} - Deploy broker node pool"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', 'kafka-node-pool-brokers.yaml.j2') }}"
+
+    - name: "{{ cluster.name }} - Deploy Kafka CR"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', 'kafka-cluster.yaml.j2') }}"
+
+    - name: "{{ cluster.name }} - Deploy Kafka Connect"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', 'kafka-connect.yaml.j2') }}"
+      when: cluster.kafka_connect_enabled | default(strimzi_kafka_connect_enabled) | bool
+
+# code: language=ansible
