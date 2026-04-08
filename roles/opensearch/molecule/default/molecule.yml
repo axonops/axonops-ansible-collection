@@ -8,6 +8,7 @@ driver:
 platforms:
   - name: ${MOLECULE_INSTANCE_NAME:-"default"}
     image: "geerlingguy/docker-${MOLECULE_DISTRO:-rockylinux9}-ansible:latest"
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     cgroupns_mode: host
