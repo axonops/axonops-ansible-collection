@@ -1,0 +1,35 @@
+ca:
+   root:
+      dn: CN=root.ca.{{ opensearch_domain_name }},OU=CA,O={{ opensearch_domain_name }}\, Inc.,DC={{ opensearch_domain_name }}
+      keysize: 2048
+      validityDays: {{ opensearch_cert_valid_days }}
+      pkPassword: none
+      file: root-ca.pem
+
+### Default values and global settings
+defaults:
+      validityDays: {{ opensearch_cert_valid_days }}
+      pkPassword: none
+      httpsEnabled: true
+      reuseTransportCertificatesForHttp: false
+      verifyHostnames: false
+      resolveHostnames: false
+
+###
+### Nodes
+###
+nodes:
+{% for item in groups['opensearch'] %}
+  - name: {{ item }}
+    dn: CN={{ item }}.{{ opensearch_domain_name }},OU=Ops,O={{ opensearch_domain_name }}\, Inc.,DC={{ opensearch_domain_name }}
+    dns: {{ item }}.{{ opensearch_domain_name }}
+    ip: {{ hostvars[item]['ansible_default_ipv4']['address'] | default(hostvars[item]['ip'] | default('')) }}
+{% endfor %}
+
+###
+### Clients
+###
+clients:
+  - name: admin
+    dn: CN=admin.{{ opensearch_domain_name }},OU=Ops,O={{ opensearch_domain_name }}\, Inc.,DC={{ opensearch_domain_name }}
+    admin: true

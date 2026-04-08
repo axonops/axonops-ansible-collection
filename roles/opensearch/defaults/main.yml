@@ -1,0 +1,87 @@
+---
+# ============================================================================
+# OpenSearch Role - Default Variables
+# ============================================================================
+
+# --- Version and Installation -----------------------------------------------
+
+opensearch_version: "3.0.0"
+opensearch_download_url: "https://artifacts.opensearch.org/releases/bundle/opensearch"
+
+# Installation format: tar
+opensearch_install_root: /usr/share/opensearch
+opensearch_conf_dir: "{{ opensearch_install_root }}/config"
+opensearch_user: opensearch
+opensearch_group: opensearch
+
+# --- Cluster Configuration --------------------------------------------------
+
+opensearch_cluster_name: opensearch
+opensearch_cluster_type: multi-node  # single-node or multi-node
+
+# Network
+opensearch_api_port: 9200
+opensearch_network_host: "{{ ansible_default_ipv4.address | default('0.0.0.0') }}"
+opensearch_bootstrap_memory_lock: true
+
+# Node discovery (multi-node only)
+# Override these in your playbook. The defaults use the 'opensearch' inventory group.
+# opensearch_seed_hosts: list of hostnames or IPs
+# opensearch_initial_master_nodes: list of master-eligible node names
+
+# Node roles - set per-host in inventory (e.g. opensearch_node_roles: "cluster_manager, data, ingest")
+# opensearch_node_roles:
+
+# --- JVM Configuration ------------------------------------------------------
+
+opensearch_heap_size: "1g"
+
+# Custom temp directory (useful when /tmp is mounted noexec)
+# opensearch_tmp_dir:
+
+# --- Security Plugin --------------------------------------------------------
+
+opensearch_security_enabled: true
+
+# Admin user password (required when security is enabled)
+# opensearch_admin_password:
+# opensearch_dashboards_password:
+
+# Authentication type: 'internal' or 'oidc'
+opensearch_auth_type: internal
+
+# TLS certificate validity (days)
+opensearch_cert_valid_days: 730
+
+# Domain name used in certificate DNs
+# opensearch_domain_name:
+
+# Custom security plugin configuration files (list of template paths)
+opensearch_custom_security_configs: []
+opensearch_copy_custom_security_configs: false
+
+# OIDC configuration (when opensearch_auth_type == 'oidc')
+# opensearch_oidc:
+#   subject_key: preferred_username
+#   roles_key: roles
+#   connect_url: https://idp.example.com/.well-known/openid-configuration
+#   dashboards_url: https://dashboards.example.com
+
+# --- /etc/hosts Management --------------------------------------------------
+
+opensearch_populate_etc_hosts: true
+
+# --- System Tuning -----------------------------------------------------------
+
+opensearch_vm_max_map_count: 262144
+opensearch_fs_file_max: 65536
+
+# --- IaC Mode ----------------------------------------------------------------
+
+# When true, forces certificate regeneration checks and idempotent re-runs
+opensearch_iac_enable: false
+
+# --- Service -----------------------------------------------------------------
+
+opensearch_start_on_boot: true
+opensearch_start_on_install: true

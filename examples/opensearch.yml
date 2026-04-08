@@ -1,0 +1,51 @@
+---
+# ============================================================================
+# OpenSearch - Example Playbook
+# ============================================================================
+#
+# Deploys OpenSearch for use as the AxonOps Server backend store.
+#
+# Prerequisites:
+#   - Target hosts in the 'opensearch' inventory group
+#   - ansible.posix collection: ansible-galaxy collection install ansible.posix
+#
+# Usage:
+#   ansible-playbook examples/opensearch.yml
+#
+# ============================================================================
+
+# --- Single-node deployment (dev/test) ---
+- name: Deploy single-node OpenSearch
+  hosts: opensearch
+  become: true
+
+  vars:
+    opensearch_version: "3.0.0"
+    opensearch_cluster_name: axonops-dev
+    opensearch_cluster_type: single-node
+    opensearch_heap_size: "1g"
+    opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+    opensearch_domain_name: example.com
+
+  roles:
+    - axonops.axonops.opensearch
+
+
+# ============================================================================
+# Multi-node cluster example
+# ============================================================================
+# - name: Deploy multi-node OpenSearch cluster
+#   hosts: opensearch
+#   become: true
+#
+#   vars:
+#     opensearch_version: "3.0.0"
+#     opensearch_cluster_name: axonops-production
+#     opensearch_cluster_type: multi-node
+#     opensearch_heap_size: "4g"
+#     opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+#     opensearch_dashboards_password: "{{ vault_opensearch_dashboards_password }}"
+#     opensearch_domain_name: example.com
+#
+#   roles:
+#     - axonops.axonops.opensearch

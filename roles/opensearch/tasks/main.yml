@@ -1,0 +1,91 @@
+---
+# ============================================================================
+# OpenSearch Role - Main Tasks
+# ============================================================================
+
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - opensearch_cluster_name is defined and opensearch_cluster_name != 'opensearch'
+    fail_msg: >-
+      WARNING: opensearch_cluster_name is set to 'opensearch'. For production
+      deployments, set opensearch_cluster_name to a meaningful cluster name.
+  ignore_errors: true
+  tags: always
+
+- name: Validate admin password is set when security is enabled
+  ansible.builtin.assert:
+    that:
+      - opensearch_admin_password is defined and opensearch_admin_password | length > 0
+    fail_msg: >-
+      opensearch_admin_password must be set when opensearch_security_enabled is true.
+  when: opensearch_security_enabled
+  tags: always
+
+- name: Populate /etc/hosts
+  ansible.builtin.import_tasks: etchosts.yml
+  when: opensearch_populate_etc_hosts
+  tags: hosts
+
+- name: Tune system settings
+  ansible.builtin.import_tasks: tune.yml
+  tags: tune
+
+- name: Install OpenSearch
+  ansible.builtin.import_tasks: opensearch.yml
+  tags: install
+
+- name: Configure security plugin
+  ansible.builtin.import_tasks: security.yml
+  when: opensearch_security_enabled
+  tags: security
+
+# After the cluster forms successfully for the first time,
+# remove cluster.initial_master_nodes to allow dynamic membership
+- name: Remove cluster.initial_master_nodes from configuration
+  ansible.builtin.lineinfile:
+    path: "{{ opensearch_conf_dir }}/opensearch.yml"
+    regexp: '^cluster\.initial_master_nodes'
+    state: absent
+  when: opensearch_cluster_type == 'multi-node'
+
+- name: Ensure OpenSearch is started
+  ansible.builtin.systemd:
+    name: opensearch
+    daemon_reload: true
+    state: started
+    enabled: "{{ opensearch_start_on_boot }}"
+
+- name: Wait for OpenSearch to be ready
+  ansible.builtin.wait_for:
+    host: "{{ opensearch_network_host }}"
+    port: "{{ opensearch_api_port }}"
+    delay: 5
+    connect_timeout: 1
+    timeout: 120
+
+- name: Check OpenSearch cluster health
+  ansible.builtin.uri:
+    url: "https://{{ opensearch_network_host }}:{{ opensearch_api_port }}/_cluster/health?pretty"
+    user: admin
+    password: "{{ opensearch_admin_password }}"
+    validate_certs: false
+  register: _opensearch_health
+  when: opensearch_security_enabled
+  tags: health
+
+- name: Check OpenSearch cluster health (no security)
+  ansible.builtin.uri:
+    url: "http://{{ opensearch_network_host }}:{{ opensearch_api_port }}/_cluster/health?pretty"
+    validate_certs: false
+  register: _opensearch_health
+  when: not opensearch_security_enabled
+  tags: health
+
+- name: Show OpenSearch cluster health
+  ansible.builtin.debug:
+    msg: "{{ _opensearch_health.json }}"
+  when: _opensearch_health is defined and _opensearch_health.json is defined
+  tags: health
+
+# code: language=ansible

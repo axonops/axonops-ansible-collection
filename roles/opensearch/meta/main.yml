@@ -1,0 +1,26 @@
+galaxy_info:
+  author: AxonOps Limited
+  description: Install and configure OpenSearch for AxonOps Server
+  company: AxonOps Limited
+  license: Apache 2.0
+  min_ansible_version: "2.10"
+
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+    - name: Ubuntu
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+
+  galaxy_tags:
+  - axonops
+  - opensearch
+  - search
+  dependencies: []
+  documentation: https://github.com/axonops/axonops-ansible-collection
+  issues: https://github.com/axonops/axonops-ansible-collection/issues

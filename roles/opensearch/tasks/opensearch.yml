@@ -1,0 +1,75 @@
+---
+- name: Download OpenSearch {{ opensearch_version }}
+  ansible.builtin.get_url:
+    url: "{{ opensearch_download_url }}/{{ opensearch_version }}/opensearch-{{ opensearch_version }}-linux-x64.tar.gz"
+    dest: "/tmp/opensearch-{{ opensearch_version }}.tar.gz"
+    mode: "0644"
+  register: _opensearch_download
+
+- name: Create OpenSearch user
+  ansible.builtin.user:
+    name: "{{ opensearch_user }}"
+    state: present
+    shell: /bin/false
+    create_home: true
+    home: "{{ opensearch_install_root }}"
+  when: _opensearch_download.changed or opensearch_iac_enable
+
+- name: Create OpenSearch home directory
+  ansible.builtin.file:
+    path: "{{ opensearch_install_root }}"
+    state: directory
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    mode: "0755"
+  when: _opensearch_download.changed or opensearch_iac_enable
+
+- name: Extract OpenSearch archive
+  ansible.builtin.unarchive:
+    src: "/tmp/opensearch-{{ opensearch_version }}.tar.gz"
+    dest: "{{ opensearch_install_root }}"
+    remote_src: true
+    extra_opts: ["--strip-components=1"]
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    creates: "{{ opensearch_conf_dir }}"
+  when: _opensearch_download.changed or opensearch_iac_enable
+
+- name: Deploy OpenSearch configuration
+  ansible.builtin.template:
+    src: "opensearch-{{ opensearch_cluster_type }}.yml.j2"
+    dest: "{{ opensearch_conf_dir }}/opensearch.yml"
+    backup: true
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    mode: "0600"
+  notify: Restart OpenSearch
+
+- name: Deploy JVM options
+  ansible.builtin.template:
+    src: jvm.options.j2
+    dest: "{{ opensearch_conf_dir }}/jvm.options"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    mode: "0600"
+  notify: Restart OpenSearch
+
+- name: Create custom OpenSearch tmp directory
+  ansible.builtin.file:
+    path: "{{ opensearch_tmp_dir }}"
+    state: directory
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    mode: "0755"
+  when: opensearch_tmp_dir is defined
+
+- name: Deploy systemd service
+  ansible.builtin.template:
+    src: opensearch.service.j2
+    dest: /etc/systemd/system/opensearch.service
+    mode: "0644"
+    owner: root
+    group: root
+  notify: Reload systemd
+
+# code: language=ansible

@@ -50,6 +50,11 @@ Installs and configures Elasticsearch for AxonOps Server configuration storage.
 
 **Use when**: Deploying a self-hosted AxonOps Server (Elasticsearch stores AxonOps configuration data).
 
+#### [opensearch](opensearch.md)
+Installs and configures OpenSearch as the backend store for AxonOps Server (replaces Elasticsearch).
+
+**Use when**: Deploying a self-hosted AxonOps Server with OpenSearch instead of Elasticsearch.
+
 #### [java](java.md)
 Installs Java (OpenJDK or Azul Zulu) on target systems.
 
@@ -74,6 +79,7 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **strimzi** | Kafka on Kubernetes | Kubernetes cluster |
 | **cassandra** | Apache Cassandra installation | Agent, Java |
 | **elastic** | Elasticsearch installation | Server |
+| **opensearch** | OpenSearch installation | Server |
 | **java** | Java installation | Cassandra, Elastic |
 | **preflight** | System validation | Before any installation |
 

@@ -1,0 +1,10 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart OpenSearch
+  ansible.builtin.systemd:
+    name: opensearch
+    state: restarted
+    enabled: true
