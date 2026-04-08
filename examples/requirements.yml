@@ -7,8 +7,10 @@ collections:
   - name: community.crypto
     source: https://galaxy.ansible.com
   - name: axonops.axonops
-    source: https://github.com/axonops/axonops-ansible-collection/releases/download/v0.2.7/axonops-axonops-0.2.7.tar.gz
+    source: https://github.com/axonops/axonops-ansible-collection/releases/download/v0.5.0/axonops-axonops-0.5.0.tar.gz
     type: url
   - name: devsec.hardening
     source: https://galaxy.ansible.com
     version: 10.3.0
+  - name: kubernetes.core
+    source: https://galaxy.ansible.com
