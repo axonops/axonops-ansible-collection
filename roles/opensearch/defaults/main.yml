@@ -5,7 +5,7 @@
 
 # --- Version and Installation -----------------------------------------------
 
-opensearch_version: "3.0.0"
+opensearch_version: "3.6.0"
 opensearch_download_url: "https://artifacts.opensearch.org/releases/bundle/opensearch"
 
 # Installation format: tar
