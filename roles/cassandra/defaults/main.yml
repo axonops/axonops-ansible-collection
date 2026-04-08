@@ -206,6 +206,8 @@ crypto_provider_class_name: "org.apache.cassandra.security.DefaultCryptoProvider
 crypto_provider_parameters_fail_on_missing_provider: false
 
 # SSL Configuration
+cassandra_ssl_path: "/opt/ssl"
+
 cassandra_ssl_internode_encryption: "none"
 cassandra_ssl_internode_require_client_auth: false
 cassandra_require_endpoint_verification: false
