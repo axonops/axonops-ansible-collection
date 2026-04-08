@@ -57,7 +57,7 @@ k8ssandra_cassandra_version: "5.0.6"
 # AxonOps container image
 k8ssandra_image: "ghcr.io/axonops/k8ssandra/cassandra"
 # Image tag defaults to the cassandra_version if not set per-cluster
-# k8ssandra_image_tag: "5.0.6"
+k8ssandra_image_tag: "5.0.6"
 
 # Datacenter defaults
 k8ssandra_dc_name: dc1
