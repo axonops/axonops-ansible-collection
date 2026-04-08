@@ -26,6 +26,13 @@ Configures alerts, integrations, and monitoring settings for AxonOps.
 
 **Use when**: You need to automate the configuration of alerts, Slack/PagerDuty integrations, or backup policies.
 
+### Kubernetes
+
+#### [k8ssandra](k8ssandra.md)
+Deploys and manages Cassandra 5.x clusters on Kubernetes using the K8ssandra operator with AxonOps container images.
+
+**Use when**: You want to run Cassandra on Kubernetes with AxonOps monitoring. Handles cert-manager, k8ssandra-operator, and cluster CR deployment.
+
 ### Infrastructure Components
 
 #### [cassandra](cassandra.md)
@@ -58,6 +65,7 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **server** | Self-hosted AxonOps backend | Elastic, Cassandra (optional) |
 | **dash** | Web UI for AxonOps | Server |
 | **configurations** | Alert configuration | Server |
+| **k8ssandra** | Cassandra on Kubernetes | Kubernetes cluster |
 | **cassandra** | Apache Cassandra installation | Agent, Java |
 | **elastic** | Elasticsearch installation | Server |
 | **java** | Java installation | Cassandra, Elastic |
@@ -150,7 +158,31 @@ Deploy both AxonOps Server and monitored Cassandra cluster:
 
 ---
 
-### Pattern 5: Alert Configuration
+### Pattern 5: Cassandra on Kubernetes (K8ssandra)
+
+Deploy Cassandra 5.x on Kubernetes with AxonOps monitoring:
+
+```yaml
+- hosts: localhost
+  connection: local
+  vars:
+    k8ssandra_axon_agent_org: "MY-ORG"
+    k8ssandra_axon_agent_key: "MY-KEY"
+    k8ssandra_clusters:
+      - name: my-cluster
+        dc_size: 3
+        storage_size: 10Gi
+  roles:
+    - role: axonops.axonops.k8ssandra
+```
+
+**Roles needed**: `axonops.axonops.k8ssandra`
+
+**See**: [k8ssandra.md](k8ssandra.md)
+
+---
+
+### Pattern 6: Alert Configuration
 
 Configure alerts and integrations for existing AxonOps deployment:
 
