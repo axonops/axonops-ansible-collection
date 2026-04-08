@@ -1,134 +1,241 @@
 ---
 # ============================================================================
 # OpenSearch Security Plugin Configuration
-# Uses searchguard-tlstool to generate self-signed TLS certificates
+# Supports two TLS modes:
+#   - generate: self-signed certs via searchguard-tlstool (default)
+#   - custom: user-supplied certificates
 # ============================================================================
 
-# --- Certificate Generation (on control node) --------------------------------
+# --- Validate custom TLS settings --------------------------------------------
 
-- name: Force remove local cert temp directory (IaC mode)
-  ansible.builtin.file:
-    path: /tmp/opensearch-nodecerts
-    state: absent
-  delegate_to: localhost
-  run_once: true
-  become: false
-  when: opensearch_iac_enable
+- name: Validate custom TLS certificate paths
+  ansible.builtin.assert:
+    that:
+      - opensearch_tls_root_ca is defined
+      - opensearch_tls_root_ca_key is defined
+      - opensearch_tls_admin_cert is defined
+      - opensearch_tls_admin_key is defined
+      - opensearch_tls_node_cert is defined
+      - opensearch_tls_node_key is defined
+      - opensearch_tls_node_http_cert is defined
+      - opensearch_tls_node_http_key is defined
+    fail_msg: >-
+      When opensearch_tls_mode is 'custom', you must provide all certificate paths:
+      opensearch_tls_root_ca, opensearch_tls_root_ca_key, opensearch_tls_admin_cert,
+      opensearch_tls_admin_key, opensearch_tls_node_cert, opensearch_tls_node_key,
+      opensearch_tls_node_http_cert, opensearch_tls_node_http_key.
+  when: opensearch_tls_mode == 'custom'
 
-- name: Create local cert temp directory
-  ansible.builtin.file:
-    path: /tmp/opensearch-nodecerts
-    state: directory
-    mode: "0755"
-  delegate_to: localhost
-  run_once: true
-  register: _cert_dir
-  become: false
+# =============================================================================
+# MODE: generate - Self-signed certificates via searchguard-tlstool
+# =============================================================================
 
-- name: Download TLS certificate generation tool
-  ansible.builtin.get_url:
-    url: https://search.maven.org/remotecontent?filepath=com/floragunn/search-guard-tlstool/1.5/search-guard-tlstool-1.5.tar.gz
-    dest: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
-    mode: "0644"
-  delegate_to: localhost
-  run_once: true
-  when: _cert_dir.changed
-  become: false
-
-- name: Extract TLS tool
-  ansible.builtin.unarchive:
-    src: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
-    dest: /tmp/opensearch-nodecerts/
-    remote_src: true
-  delegate_to: localhost
-  run_once: true
-  when: _cert_dir.changed
-  become: false
-
-- name: Make TLS tool executable
-  ansible.builtin.file:
-    path: /tmp/opensearch-nodecerts/tools/sgtlstool.sh
-    mode: "0755"
-  delegate_to: localhost
-  run_once: true
-  when: _cert_dir.changed
-  become: false
-
-- name: Generate TLS config template
-  ansible.builtin.template:
-    src: tlsconfig.yml.j2
-    dest: /tmp/opensearch-nodecerts/config/tlsconfig.yml
-    mode: "0644"
-  delegate_to: localhost
-  run_once: true
-  when: _cert_dir.changed
-  become: false
-
-- name: Generate node and admin certificates
-  ansible.builtin.command: >
-    /tmp/opensearch-nodecerts/tools/sgtlstool.sh
-    -c /tmp/opensearch-nodecerts/config/tlsconfig.yml
-    -ca -crt -t /tmp/opensearch-nodecerts/config/
-  delegate_to: localhost
-  run_once: true
-  when: _cert_dir.changed
-  become: false
-  changed_when: true
-
-# --- IaC certificate check ---------------------------------------------------
-
-- name: Check existing certificates (IaC mode)
-  when: opensearch_iac_enable
+- name: Generate self-signed TLS certificates
+  when: opensearch_tls_mode == 'generate'
   block:
-    - name: Check if certificates exist
-      ansible.builtin.stat:
-        path: "{{ item }}"
-        get_attributes: false
-        get_checksum: false
-        get_mime: false
-      register: _cert_stat
-      loop:
-        - "{{ opensearch_conf_dir }}/root-ca.pem"
-        - "{{ opensearch_conf_dir }}/root-ca.key"
-        - "{{ opensearch_conf_dir }}/{{ inventory_hostname }}.key"
-        - "{{ opensearch_conf_dir }}/{{ inventory_hostname }}.pem"
-        - "{{ opensearch_conf_dir }}/{{ inventory_hostname }}_http.key"
-        - "{{ opensearch_conf_dir }}/{{ inventory_hostname }}_http.pem"
-        - "{{ opensearch_conf_dir }}/admin.key"
-        - "{{ opensearch_conf_dir }}/admin.pem"
+    - name: Force remove local cert temp directory (IaC mode)
+      ansible.builtin.file:
+        path: /tmp/opensearch-nodecerts
+        state: absent
+      delegate_to: localhost
+      run_once: true
+      become: false
+      when: opensearch_iac_enable
 
-    - name: Determine if certificates need updating
+    - name: Create local cert temp directory
+      ansible.builtin.file:
+        path: /tmp/opensearch-nodecerts
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+      run_once: true
+      register: _cert_dir
+      become: false
+
+    - name: Download TLS certificate generation tool
+      ansible.builtin.get_url:
+        url: https://search.maven.org/remotecontent?filepath=com/floragunn/search-guard-tlstool/1.5/search-guard-tlstool-1.5.tar.gz
+        dest: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
+        mode: "0644"
+      delegate_to: localhost
+      run_once: true
+      when: _cert_dir.changed
+      become: false
+
+    - name: Extract TLS tool
+      ansible.builtin.unarchive:
+        src: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
+        dest: /tmp/opensearch-nodecerts/
+        remote_src: true
+      delegate_to: localhost
+      run_once: true
+      when: _cert_dir.changed
+      become: false
+
+    - name: Make TLS tool executable
+      ansible.builtin.file:
+        path: /tmp/opensearch-nodecerts/tools/sgtlstool.sh
+        mode: "0755"
+      delegate_to: localhost
+      run_once: true
+      when: _cert_dir.changed
+      become: false
+
+    - name: Generate TLS config template
+      ansible.builtin.template:
+        src: tlsconfig.yml.j2
+        dest: /tmp/opensearch-nodecerts/config/tlsconfig.yml
+        mode: "0644"
+      delegate_to: localhost
+      run_once: true
+      when: _cert_dir.changed
+      become: false
+
+    - name: Generate node and admin certificates
+      ansible.builtin.command: >
+        /tmp/opensearch-nodecerts/tools/sgtlstool.sh
+        -c /tmp/opensearch-nodecerts/config/tlsconfig.yml
+        -ca -crt -t /tmp/opensearch-nodecerts/config/
+      delegate_to: localhost
+      run_once: true
+      when: _cert_dir.changed
+      become: false
+      changed_when: true
+
+    # --- IaC certificate check -----------------------------------------------
+
+    - name: Check existing certificates (IaC mode)
+      when: opensearch_iac_enable
+      block:
+        - name: Check if certificates exist
+          ansible.builtin.stat:
+            path: "{{ item }}"
+            get_attributes: false
+            get_checksum: false
+            get_mime: false
+          register: _cert_stat
+          loop:
+            - "{{ opensearch_conf_dir }}/root-ca.pem"
+            - "{{ opensearch_conf_dir }}/root-ca.key"
+            - "{{ opensearch_conf_dir }}/{{ inventory_hostname }}.key"
+            - "{{ opensearch_conf_dir }}/{{ inventory_hostname }}.pem"
+            - "{{ opensearch_conf_dir }}/{{ inventory_hostname }}_http.key"
+            - "{{ opensearch_conf_dir }}/{{ inventory_hostname }}_http.pem"
+            - "{{ opensearch_conf_dir }}/admin.key"
+            - "{{ opensearch_conf_dir }}/admin.pem"
+
+        - name: Determine if certificates need updating
+          ansible.builtin.set_fact:
+            _force_update_cert: "{{ _cert_stat.results | selectattr('stat.exists', 'equalto', false) | list | length > 0 }}"
+
+    - name: Set cert update flag for non-IaC mode
       ansible.builtin.set_fact:
-        _force_update_cert: "{{ _cert_stat.results | selectattr('stat.exists', 'equalto', false) | list | length > 0 }}"
+        _force_update_cert: false
+      when: not opensearch_iac_enable
 
-- name: Set cert update count for non-IaC mode
-  ansible.builtin.set_fact:
-    _force_update_cert: false
-  when: not opensearch_iac_enable
+    # --- Copy generated certificates to nodes --------------------------------
 
-# --- Copy certificates to nodes ----------------------------------------------
+    - name: Copy generated certificates to OpenSearch nodes
+      ansible.builtin.copy:
+        src: "/tmp/opensearch-nodecerts/config/{{ item }}"
+        dest: "{{ opensearch_conf_dir }}/"
+        mode: "0600"
+        owner: "{{ opensearch_user }}"
+        group: "{{ opensearch_group }}"
+      loop:
+        - root-ca.pem
+        - root-ca.key
+        - "{{ inventory_hostname }}.key"
+        - "{{ inventory_hostname }}.pem"
+        - "{{ inventory_hostname }}_http.key"
+        - "{{ inventory_hostname }}_http.pem"
+        - admin.key
+        - admin.pem
+      when: (_cert_dir.changed and not opensearch_iac_enable) or (opensearch_iac_enable and _force_update_cert)
 
-- name: Copy certificates to OpenSearch nodes
-  ansible.builtin.copy:
-    src: "/tmp/opensearch-nodecerts/config/{{ item }}"
-    dest: "{{ opensearch_conf_dir }}/"
-    mode: "0600"
-    owner: "{{ opensearch_user }}"
-    group: "{{ opensearch_group }}"
-  loop:
-    - root-ca.pem
-    - root-ca.key
-    - "{{ inventory_hostname }}.key"
-    - "{{ inventory_hostname }}.pem"
-    - "{{ inventory_hostname }}_http.key"
-    - "{{ inventory_hostname }}_http.pem"
-    - admin.key
-    - admin.pem
-  when: (_cert_dir.changed and not opensearch_iac_enable) or (opensearch_iac_enable and _force_update_cert)
+    # --- Deploy generated TLS config snippet ---------------------------------
 
-# --- Security plugin configuration -------------------------------------------
+    - name: Deploy TLS certificate paths to opensearch.yml (generated)
+      ansible.builtin.blockinfile:
+        block: "{{ lookup('file', '/tmp/opensearch-nodecerts/config/' + inventory_hostname + '_elasticsearch_config_snippet.yml') }}"
+        dest: "{{ opensearch_conf_dir }}/opensearch.yml"
+        backup: true
+        insertafter: EOF
+        marker: "## {mark} OpenSearch Security TLS configuration ##"
+        owner: "{{ opensearch_user }}"
+        group: "{{ opensearch_group }}"
+      when: _cert_dir.changed or opensearch_iac_enable
 
-- name: Deploy security configuration to opensearch.yml
+    - name: Fix security plugin namespace in config (generated)
+      ansible.builtin.replace:
+        path: "{{ opensearch_conf_dir }}/opensearch.yml"
+        regexp: 'searchguard'
+        replace: 'plugins.security'
+      when: _cert_dir.changed or opensearch_iac_enable
+
+    # --- Set _certs_changed flag for downstream tasks ------------------------
+
+    - name: Set certs changed flag (generate mode)
+      ansible.builtin.set_fact:
+        _certs_changed: "{{ _cert_dir.changed }}"
+
+    # --- Cleanup temp directory -----------------------------------------------
+
+    - name: Cleanup local certificate temp directory
+      ansible.builtin.file:
+        path: /tmp/opensearch-nodecerts
+        state: absent
+      delegate_to: localhost
+      run_once: true
+      when: _cert_dir.changed
+      become: false
+
+# =============================================================================
+# MODE: custom - User-supplied certificates
+# =============================================================================
+
+- name: Deploy custom TLS certificates
+  when: opensearch_tls_mode == 'custom'
+  block:
+    - name: Copy custom root CA certificate
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ opensearch_conf_dir }}/{{ item.name }}"
+        mode: "0600"
+        owner: "{{ opensearch_user }}"
+        group: "{{ opensearch_group }}"
+      loop:
+        - { src: "{{ opensearch_tls_root_ca }}", name: "root-ca.pem" }
+        - { src: "{{ opensearch_tls_root_ca_key }}", name: "root-ca.key" }
+        - { src: "{{ opensearch_tls_admin_cert }}", name: "admin.pem" }
+        - { src: "{{ opensearch_tls_admin_key }}", name: "admin.key" }
+        - { src: "{{ opensearch_tls_node_cert }}", name: "{{ inventory_hostname }}.pem" }
+        - { src: "{{ opensearch_tls_node_key }}", name: "{{ inventory_hostname }}.key" }
+        - { src: "{{ opensearch_tls_node_http_cert }}", name: "{{ inventory_hostname }}_http.pem" }
+        - { src: "{{ opensearch_tls_node_http_key }}", name: "{{ inventory_hostname }}_http.key" }
+      loop_control:
+        label: "{{ item.name }}"
+      register: _custom_certs_copy
+
+    - name: Deploy custom TLS configuration to opensearch.yml
+      ansible.builtin.blockinfile:
+        block: "{{ lookup('template', 'security_tls_custom.yml.j2') }}"
+        dest: "{{ opensearch_conf_dir }}/opensearch.yml"
+        backup: true
+        insertafter: EOF
+        marker: "## {mark} OpenSearch Security TLS configuration ##"
+        owner: "{{ opensearch_user }}"
+        group: "{{ opensearch_group }}"
+
+    - name: Set certs changed flag (custom mode)
+      ansible.builtin.set_fact:
+        _certs_changed: "{{ _custom_certs_copy.changed }}"
+
+# =============================================================================
+# Common security configuration (both TLS modes)
+# =============================================================================
+
+- name: Deploy security auth configuration to opensearch.yml
   ansible.builtin.blockinfile:
     block: "{{ lookup('template', 'security_conf.yml.j2') }}"
     dest: "{{ opensearch_conf_dir }}/opensearch.yml"
@@ -137,25 +244,7 @@
     marker: "## {mark} OpenSearch Security configuration ##"
     owner: "{{ opensearch_user }}"
     group: "{{ opensearch_group }}"
-  when: _cert_dir.changed or opensearch_iac_enable
-
-- name: Deploy TLS certificate paths to opensearch.yml
-  ansible.builtin.blockinfile:
-    block: "{{ lookup('file', '/tmp/opensearch-nodecerts/config/{{ inventory_hostname }}_elasticsearch_config_snippet.yml') }}"
-    dest: "{{ opensearch_conf_dir }}/opensearch.yml"
-    backup: true
-    insertafter: EOF
-    marker: "## {mark} OpenSearch Security TLS configuration ##"
-    owner: "{{ opensearch_user }}"
-    group: "{{ opensearch_group }}"
-  when: _cert_dir.changed or opensearch_iac_enable
-
-- name: Fix security plugin namespace in config
-  ansible.builtin.replace:
-    path: "{{ opensearch_conf_dir }}/opensearch.yml"
-    regexp: 'searchguard'
-    replace: 'plugins.security'
-  when: _cert_dir.changed or opensearch_iac_enable
+  when: _certs_changed or opensearch_iac_enable
 
 - name: Create security plugin configuration directory
   ansible.builtin.file:
@@ -164,7 +253,6 @@
     owner: "{{ opensearch_user }}"
     group: "{{ opensearch_group }}"
     mode: "0700"
-  when: _cert_dir.changed or opensearch_iac_enable
 
 - name: Deploy security plugin config.yml
   ansible.builtin.template:
@@ -219,7 +307,7 @@
     group: "{{ opensearch_group }}"
     mode: "0644"
   run_once: true
-  when: _cert_dir.changed or opensearch_iac_enable
+  when: _certs_changed or opensearch_iac_enable
 
 - name: Deploy custom security configuration files
   ansible.builtin.template:
@@ -239,7 +327,7 @@
   environment:
     JAVA_HOME: "{{ opensearch_install_root }}/jdk"
   run_once: true
-  when: _cert_dir.changed or opensearch_iac_enable
+  when: _certs_changed or opensearch_iac_enable
   changed_when: true
 
 - name: Hash dashboards password
@@ -250,7 +338,7 @@
     JAVA_HOME: "{{ opensearch_install_root }}/jdk"
   run_once: true
   when:
-    - (_cert_dir.changed or opensearch_iac_enable)
+    - (_certs_changed or opensearch_iac_enable)
     - opensearch_dashboards_password is defined
   changed_when: true
 
@@ -284,7 +372,7 @@
       environment:
         JAVA_HOME: "{{ opensearch_install_root }}/jdk"
       run_once: true
-      when: _cert_dir.changed or opensearch_copy_custom_security_configs
+      when: _certs_changed or opensearch_copy_custom_security_configs
       loop: "{{ _custom_users_filtered | list }}"
       changed_when: true
 
@@ -302,7 +390,7 @@
   environment:
     JAVA_HOME: "{{ opensearch_install_root }}/jdk"
   run_once: true
-  when: _cert_dir.changed and opensearch_copy_custom_security_configs
+  when: _certs_changed and opensearch_copy_custom_security_configs
   changed_when: true
 
 - name: Initialise security index (default configs)
@@ -317,18 +405,7 @@
   environment:
     JAVA_HOME: "{{ opensearch_install_root }}/jdk"
   run_once: true
-  when: _cert_dir.changed and not opensearch_copy_custom_security_configs
+  when: _certs_changed and not opensearch_copy_custom_security_configs
   changed_when: true
-
-# --- Cleanup ------------------------------------------------------------------
-
-- name: Cleanup local certificate temp directory
-  ansible.builtin.file:
-    path: /tmp/opensearch-nodecerts
-    state: absent
-  delegate_to: localhost
-  run_once: true
-  when: _cert_dir.changed
-  become: false
 
 # code: language=ansible

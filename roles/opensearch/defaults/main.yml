@@ -50,11 +50,31 @@ opensearch_security_enabled: true
 # Authentication type: 'internal' or 'oidc'
 opensearch_auth_type: internal
 
-# TLS certificate validity (days)
-opensearch_cert_valid_days: 730
+# TLS certificate mode: 'generate' (self-signed via searchguard-tlstool) or 'custom' (user-supplied)
+opensearch_tls_mode: generate
 
+# --- TLS generate mode settings (opensearch_tls_mode == 'generate') ---
+# Certificate validity (days)
+opensearch_cert_valid_days: 730
 # Domain name used in certificate DNs
 # opensearch_domain_name:
+
+# --- TLS custom mode settings (opensearch_tls_mode == 'custom') ---
+# Paths to certificate files on the control node. All are required when tls_mode is 'custom'.
+# opensearch_tls_root_ca: /path/to/root-ca.pem
+# opensearch_tls_root_ca_key: /path/to/root-ca.key
+# opensearch_tls_admin_cert: /path/to/admin.pem
+# opensearch_tls_admin_key: /path/to/admin.key
+# Per-node transport certs (Jinja2 supported, e.g. using inventory_hostname):
+# opensearch_tls_node_cert: /path/to/{{ inventory_hostname }}.pem
+# opensearch_tls_node_key: /path/to/{{ inventory_hostname }}.key
+# Per-node HTTP certs:
+# opensearch_tls_node_http_cert: /path/to/{{ inventory_hostname }}_http.pem
+# opensearch_tls_node_http_key: /path/to/{{ inventory_hostname }}_http.key
+# TLS distinguished names for admin certificate (used in opensearch.yml security config)
+# opensearch_tls_admin_dn: "CN=admin,OU=Ops,O=Example Inc.,DC=example.com"
+# TLS distinguished names for node certificates
+# opensearch_tls_node_dn: "CN=*.example.com,OU=Ops,O=Example Inc.,DC=example.com"
 
 # Custom security plugin configuration files (list of template paths)
 opensearch_custom_security_configs: []

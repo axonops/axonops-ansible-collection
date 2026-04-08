@@ -46,8 +46,31 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It is 
 | `opensearch_admin_password` | — | **Required when security enabled.** Admin password |
 | `opensearch_dashboards_password` | — | Dashboards/Kibana server password |
 | `opensearch_auth_type` | `internal` | Auth type: `internal` or `oidc` |
-| `opensearch_cert_valid_days` | `730` | TLS certificate validity |
+| `opensearch_tls_mode` | `generate` | TLS mode: `generate` (self-signed) or `custom` (user-supplied) |
+
+### TLS Generate Mode (`opensearch_tls_mode: generate`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `opensearch_cert_valid_days` | `730` | Certificate validity in days |
 | `opensearch_domain_name` | — | Domain name for certificate DNs |
+
+### TLS Custom Mode (`opensearch_tls_mode: custom`)
+
+All paths are on the **control node** and will be copied to each OpenSearch node.
+
+| Variable | Description |
+|----------|-------------|
+| `opensearch_tls_root_ca` | Path to root CA certificate (PEM) |
+| `opensearch_tls_root_ca_key` | Path to root CA private key |
+| `opensearch_tls_admin_cert` | Path to admin client certificate |
+| `opensearch_tls_admin_key` | Path to admin client private key |
+| `opensearch_tls_node_cert` | Path to node transport certificate (supports `{{ inventory_hostname }}`) |
+| `opensearch_tls_node_key` | Path to node transport private key |
+| `opensearch_tls_node_http_cert` | Path to node HTTP certificate |
+| `opensearch_tls_node_http_key` | Path to node HTTP private key |
+| `opensearch_tls_admin_dn` | Admin certificate DN (for `plugins.security.authcz.admin_dn`) |
+| `opensearch_tls_node_dn` | Node certificate DN pattern (for `plugins.security.nodes_dn`) |
 
 ### System Tuning
 
@@ -101,6 +124,34 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It is 
     opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
     opensearch_dashboards_password: "{{ vault_opensearch_dashboards_password }}"
     opensearch_domain_name: example.com
+
+  roles:
+    - axonops.axonops.opensearch
+```
+
+### Custom TLS Certificates
+
+```yaml
+- name: Deploy OpenSearch with custom certificates
+  hosts: opensearch
+  become: true
+
+  vars:
+    opensearch_cluster_name: axonops-production
+    opensearch_cluster_type: multi-node
+    opensearch_heap_size: "4g"
+    opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+    opensearch_tls_mode: custom
+    opensearch_tls_root_ca: /path/to/certs/root-ca.pem
+    opensearch_tls_root_ca_key: /path/to/certs/root-ca.key
+    opensearch_tls_admin_cert: /path/to/certs/admin.pem
+    opensearch_tls_admin_key: /path/to/certs/admin.key
+    opensearch_tls_node_cert: "/path/to/certs/{{ inventory_hostname }}.pem"
+    opensearch_tls_node_key: "/path/to/certs/{{ inventory_hostname }}.key"
+    opensearch_tls_node_http_cert: "/path/to/certs/{{ inventory_hostname }}_http.pem"
+    opensearch_tls_node_http_key: "/path/to/certs/{{ inventory_hostname }}_http.key"
+    opensearch_tls_admin_dn: "CN=admin,OU=Ops,O=My Company,DC=example.com"
+    opensearch_tls_node_dn: "CN=*.example.com,OU=Ops,O=My Company,DC=example.com"
 
   roles:
     - axonops.axonops.opensearch
