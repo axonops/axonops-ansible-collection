@@ -6,9 +6,10 @@
     cassandra_dc: default
     cassandra_rack: rack1
     cassandra_max_heap_size: 512M
-    cassandra_version: 5.0.7
+    cassandra_version: 5.0.6
     cassandra_start_on_boot: false
     cassandra_install_format: tar
+    cassandra_jvm_use_shenandoah: false
   pre_tasks:
     # bug in the container we use for testing
     - name: "Create /usr/share/man/man1/"
@@ -21,5 +22,4 @@
     - role: java
       vars:
         java_use_zulu: true
-        #java_pkg: openjdk-11-jre-headless
     - role: cassandra

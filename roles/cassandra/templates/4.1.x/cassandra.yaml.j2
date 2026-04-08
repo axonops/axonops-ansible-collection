@@ -1506,7 +1506,7 @@ server_encryption_options:
   require_client_auth: {{ cassandra_ssl_client_require_client_auth }}
   # Set to a valid trustore if require_client_auth is true
   truststore: {{ cassandra_ssl_truststore_file | default("") }}
-  truststore_password: {{ cassandra_ssl_internode_keystore_pass | default("") }}
+  truststore_password: {{ cassandra_ssl_truststore_pass | default("") }}
   # Verify that the host name in the certificate matches the connected host
   require_endpoint_verification: {{ cassandra_require_endpoint_verification }}
   # More advanced defaults:

@@ -28,11 +28,9 @@
       failed_when: false
 
   roles:
-    - name: preflight
+    - role: axonops.axonops.preflight
       tags: preflight
-      role: axonops.axonops.preflight
-    - name: java
-      role: axonops.axonops.java
+    - role: axonops.axonops.java
       tags: java
     - role: axonops.axonops.agent
       tags: agent

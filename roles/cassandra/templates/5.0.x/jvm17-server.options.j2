@@ -26,32 +26,34 @@
 #  GC SETTINGS  #
 #################
 
-
-
+{% if cassandra_jvm_use_shenandoah is defined and cassandra_jvm_use_shenandoah %}
+-XX:+UnlockExperimentalVMOptions
+-XX:+UseShenandoahGC
+-XX:+UseTransparentHugePages
+{% else %}
 ### G1 Settings
 ## Use the Hotspot garbage-first collector.
 -XX:+UseG1GC
 -XX:+ParallelRefProcEnabled
--XX:MaxTenuringThreshold=2
--XX:G1HeapRegionSize=16m
+-XX:MaxTenuringThreshold={{ cassandra_jvm_max_tenuring_threshold | default(2) }}
+-XX:G1HeapRegionSize={{ cassandra_jvm_g1_heap_region_size_mb | default(16) }}m
 
 # Floor the young generation size to 50% of the heap size
 -XX:+UnlockExperimentalVMOptions
--XX:G1NewSizePercent=50
+-XX:G1NewSizePercent={{ cassandra_jvm_g1_new_size_percent | default(50) }}
 
 # Have the JVM do less remembered set work during STW, instead
 # preferring concurrent GC. Reduces p99.9 latency.
--XX:G1RSetUpdatingPauseTimePercent=5
+-XX:G1RSetUpdatingPauseTimePercent={{ cassandra_jvm_g1_rset_updating_pause_time_percent }}
 
 # Main G1GC tunable: lowering the pause target will lower throughput and vise versa.
 # 200ms is the JVM default and lowest viable setting
 # 1000ms increases throughput. Keep it smaller than the timeouts in cassandra.yaml.
--XX:MaxGCPauseMillis=300
+-XX:MaxGCPauseMillis={{ cassandra_jvm_max_gc_pause_ms }}
 
-## Optional G1 Settings
 # Save CPU time on large (>= 16GB) heaps by delaying region scanning
-# until the heap is 70% full. The default in Hotspot 8u40 is 40%.
--XX:InitiatingHeapOccupancyPercent=70
+# until the heap is full. The default in Hotspot 8u40 is 40%.
+-XX:InitiatingHeapOccupancyPercent={{ cassandra_jvm_initiating_heap_occupancy_percentage }}
 
 # For systems with > 8 cores, the default ParallelGCThreads is 5/8 the number of logical cores.
 # Otherwise equal to the number of cores when 8 or less.
@@ -59,8 +61,16 @@
 # By default, ConcGCThreads is 1/4 of ParallelGCThreads.
 # Setting both to the same value can reduce STW durations.
 # When leaving both unset then cassandra-env.sh will set them both to the number of your cores.
-#-XX:ParallelGCThreads=16
-#-XX:ConcGCThreads=16
+{% if cassandra_jvm_parallel_gc_threads is defined %}
+-XX:ParallelGCThreads={{ cassandra_jvm_parallel_gc_threads }}
+{% endif %}
+{% if cassandra_jvm_conc_gc_threads is defined %}
+-XX:ConcGCThreads={{ cassandra_jvm_conc_gc_threads }}
+{% endif %}
+{% endif %}
+
+-XX:ThreadPriorityPolicy=1
+-XX:StringTableSize=1000003
 
 ### JPMS
 
@@ -89,13 +99,9 @@
 --add-opens java.base/java.util=ALL-UNNAMED
 --add-opens java.base/java.nio=ALL-UNNAMED
 
-### GC logging options -- uncomment to enable
-
-# Java 11 (and newer) GC logging options:
+### GC logging options
 # See description of https://bugs.openjdk.java.net/browse/JDK-8046148 for details about the syntax
-# The following is the equivalent to -XX:+PrintGCDetails -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=10M
-#-Xlog:gc=info,heap*=trace,age*=debug,safepoint=info,promotion*=trace:file=/var/log/cassandra/gc.log:time,uptime,pid,tid,level:filecount=10,filesize=10485760
-
+# The following is the equivalent to -XX:+PrintGCDetails -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=N -XX:GCLogFileSize=NM
 # Notes for Java 8 migration:
 #
 # -XX:+PrintGCDetails                   maps to -Xlog:gc*:... - i.e. add a '*' after "gc"
@@ -106,16 +112,9 @@
 # -XX:+PrintGCApplicationStoppedTime    maps to 'safepoint' with level 'info'
 # -XX:+PrintPromotionFailure            maps to 'promotion' with level 'trace'
 # -XX:PrintFLSStatistics=1              maps to 'freelist' with level 'trace'
-
--XX:ThreadPriorityPolicy=1
--XX:StringTableSize=1000003
--XX:+UseG1GC
--XX:G1RSetUpdatingPauseTimePercent={{ cassandra_jvm_g1_rset_updating_pause_time_percent }}
--XX:MaxGCPauseMillis={{ cassandra_jvm_max_gc_pause_ms }}
--XX:InitiatingHeapOccupancyPercent={{ cassandra_jvm_initiating_heap_occupancy_percentage }}
--XX:ParallelGCThreads={{ cassandra_jvm_parallel_gc_threads }}
--XX:ConcGCThreads={{ cassandra_jvm_conc_gc_threads }}
--XX:+ParallelRefProcEnabled
+{% if cassandra_jvm_gc_log_enabled | default(true) | bool %}
+-Xlog:gc=info,heap*=trace,age*=debug,safepoint=info,promotion*=trace:file={{ cassandra_gc_log_dir }}/gc.log:time,uptime,pid,tid,level:filecount={{ cassandra_jvm_gc_log_file_number }},filesize={{ (cassandra_jvm_gc_log_file_max_size_mb | int * 1024 * 1024) }}
+{% endif %}
 
 ### Netty Options
 
@@ -127,5 +126,9 @@
 # Revert changes in defaults introduced in https://netty.io/news/2022/03/10/4-1-75-Final.html
 -Dio.netty.allocator.useCacheForAllThreads=true
 -Dio.netty.allocator.maxOrder=11
+
+{% for setting in cassandra_jvm17_server_settings %}
+{{ setting }}
+{% endfor %}
 
 # The newline in the end of file is intentional

@@ -1,0 +1,4 @@
+---
+# Cassandra 5.0.x uses human-readable values with units (e.g. "24MiB", "5s").
+# All required variables are defined in defaults/main.yml with the correct format.
+# No derived conversions needed here — the 5.0.x templates use the primary variables directly.

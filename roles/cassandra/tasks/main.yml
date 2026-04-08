@@ -1,3 +1,32 @@
+- name: Warn if cassandra_seeds is set to 127.0.0.1
+  ansible.builtin.fail:
+    msg: >-
+      WARNING: cassandra_seeds is set to '127.0.0.1'. This is only suitable for
+      single-node development clusters. For production deployments, set
+      cassandra_seeds to the actual seed node addresses.
+  when: cassandra_seeds is defined and cassandra_seeds == "127.0.0.1"
+  ignore_errors: true
+  tags: always
+
+- name: Warn if cassandra_cluster_name is set to default
+  ansible.builtin.fail:
+    msg: >-
+      WARNING: cassandra_cluster_name is set to 'default'. For production
+      deployments, set cassandra_cluster_name to a meaningful cluster name.
+  when: cassandra_cluster_name is defined and cassandra_cluster_name == "default"
+  ignore_errors: true
+  tags: always
+
+- name: Validate cassandra_version is supported
+  ansible.builtin.assert:
+    that:
+      - cassandra_version is defined
+      - cassandra_version.startswith('4.1') or cassandra_version.startswith('5.')
+    fail_msg: >-
+      Unsupported cassandra_version '{{ cassandra_version }}'. This role supports versions
+      starting with '4.1' or '5.'. Please set cassandra_version to a supported value.
+  tags: always
+
 - name: Import vars for 4.1
   ansible.builtin.include_vars: cassandra-4.1.yml
   when: cassandra_version.startswith('4.1')
@@ -5,7 +34,7 @@
 
 - name: Import vars for 5.0
   ansible.builtin.include_vars: cassandra-5.0.yml
-  when: cassandra_version.startswith('5.0')
+  when: cassandra_version.startswith('5.')
   tags: always
 
 - name: Import vars for Debian
@@ -27,6 +56,7 @@
   ansible.builtin.import_tasks: install-tar.yml
 
 - name: Remove needrestart package
+  when: ansible_os_family == "Debian"
   ansible.builtin.package:
     name: needrestart
     state: absent
@@ -103,7 +133,7 @@
     owner: "cassandra"
     group: "cassandra"
     state: directory
-  with_items:
+  loop:
     - "{{ cassandra_log_dir }}"
     - "{{ cassandra_hints_directory }}"
     - "{{ cassandra_gc_log_dir }}"
@@ -119,7 +149,7 @@
     - name: Ensure Cassandra SSL directories exist
       ansible.builtin.file:
         state: directory
-        path: /opt/ssl
+        path: "{{ cassandra_ssl_path | default('/opt/ssl') }}"
         mode: '0750'
         owner: cassandra
         group: cassandra
@@ -127,7 +157,7 @@
     - name: Copy Cassandra SSL keystore
       ansible.builtin.copy:
         src: "{{ item }}"
-        dest: /opt/ssl/
+        dest: "{{ cassandra_ssl_path | default('/opt/ssl') }}/{{ item | basename }}"
         owner: cassandra
         group: cassandra
         mode: '0640'
@@ -151,8 +181,10 @@
       ansible.builtin.template:
         src: "{{ tmpl_dir }}/{{ item }}.j2"
         dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
-        mode: "0644"
-      with_items:
+        mode: "0640"
+        owner: cassandra
+        group: cassandra
+      loop:
         - cassandra-env.sh
         - cassandra-rackdc.properties
         - cassandra.yaml
@@ -161,16 +193,20 @@
         - jvm11-server.options
         - jvm-clients.options
         - jvm11-clients.options
+      notify: Restart Cassandra
 
     - name: Ensure Cassandra node configured (5.x only)
       when: cassandra_version.startswith('5.')
       ansible.builtin.template:
         src: "{{ tmpl_dir }}/{{ item }}.j2"
         dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
-        mode: "0644"
-      with_items:
+        mode: "0640"
+        owner: cassandra
+        group: cassandra
+      loop:
         - jvm17-server.options
         - jvm17-clients.options
+      notify: Restart Cassandra
 
 - name: JMX Authentication
   when:
@@ -199,18 +235,18 @@
 - name: OS configs
   ansible.builtin.import_tasks: os-config.yml
 
-- name: Installed the compiled cqlsh binary
-  tags: cqlsh
+- name: Install cqlai
+  tags: cqlai
   ansible.builtin.apt:
-    deb: "{{ cassandra_cqlsh_binary }}"
-  when: cassandra_cqlsh_binary is defined and ansible_os_family == "Debian"
+    deb: "{{ cassandra_cqlai_binary }}"
+  when: cassandra_cqlai_binary is defined and ansible_os_family == "Debian"
 
-- name: Installed the compiled cqlsh binary
-  tags: cqlsh
+- name: Install cqlai
+  tags: cqlai
   ansible.builtin.yum:
-    name: "{{ cassandra_cqlsh_binary }}"
+    name: "{{ cassandra_cqlai_binary }}"
     disable_gpg_check: true
-  when: cassandra_cqlsh_binary is defined and ansible_os_family == "RedHat"
+  when: cassandra_cqlai_binary is defined and ansible_os_family == "RedHat"
 
 - name: Systemd service for cassandra
   ansible.builtin.template:
