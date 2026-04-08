@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feat/k8ssandra
   pull_request:
 
 defaults:
