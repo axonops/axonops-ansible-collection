@@ -28,6 +28,7 @@ opensearch_bootstrap_memory_lock: true
 # Override these in your playbook. By default, all hosts in the current play are used.
 # opensearch_seed_hosts: list of hostnames or IPs
 # opensearch_initial_master_nodes: list of master-eligible node names
+# opensearch_initial_cluster_manager_nodes: list of cluster manager node names
 
 # Node roles - set per-host in inventory (e.g. opensearch_node_roles: "cluster_manager, data, ingest")
 # opensearch_node_roles:
