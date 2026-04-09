@@ -42,8 +42,6 @@ env:
   PY_COLORS: "1"
   ANSIBLE_FORCE_COLOR: "1"
   ANSIBLE_ROLES_PATH: ${{ github.workspace }}/roles
-  # Silence the hyphen-in-group-name warning produced by the axon-server group
-  ANSIBLE_TRANSFORM_INVALID_GROUP_CHARS: silently
 
 jobs:
   platform:
