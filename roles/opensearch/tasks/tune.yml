@@ -11,4 +11,53 @@
     value: "{{ opensearch_fs_file_max }}"
     state: present
 
+- name: Set vm.swappiness
+  ansible.posix.sysctl:
+    name: vm.swappiness
+    value: "{{ opensearch_vm_swappiness }}"
+    state: present
+
+- name: Set net.ipv4.tcp_retries2
+  ansible.posix.sysctl:
+    name: net.ipv4.tcp_retries2
+    value: "{{ opensearch_tcp_retries2 }}"
+    state: present
+
+- name: Disable Transparent Huge Pages (current session)
+  ansible.builtin.shell: |
+    echo never > /sys/kernel/mm/transparent_hugepage/enabled
+    echo never > /sys/kernel/mm/transparent_hugepage/defrag
+  changed_when: false
+  failed_when: false
+  when: opensearch_disable_thp
+
+- name: Disable Transparent Huge Pages on boot
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/disable-thp.service
+    mode: "0644"
+    owner: root
+    group: root
+    content: |
+      [Unit]
+      Description=Disable Transparent Huge Pages
+      DefaultDependencies=no
+      After=sysinit.target local-fs.target
+      Before=opensearch.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled && echo never > /sys/kernel/mm/transparent_hugepage/defrag'
+
+      [Install]
+      WantedBy=basic.target
+  notify: Reload systemd
+  when: opensearch_disable_thp
+
+- name: Enable disable-thp service
+  ansible.builtin.systemd:
+    name: disable-thp
+    enabled: true
+    daemon_reload: true
+  when: opensearch_disable_thp
+
 # code: language=ansible

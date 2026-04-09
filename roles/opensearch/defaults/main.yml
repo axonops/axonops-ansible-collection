@@ -95,6 +95,11 @@ opensearch_populate_etc_hosts: true
 
 opensearch_vm_max_map_count: 262144
 opensearch_fs_file_max: 65536
+opensearch_vm_swappiness: 1
+opensearch_tcp_retries2: 5
+
+# Disable Transparent Huge Pages (recommended for JVM workloads)
+opensearch_disable_thp: true
 
 # --- IaC Mode ----------------------------------------------------------------
 
