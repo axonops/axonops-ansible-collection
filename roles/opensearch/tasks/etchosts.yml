@@ -3,7 +3,7 @@
   ansible.builtin.blockinfile:
     dest: /etc/hosts
     block: |-
-      {% for item in groups['opensearch'] %}
+      {% for item in ansible_play_hosts %}
       {{ hostvars[item]['ansible_default_ipv4']['address'] | default(hostvars[item]['ip'] | default('')) }} {{ item }}.{{ opensearch_domain_name | default('local') }} {{ item }}
       {% endfor %}
     state: present

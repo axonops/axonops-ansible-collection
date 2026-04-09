@@ -19,7 +19,7 @@ defaults:
 ### Nodes
 ###
 nodes:
-{% for item in groups['opensearch'] %}
+{% for item in ansible_play_hosts %}
   - name: {{ item }}
     dn: CN={{ item }}.{{ opensearch_domain_name }},OU=Ops,O={{ opensearch_domain_name }}\, Inc.,DC={{ opensearch_domain_name }}
     dns: {{ item }}.{{ opensearch_domain_name }}

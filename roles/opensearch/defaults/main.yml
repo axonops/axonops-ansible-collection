@@ -25,7 +25,7 @@ opensearch_network_host: "{{ ansible_default_ipv4.address | default('0.0.0.0') }
 opensearch_bootstrap_memory_lock: true
 
 # Node discovery (multi-node only)
-# Override these in your playbook. The defaults use the 'opensearch' inventory group.
+# Override these in your playbook. By default, all hosts in the current play are used.
 # opensearch_seed_hosts: list of hostnames or IPs
 # opensearch_initial_master_nodes: list of master-eligible node names
 
