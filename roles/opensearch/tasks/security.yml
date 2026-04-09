@@ -235,16 +235,16 @@
 # Common security configuration (both TLS modes)
 # =============================================================================
 
-- name: Deploy security auth configuration to opensearch.yml
+- name: Deploy security plugin configuration to opensearch.yml
   ansible.builtin.blockinfile:
-    block: "{{ lookup('template', 'security_conf.yml.j2') }}"
+    block: "{{ lookup('template', 'security_plugin_conf.yml.j2') }}"
     dest: "{{ opensearch_conf_dir }}/opensearch.yml"
     backup: true
     insertafter: EOF
-    marker: "## {mark} OpenSearch Security configuration ##"
+    marker: "## {mark} OpenSearch Plugin Security configuration ##"
     owner: "{{ opensearch_user }}"
     group: "{{ opensearch_group }}"
-  when: _certs_changed or opensearch_iac_enable
+  when: opensearch_auth_type == 'oidc' or opensearch_copy_custom_security_configs
 
 - name: Create security plugin configuration directory
   ansible.builtin.file:
@@ -254,15 +254,13 @@
     group: "{{ opensearch_group }}"
     mode: "0700"
 
-- name: Deploy security plugin config.yml
+- name: Deploy security auth configuration
   ansible.builtin.template:
-    src: security_plugin_conf.yml.j2
-    dest: "{{ opensearch_install_root }}/config/opensearch-security/config.yml"
-    backup: true
+    src: "{{ lookup('template', 'security_conf.yml.j2') }}"
+    dest: "{{ opensearch_conf_dir }}/opensearch-security/config.yml"
     owner: "{{ opensearch_user }}"
     group: "{{ opensearch_group }}"
-    mode: "0600"
-  when: opensearch_auth_type == 'oidc' or opensearch_copy_custom_security_configs
+  when: _certs_changed or opensearch_iac_enable
 
 # --- File ownership and permissions ------------------------------------------
 
