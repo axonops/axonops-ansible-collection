@@ -5,7 +5,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'roles/k8ssandra/**'
+      - '.github/workflows/k8ssandra-molecule.yml'
   pull_request:
+    paths:
+      - 'roles/k8ssandra/**'
+      - '.github/workflows/k8ssandra-molecule.yml'
 
 defaults:
   run:

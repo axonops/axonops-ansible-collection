@@ -1,0 +1,14 @@
+---
+- name: Populate inventory into /etc/hosts
+  ansible.builtin.blockinfile:
+    dest: /etc/hosts
+    block: |-
+      {% for item in ansible_play_hosts %}
+      {{ hostvars[item]['ansible_default_ipv4']['address'] | default(hostvars[item]['ip'] | default('')) }} {{ item }}.{{ opensearch_domain_name | default('local') }} {{ item }}
+      {% endfor %}
+    state: present
+    create: true
+    backup: true
+    marker: "# Ansible OpenSearch inventory hosts {mark}"
+
+# code: language=ansible

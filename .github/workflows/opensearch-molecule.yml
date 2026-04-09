@@ -1,25 +1,25 @@
 ---
-name: AxonOps Server Molecule
+name: OpenSearch Molecule
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'roles/server/**'
-      - '.github/workflows/server-molecule.yml'
+      - 'roles/opensearch/**'
+      - '.github/workflows/opensearch-molecule.yml'
   pull_request:
     paths:
-      - 'roles/server/**'
-      - '.github/workflows/server-molecule.yml'
+      - 'roles/opensearch/**'
+      - '.github/workflows/opensearch-molecule.yml'
 
 defaults:
   run:
-    working-directory: roles/server
+    working-directory: roles/opensearch
 
 jobs:
   molecule:
-    name: Molecule AxonOps Server
+    name: Molecule OpenSearch (${{ matrix.distro }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -49,7 +49,7 @@ jobs:
           ANSIBLE_FORCE_COLOR: '1'
           MOLECULE_DISTRO: ${{ matrix.distro }}
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
-          MOLECULE_INSTANCE_NAME: server-${{ matrix.distro }}
+          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.distro }}
 
       - name: Run Molecule converge
         run: molecule -v converge
@@ -58,4 +58,4 @@ jobs:
           ANSIBLE_FORCE_COLOR: '1'
           MOLECULE_DISTRO: ${{ matrix.distro }}
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
-          MOLECULE_INSTANCE_NAME: server-${{ matrix.distro }}
+          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.distro }}

@@ -1,0 +1,11 @@
+cluster.name: "{{ opensearch_cluster_name }}"
+
+node.name: "{{ inventory_hostname }}"
+
+network.host: "{{ opensearch_network_host }}"
+
+http.port: {{ opensearch_api_port }}
+
+discovery.type: single-node
+
+bootstrap.memory_lock: {{ opensearch_bootstrap_memory_lock | lower }}

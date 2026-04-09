@@ -1,0 +1,12 @@
+plugins.security.ssl.transport.pemcert_filepath: {{ inventory_hostname }}.pem
+plugins.security.ssl.transport.pemkey_filepath: {{ inventory_hostname }}.key
+plugins.security.ssl.transport.pemtrustedcas_filepath: root-ca.pem
+plugins.security.ssl.transport.enforce_hostname_verification: false
+plugins.security.ssl.http.enabled: true
+plugins.security.ssl.http.pemcert_filepath: {{ inventory_hostname }}_http.pem
+plugins.security.ssl.http.pemkey_filepath: {{ inventory_hostname }}_http.key
+plugins.security.ssl.http.pemtrustedcas_filepath: root-ca.pem
+plugins.security.authcz.admin_dn:
+  - "{{ opensearch_tls_admin_dn | default('CN=admin,OU=Ops,O=Example Inc.,DC=example.com') }}"
+plugins.security.nodes_dn:
+  - "{{ opensearch_tls_node_dn | default('CN=*,OU=Ops,O=Example Inc.,DC=example.com') }}"
