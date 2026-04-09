@@ -91,49 +91,64 @@ jobs:
 
       - name: Verify — OpenSearch cluster health
         run: |
-          docker exec "$CONTAINER_NAME" bash -c '
-            for i in $(seq 1 24); do
-              status=$(curl -sk -u admin:changeme \
-                https://localhost:9200/_cluster/health \
-                | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[\"status\"])" 2>/dev/null)
-              if [ "$status" = "green" ] || [ "$status" = "yellow" ]; then
-                echo "OpenSearch is healthy (status: $status)"
-                exit 0
-              fi
-              echo "Waiting for OpenSearch... ($i/24)"
-              sleep 5
-            done
-            echo "ERROR: OpenSearch did not become healthy"
-            exit 1
-          '
+          docker exec "$CONTAINER_NAME" python3 - <<'EOF'
+          import urllib.request, urllib.error, ssl, json, sys, time, base64
+          ctx = ssl.create_default_context()
+          ctx.check_hostname = False
+          ctx.verify_mode = ssl.CERT_NONE
+          token = base64.b64encode(b"admin:changeme").decode()
+          for i in range(1, 25):
+              try:
+                  req = urllib.request.Request(
+                      "https://localhost:9200/_cluster/health",
+                      headers={"Authorization": f"Basic {token}"},
+                  )
+                  with urllib.request.urlopen(req, context=ctx, timeout=5) as r:
+                      d = json.load(r)
+                  if d["status"] in ("green", "yellow"):
+                      print(f"OpenSearch is healthy (status: {d['status']})")
+                      sys.exit(0)
+              except Exception as e:
+                  pass
+              print(f"Waiting for OpenSearch... ({i}/24)")
+              time.sleep(5)
+          print("ERROR: OpenSearch did not become healthy")
+          sys.exit(1)
+          EOF
 
       - name: Verify — Cassandra native transport (port 9042)
         run: |
-          docker exec "$CONTAINER_NAME" bash -c '
-            for i in $(seq 1 24); do
-              (echo >/dev/tcp/localhost/9042) 2>/dev/null && \
-                echo "Cassandra native transport is UP" && exit 0
-              echo "Waiting for Cassandra... ($i/24)"
-              sleep 5
-            done
-            echo "ERROR: Cassandra did not start"
-            exit 1
-          '
+          docker exec "$CONTAINER_NAME" python3 - <<'EOF'
+          import socket, sys, time
+          for i in range(1, 25):
+              try:
+                  with socket.create_connection(("localhost", 9042), timeout=3):
+                      print("Cassandra native transport is UP")
+                      sys.exit(0)
+              except OSError:
+                  pass
+              print(f"Waiting for Cassandra... ({i}/24)")
+              time.sleep(5)
+          print("ERROR: Cassandra did not start")
+          sys.exit(1)
+          EOF
 
       - name: Verify — AxonOps Server API (port 8080)
         run: |
-          docker exec "$CONTAINER_NAME" bash -c '
-            for i in $(seq 1 24); do
-              if curl -sf http://localhost:8080/api/v1/version >/dev/null 2>&1; then
-                echo "AxonOps Server is UP"
-                exit 0
-              fi
-              echo "Waiting for AxonOps Server... ($i/24)"
-              sleep 5
-            done
-            echo "ERROR: AxonOps Server did not start"
-            exit 1
-          '
+          docker exec "$CONTAINER_NAME" python3 - <<'EOF'
+          import urllib.request, urllib.error, sys, time
+          for i in range(1, 25):
+              try:
+                  with urllib.request.urlopen("http://localhost:8080/api/v1/version", timeout=5):
+                      print("AxonOps Server is UP")
+                      sys.exit(0)
+              except Exception:
+                  pass
+              print(f"Waiting for AxonOps Server... ({i}/24)")
+              time.sleep(5)
+          print("ERROR: AxonOps Server did not start")
+          sys.exit(1)
+          EOF
 
       - name: Collect logs on failure
         if: failure()
