@@ -16,6 +16,18 @@ cassandra_max_heap_size: "512M"
 opensearch_bootstrap_memory_lock: false
 # Docker bind-mounts /etc/hosts; Ansible's atomic rename fails on bind mounts.
 opensearch_populate_etc_hosts: false
+# OpenSearch 3.x securityadmin.sh has a known HTTP/2 timeout bug where the
+# cache-flush call after a successful config update exits non-zero. Disable the
+# security plugin for CI to skip TLS setup and securityadmin entirely.
+opensearch_security_enabled: false
+
+# --- AxonOps Server → OpenSearch (plain HTTP, no security plugin) -----------
+# Override the example playbook's https:// URL and credentials.
+axon_server_searchdb_hosts:
+  - "http://127.0.0.1:9200"
+axon_server_searchdb_username: ""
+axon_server_searchdb_password: ""
+axon_server_searchdb_tls_skip_verify: false
 
 # --- Java -------------------------------------------------------------------
 # openjdk-17-jre-headless's ca-certificates-java postinstall script fails in

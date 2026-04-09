@@ -90,18 +90,10 @@ jobs:
       - name: Verify — OpenSearch cluster health
         run: |
           docker exec "$CONTAINER_NAME" python3 - <<'EOF'
-          import urllib.request, urllib.error, ssl, json, sys, time, base64
-          ctx = ssl.create_default_context()
-          ctx.check_hostname = False
-          ctx.verify_mode = ssl.CERT_NONE
-          token = base64.b64encode(b"admin:changeme").decode()
+          import urllib.request, urllib.error, json, sys, time
           for i in range(1, 25):
               try:
-                  req = urllib.request.Request(
-                      "https://localhost:9200/_cluster/health",
-                      headers={"Authorization": f"Basic {token}"},
-                  )
-                  with urllib.request.urlopen(req, context=ctx, timeout=5) as r:
+                  with urllib.request.urlopen("http://localhost:9200/_cluster/health", timeout=5) as r:
                       d = json.load(r)
                   if d["status"] in ("green", "yellow"):
                       print(f"OpenSearch is healthy (status: {d['status']})")
