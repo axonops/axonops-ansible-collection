@@ -15,6 +15,11 @@ cassandra_max_heap_size: "512M"
 # settings; disable to prevent bootstrap failures.
 opensearch_bootstrap_memory_lock: false
 
+# --- Java -------------------------------------------------------------------
+# openjdk-17-jre-headless's ca-certificates-java postinstall script fails in
+# Docker containers. Use Zulu JDK instead, which doesn't have this problem.
+java_use_zulu: true
+
 # --- Service startup --------------------------------------------------------
 # Cassandra defaults to cassandra_start_on_install: false (intentional for
 # multi-node clusters). Override here so the server role can connect.
