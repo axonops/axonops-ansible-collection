@@ -11,6 +11,7 @@ bootstrap.memory_lock: {{ opensearch_bootstrap_memory_lock | lower }}
 discovery.seed_hosts: [{% for host in opensearch_seed_hosts | default(ansible_play_hosts) %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 
 cluster.initial_master_nodes: [{% for host in opensearch_initial_master_nodes | default(ansible_play_hosts) %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+
 cluster.initial_cluster_manager_nodes: [{% for host in opensearch_initial_cluster_manager_nodes | default(ansible_play_hosts) %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 
 {% if opensearch_node_roles is defined %}
