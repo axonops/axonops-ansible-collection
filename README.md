@@ -3,8 +3,12 @@
 [AxonOps](https://axonops.com/) can be used either via our SaaS service or you can install it locally in your environment.
 
 This collection provides Ansible roles and playbooks to deploy [AxonOps](https://axonops.com/) components. The examples below
-show how you can install the AxonOps server with Elasticsearch® and Cassandra® to store metrics and configurations,
+show how you can install the AxonOps server with OpenSearch or Elasticsearch® and Cassandra® to store metrics and configurations,
 and how you can install the AxonOps agent to connect to your Apache Cassandra cluster.
+
+**For on-premises deployments, OpenSearch is the preferred search backend.** The `opensearch` role is included in this collection
+and provides a complete, production-ready OpenSearch deployment with automatic TLS certificate generation, multi-node cluster
+support, and Security plugin configuration. Elasticsearch remains supported for existing deployments.
 
 Ansible is an open-source IT automation platform that enables organizations to automate various IT processes, including provisioning, configuration management,
 application deployment, and orchestration. It operates as an agentless system, using remote connections via SSH or Windows Remote Management
@@ -38,6 +42,7 @@ This collection provides the following Ansible roles. Click on each role for det
 
 ### Infrastructure Components
 - **[cassandra](docs/roles/cassandra.md)** - Install and configure Apache Cassandra (3.11, 4.x, 5.x)
+- **[opensearch](docs/roles/opensearch.md)** - Install and configure OpenSearch for AxonOps (preferred for on-premises)
 - **[elastic](docs/roles/elastic.md)** - Install and configure Elasticsearch for AxonOps
 - **[java](docs/roles/java.md)** - Install Java (OpenJDK or Azul Zulu)
 
@@ -78,7 +83,7 @@ The following targets are available in the Makefile:
 
 - `help`: Display this help message.
 - `agent`: Installs the AxonOps agent to the Cassandra nodes.
-- `server`: Installs the AxonOps server with Elasticsearch and optional Cassandra.
+- `server`: Installs the AxonOps server with OpenSearch (or Elasticsearch) and optional Cassandra.
 
 You can then invoke the installation using
 
@@ -125,17 +130,56 @@ the `*_redhat_repository` URLs.
 
 ### axon-server.yml (note - you do not need to use this if connecting to the SaaS)
 
-This playbook deploys the AxonOps Server. It installs a local Apache Cassandra server to use a metrics
-storage and it will also deploy Elasticsearch for the AxonOps configuration.
+This playbook deploys the AxonOps Server. It installs a local Apache Cassandra server for metrics
+storage and a search backend (OpenSearch or Elasticsearch) for the AxonOps configuration.
 
-For more information about the Elasticsearch installation options please see the following [README.md](./roles/elastic/README.md)
+**OpenSearch is recommended for on-premises deployments.** For more information see
+[roles/opensearch/README.md](./roles/opensearch/README.md). For Elasticsearch, see
+[roles/elastic/README.md](./roles/elastic/README.md).
 
-**Note:** For AxonOps server version >= 2.0.4, the Elasticsearch configuration uses a new syntax with a `hosts` array format.
-The playbook automatically detects the server version and applies the appropriate configuration format. For older versions,
-the legacy `elastic_host` and `elastic_port` configuration is used.
+**Note:** For AxonOps server version >= 2.0.4, the search backend configuration uses a `search_db.hosts`
+array format. The `axon_server_searchdb_hosts` variable accepts a list of URLs and works with both
+OpenSearch and Elasticsearch endpoints.
+
+#### With OpenSearch (recommended for on-premises)
 
 ```yaml
-- name: Deploy AxonOps Server
+- name: Deploy AxonOps Server with OpenSearch
+  hosts: axon-server
+  become: true
+  vars:
+    # OpenSearch
+    opensearch_cluster_name: axonops
+    opensearch_cluster_type: single-node
+    opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+    opensearch_domain_name: example.com
+
+    # AxonOps Server
+    axon_server_license_key: "{{ vault_axonops_license_key }}"
+    axon_server_cql_hosts:
+      - localhost:9042
+    axon_server_searchdb_hosts:
+      - "https://127.0.0.1:9200"
+    axon_server_searchdb_username: admin
+    axon_server_searchdb_password: "{{ vault_opensearch_admin_password }}"
+    axon_server_searchdb_tls_skip_verify: true
+    axon_dash_listen_address: 0.0.0.0
+
+  roles:
+    - role: axonops.axonops.cassandra
+      tags: cassandra
+    - role: axonops.axonops.opensearch
+      tags: opensearch
+    - role: axonops.axonops.server
+      tags: server, axonops-server
+    - role: axonops.axonops.dash
+      tags: dash, axonops-dashboard
+```
+
+#### With Elasticsearch (legacy / existing deployments)
+
+```yaml
+- name: Deploy AxonOps Server with Elasticsearch
   hosts: axon-server
   become: true
   vars:
@@ -144,6 +188,8 @@ the legacy `elastic_host` and `elastic_port` configuration is used.
     java_pkg: java-17-openjdk-headless
     axon_server_cql_hosts:
       - localhost:9042
+    axon_server_searchdb_hosts:
+      - http://127.0.0.1:9200
     axon_dash_listen_address: 0.0.0.0
     axon_agent_redhat_repository: "https://packages.axonops.com/yum"
     es_redhat_repository_url: https://artifacts.elastic.co/packages/7.x/yum

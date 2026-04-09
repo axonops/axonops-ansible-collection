@@ -42,6 +42,8 @@ env:
   PY_COLORS: "1"
   ANSIBLE_FORCE_COLOR: "1"
   ANSIBLE_ROLES_PATH: ${{ github.workspace }}/roles
+  # Silence the hyphen-in-group-name warning produced by the axon-server group
+  ANSIBLE_TRANSFORM_INVALID_GROUP_CHARS: silently
 
 jobs:
   platform:
@@ -86,8 +88,6 @@ jobs:
             -i "ci/inventory.yml" \
             --extra-vars "@ci/platform-ci-vars.yml" \
             examples/axon-server.yml
-        env:
-          ANSIBLE_STDOUT_CALLBACK: yaml
 
       - name: Verify — OpenSearch cluster health
         run: |

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `opensearch` role installs and configures OpenSearch on target nodes. It is used as the backend configuration store for self-hosted AxonOps Server deployments, replacing Elasticsearch. It supports both single-node and multi-node cluster configurations with optional TLS security.
+The `opensearch` role installs and configures OpenSearch on target nodes. It serves as the search and configuration backend for self-hosted AxonOps Server deployments. OpenSearch is the preferred search backend for on-premises deployments — it is fully open-source, ships with the Security plugin for TLS and authentication, and generates certificates automatically. The role supports both single-node development setups and multi-node production clusters.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It is 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `opensearch_version` | `3.0.0` | OpenSearch version to install |
+| `opensearch_version` | `3.6.0` | OpenSearch version to install |
 | `opensearch_cluster_name` | `opensearch` | Cluster name |
 | `opensearch_cluster_type` | `multi-node` | `single-node` or `multi-node` |
 | `opensearch_install_root` | `/usr/share/opensearch` | Installation directory |
@@ -175,16 +175,30 @@ All paths are on the **control node** and will be copied to each OpenSearch node
 
 ### Part of Self-Hosted AxonOps Stack
 
+Deploy OpenSearch alongside AxonOps Server and Dashboard on a single host. The `axon_server_searchdb_*`
+variables connect axon-server to OpenSearch. When using auto-generated certificates
+(`opensearch_tls_mode: generate`), set `axon_server_searchdb_tls_skip_verify: true` so that axon-server
+accepts the self-signed certificates.
+
 ```yaml
 - name: Deploy AxonOps Server with OpenSearch
   hosts: axon-server
   become: true
 
   vars:
+    # OpenSearch
     opensearch_cluster_name: axonops
     opensearch_cluster_type: single-node
     opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
     opensearch_domain_name: example.com
+
+    # AxonOps Server search_db connection
+    axon_server_license_key: "{{ vault_axonops_license_key }}"
+    axon_server_searchdb_hosts:
+      - "https://127.0.0.1:9200"
+    axon_server_searchdb_username: admin
+    axon_server_searchdb_password: "{{ vault_opensearch_admin_password }}"
+    axon_server_searchdb_tls_skip_verify: true
 
   roles:
     - axonops.axonops.opensearch

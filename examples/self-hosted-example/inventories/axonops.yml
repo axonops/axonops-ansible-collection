@@ -40,7 +40,8 @@ all:
             node.master: false
       vars:
         # AxonOps Server
-        axon_server_elastic_host: "{{ groups['axonops-server'] | map('regex_replace', '^(.*)$', 'http://\\1:9200') | list }}"
+        # axon_server_searchdb_hosts accepts a list of URLs (server >= 2.0.4 syntax)
+        axon_server_searchdb_hosts: "{{ groups['axonops-server'] | map('regex_replace', '^(.*)$', 'http://\\1:9200') | list }}"
 
 
         # AxonOps Search DB

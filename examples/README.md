@@ -25,11 +25,11 @@ Deploys AxonOps Agent alongside Apache Cassandra on target hosts.
 ### Server Deployment
 
 #### [axon-server.yml](axon-server.yml)
-Deploys a complete AxonOps Server stack including Cassandra, Elasticsearch, and the AxonOps Dashboard.
+Deploys a complete AxonOps Server stack including Cassandra, a search backend, and the AxonOps Dashboard.
 
 **Components:**
-- Apache Cassandra 5.0 (metadata storage)
-- Elasticsearch 7.x (metrics storage)
+- Apache Cassandra 5.0 (metrics storage)
+- OpenSearch or Elasticsearch (search and configuration backend)
 - AxonOps Server (API and backend)
 - AxonOps Dashboard (web UI)
 - AxonOps Agent (monitoring the local Cassandra)
@@ -37,8 +37,25 @@ Deploys a complete AxonOps Server stack including Cassandra, Elasticsearch, and 
 **Key Variables:**
 - `axon_server_cql_hosts`: Cassandra connection endpoints
 - `axon_dash_listen_address`: Dashboard bind address
-- `axon_server_elastic_host`: Elasticsearch endpoint (legacy)
-- `axon_server_elastic_hosts`: Elasticsearch endpoints (server >= 2.0.4)
+- `axon_server_searchdb_hosts`: Search backend endpoints (OpenSearch or Elasticsearch, server >= 2.0.4)
+- `axon_server_searchdb_username` / `axon_server_searchdb_password`: Credentials (required for OpenSearch with Security plugin)
+- `axon_server_searchdb_tls_skip_verify`: Set to `true` when using auto-generated OpenSearch TLS certificates
+
+#### [opensearch.yml](opensearch.yml)
+Deploys an OpenSearch cluster for use as the AxonOps Server search backend. OpenSearch is the preferred
+search backend for on-premises deployments.
+
+**Features:**
+- Single-node development configuration (multi-node variant commented out)
+- Automatic TLS certificate generation via searchguard-tlstool
+- Security plugin with password hashing
+- System tuning (vm.max_map_count, THP, memory lock)
+
+**Key Variables:**
+- `opensearch_version`: OpenSearch version (default: `3.6.0`)
+- `opensearch_cluster_type`: `single-node` or `multi-node`
+- `opensearch_admin_password`: Admin password (use Ansible Vault)
+- `opensearch_domain_name`: Domain for certificate DNs
 
 ### Cassandra Deployments
 
@@ -185,7 +202,7 @@ The examples disable `firewalld` for demonstration purposes. In production:
    - Cassandra: 7000 (storage), 7001 (SSL), 9042 (CQL), 7199 (JMX)
    - AxonOps Server: 1888 (agent connections), 8080 (API)
    - AxonOps Dashboard: 3000 (web UI)
-   - Elasticsearch: 9200 (HTTP), 9300 (transport)
+   - OpenSearch / Elasticsearch: 9200 (HTTP), 9300 (transport, multi-node only)
 
 ### TLS Configuration
 

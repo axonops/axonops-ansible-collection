@@ -7,8 +7,8 @@
 
 # --- Heap sizes (reduced for CI) --------------------------------------------
 # Production defaults: opensearch_heap_size=1g, cassandra_max_heap_size=1G
-opensearch_heap_size: "256m"
-cassandra_max_heap_size: "256M"
+opensearch_heap_size: "512m"
+cassandra_max_heap_size: "512M"
 
 # --- OpenSearch container safety --------------------------------------------
 # mlockall is not available inside Docker containers without special kernel

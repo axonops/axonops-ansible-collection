@@ -349,11 +349,11 @@ Deploy OpenSearch alongside AxonOps Server and Dashboard in a single play. The r
 
     # AxonOps Server
     axon_server_license_key: "{{ vault_axonops_license_key }}"
-    axon_server_elastic_hosts:
+    axon_server_searchdb_hosts:
       - "https://127.0.0.1:9200"
-    axon_server_elastic_username: admin
-    axon_server_elastic_password: "{{ vault_opensearch_admin_password }}"
-    axon_server_elastic_tls_skip_verify: true
+    axon_server_searchdb_username: admin
+    axon_server_searchdb_password: "{{ vault_opensearch_admin_password }}"
+    axon_server_searchdb_tls_skip_verify: true
 
   roles:
     - axonops.axonops.opensearch
