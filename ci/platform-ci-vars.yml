@@ -1,0 +1,24 @@
+---
+# Variable overrides for the GitHub Actions platform integration test.
+#
+# GitHub Actions shared runners: 2 vCPU, 7 GB RAM.
+# All heap sizes are reduced from production defaults so the full stack fits
+# within the runner's memory budget.
+
+# --- Heap sizes (reduced for CI) --------------------------------------------
+# Production defaults: opensearch_heap_size=1g, cassandra_max_heap_size=1G
+opensearch_heap_size: "256m"
+cassandra_max_heap_size: "256M"
+
+# --- OpenSearch container safety --------------------------------------------
+# mlockall is not available inside Docker containers without special kernel
+# settings; disable to prevent bootstrap failures.
+opensearch_bootstrap_memory_lock: false
+
+# --- Service startup --------------------------------------------------------
+# Cassandra defaults to cassandra_start_on_install: false (intentional for
+# multi-node clusters). Override here so the server role can connect.
+cassandra_start_on_install: true
+
+# --- AxonOps agent ----------------------------------------------------------
+axon_agent_customer_name: "ci-test"
