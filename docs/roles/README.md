@@ -21,10 +21,22 @@ Installs and configures the AxonOps Dashboard web interface.
 
 **Use when**: You're deploying a self-hosted AxonOps Server and need the web UI (typically installed alongside the server).
 
-#### [alerts](alerts.md)
+#### [configurations](configurations.md)
 Configures alerts, integrations, and monitoring settings for AxonOps.
 
 **Use when**: You need to automate the configuration of alerts, Slack/PagerDuty integrations, or backup policies.
+
+### Kubernetes
+
+#### [k8ssandra](k8ssandra.md)
+Deploys and manages Cassandra 5.x clusters on Kubernetes using the K8ssandra operator with AxonOps container images.
+
+**Use when**: You want to run Cassandra on Kubernetes with AxonOps monitoring. Handles cert-manager, k8ssandra-operator, and cluster CR deployment.
+
+#### [strimzi](strimzi.md)
+Deploys and manages Apache Kafka clusters on Kubernetes using the Strimzi operator with AxonOps container images.
+
+**Use when**: You want to run Kafka on Kubernetes with AxonOps monitoring. Handles Strimzi operator, broker/controller node pools, and optional Kafka Connect.
 
 ### Infrastructure Components
 
@@ -57,7 +69,9 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **agent** | Monitor Cassandra clusters | Cassandra nodes |
 | **server** | Self-hosted AxonOps backend | Elastic, Cassandra (optional) |
 | **dash** | Web UI for AxonOps | Server |
-| **alerts** | Alert configuration | Server |
+| **configurations** | Alert configuration | Server |
+| **k8ssandra** | Cassandra on Kubernetes | Kubernetes cluster |
+| **strimzi** | Kafka on Kubernetes | Kubernetes cluster |
 | **cassandra** | Apache Cassandra installation | Agent, Java |
 | **elastic** | Elasticsearch installation | Server |
 | **java** | Java installation | Cassandra, Elastic |
@@ -72,10 +86,10 @@ Deploy AxonOps Agent on existing Cassandra nodes to monitor with AxonOps SaaS:
 ```yaml
 - hosts: cassandra
   roles:
-    - agent
+    - role: axonops.axonops.agent
 ```
 
-**Roles needed**: `agent`
+**Roles needed**: `axonops.axonops.agent`
 
 **See**: [agent.md](agent.md)
 
@@ -88,13 +102,13 @@ Deploy new Cassandra cluster with AxonOps monitoring:
 ```yaml
 - hosts: cassandra
   roles:
-    - preflight
-    - java
-    - agent
-    - cassandra
+    - role: axonops.axonops.preflight
+    - role: axonops.axonops.java
+    - role: axonops.axonops.agent
+    - role: axonops.axonops.cassandra
 ```
 
-**Roles needed**: `preflight`, `java`, `agent`, `cassandra`
+**Roles needed**: `axonops.axonops.preflight`, `axonops.axonops.java`, `axonops.axonops.agent`, `axonops.axonops.cassandra`
 
 **See**: [cassandra.md](cassandra.md), [agent.md](agent.md), [java.md](java.md), [preflight.md](preflight.md)
 
@@ -107,14 +121,14 @@ Deploy complete self-hosted AxonOps stack:
 ```yaml
 - hosts: axon-server
   roles:
-    - java
-    - elastic
-    - cassandra  # Optional: for metrics storage
-    - server
-    - dash
+    - role: axonops.axonops.java
+    - role: axonops.axonops.elastic
+    - role: axonops.axonops.cassandra  # Optional: for metrics storage
+    - role: axonops.axonops.server
+    - role: axonops.axonops.dash
 ```
 
-**Roles needed**: `java`, `elastic`, `server`, `dash`, optionally `cassandra`
+**Roles needed**: `axonops.axonops.java`, `axonops.axonops.elastic`, `axonops.axonops.server`, `axonops.axonops.dash`, optionally `axonops.axonops.cassandra`
 
 **See**: [server.md](server.md), [elastic.md](elastic.md), [dash.md](dash.md)
 
@@ -128,41 +142,90 @@ Deploy both AxonOps Server and monitored Cassandra cluster:
 ```yaml
 - hosts: axon-server
   roles:
-    - java
-    - elastic
-    - cassandra
-    - agent
-    - server
-    - dash
+    - role: axonops.axonops.java
+    - role: axonops.axonops.elastic
+    - role: axonops.axonops.cassandra
+    - role: axonops.axonops.agent
+    - role: axonops.axonops.server
+    - role: axonops.axonops.dash
 ```
 
 **Cassandra hosts**:
 ```yaml
 - hosts: cassandra
   roles:
-    - preflight
-    - java
-    - agent
-    - cassandra
+    - role: axonops.axonops.preflight
+    - role: axonops.axonops.java
+    - role: axonops.axonops.agent
+    - role: axonops.axonops.cassandra
 ```
 
 **Roles needed**: All roles
 
 ---
 
-### Pattern 5: Alert Configuration
+### Pattern 5: Cassandra on Kubernetes (K8ssandra)
+
+Deploy Cassandra 5.x on Kubernetes with AxonOps monitoring:
+
+```yaml
+- hosts: localhost
+  connection: local
+  vars:
+    k8ssandra_axon_agent_org: "MY-ORG"
+    k8ssandra_axon_agent_key: "MY-KEY"
+    k8ssandra_clusters:
+      - name: my-cluster
+        dc_size: 3
+        storage_size: 10Gi
+  roles:
+    - role: axonops.axonops.k8ssandra
+```
+
+**Roles needed**: `axonops.axonops.k8ssandra`
+
+**See**: [k8ssandra.md](k8ssandra.md)
+
+---
+
+### Pattern 6: Kafka on Kubernetes (Strimzi)
+
+Deploy Kafka on Kubernetes with AxonOps monitoring:
+
+```yaml
+- hosts: localhost
+  connection: local
+  vars:
+    strimzi_axon_agent_org: "MY-ORG"
+    strimzi_axon_agent_key: "MY-KEY"
+    strimzi_clusters:
+      - name: my-kafka
+        namespace: kafka
+        broker_replicas: 3
+        controller_replicas: 3
+  roles:
+    - role: axonops.axonops.strimzi
+```
+
+**Roles needed**: `axonops.axonops.strimzi`
+
+**See**: [strimzi.md](strimzi.md)
+
+---
+
+### Pattern 7: Alert Configuration
 
 Configure alerts and integrations for existing AxonOps deployment:
 
 ```yaml
 - hosts: localhost
   roles:
-    - alerts
+    - role: axonops.axonops.configurations
 ```
 
-**Roles needed**: `alerts`
+**Roles needed**: `axonops.axonops.configurations`
 
-**See**: [alerts.md](alerts.md)
+**See**: [configurations.md](configurations.md)
 
 ## Getting Started
 

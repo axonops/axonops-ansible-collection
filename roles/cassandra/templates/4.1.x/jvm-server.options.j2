@@ -57,6 +57,10 @@
 # before joining the ring.
 #-Dcassandra.ring_delay_ms=ms
 
+# Allows overriding the timeout after which an unresponsive bootstrapping node is considered failed
+# and is removed from gossip state and bootstrapTokens. (Default: cassandra.ring_delay * 2)
+#-Dcassandra.failed_bootstrap_timeout_ms=ms
+
 # Set the SSL port for encrypted communication. (Default: 7001)
 #-Dcassandra.ssl_storage_port=port
 
@@ -102,7 +106,7 @@
 -XX:+HeapDumpOnOutOfMemoryError
 
 # Per-thread stack size.
--Xss256k
+-Xss{{ cassandra_jvm_thread_stack_size | default('256k') }}
 
 # Make sure all memory is faulted and zeroed on startup.
 # This helps prevent soft faults in containers and makes
@@ -128,7 +132,7 @@
 
 ### Debug options
 
-# uncomment to enable flight recorder
+# uncomment to enable JVM Profiling with Java Flight Recorder (JFR)
 #-XX:+UnlockCommercialFeatures
 #-XX:+FlightRecorder
 
@@ -160,8 +164,10 @@
 # of it from being swapped out.
 #-Xms4G
 #-Xmx4G
+{% if cassandra_max_heap_size is defined %}
 -Xms{{ cassandra_max_heap_size }}
 -Xmx{{ cassandra_max_heap_size }}
+{% endif %}
 
 # Young generation size is automatically calculated by cassandra-env
 # based on this formula: min(100 * num_cores, 1/4 * heap size)

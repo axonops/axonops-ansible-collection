@@ -1,0 +1,40 @@
+---
+# Create a Kind cluster for strimzi molecule tests
+- name: Prepare - Create Kind cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Check if Kind is installed
+      ansible.builtin.command: kind version
+      register: _kind_version
+      changed_when: false
+      failed_when: false
+
+    - name: Fail if Kind is not installed
+      ansible.builtin.fail:
+        msg: >-
+          Kind is required for strimzi molecule tests.
+          Install it from https://kind.sigs.k8s.io/docs/user/quick-start/
+      when: _kind_version.rc != 0
+
+    - name: Check if molecule test cluster exists
+      ansible.builtin.command: kind get clusters
+      register: _kind_clusters
+      changed_when: false
+
+    - name: Create Kind cluster for testing
+      ansible.builtin.command: >
+        kind create cluster
+        --name molecule-strimzi
+        --wait 60s
+      when: "'molecule-strimzi' not in _kind_clusters.stdout_lines"
+      changed_when: true
+
+    - name: Set kubectl context
+      ansible.builtin.command: >
+        kubectl cluster-info --context kind-molecule-strimzi
+      changed_when: false
+
+# code: language=ansible

@@ -1,0 +1,102 @@
+---
+- name: Verify
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    # --- Verify strimzi-cluster-operator is running --------------------------
+    - name: Check strimzi-cluster-operator deployment
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: strimzi-cluster-operator
+        namespace: strimzi-system
+      register: _strimzi_op
+
+    - name: Verify strimzi-cluster-operator is ready
+      ansible.builtin.assert:
+        that:
+          - _strimzi_op.resources | length > 0
+          - _strimzi_op.resources[0].status.readyReplicas >= 1
+        fail_msg: "strimzi-cluster-operator is not ready"
+
+    # --- Verify Kafka CR was created -----------------------------------------
+    - name: Check Kafka CR exists
+      kubernetes.core.k8s_info:
+        api_version: kafka.strimzi.io/v1beta2
+        kind: Kafka
+        name: molecule-test
+        namespace: kafka
+      register: _kafka_cr
+
+    - name: Verify Kafka CR exists
+      ansible.builtin.assert:
+        that:
+          - _kafka_cr.resources | length == 1
+        fail_msg: "Kafka CR 'molecule-test' was not created"
+
+    - name: Verify Kafka CR spec values
+      ansible.builtin.assert:
+        that:
+          - _kafka_cr.resources[0].spec.kafka.version == "4.1.1"
+          - _kafka_cr.resources[0].metadata.annotations['strimzi.io/kraft'] == "enabled"
+          - _kafka_cr.resources[0].metadata.annotations['strimzi.io/node-pools'] == "enabled"
+        fail_msg: "Kafka CR spec does not match expected values"
+
+    # --- Verify KafkaNodePool CRs exist --------------------------------------
+    - name: Check controller node pool
+      kubernetes.core.k8s_info:
+        api_version: kafka.strimzi.io/v1beta2
+        kind: KafkaNodePool
+        name: molecule-test-controller
+        namespace: kafka
+      register: _controller_pool
+
+    - name: Verify controller node pool exists
+      ansible.builtin.assert:
+        that:
+          - _controller_pool.resources | length == 1
+          - _controller_pool.resources[0].spec.replicas == 1
+          - "'controller' in _controller_pool.resources[0].spec.roles"
+        fail_msg: "Controller KafkaNodePool was not created correctly"
+
+    - name: Check broker node pool
+      kubernetes.core.k8s_info:
+        api_version: kafka.strimzi.io/v1beta2
+        kind: KafkaNodePool
+        name: molecule-test-brokers
+        namespace: kafka
+      register: _broker_pool
+
+    - name: Verify broker node pool exists
+      ansible.builtin.assert:
+        that:
+          - _broker_pool.resources | length == 1
+          - _broker_pool.resources[0].spec.replicas == 1
+          - "'broker' in _broker_pool.resources[0].spec.roles"
+        fail_msg: "Broker KafkaNodePool was not created correctly"
+
+    # --- Verify AxonOps env vars in node pools --------------------------------
+    - name: Verify AxonOps env vars in broker pool
+      vars:
+        _env: "{{ _broker_pool.resources[0].spec.template.kafkaContainer.env }}"
+      ansible.builtin.assert:
+        that:
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_ORG') | list | length == 1
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_KEY') | list | length == 1
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_SERVER_HOST') | list | length == 1
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_SERVER_PORT') | list | length == 1
+          - _env | selectattr('name', 'equalto', 'AXON_AGENT_TLS_MODE') | list | length == 1
+          - _env | selectattr('name', 'equalto', 'KAFKA_NODE_TYPE') | map(attribute='value') | first == "kraft-broker"
+        fail_msg: "AxonOps environment variables are missing from broker pool"
+
+    - name: Verify AxonOps env vars in controller pool
+      vars:
+        _env: "{{ _controller_pool.resources[0].spec.template.kafkaContainer.env }}"
+      ansible.builtin.assert:
+        that:
+          - _env | selectattr('name', 'equalto', 'KAFKA_NODE_TYPE') | map(attribute='value') | first == "kraft-controller"
+        fail_msg: "KAFKA_NODE_TYPE not set correctly in controller pool"
+
+# code: language=ansible

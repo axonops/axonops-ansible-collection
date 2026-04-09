@@ -1,0 +1,13 @@
+---
+- name: Cleanup - Delete Kind cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Delete Kind cluster
+      ansible.builtin.command: kind delete cluster --name molecule-k8ssandra
+      changed_when: true
+      failed_when: false
+
+# code: language=ansible

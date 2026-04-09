@@ -6,6 +6,7 @@ After=network.target
 [Service]
 User=cassandra
 Group=cassandra
+RuntimeDirectory=cassandra
 Environment=CASSANDRA_LOG_DIR={{ cassandra_log_dir | default('/var/log/cassandra') }}
 {% if cassandra_home_dir is defined %}
 ExecStart={{ cassandra_home_dir }}/bin/cassandra -f -p /run/cassandra/cassandra.pid

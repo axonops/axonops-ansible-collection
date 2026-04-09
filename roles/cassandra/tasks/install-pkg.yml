@@ -15,7 +15,7 @@
   block:
     - name: Set up Cassandra apt repos
       ansible.builtin.copy:
-        dest: /etc/apt/sources.list.d/cassandra.sources.list
+        dest: /etc/apt/sources.list.d/cassandra.list
         content: |
           deb [signed-by=/etc/apt/keyrings/apache-cassandra.asc] https://debian.cassandra.apache.org 41x main
           deb [signed-by=/etc/apt/keyrings/apache-cassandra.asc] https://debian.cassandra.apache.org 50x main
@@ -31,6 +31,7 @@
       ansible.builtin.get_url:
         url: https://downloads.apache.org/cassandra/KEYS
         dest: /etc/apt/keyrings/apache-cassandra.asc
+        mode: "0644"
 
     - name: Set pkg name
       ansible.builtin.set_fact:
@@ -39,7 +40,12 @@
 - name: Set up repos Redhat
   when: ansible_os_family == 'RedHat'
   block:
-    - name: Set up Cassandra apt repos
+    - name: Import Apache Cassandra GPG key
+      ansible.builtin.rpm_key:
+        key: https://downloads.apache.org/cassandra/KEYS
+        state: present
+
+    - name: Set up Cassandra yum repos
       ansible.builtin.copy:
         dest: /etc/yum.repos.d/cassandra.repo
         mode: "0644"
@@ -47,16 +53,16 @@
         group: root
         content: |
           [cassandra41]
-          name=Apache Cassandra
-          baseurl={{ cassandra_redhat_repository_url | default('https://redhat.cassandra.apache.org/41x/') }}
-          gpgcheck=0
-          repo_gpgcheck=0
+          name=Apache Cassandra 4.1
+          baseurl={{ cassandra_redhat_repository_url_41x | default('https://redhat.cassandra.apache.org/41x/') }}
+          gpgcheck=1
+          repo_gpgcheck=1
 
           [cassandra50]
-          name=Apache Cassandra
-          baseurl={{ cassandra_redhat_repository_url | default('https://redhat.cassandra.apache.org/50x/') }}
-          gpgcheck=0
-          repo_gpgcheck=0
+          name=Apache Cassandra 5.0
+          baseurl={{ cassandra_redhat_repository_url_50x | default('https://redhat.cassandra.apache.org/50x/') }}
+          gpgcheck=1
+          repo_gpgcheck=1
 
     - name: Set pkg name
       ansible.builtin.set_fact:

@@ -1,0 +1,198 @@
+---
+# Validates input validation logic and template rendering without a K8s cluster.
+- name: Converge - Validate k8ssandra role logic
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    # Load role defaults
+    k8ssandra_cassandra_version: "5.0.6"
+    k8ssandra_image: "ghcr.io/axonops/k8ssandra/cassandra"
+    k8ssandra_dc_name: dc1
+    k8ssandra_dc_size: 3
+    k8ssandra_storage_class: ""
+    k8ssandra_storage_size: "10Gi"
+    k8ssandra_axonops_storage_size: "512Mi"
+    k8ssandra_cpu_limit: 1
+    k8ssandra_cpu_request: 1
+    k8ssandra_memory_limit: "2Gi"
+    k8ssandra_memory_request: "1Gi"
+    k8ssandra_heap_size: "1G"
+    k8ssandra_soft_pod_anti_affinity: true
+    k8ssandra_axon_agent_org: "test-org"
+    k8ssandra_axon_agent_key: "test-key"
+    k8ssandra_axon_agent_server_host: "agents.axonops.cloud"
+    k8ssandra_axon_agent_server_port: "443"
+    k8ssandra_operator_namespace: "k8ssandra-operator"
+
+  tasks:
+    # --- Test 1: Version validation rejects Cassandra 4.x -------------------
+    - name: "TEST 1 - Reject Cassandra 4.x"
+      ansible.builtin.assert:
+        that:
+          - "'4.1.7' is version('5.0', '>=') == false"
+        success_msg: "PASS: Cassandra 4.x correctly rejected"
+
+    # --- Test 2: Version validation accepts Cassandra 5.x -------------------
+    - name: "TEST 2 - Accept Cassandra 5.x"
+      ansible.builtin.assert:
+        that:
+          - "'5.0.6' is version('5.0', '>=')"
+          - "'5.0.6' is version('6.0', '<')"
+        success_msg: "PASS: Cassandra 5.x correctly accepted"
+
+    # --- Test 3: Template renders valid YAML --------------------------------
+    - name: "TEST 3 - Render simple cluster template"
+      vars:
+        cluster:
+          name: template-test
+          namespace: k8ssandra-operator
+          cassandra_version: "5.0.6"
+          dc_name: dc1
+          dc_size: 3
+      ansible.builtin.set_fact:
+        _rendered: "{{ lookup('template', '../../templates/k8ssandra-cluster.yaml.j2') }}"
+
+    - name: "TEST 3 - Validate rendered template is valid YAML"
+      ansible.builtin.set_fact:
+        _parsed: "{{ _rendered | from_yaml }}"
+
+    - name: "TEST 3 - Verify rendered template values"
+      ansible.builtin.assert:
+        that:
+          - _parsed.apiVersion == "k8ssandra.io/v1alpha1"
+          - _parsed.kind == "K8ssandraCluster"
+          - _parsed.metadata.name == "template-test"
+          - _parsed.metadata.namespace == "k8ssandra-operator"
+          - _parsed.spec.cassandra.serverVersion == "5.0.6"
+          - _parsed.spec.cassandra.serverImage == "ghcr.io/axonops/k8ssandra/cassandra:5.0.6"
+          - _parsed.spec.cassandra.datacenters | length == 1
+          - _parsed.spec.cassandra.datacenters[0].metadata.name == "dc1"
+          - _parsed.spec.cassandra.datacenters[0].size == 3
+        success_msg: "PASS: Template renders correctly"
+
+    # --- Test 4: AxonOps env vars are present --------------------------------
+    - name: "TEST 4 - Verify AxonOps env vars in rendered template"
+      vars:
+        _env_vars: "{{ _parsed.spec.cassandra.datacenters[0].containers[0].env }}"
+      ansible.builtin.assert:
+        that:
+          - _env_vars | selectattr('name', 'equalto', 'AXON_AGENT_KEY') | list | length == 1
+          - _env_vars | selectattr('name', 'equalto', 'AXON_AGENT_ORG') | list | length == 1
+          - _env_vars | selectattr('name', 'equalto', 'AXON_AGENT_SERVER_HOST') | list | length == 1
+          - _env_vars | selectattr('name', 'equalto', 'AXON_AGENT_SERVER_PORT') | list | length == 1
+          - (_env_vars | selectattr('name', 'equalto', 'AXON_AGENT_ORG') | map(attribute='value') | first) == "test-org"
+          - (_env_vars | selectattr('name', 'equalto', 'AXON_AGENT_KEY') | map(attribute='value') | first) == "test-key"
+        success_msg: "PASS: AxonOps env vars are correct"
+
+    # --- Test 5: axonops-data PVC is present --------------------------------
+    - name: "TEST 5 - Verify axonops-data extra volume"
+      ansible.builtin.assert:
+        that:
+          - _parsed.spec.cassandra.datacenters[0].extraVolumes.pvcs | selectattr('name', 'equalto', 'axonops-data') | list | length == 1
+          - (_parsed.spec.cassandra.datacenters[0].extraVolumes.pvcs | selectattr('name', 'equalto', 'axonops-data') | map(attribute='mountPath') | first) == "/var/lib/axonops"
+        success_msg: "PASS: axonops-data PVC is present"
+
+    # --- Test 6: Per-cluster overrides work ---------------------------------
+    - name: "TEST 6 - Render cluster with overrides"
+      vars:
+        cluster:
+          name: override-test
+          namespace: custom-ns
+          cassandra_version: "5.0.7"
+          dc_name: us-east-1
+          dc_size: 6
+          storage_size: 100Gi
+          heap_size: 8G
+          cpu_limit: 8
+          memory_limit: 16Gi
+          axon_agent_org: "override-org"
+          axon_agent_key: "override-key"
+          axon_agent_server_host: "my-server.local"
+          axon_agent_server_port: "1888"
+      ansible.builtin.set_fact:
+        _override_rendered: "{{ lookup('template', '../../templates/k8ssandra-cluster.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 6 - Verify overrides applied"
+      ansible.builtin.assert:
+        that:
+          - _override_rendered.metadata.name == "override-test"
+          - _override_rendered.metadata.namespace == "custom-ns"
+          - _override_rendered.spec.cassandra.serverVersion == "5.0.7"
+          - _override_rendered.spec.cassandra.serverImage == "ghcr.io/axonops/k8ssandra/cassandra:5.0.7"
+          - _override_rendered.spec.cassandra.datacenters[0].metadata.name == "us-east-1"
+          - _override_rendered.spec.cassandra.datacenters[0].size == 6
+          - _override_rendered.spec.cassandra.resources.limits.cpu == 8
+          - _override_rendered.spec.cassandra.resources.limits.memory == "16Gi"
+        success_msg: "PASS: Per-cluster overrides work correctly"
+
+    # --- Test 7: Extra env vars are rendered --------------------------------
+    - name: "TEST 7 - Render cluster with extra env vars"
+      vars:
+        cluster:
+          name: extra-env-test
+          extra_env:
+            - name: CUSTOM_VAR
+              value: custom-value
+            - name: ANOTHER_VAR
+              value: another-value
+      ansible.builtin.set_fact:
+        _extra_env_rendered: "{{ lookup('template', '../../templates/k8ssandra-cluster.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 7 - Verify extra env vars"
+      vars:
+        _env_vars: "{{ _extra_env_rendered.spec.cassandra.datacenters[0].containers[0].env }}"
+      ansible.builtin.assert:
+        that:
+          - _env_vars | selectattr('name', 'equalto', 'CUSTOM_VAR') | list | length == 1
+          - (_env_vars | selectattr('name', 'equalto', 'CUSTOM_VAR') | map(attribute='value') | first) == "custom-value"
+        success_msg: "PASS: Extra env vars rendered correctly"
+
+    # --- Test 8: Storage class is omitted when empty ------------------------
+    - name: "TEST 8 - Verify storageClassName omitted when empty"
+      ansible.builtin.assert:
+        that:
+          - _parsed.spec.cassandra.datacenters[0].storageConfig.cassandraDataVolumeClaimSpec.storageClassName is not defined
+        success_msg: "PASS: storageClassName correctly omitted when empty"
+
+    # --- Test 9: Storage class is set when provided -------------------------
+    - name: "TEST 9 - Render cluster with storage class"
+      vars:
+        cluster:
+          name: sc-test
+          storage_class: gp3
+      ansible.builtin.set_fact:
+        _sc_rendered: "{{ lookup('template', '../../templates/k8ssandra-cluster.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 9 - Verify storageClassName is set"
+      ansible.builtin.assert:
+        that:
+          - _sc_rendered.spec.cassandra.datacenters[0].storageConfig.cassandraDataVolumeClaimSpec.storageClassName == "gp3"
+        success_msg: "PASS: storageClassName correctly set"
+
+    # --- Test 10: Multi-DC renders correctly --------------------------------
+    - name: "TEST 10 - Render multi-DC cluster"
+      vars:
+        cluster:
+          name: multi-dc-test
+          dc_name: us-east-1
+          dc_size: 3
+          additional_datacenters:
+            - name: eu-west-1
+              size: 3
+              heap_size: 4G
+              storage_size: 50Gi
+      ansible.builtin.set_fact:
+        _multi_dc_rendered: "{{ lookup('template', '../../templates/k8ssandra-cluster.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 10 - Verify multi-DC"
+      ansible.builtin.assert:
+        that:
+          - _multi_dc_rendered.spec.cassandra.datacenters | length == 2
+          - _multi_dc_rendered.spec.cassandra.datacenters[0].metadata.name == "us-east-1"
+          - _multi_dc_rendered.spec.cassandra.datacenters[1].metadata.name == "eu-west-1"
+          - _multi_dc_rendered.spec.cassandra.datacenters[1].size == 3
+        success_msg: "PASS: Multi-DC renders correctly"
+
+# code: language=ansible

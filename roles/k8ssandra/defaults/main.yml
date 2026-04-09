@@ -1,0 +1,93 @@
+---
+# ============================================================================
+# K8ssandra Operator Role - Default Variables
+# ============================================================================
+
+# --- Helm Prerequisites ---------------------------------------------------
+
+# Install cert-manager (required by k8ssandra-operator)
+k8ssandra_install_cert_manager: true
+k8ssandra_cert_manager_version: "v1.20.1"
+k8ssandra_cert_manager_namespace: cert-manager
+k8ssandra_cert_manager_chart: "oci://quay.io/jetstack/charts/cert-manager"
+
+# Install k8ssandra-operator
+k8ssandra_install_operator: true
+k8ssandra_operator_version: "v1.29.0"
+k8ssandra_operator_namespace: k8ssandra-operator
+k8ssandra_operator_helm_repo: "https://helm.k8ssandra.io/stable"
+k8ssandra_operator_helm_repo_name: k8ssandra
+k8ssandra_operator_cluster_scoped: true
+
+# Wait for operator to be ready before deploying clusters
+k8ssandra_wait_for_operator: true
+k8ssandra_operator_wait_timeout: 300
+
+# --- Cassandra Clusters ----------------------------------------------------
+# Define one or more clusters. Each entry creates a K8ssandraCluster CR.
+#
+# Option A: Simple mode - provide basic settings, the role generates the CR.
+# Option B: Custom mode - provide full YAML spec via 'custom_spec'.
+#
+# Example (simple mode):
+#   k8ssandra_clusters:
+#     - name: my-cluster
+#       namespace: k8ssandra-operator
+#       cassandra_version: "5.0.6"
+#       dc_name: dc1
+#       dc_size: 3
+#       storage_size: 10Gi
+#       heap_size: 1G
+#       axon_agent_org: "MY-ORG"
+#       axon_agent_key: "MY-KEY"
+#
+# Example (custom mode):
+#   k8ssandra_clusters:
+#     - name: my-cluster
+#       namespace: k8ssandra-operator
+#       custom_spec: "{{ lookup('file', 'my-cluster.yaml') }}"
+#
+k8ssandra_clusters: []
+
+# --- Cluster Defaults (applied when not set per-cluster) --------------------
+
+# Cassandra version - only 5.x is supported
+k8ssandra_cassandra_version: "5.0.6"
+
+# AxonOps container image
+k8ssandra_image: "ghcr.io/axonops/k8ssandra/cassandra"
+# Image tag defaults to the cassandra_version if not set per-cluster
+k8ssandra_image_tag: "5.0.6"
+
+# Datacenter defaults
+k8ssandra_dc_name: dc1
+k8ssandra_dc_size: 3
+
+# Storage
+k8ssandra_storage_class: ""
+k8ssandra_storage_size: "10Gi"
+
+# AxonOps data volume (extra PVC for /var/lib/axonops)
+k8ssandra_axonops_storage_size: "512Mi"
+
+# Resources
+k8ssandra_cpu_limit: 1
+k8ssandra_cpu_request: 1
+k8ssandra_memory_limit: "2Gi"
+k8ssandra_memory_request: "1Gi"
+k8ssandra_heap_size: "1G"
+
+# Pod scheduling
+k8ssandra_soft_pod_anti_affinity: true
+
+# --- AxonOps Agent Configuration -------------------------------------------
+
+# AxonOps organisation and API key (required)
+k8ssandra_axon_agent_org: ""
+k8ssandra_axon_agent_key: ""
+
+# AxonOps server connection
+# Use agents.axonops.cloud for SaaS, or your on-prem server hostname
+k8ssandra_axon_agent_server_host: "agents.axonops.cloud"
+# Port 443 for SaaS, 1888 for on-prem with default configuration
+k8ssandra_axon_agent_server_port: "{% if k8ssandra_axon_agent_server_host == 'agents.axonops.cloud' %}443{% else %}1888{% endif %}"

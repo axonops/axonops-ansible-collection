@@ -1,0 +1,109 @@
+---
+# ============================================================================
+# Strimzi Kafka Role - Default Variables
+# ============================================================================
+
+# --- Strimzi Operator -------------------------------------------------------
+
+# Install the Strimzi operator via Helm
+strimzi_install_operator: true
+strimzi_operator_version: "0.51.0"
+strimzi_operator_namespace: strimzi-system
+strimzi_operator_helm_repo: "https://strimzi.io/charts/"
+strimzi_operator_helm_repo_name: strimzi
+# Extra Helm values for the operator chart (dict)
+# strimzi_operator_helm_values: {}
+
+# Wait for operator to be ready before deploying clusters
+strimzi_wait_for_operator: true
+strimzi_operator_wait_timeout: 300
+
+# --- Kafka Clusters ----------------------------------------------------------
+# Define one or more Kafka clusters. Each entry creates a Kafka CR plus
+# KafkaNodePool CRs for brokers and controllers.
+#
+# Option A: Simple mode - provide basic settings, the role generates the CRs.
+# Option B: Custom mode - provide full YAML specs via 'custom_specs'.
+#
+# Example (simple mode):
+#   strimzi_clusters:
+#     - name: my-kafka
+#       namespace: kafka
+#       kafka_version: "4.1.1"
+#       broker_replicas: 3
+#       controller_replicas: 3
+#       broker_storage_size: 10Gi
+#       axon_agent_org: "MY-ORG"
+#       axon_agent_key: "MY-KEY"
+#
+# Example (custom mode):
+#   strimzi_clusters:
+#     - name: my-kafka
+#       custom_specs:
+#         kafka: "{{ lookup('file', 'kafka.yaml') | from_yaml }}"
+#         broker_pool: "{{ lookup('file', 'brokers.yaml') | from_yaml }}"
+#         controller_pool: "{{ lookup('file', 'controllers.yaml') | from_yaml }}"
+#
+strimzi_clusters: []
+
+# --- Cluster Defaults (applied when not set per-cluster) --------------------
+
+# Kafka version
+strimzi_kafka_version: "4.1.1"
+
+# Strimzi version (used in image tag)
+strimzi_strimzi_version: "0.50.0"
+
+# AxonOps container image
+strimzi_image: "ghcr.io/axonops/strimzi/kafka"
+# Image tag format: <strimzi_version>-<kafka_version>-<axon_agent_version>-<build>
+strimzi_image_tag: "0.50.0-4.1.1-2.0.19-0.1.12"
+
+# Broker pool defaults
+strimzi_broker_replicas: 3
+strimzi_broker_storage_size: "10Gi"
+strimzi_broker_storage_class: ""
+
+# Controller pool defaults
+strimzi_controller_replicas: 3
+strimzi_controller_storage_size: "10Gi"
+strimzi_controller_storage_class: ""
+
+# Kafka config defaults
+strimzi_default_replication_factor: 3
+strimzi_min_insync_replicas: 2
+strimzi_offsets_topic_replication_factor: 3
+strimzi_transaction_state_log_replication_factor: 3
+strimzi_transaction_state_log_min_isr: 2
+
+# Rack awareness
+strimzi_rack_topology_key: "topology.kubernetes.io/zone"
+
+# Kafka listeners
+strimzi_listeners:
+  - name: plain
+    port: 9092
+    type: internal
+    tls: false
+  - name: tls
+    port: 9093
+    type: internal
+    tls: true
+
+# Kafka Connect (optional, disabled by default)
+strimzi_kafka_connect_enabled: false
+strimzi_kafka_connect_replicas: 2
+
+# --- AxonOps Agent Configuration -------------------------------------------
+
+# AxonOps organisation and API key (required)
+strimzi_axon_agent_org: ""
+strimzi_axon_agent_key: ""
+
+# AxonOps server connection
+strimzi_axon_agent_server_host: "agents.axonops.cloud"
+strimzi_axon_agent_server_port: "{% if strimzi_axon_agent_server_host == 'agents.axonops.cloud' %}443{% else %}1888{% endif %}"
+
+# TLS mode for AxonOps agent communication
+# "TLS" for SaaS (agents.axonops.cloud), "disabled" for on-prem without TLS
+strimzi_axon_agent_tls_mode: "{% if strimzi_axon_agent_server_host == 'agents.axonops.cloud' %}TLS{% else %}disabled{% endif %}"

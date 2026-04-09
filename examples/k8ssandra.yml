@@ -1,0 +1,85 @@
+---
+# ============================================================================
+# K8ssandra with AxonOps - Example Playbook
+# ============================================================================
+#
+# This playbook installs cert-manager, the k8ssandra-operator, and deploys
+# one or more Cassandra 5.x clusters using AxonOps containers.
+#
+# Prerequisites:
+#   - A running Kubernetes cluster with kubectl configured
+#   - Ansible kubernetes.core collection: ansible-galaxy collection install kubernetes.core
+#   - Python kubernetes and helm packages: pip install kubernetes
+#
+# Usage:
+#   ansible-playbook examples/k8ssandra.yml
+#
+# ============================================================================
+
+- name: Deploy K8ssandra Cassandra clusters with AxonOps
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    # --- Simple mode: one cluster with basic settings -----------------------
+    k8ssandra_clusters:
+      - name: axonops-k8ssandra-5
+        namespace: k8ssandra-operator
+        cassandra_version: "5.0.6"
+        dc_name: dc1
+        dc_size: 3
+        storage_size: 10Gi
+        heap_size: 1G
+        cpu_limit: 2
+        cpu_request: 1
+        memory_limit: 4Gi
+        memory_request: 2Gi
+        # storage_class: ""  # Leave empty for cluster default
+
+    # --- AxonOps Agent Configuration ----------------------------------------
+    # Set these to your AxonOps organisation and API key.
+    # For SaaS, use agents.axonops.cloud:443
+    # For on-prem, use your server hostname:1888
+    k8ssandra_axon_agent_org: "YOUR-ORG"
+    k8ssandra_axon_agent_key: "YOUR-KEY"
+    k8ssandra_axon_agent_server_host: agents.axonops.cloud
+    # k8ssandra_axon_agent_server_port is auto-detected from the host
+
+  roles:
+    - axonops.axonops.k8ssandra
+
+
+# ============================================================================
+# Alternative: Custom spec mode
+# ============================================================================
+# If you need full control over the K8ssandraCluster CR, use custom_spec:
+#
+#   vars:
+#     k8ssandra_clusters:
+#       - name: my-custom-cluster
+#         namespace: k8ssandra-operator
+#         custom_spec: "{{ lookup('file', 'my-cluster.yaml') | from_yaml }}"
+#
+# ============================================================================
+# Multi-cluster example
+# ============================================================================
+# Deploy multiple clusters in a single playbook run:
+#
+#   vars:
+#     k8ssandra_axon_agent_org: "MY-ORG"
+#     k8ssandra_axon_agent_key: "MY-KEY"
+#     k8ssandra_clusters:
+#       - name: cluster-prod
+#         dc_name: us-east-1
+#         dc_size: 6
+#         storage_size: 100Gi
+#         heap_size: 8G
+#         cpu_limit: 8
+#         memory_limit: 16Gi
+#
+#       - name: cluster-staging
+#         dc_name: us-east-1
+#         dc_size: 3
+#         storage_size: 20Gi
+#         heap_size: 2G
