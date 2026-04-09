@@ -14,6 +14,8 @@ cassandra_max_heap_size: "512M"
 # mlockall is not available inside Docker containers without special kernel
 # settings; disable to prevent bootstrap failures.
 opensearch_bootstrap_memory_lock: false
+# Docker bind-mounts /etc/hosts; Ansible's atomic rename fails on bind mounts.
+opensearch_populate_etc_hosts: false
 
 # --- Java -------------------------------------------------------------------
 # openjdk-17-jre-headless's ca-certificates-java postinstall script fails in
