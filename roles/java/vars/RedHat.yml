@@ -8,7 +8,9 @@ _zulu_major_version: >-
     11
   {%- endif -%}
 
-# RedHat
+# RHEL/Rocky Linux 10 and later do not ship OpenJDK 11 or 17 in their base repositories.
+# Zulu JDK is activated automatically on EL 10+ (see tasks/main.yml).
+# On EL 8/9, Zulu is only used when java_use_zulu: true is set explicitly.
 _zulu_jdk:
   yum_repo: "https://cdn.azul.com/zulu/bin/zulu-repo-1.0.0-1.noarch.rpm"
   package_names:

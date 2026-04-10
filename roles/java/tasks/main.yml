@@ -28,7 +28,7 @@
 - name: Debian Zulu Java Install
   when:
     - _zulu_jdk is defined
-    - java_use_zulu | default(false)
+    - java_use_zulu | default(false) or (ansible_os_family == 'Debian' and ansible_distribution_major_version is version('13', '>='))  # Debian 13+ does not ship OpenJDK 17 in base repos
     - ansible_os_family == 'Debian'
   block:
     - name: "Debian - Install apt packages"
