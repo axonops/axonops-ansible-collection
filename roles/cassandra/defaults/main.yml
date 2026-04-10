@@ -304,6 +304,10 @@ cassandra_transparent_data_encryption_options:
           store_type: "JCEKS"
           key_password: "cassandra"
 
+# jemalloc
+cassandra_jemalloc_enabled: true
+# cassandra_libjemalloc_path: ""  # auto-detected when cassandra_jemalloc_enabled is true
+
 # JVM
 cassandra_jvm_use_shenandoah: false
 cassandra_max_queued_native_transport_requests: 1024
