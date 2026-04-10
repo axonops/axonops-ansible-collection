@@ -8,7 +8,9 @@ _zulu_major_version: >-
     11
   {%- endif -%}
 
-# Debian Bookworm JDK
+# Debian 13 (Trixie) and later do not ship OpenJDK 17 in their base repositories.
+# Zulu JDK is activated automatically on Debian 13+ (see tasks/main.yml).
+# On Debian 12 and earlier, Zulu is only used when java_use_zulu: true is set explicitly.
 _zulu_jdk:
   apt_repo:
     repo_line: "deb https://repos.azul.com/zulu/deb stable main"
