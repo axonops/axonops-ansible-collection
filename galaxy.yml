@@ -8,7 +8,7 @@ authors:
 description: Ansible collection to install and manage AxonOps components
 license:
   - Apache-2.0
-tags: [observability, monitoring, cassandra, kafka, axonops]
+tags: [observability, monitoring, cassandra, kafka, axonops, elasticsearch, opensearch]
 repository: https://github.com/axonops/axonops-ansible-collection
 issues: https://github.com/axonops/axonops-ansible-collection/issues
 documentation: https://axonops.com/docs
