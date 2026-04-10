@@ -6,18 +6,19 @@ axon_server_version: latest
 # If you're setting up on-premises AxonOps you will need a License Key
 #axon_server_license_key: xxx
 
-axon_server_elastic_hosts:
+axon_server_searchdb_hosts:
   - http://127.0.0.1:9200
-axon_server_elastic_shards: 1
-axon_server_elastic_replicas: 0
-axon_server_elastic_tls_skip_verify: false
-# axon_server_elastic_username: elastic
-# axon_server_elastic_password: elastic
+axon_server_searchdb_shards: 1
+axon_server_searchdb_replicas: 0
+axon_server_searchdb_tls_skip_verify: false
+# axon_server_searchdb_username: elastic
+# axon_server_searchdb_password: elastic
 
 
-# Override listen address and port for the axon-server API
+# Override listen address and ports for the axon-server
 axon_server_listen_address: 0.0.0.0
-axon_server_listen_port: 8080
+axon_server_listen_port: 8080     # API port (axon-server <> axon-dash)
+axon_server_agents_port: 1888     # Agent port (axon-server <> axon-agent)
 
 axon_server_ldap_enabled: false
 axon_server_ldap_setting:

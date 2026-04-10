@@ -45,15 +45,15 @@ Installs and configures Apache Cassandra (versions 3.11, 4.x, and 5.x).
 
 **Use when**: You need to deploy new Cassandra nodes or manage existing installations.
 
+#### [opensearch](opensearch.md)
+Installs and configures OpenSearch as the search backend for AxonOps Server.
+
+**Use when**: Deploying a self-hosted AxonOps Server. OpenSearch is the preferred search backend for on-premises deployments. It provides full TLS security, multi-node clustering, and active open-source maintenance.
+
 #### [elastic](elastic.md)
 Installs and configures Elasticsearch for AxonOps Server configuration storage.
 
-**Use when**: Deploying a self-hosted AxonOps Server (Elasticsearch stores AxonOps configuration data).
-
-#### [opensearch](opensearch.md)
-Installs and configures OpenSearch as the backend store for AxonOps Server (replaces Elasticsearch).
-
-**Use when**: Deploying a self-hosted AxonOps Server with OpenSearch instead of Elasticsearch.
+**Use when**: You have an existing Elasticsearch deployment or are migrating from an older AxonOps installation. For new on-premises deployments, prefer `opensearch`.
 
 #### [java](java.md)
 Installs Java (OpenJDK or Azul Zulu) on target systems.
@@ -72,14 +72,14 @@ Performs pre-installation checks to ensure systems meet requirements.
 | Role | Purpose | Typically Used With |
 |------|---------|-------------------|
 | **agent** | Monitor Cassandra clusters | Cassandra nodes |
-| **server** | Self-hosted AxonOps backend | Elastic, Cassandra (optional) |
+| **server** | Self-hosted AxonOps backend | OpenSearch (preferred) or Elastic, Cassandra (optional) |
 | **dash** | Web UI for AxonOps | Server |
 | **configurations** | Alert configuration | Server |
 | **k8ssandra** | Cassandra on Kubernetes | Kubernetes cluster |
 | **strimzi** | Kafka on Kubernetes | Kubernetes cluster |
 | **cassandra** | Apache Cassandra installation | Agent, Java |
-| **elastic** | Elasticsearch installation | Server |
-| **opensearch** | OpenSearch installation | Server |
+| **opensearch** | OpenSearch installation (preferred for on-premises) | Server |
+| **elastic** | Elasticsearch installation (legacy / existing deployments) | Server |
 | **java** | Java installation | Cassandra, Elastic |
 | **preflight** | System validation | Before any installation |
 
@@ -120,9 +120,39 @@ Deploy new Cassandra cluster with AxonOps monitoring:
 
 ---
 
-### Pattern 3: Self-Hosted AxonOps Server
+### Pattern 3: Self-Hosted AxonOps Server with OpenSearch (recommended)
 
-Deploy complete self-hosted AxonOps stack:
+Deploy a complete self-hosted AxonOps stack using OpenSearch as the search backend.
+OpenSearch is preferred for new on-premises deployments:
+
+```yaml
+- hosts: axon-server
+  vars:
+    opensearch_cluster_name: axonops
+    opensearch_cluster_type: single-node
+    opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+    opensearch_domain_name: example.com
+    axon_server_searchdb_hosts:
+      - "https://127.0.0.1:9200"
+    axon_server_searchdb_username: admin
+    axon_server_searchdb_password: "{{ vault_opensearch_admin_password }}"
+    axon_server_searchdb_tls_skip_verify: true
+  roles:
+    - role: axonops.axonops.opensearch
+    - role: axonops.axonops.cassandra  # Optional: for metrics storage
+    - role: axonops.axonops.server
+    - role: axonops.axonops.dash
+```
+
+**Roles needed**: `axonops.axonops.opensearch`, `axonops.axonops.server`, `axonops.axonops.dash`, optionally `axonops.axonops.cassandra`
+
+**See**: [server.md](server.md), [opensearch.md](opensearch.md), [dash.md](dash.md)
+
+---
+
+### Pattern 3b: Self-Hosted AxonOps Server with Elasticsearch (legacy)
+
+For existing deployments using Elasticsearch:
 
 ```yaml
 - hosts: axon-server
@@ -142,14 +172,23 @@ Deploy complete self-hosted AxonOps stack:
 
 ### Pattern 4: Complete Infrastructure
 
-Deploy both AxonOps Server and monitored Cassandra cluster:
+Deploy both AxonOps Server and a monitored Cassandra cluster. OpenSearch is the preferred search backend for on-premises deployments:
 
-**Server host**:
+**Server host (with OpenSearch)**:
 ```yaml
 - hosts: axon-server
+  vars:
+    opensearch_cluster_name: axonops
+    opensearch_cluster_type: single-node
+    opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+    opensearch_domain_name: example.com
+    axon_server_searchdb_hosts:
+      - "https://127.0.0.1:9200"
+    axon_server_searchdb_username: admin
+    axon_server_searchdb_password: "{{ vault_opensearch_admin_password }}"
+    axon_server_searchdb_tls_skip_verify: true
   roles:
-    - role: axonops.axonops.java
-    - role: axonops.axonops.elastic
+    - role: axonops.axonops.opensearch
     - role: axonops.axonops.cassandra
     - role: axonops.axonops.agent
     - role: axonops.axonops.server
@@ -166,7 +205,9 @@ Deploy both AxonOps Server and monitored Cassandra cluster:
     - role: axonops.axonops.cassandra
 ```
 
-**Roles needed**: All roles
+**Roles needed**: `axonops.axonops.opensearch`, `axonops.axonops.cassandra`, `axonops.axonops.agent`, `axonops.axonops.server`, `axonops.axonops.dash` (server host); `axonops.axonops.preflight`, `axonops.axonops.java`, `axonops.axonops.agent`, `axonops.axonops.cassandra` (Cassandra hosts)
+
+For existing Elasticsearch deployments, replace the `opensearch` role with `axonops.axonops.java` and `axonops.axonops.elastic`, and set `axon_server_searchdb_hosts` to `["http://127.0.0.1:9200"]`.
 
 ---
 

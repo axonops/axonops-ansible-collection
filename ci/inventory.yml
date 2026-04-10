@@ -1,0 +1,9 @@
+---
+# CI inventory for the AxonOps platform integration test.
+# The hostname must match the Docker container name used in the workflow.
+all:
+  children:
+    axon-server:
+      hosts:
+        axonops-platform-ci:
+          ansible_connection: docker

@@ -10,7 +10,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
 
 - Ansible 2.9 or higher
 - Target system running a supported Linux distribution (RHEL, CentOS, Ubuntu, Debian)
-- Elasticsearch installed and running (use the `elastic` role)
+- A search backend installed and running: either OpenSearch (use the `opensearch` role, preferred for on-premises) or Elasticsearch (use the `elastic` role)
 - Cassandra installed for metrics storage (optional but recommended, use the `cassandra` role)
 - Sufficient system resources (minimum 4GB RAM, 20GB disk space)
 
@@ -30,27 +30,31 @@ The `server` role installs and configures the AxonOps Server, which is the core 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `axon_server_listen_address` | `0.0.0.0` | IP address the server listens on |
-| `axon_server_listen_port` | `8080` | Port the server listens on |
+| `axon_server_listen_port` | `8080` | API port (used by axon-dash to connect to axon-server) |
+| `axon_server_agents_port` | `1888` | Agent port (used by axon-agent to connect to axon-server) |
 
-### Elasticsearch Configuration
+### Search Backend Configuration
 
-**For AxonOps Server >= 2.0.4** (new syntax):
+AxonOps Server supports both OpenSearch and Elasticsearch as the search backend. OpenSearch is preferred
+for new on-premises deployments. The same `axon_server_searchdb_*` variables are used for both.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `axon_server_elastic_hosts` | `["http://127.0.0.1:9200"]` | Array of Elasticsearch host URLs |
-| `axon_server_elastic_shards` | `1` | Number of shards for indices |
-| `axon_server_elastic_replicas` | `0` | Number of replicas for indices |
-| `axon_server_elastic_tls_skip_verify` | `false` | Skip TLS certificate verification |
-| `axon_server_elastic_username` | - | Elasticsearch username (if auth enabled) |
-| `axon_server_elastic_password` | - | Elasticsearch password (if auth enabled) |
-
-**For older versions** (legacy syntax):
+**For AxonOps Server >= 2.0.4** (current syntax):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `axon_server_elastic_host` | `http://127.0.0.1` | Elasticsearch host URL |
-| `axon_server_elastic_port` | `9200` | Elasticsearch port |
+| `axon_server_searchdb_hosts` | `["http://127.0.0.1:9200"]` | Array of search backend host URLs (OpenSearch or Elasticsearch) |
+| `axon_server_searchdb_shards` | `1` | Number of shards for indices |
+| `axon_server_searchdb_replicas` | `0` | Number of replicas for indices |
+| `axon_server_searchdb_tls_skip_verify` | `false` | Skip TLS certificate verification (set to `true` when using auto-generated OpenSearch certificates) |
+| `axon_server_searchdb_username` | - | Search backend username (required when OpenSearch Security plugin is enabled) |
+| `axon_server_searchdb_password` | - | Search backend password |
+
+**For older versions** (legacy syntax, pre-2.0.4):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `axon_server_searchdb_host` | `http://127.0.0.1` | Search backend host URL |
+| `axon_server_searchdb_port` | `9200` | Search backend port |
 
 ### Cassandra Storage Configuration
 
@@ -105,13 +109,50 @@ The `server` role installs and configures the AxonOps Server, which is the core 
 
 ## Dependencies
 
-- Elasticsearch (installed via `elastic` role)
+- A search backend — one of:
+  - OpenSearch (installed via `opensearch` role) — preferred for on-premises deployments
+  - Elasticsearch (installed via `elastic` role) — for existing or legacy deployments
 - Cassandra (optional but recommended, installed via `cassandra` role)
-- Java (installed automatically by dependencies)
+- Java (installed automatically by dependencies when using the `elastic` role)
 
 ## Example Playbooks
 
-### Basic Self-Hosted Server
+### Self-Hosted Server with OpenSearch (recommended for on-premises)
+
+Deploy AxonOps Server with OpenSearch as the search backend. OpenSearch is deployed on the same host
+using `single-node` mode with automatically generated TLS certificates:
+
+```yaml
+- name: Deploy AxonOps Server with OpenSearch
+  hosts: axon-server
+  become: true
+  vars:
+    # OpenSearch configuration
+    opensearch_cluster_name: axonops
+    opensearch_cluster_type: single-node
+    opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+    opensearch_domain_name: example.com
+
+    # AxonOps Server configuration
+    axon_server_license_key: "your-license-key-here"
+    axon_server_cql_hosts:
+      - localhost:9042
+    axon_server_searchdb_hosts:
+      - "https://127.0.0.1:9200"
+    axon_server_searchdb_username: admin
+    axon_server_searchdb_password: "{{ vault_opensearch_admin_password }}"
+    axon_server_searchdb_tls_skip_verify: true
+
+  roles:
+    - role: axonops.axonops.opensearch
+      tags: opensearch
+    - role: axonops.axonops.server
+      tags: server
+    - role: axonops.axonops.dash
+      tags: dash
+```
+
+### Basic Self-Hosted Server with Elasticsearch
 
 ```yaml
 - name: Deploy AxonOps Server
@@ -121,7 +162,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
-    axon_server_elastic_hosts:
+    axon_server_searchdb_hosts:
       - http://127.0.0.1:9200
 
   roles:
@@ -159,7 +200,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
-    axon_server_elastic_hosts:
+    axon_server_searchdb_hosts:
       - http://127.0.0.1:9200
     axon_server_listen_address: 0.0.0.0
 
@@ -203,7 +244,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
     axon_server_username: axonops_user
     axon_server_password: "{{ vault_cassandra_password }}"
     axon_server_local_dc: DC1
-    axon_server_elastic_hosts:
+    axon_server_searchdb_hosts:
       - http://127.0.0.1:9200
 
   roles:
@@ -224,7 +265,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
-    axon_server_elastic_hosts:
+    axon_server_searchdb_hosts:
       - http://127.0.0.1:9200
     axon_server_ldap_enabled: true
     axon_server_ldap_setting:
@@ -260,7 +301,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
-    axon_server_elastic_hosts:
+    axon_server_searchdb_hosts:
       - http://127.0.0.1:9200
     axon_server_retention:
       events: 8w
@@ -288,11 +329,11 @@ The `server` role installs and configures the AxonOps Server, which is the core 
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
-    axon_server_elastic_hosts:
+    axon_server_searchdb_hosts:
       - https://127.0.0.1:9200
-    axon_server_elastic_username: elastic
-    axon_server_elastic_password: "{{ vault_elastic_password }}"
-    axon_server_elastic_tls_skip_verify: false
+    axon_server_searchdb_username: elastic
+    axon_server_searchdb_password: "{{ vault_elastic_password }}"
+    axon_server_searchdb_tls_skip_verify: false
 
   roles:
     - role: axonops.axonops.server
@@ -308,7 +349,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
-    axon_server_elastic_hosts:
+    axon_server_searchdb_hosts:
       - http://127.0.0.1:9200
     axon_server_org_name: "production"
 
@@ -360,12 +401,12 @@ axon_server_cql_keyspace_replication: "{ 'class': 'NetworkTopologyStrategy', 'DC
 
 ## Version Compatibility
 
-### Elasticsearch Configuration Format
+### Search Backend Configuration Format
 
-The role automatically detects the server version and applies the appropriate Elasticsearch configuration format:
+The role automatically detects the server version and applies the appropriate configuration format:
 
-- **Version >= 2.0.4**: Uses new `hosts` array format
-- **Version < 2.0.4**: Uses legacy `elastic_host` and `elastic_port` format
+- **Version >= 2.0.4** (or `latest`): Uses the `search_db.hosts` array format. Supports both OpenSearch and Elasticsearch. Set `axon_server_searchdb_hosts` to a list of host URLs
+- **Version < 2.0.4**: Uses the legacy `elastic_host` and `elastic_port` format. Only Elasticsearch is supported with these older server versions
 
 ## Tags
 
@@ -385,10 +426,11 @@ The role automatically detects the server version and applies the appropriate El
 ## Firewall Configuration
 
 Ensure the following ports are accessible:
-- `8080` (or custom): AxonOps Server API
-- `1888`: Agent communication (default for self-hosted)
+- `8080` (or custom): AxonOps Server API (axon-dash to axon-server)
+- `1888` (or custom): Agent communication (axon-agent to axon-server)
 - `9042`: Cassandra CQL (if using local Cassandra)
-- `9200`: Elasticsearch HTTP API
+- `9200`: OpenSearch or Elasticsearch HTTP API
+- `9300`: OpenSearch or Elasticsearch transport port (multi-node clusters only)
 
 ## License
 

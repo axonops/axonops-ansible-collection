@@ -8,6 +8,10 @@ http.port: {{ opensearch_api_port }}
 
 bootstrap.memory_lock: {{ opensearch_bootstrap_memory_lock | lower }}
 
+{% if not opensearch_security_enabled %}
+plugins.security.disabled: true
+{% endif %}
+
 discovery.seed_hosts: [{% for host in opensearch_seed_hosts | default(ansible_play_hosts) %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 
 cluster.initial_master_nodes: [{% for host in opensearch_initial_master_nodes | default(ansible_play_hosts) %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]

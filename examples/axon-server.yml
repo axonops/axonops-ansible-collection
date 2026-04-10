@@ -3,7 +3,9 @@
   become: true
   vars:
     install_cassandra: true
-    install_elastic: true
+    # Search backend: set install_opensearch or install_elastic to true (not both)
+    install_opensearch: true
+    install_elastic: false
     axon_server_cql_hosts:
       - localhost:9042
     axon_dash_listen_address: 0.0.0.0
@@ -18,12 +20,25 @@
     cassandra_listen_address: "localhost"
     cassandra_rpc_address: "localhost"
 
-    # For AxonOps server version >= 2.0.4, set this variable to use the new Elasticsearch syntax
-    # axon_server_version: "2.0.4"
+    # --- OpenSearch configuration (used when install_opensearch: true) ---
+    # OpenSearch is the preferred search backend for on-premises AxonOps deployments.
+    # Store the admin password in Ansible Vault in production.
+    opensearch_cluster_name: axonops
+    opensearch_cluster_type: single-node
+    opensearch_admin_password: "changeme"
+    opensearch_domain_name: example.com
 
-    # Legacy Elasticsearch configuration (used for server versions < 2.0.4)
-    axon_server_elastic_host: "http://127.0.0.1"
-    axon_server_elastic_port: "9200"
+    # AxonOps Server connection to OpenSearch
+    axon_server_searchdb_hosts:
+      - "https://127.0.0.1:9200"
+    axon_server_searchdb_username: admin
+    axon_server_searchdb_password: "changeme"
+    axon_server_searchdb_tls_skip_verify: true
+
+    # --- Elasticsearch configuration (used when install_elastic: true) ---
+    # Uncomment and adjust these if using Elasticsearch instead of OpenSearch.
+    # axon_server_searchdb_hosts:
+    #   - "http://127.0.0.1:9200"
 
 
   pre_tasks:
@@ -45,6 +60,9 @@
     - role: axonops.axonops.cassandra
       tags: cassandra
       when: install_cassandra is defined and install_cassandra
+    - role: axonops.axonops.opensearch
+      tags: opensearch
+      when: install_opensearch is defined and install_opensearch
     - role: axonops.axonops.elastic
       tags: elastic
       when: install_elastic is defined and install_elastic

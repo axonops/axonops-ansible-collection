@@ -1,0 +1,30 @@
+all:
+  children:
+    axonops-server:
+      hosts:
+        157.90.235.43:
+    axonops-searchdb:
+      hosts:
+        157.90.235.43:
+        188.245.42.4:
+        168.119.234.32:
+      vars:
+        # OpenSearch cluster configuration
+        opensearch_cluster_name: axonops
+        opensearch_cluster_type: multi-node
+        opensearch_heap_size: "2g"
+        opensearch_domain_name: example.com
+        # Store the admin password in Ansible Vault in production
+        opensearch_admin_password: "changeme"
+
+        # AxonOps Server search_db connection
+        # Use https:// and set axon_server_searchdb_tls_skip_verify: true when using
+        # the auto-generated self-signed certificates from opensearch_tls_mode: generate
+        axon_server_searchdb_hosts:
+          - "https://157.90.235.43:9200"
+          - "https://188.245.42.4:9200"
+          - "https://168.119.234.32:9200"
+        axon_server_searchdb_username: admin
+        # Must match opensearch_admin_password
+        axon_server_searchdb_password: "changeme"
+        axon_server_searchdb_tls_skip_verify: true

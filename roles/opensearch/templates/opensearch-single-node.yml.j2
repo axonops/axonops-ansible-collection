@@ -9,3 +9,7 @@ http.port: {{ opensearch_api_port }}
 discovery.type: single-node
 
 bootstrap.memory_lock: {{ opensearch_bootstrap_memory_lock | lower }}
+
+{% if not opensearch_security_enabled %}
+plugins.security.disabled: true
+{% endif %}

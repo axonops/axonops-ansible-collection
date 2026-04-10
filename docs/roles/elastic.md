@@ -150,7 +150,7 @@ None (Java installation is handled by the role)
       discovery.type: single-node
 
     # AxonOps Server Configuration
-    axon_server_elastic_hosts:
+    axon_server_searchdb_hosts:
       - http://127.0.0.1:9200
     axon_server_cql_hosts:
       - localhost:9042
@@ -252,7 +252,7 @@ None (Java installation is handled by the role)
 For AxonOps Server version 2.0.4 and above, use the new `hosts` array format:
 
 ```yaml
-axon_server_elastic_hosts:
+axon_server_searchdb_hosts:
   - http://127.0.0.1:9200
 ```
 
@@ -261,8 +261,8 @@ axon_server_elastic_hosts:
 For older server versions, use the legacy configuration:
 
 ```yaml
-axon_server_elastic_host: "http://127.0.0.1"
-axon_server_elastic_port: "9200"
+axon_server_searchdb_host: "http://127.0.0.1"
+axon_server_searchdb_port: "9200"
 ```
 
 ## Important Notes
