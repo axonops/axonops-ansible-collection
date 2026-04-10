@@ -164,6 +164,40 @@
       loop: "{{ cassandra_ssl_files }}"
       when: item is defined
 
+- name: Install jemalloc
+  when: cassandra_jemalloc_enabled | bool
+  tags: jemalloc
+  block:
+    - name: Install jemalloc package (Debian)
+      when: ansible_os_family == "Debian"
+      ansible.builtin.package:
+        name: libjemalloc2
+        state: present
+
+    - name: Install jemalloc package (RedHat)
+      when: ansible_os_family == "RedHat"
+      ansible.builtin.package:
+        name: jemalloc
+        state: present
+
+    - name: Find jemalloc library path
+      when: cassandra_libjemalloc_path is not defined
+      ansible.builtin.find:
+        paths:
+          - /usr/lib
+          - /usr/lib64
+        patterns: "libjemalloc.so*"
+        recurse: true
+        file_type: file
+      register: _jemalloc_lib_find
+
+    - name: Set jemalloc library path
+      when:
+        - cassandra_libjemalloc_path is not defined
+        - _jemalloc_lib_find.files | length > 0
+      ansible.builtin.set_fact:
+        cassandra_libjemalloc_path: "{{ (_jemalloc_lib_find.files | sort(attribute='path') | first).path }}"
+
 - name: Deploy configuration
   tags: config
   block:
