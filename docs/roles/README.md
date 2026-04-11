@@ -26,6 +26,11 @@ Configures alerts, integrations, and monitoring settings for AxonOps.
 
 **Use when**: You need to automate the configuration of alerts, Slack/PagerDuty integrations, or backup policies.
 
+#### [cqlai](cqlai.md)
+Installs and configures CQL AI, an AI-powered CQL shell for Apache Cassandra that provides natural-language query assistance and confirmation prompts for destructive statements.
+
+**Use when**: You want to deploy the CQL AI tool on Cassandra nodes for AI-assisted query development and cluster exploration.
+
 ### Kubernetes
 
 #### [k8ssandra](k8ssandra.md)
@@ -37,6 +42,11 @@ Deploys and manages Cassandra 5.x clusters on Kubernetes using the K8ssandra ope
 Deploys and manages Apache Kafka clusters on Kubernetes using the Strimzi operator with AxonOps container images.
 
 **Use when**: You want to run Kafka on Kubernetes with AxonOps monitoring. Handles Strimzi operator, broker/controller node pools, and optional Kafka Connect.
+
+#### [operator](operator.md)
+Installs the AxonOps Kubernetes operator via its OCI Helm chart and deploys `AxonOpsPlatform` custom resources that bring up the full AxonOps server stack (axon-server, dashboard, timeseries database, and search) on Kubernetes.
+
+**Use when**: You want to run the AxonOps server stack natively on Kubernetes. The operator manages the full lifecycle of AxonOps platform components via a single custom resource.
 
 ### Infrastructure Components
 
@@ -75,6 +85,8 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **server** | Self-hosted AxonOps backend | OpenSearch (preferred) or Elastic, Cassandra (optional) |
 | **dash** | Web UI for AxonOps | Server |
 | **configurations** | Alert configuration | Server |
+| **cqlai** | AI-powered CQL shell for Cassandra | Cassandra nodes |
+| **operator** | AxonOps operator and platform on Kubernetes | Kubernetes cluster |
 | **k8ssandra** | Cassandra on Kubernetes | Kubernetes cluster |
 | **strimzi** | Kafka on Kubernetes | Kubernetes cluster |
 | **cassandra** | Apache Cassandra installation | Agent, Java |
@@ -273,6 +285,39 @@ Configure alerts and integrations for existing AxonOps deployment:
 **Roles needed**: `axonops.axonops.configurations`
 
 **See**: [configurations.md](configurations.md)
+
+---
+
+### Pattern 8: AxonOps Operator on Kubernetes
+
+Deploy the AxonOps operator and a full AxonOps platform stack on Kubernetes. The operator manages axon-server, dashboard, timeseries database, and search as a single `AxonOpsPlatform` custom resource.
+
+```yaml
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    axonops_operator_install_cert_manager: true
+    axonops_operator_install_operator: true
+    axonops_operator_helm_values:
+      certManager:
+        enable: true
+    axonops_operator_platforms:
+      - name: axonops
+        namespace: axonops
+        spec:
+          server:
+            orgName: "MyOrganization"
+          timeSeries: {}
+          search: {}
+          dashboard: {}
+  roles:
+    - role: axonops.axonops.operator
+```
+
+**Roles needed**: `axonops.axonops.operator`
+
+**See**: [operator.md](operator.md)
 
 ## Getting Started
 
