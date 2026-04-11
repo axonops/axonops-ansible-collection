@@ -83,21 +83,6 @@ in the [./examples](./examples) directory. There are two sections:
 - axon-server: list here the IP address or hostname of the server where you would like to install AxonOps
 - cassandra: these are the Apache Cassandra nodes where the agent will be installed
 
-## Makefile Targets
-
-The following targets are available in the Makefile:
-
-- `help`: Display this help message.
-- `agent`: Installs the AxonOps agent to the Cassandra nodes.
-- `server`: Installs the AxonOps server with OpenSearch (or Elasticsearch) and optional Cassandra.
-
-You can then invoke the installation using
-
-```sh
-# the default SSH user is root but you can change it passing the ANSIBLE_USER variable
-make agent ANSIBLE_USER=redhat
-```
-
 ## Examples
 
 ### axon-agent.yml
