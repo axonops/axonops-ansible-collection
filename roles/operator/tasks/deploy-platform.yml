@@ -1,0 +1,27 @@
+---
+# ============================================================================
+# Deploy a single AxonOpsPlatform CR
+# ============================================================================
+
+- name: "{{ platform.name }} - Ensure target namespace exists"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ platform.namespace }}"
+
+- name: "{{ platform.name }} - Deploy custom AxonOpsPlatform spec"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ platform.custom_spec }}"
+  when: platform.custom_spec is defined
+
+- name: "{{ platform.name }} - Deploy AxonOpsPlatform from template"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'axonops-platform.yaml.j2') }}"
+  when: platform.custom_spec is not defined
+
+# code: language=ansible

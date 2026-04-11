@@ -1,0 +1,76 @@
+---
+# ============================================================================
+# AxonOps Operator Role - Default Variables
+# ============================================================================
+
+# --- cert-manager (optional prerequisite) -----------------------------------
+
+# Install cert-manager via Helm (required when certManager.enable is true in
+# axonops_operator_helm_values; safe to skip if already installed in the cluster)
+axonops_operator_install_cert_manager: true
+axonops_operator_cert_manager_version: "v1.20.1"
+axonops_operator_cert_manager_namespace: cert-manager
+axonops_operator_cert_manager_chart: "oci://quay.io/jetstack/charts/cert-manager"
+
+# --- AxonOps Operator -------------------------------------------------------
+
+# Install the axonops-operator Helm chart
+axonops_operator_install_operator: true
+axonops_operator_version: "0.1.0"
+axonops_operator_namespace: axonops-system
+axonops_operator_chart: "oci://ghcr.io/axonops/charts/axonops-operator"
+
+# Arbitrary Helm values merged into the install.
+# Any value from the chart's values.yaml can be overridden here.
+# Example:
+#   axonops_operator_helm_values:
+#     manager:
+#       replicas: 2
+#     certManager:
+#       enable: true
+axonops_operator_helm_values: {}
+
+# Wait for the operator manager deployment to become ready before continuing
+axonops_operator_wait: true
+axonops_operator_wait_timeout: 300
+
+# CRD lifecycle settings (passed to the chart as crd.enable / crd.keep)
+axonops_operator_crd_install: true
+axonops_operator_crd_keep: true
+
+# --- AxonOpsPlatform CRs ----------------------------------------------------
+# Define one or more platform deployments. Each entry creates an AxonOpsPlatform CR.
+#
+# Option A: Custom mode — provide the full spec via 'custom_spec'.
+#   The value is applied verbatim via kubernetes.core.k8s.
+#
+#   axonops_operator_platforms:
+#     - name: my-platform
+#       namespace: axonops
+#       custom_spec:
+#         apiVersion: core.axonops.com/v1alpha1
+#         kind: AxonOpsPlatform
+#         metadata:
+#           name: my-platform
+#           namespace: axonops
+#         spec:
+#           server:
+#             orgName: "MyOrg"
+#           timeSeries: {}
+#           search: {}
+#           dashboard: {}
+#
+# Option B: Simple mode — provide a 'spec' dict; role renders the CR.
+#   The spec dict is placed under the AxonOpsPlatform spec field verbatim.
+#
+#   axonops_operator_platforms:
+#     - name: my-platform
+#       namespace: axonops
+#       spec:
+#         server:
+#           orgName: "MyOrg"
+#         timeSeries: {}
+#         search: {}
+#         dashboard: {}
+#
+axonops_operator_platforms: []
