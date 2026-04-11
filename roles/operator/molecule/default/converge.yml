@@ -1,0 +1,14 @@
+---
+- name: Converge
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - role: operator
+      vars:
+        axonops_operator_install_cert_manager: true
+        axonops_operator_install_operator: true
+        axonops_operator_platforms: []
+
+# code: language=ansible

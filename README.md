@@ -39,6 +39,12 @@ This collection provides the following Ansible roles. Click on each role for det
 - **[server](docs/roles/server.md)** - Install and configure AxonOps Server (self-hosted deployments)
 - **[dash](docs/roles/dash.md)** - Install and configure AxonOps Dashboard web interface
 - **[configurations](docs/roles/configurations.md)** - Configure alerts, integrations, and monitoring settings
+- **[cqlai](docs/roles/cqlai.md)** - Install CQL AI, the AI-powered CQL shell for Apache Cassandra
+
+### Kubernetes / Operator
+- **[operator](docs/roles/operator.md)** - Install the AxonOps Kubernetes operator and deploy AxonOpsPlatform custom resources
+- **[k8ssandra](docs/roles/k8ssandra.md)** - Deploy Cassandra 5.x on Kubernetes using the K8ssandra operator with AxonOps images
+- **[strimzi](docs/roles/strimzi.md)** - Deploy Apache Kafka on Kubernetes using the Strimzi operator with AxonOps images
 
 ### Infrastructure Components
 - **[cassandra](docs/roles/cassandra.md)** - Install and configure Apache Cassandra (3.11, 4.x, 5.x)
@@ -76,21 +82,6 @@ in the [./examples](./examples) directory. There are two sections:
 
 - axon-server: list here the IP address or hostname of the server where you would like to install AxonOps
 - cassandra: these are the Apache Cassandra nodes where the agent will be installed
-
-## Makefile Targets
-
-The following targets are available in the Makefile:
-
-- `help`: Display this help message.
-- `agent`: Installs the AxonOps agent to the Cassandra nodes.
-- `server`: Installs the AxonOps server with OpenSearch (or Elasticsearch) and optional Cassandra.
-
-You can then invoke the installation using
-
-```sh
-# the default SSH user is root but you can change it passing the ANSIBLE_USER variable
-make agent ANSIBLE_USER=redhat
-```
 
 ## Examples
 

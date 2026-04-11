@@ -1,0 +1,92 @@
+---
+# ============================================================================
+# AxonOps Operator Role - Main Tasks
+# ============================================================================
+
+# --- Validation --------------------------------------------------------------
+
+- name: Warn when no platforms are defined
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: axonops_operator_platforms is empty. The operator will be
+      installed but no AxonOpsPlatform CRs will be created.
+  when: axonops_operator_platforms | length == 0
+  tags: always
+
+# --- cert-manager ------------------------------------------------------------
+
+- name: Install cert-manager
+  when: axonops_operator_install_cert_manager
+  tags: cert-manager
+  block:
+    - name: Install cert-manager via Helm
+      kubernetes.core.helm:
+        name: cert-manager
+        chart_ref: "{{ axonops_operator_cert_manager_chart }}"
+        chart_version: "{{ axonops_operator_cert_manager_version }}"
+        release_namespace: "{{ axonops_operator_cert_manager_namespace }}"
+        create_namespace: true
+        values:
+          crds:
+            enabled: true
+        wait: true
+
+    - name: Wait for cert-manager webhook to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: cert-manager-webhook
+        namespace: "{{ axonops_operator_cert_manager_namespace }}"
+      register: _cert_manager_webhook
+      until:
+        - _cert_manager_webhook.resources | length > 0
+        - (_cert_manager_webhook.resources[0].status.readyReplicas | default(0)) >= 1
+      retries: 30
+      delay: 10
+
+# --- axonops-operator --------------------------------------------------------
+
+- name: Install axonops-operator
+  when: axonops_operator_install_operator
+  tags: operator
+  block:
+    - name: Install axonops-operator via Helm
+      kubernetes.core.helm:
+        name: axonops-operator
+        chart_ref: "{{ axonops_operator_chart }}"
+        chart_version: "{{ axonops_operator_version }}"
+        release_namespace: "{{ axonops_operator_namespace }}"
+        create_namespace: true
+        values: "{{ _axonops_operator_base_values | combine(axonops_operator_helm_values, recursive=true) }}"
+        wait: true
+      vars:
+        _axonops_operator_base_values:
+          crd:
+            enable: "{{ axonops_operator_crd_install }}"
+            keep: "{{ axonops_operator_crd_keep }}"
+
+    - name: Wait for axonops-operator manager to be ready
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: axonops-operator-controller-manager
+        namespace: "{{ axonops_operator_namespace }}"
+      register: _axonops_operator
+      until:
+        - _axonops_operator.resources | length > 0
+        - (_axonops_operator.resources[0].status.readyReplicas | default(0)) >= 1
+      retries: "{{ (axonops_operator_wait_timeout / 10) | int }}"
+      delay: 10
+      when: axonops_operator_wait
+
+# --- Deploy AxonOpsPlatform CRs ----------------------------------------------
+
+- name: Deploy AxonOpsPlatform CRs
+  ansible.builtin.include_tasks: deploy-platform.yml
+  loop: "{{ axonops_operator_platforms }}"
+  loop_control:
+    loop_var: platform
+    label: "{{ platform.name }}"
+  tags: platforms
+
+# code: language=ansible

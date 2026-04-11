@@ -1,0 +1,70 @@
+---
+- name: Verify
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    # --- Check cert-manager is running ---------------------------------------
+    - name: Check cert-manager deployment
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: cert-manager
+        namespace: cert-manager
+      register: _cert_manager
+
+    - name: Verify cert-manager is ready
+      ansible.builtin.assert:
+        that:
+          - _cert_manager.resources | length > 0
+          - _cert_manager.resources[0].status.readyReplicas >= 1
+        fail_msg: "cert-manager is not ready"
+
+    # --- Check cert-manager-webhook is running --------------------------------
+    - name: Check cert-manager-webhook deployment
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: cert-manager-webhook
+        namespace: cert-manager
+      register: _cert_manager_webhook
+
+    - name: Verify cert-manager-webhook is ready
+      ansible.builtin.assert:
+        that:
+          - _cert_manager_webhook.resources | length > 0
+          - _cert_manager_webhook.resources[0].status.readyReplicas >= 1
+        fail_msg: "cert-manager-webhook is not ready"
+
+    # --- Check axonops-operator-manager is running ---------------------------
+    - name: Check axonops-operator-manager deployment
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: axonops-operator-controller-manager
+        namespace: axonops-system
+      register: _axonops_operator
+
+    - name: Verify axonops-operator-manager is ready
+      ansible.builtin.assert:
+        that:
+          - _axonops_operator.resources | length > 0
+          - _axonops_operator.resources[0].status.readyReplicas >= 1
+        fail_msg: "axonops-operator-controller-manager is not ready"
+
+    # --- Verify CRDs are installed -------------------------------------------
+    - name: Verify CRDs are installed
+      kubernetes.core.k8s_info:
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: axonopsplatforms.core.axonops.com
+      register: _axonopsplatforms_crd
+
+    - name: Assert AxonOpsPlatform CRD exists
+      ansible.builtin.assert:
+        that:
+          - _axonopsplatforms_crd.resources | length == 1
+        fail_msg: "axonopsplatforms.core.axonops.com CRD was not installed"
+
+# code: language=ansible

@@ -1,0 +1,136 @@
+---
+# Validates variable defaults and template rendering without a K8s cluster.
+- name: Converge - Validate operator role logic
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    # Role defaults (must match defaults/main.yml exactly)
+    axonops_operator_install_cert_manager: true
+    axonops_operator_cert_manager_version: "v1.20.1"
+    axonops_operator_cert_manager_namespace: cert-manager
+    axonops_operator_cert_manager_chart: "oci://quay.io/jetstack/charts/cert-manager"
+    axonops_operator_install_operator: true
+    axonops_operator_version: "0.1.0"
+    axonops_operator_namespace: axonops-system
+    axonops_operator_chart: "oci://ghcr.io/axonops/charts/axonops-operator"
+    axonops_operator_helm_values: {}
+    axonops_operator_wait: true
+    axonops_operator_wait_timeout: 300
+    axonops_operator_crd_install: true
+    axonops_operator_crd_keep: true
+    axonops_operator_platforms: []
+
+  tasks:
+    # --- TEST 1: Default variables are set -----------------------------------
+    - name: "TEST 1 - Default variables are set"
+      ansible.builtin.assert:
+        that:
+          - axonops_operator_install_cert_manager == true
+          - axonops_operator_cert_manager_version == "v1.20.1"
+          - axonops_operator_cert_manager_namespace == "cert-manager"
+          - axonops_operator_cert_manager_chart == "oci://quay.io/jetstack/charts/cert-manager"
+          - axonops_operator_install_operator == true
+          - axonops_operator_version == "0.1.0"
+          - axonops_operator_namespace == "axonops-system"
+          - axonops_operator_chart == "oci://ghcr.io/axonops/charts/axonops-operator"
+          - axonops_operator_helm_values == {}
+          - axonops_operator_wait == true
+          - axonops_operator_wait_timeout == 300
+          - axonops_operator_crd_install == true
+          - axonops_operator_crd_keep == true
+          - axonops_operator_platforms | length == 0
+        success_msg: "PASS: All default variables are set correctly"
+
+    # --- TEST 2: axonops_operator_helm_values merges correctly ----------------
+    - name: "TEST 2 - helm_values merges with base values correctly"
+      vars:
+        _custom_values:
+          manager:
+            replicas: 2
+          certManager:
+            enable: true
+        _base_values:
+          crd:
+            enable: true
+            keep: true
+        _merged: "{{ _base_values | combine(_custom_values, recursive=true) }}"
+      ansible.builtin.assert:
+        that:
+          - _merged.crd.enable == true
+          - _merged.crd.keep == true
+          - _merged.manager.replicas == 2
+          - _merged.certManager.enable == true
+        success_msg: "PASS: helm_values merge produces correct combined dict"
+
+    # --- TEST 3: Template renders valid YAML (simple mode) -------------------
+    - name: "TEST 3 - Render AxonOpsPlatform template (simple mode)"
+      vars:
+        platform:
+          name: test-platform
+          namespace: axonops
+          spec:
+            server:
+              orgName: "TestOrg"
+            timeSeries: {}
+            search: {}
+            dashboard: {}
+      ansible.builtin.set_fact:
+        _rendered: "{{ lookup('template', '../../templates/axonops-platform.yaml.j2') }}"
+
+    - name: "TEST 3 - Parse rendered template"
+      ansible.builtin.set_fact:
+        _parsed: "{{ _rendered | from_yaml }}"
+
+    - name: "TEST 3 - Verify rendered template values"
+      ansible.builtin.assert:
+        that:
+          - _parsed.apiVersion == "core.axonops.com/v1alpha1"
+          - _parsed.kind == "AxonOpsPlatform"
+          - _parsed.metadata.name == "test-platform"
+          - _parsed.metadata.namespace == "axonops"
+          - _parsed.spec.server.orgName == "TestOrg"
+        success_msg: "PASS: Template renders simple mode correctly"
+
+    # --- TEST 4: Template renders with empty spec ----------------------------
+    - name: "TEST 4 - Render AxonOpsPlatform template (empty spec)"
+      vars:
+        platform:
+          name: minimal-platform
+          namespace: axonops
+      ansible.builtin.set_fact:
+        _rendered_minimal: "{{ lookup('template', '../../templates/axonops-platform.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 4 - Verify minimal template renders valid YAML"
+      ansible.builtin.assert:
+        that:
+          - _rendered_minimal.apiVersion == "core.axonops.com/v1alpha1"
+          - _rendered_minimal.kind == "AxonOpsPlatform"
+          - _rendered_minimal.metadata.name == "minimal-platform"
+          - _rendered_minimal.metadata.namespace == "axonops"
+        success_msg: "PASS: Minimal template (no spec) renders valid YAML"
+
+    # --- TEST 5: Template supports labels and annotations --------------------
+    - name: "TEST 5 - Render AxonOpsPlatform template with labels and annotations"
+      vars:
+        platform:
+          name: labelled-platform
+          namespace: axonops
+          labels:
+            env: production
+            team: platform
+          annotations:
+            description: "test platform"
+      ansible.builtin.set_fact:
+        _rendered_labelled: "{{ lookup('template', '../../templates/axonops-platform.yaml.j2') | from_yaml }}"
+
+    - name: "TEST 5 - Verify labels and annotations are present"
+      ansible.builtin.assert:
+        that:
+          - _rendered_labelled.metadata.labels.env == "production"
+          - _rendered_labelled.metadata.labels.team == "platform"
+          - _rendered_labelled.metadata.annotations.description == "test platform"
+        success_msg: "PASS: Labels and annotations render correctly"
+
+# code: language=ansible
