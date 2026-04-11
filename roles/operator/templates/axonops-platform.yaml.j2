@@ -6,15 +6,15 @@ metadata:
   namespace: "{{ platform.namespace }}"
 {% if platform.labels is defined %}
   labels:
-{{ platform.labels | to_nice_yaml(indent=2) | indent(4, false) }}
+{{ platform.labels | to_nice_yaml(indent=2) | indent(4, true) }}
 {% endif %}
 {% if platform.annotations is defined %}
   annotations:
-{{ platform.annotations | to_nice_yaml(indent=2) | indent(4, false) }}
+{{ platform.annotations | to_nice_yaml(indent=2) | indent(4, true) }}
 {% endif %}
 spec:
 {% if platform.spec is defined and platform.spec %}
-{{ platform.spec | to_nice_yaml(indent=2) | indent(2, false) }}
+{{ platform.spec | to_nice_yaml(indent=2) | indent(2, true) }}
 {% else %}
   {}
 {% endif %}
