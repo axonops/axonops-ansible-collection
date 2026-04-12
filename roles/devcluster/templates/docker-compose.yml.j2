@@ -24,7 +24,7 @@ services:
       opensearch:
         condition: service_healthy
     environment:
-      - ELASTIC_HOSTS=http://opensearch:9200
+      - ELASTIC_HOST=http://opensearch:9200
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080"]
       interval: 10s
