@@ -79,6 +79,12 @@ jobs:
           ANSIBLE_FORCE_COLOR: '1'
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
 
+      - name: Show container logs on failure
+        if: failure()
+        run: |
+          docker compose -p axonops-devcluster-integration logs --no-color || true
+        working-directory: /tmp/axonops-devcluster-integration
+
       - name: Run Molecule verify
         run: molecule -v verify
         env:
