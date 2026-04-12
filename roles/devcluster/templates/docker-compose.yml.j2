@@ -24,13 +24,13 @@ services:
       opensearch:
         condition: service_healthy
     environment:
-      - OPENSEARCH_HOSTS=http://opensearch:9200
+      - ELASTIC_HOSTS=http://opensearch:9200
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080"]
       interval: 10s
       timeout: 5s
       retries: 30
-      start_period: 10s
+      start_period: 30s
 
   axon-dash:
     image: "{{ devcluster_registry }}/axon-dash:{{ devcluster_axon_dash_version }}"
