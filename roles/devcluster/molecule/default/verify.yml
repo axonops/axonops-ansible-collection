@@ -1,0 +1,60 @@
+---
+- name: Verify - AxonOps devcluster is running
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    devcluster_axon_dash_port: 3000
+
+  tasks:
+    # --- Verify axon-dash responds -------------------------------------------
+    - name: Wait for axon-dash to respond on port {{ devcluster_axon_dash_port }}
+      ansible.builtin.uri:
+        url: "http://localhost:{{ devcluster_axon_dash_port }}"
+        status_code: [200, 302]
+      register: _dash_response
+      until: _dash_response.status in [200, 302]
+      retries: 30
+      delay: 10
+
+    - name: Assert axon-dash is reachable
+      ansible.builtin.assert:
+        that:
+          - _dash_response.status in [200, 302]
+        success_msg: "PASS: axon-dash is responding on port {{ devcluster_axon_dash_port }}"
+
+    # --- Verify OpenSearch cluster health ------------------------------------
+    - name: Check OpenSearch cluster health via docker exec
+      ansible.builtin.command:
+        cmd: >
+          docker exec axonops-devcluster-integration-opensearch-1
+          curl -sf http://localhost:9200/_cluster/health
+      register: _os_health
+      changed_when: false
+
+    - name: Parse OpenSearch health response
+      ansible.builtin.set_fact:
+        _os_health_json: "{{ _os_health.stdout | from_json }}"
+
+    - name: Assert OpenSearch cluster is healthy
+      ansible.builtin.assert:
+        that:
+          - _os_health_json.status in ['green', 'yellow']
+        success_msg: "PASS: OpenSearch cluster status is {{ _os_health_json.status }}"
+
+    # --- Verify all containers are running -----------------------------------
+    - name: Get docker compose project containers
+      ansible.builtin.command:
+        cmd: docker compose -p axonops-devcluster-integration ps --format json
+        chdir: /tmp/axonops-devcluster-integration
+      register: _containers
+      changed_when: false
+
+    - name: Assert at least 4 containers are running
+      ansible.builtin.assert:
+        that:
+          - _containers.stdout_lines | length >= 4
+        success_msg: "PASS: All devcluster containers are running"
+
+# code: language=ansible

@@ -1,0 +1,17 @@
+---
+- name: Validate inputs
+  ansible.builtin.import_tasks: validate.yml
+  tags: [always]
+
+- name: Authenticate to container registry
+  ansible.builtin.import_tasks: auth.yml
+  when: devcluster_registry_auth | length > 0
+  tags: [auth]
+
+- name: Render docker-compose file
+  ansible.builtin.import_tasks: render.yml
+  tags: [render]
+
+- name: Manage devcluster lifecycle
+  ansible.builtin.import_tasks: manage.yml
+  tags: [manage]

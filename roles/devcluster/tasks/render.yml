@@ -1,0 +1,12 @@
+---
+- name: Ensure compose directory exists
+  ansible.builtin.file:
+    path: "{{ devcluster_compose_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Render docker-compose.yml from template
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ devcluster_compose_dir }}/docker-compose.yml"
+    mode: "0644"

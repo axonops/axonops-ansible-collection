@@ -1,0 +1,89 @@
+# Managed by Ansible — axonops.axonops devcluster role
+# Do not edit manually. Re-run the role to update.
+---
+services:
+
+  opensearch:
+    image: opensearchproject/opensearch:{{ devcluster_opensearch_version }}
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - "OPENSEARCH_JAVA_OPTS={{ devcluster_opensearch_java_opts }}"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9200/_cluster/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  axon-server:
+    image: {{ devcluster_registry }}/axon-server:{{ devcluster_axon_server_version }}
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    environment:
+      - OPENSEARCH_HOSTS=http://opensearch:9200
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  axon-dash:
+    image: {{ devcluster_registry }}/axon-dash:{{ devcluster_axon_dash_version }}
+    depends_on:
+      axon-server:
+        condition: service_healthy
+    environment:
+      - AXONSERVER_PRIVATE_ENDPOINTS=http://axon-server:8080
+    ports:
+      - "{{ devcluster_axon_dash_port }}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+{% for i in range(devcluster_cassandra_nodes | int) %}
+  cassandra-{{ i }}:
+    image: {{ devcluster_registry }}/cassandra:{{ devcluster_cassandra_version }}
+    hostname: cassandra-{{ i }}
+    restart: always
+    depends_on:
+{% if i == 0 %}
+      axon-server:
+        condition: service_healthy
+{% else %}
+      cassandra-{{ i - 1 }}:
+        condition: service_healthy
+{% endif %}
+    environment:
+      - CASSANDRA_CLUSTER_NAME={{ devcluster_cassandra_cluster_name }}
+      - CASSANDRA_SEEDS=cassandra-0
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack{{ i }}
+      - AXON_AGENT_SERVER_HOST=axon-server
+      - AXON_AGENT_SERVER_PORT=1888
+      - AXON_AGENT_ORG={{ devcluster_axonops_org }}
+      - AXON_AGENT_TLS_MODE=none
+      - AXON_AGENT_LOG_OUTPUT=file
+    volumes:
+      - cassandra-{{ i }}:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9042"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+{% endfor %}
+volumes:
+  opensearch-data:
+{% for i in range(devcluster_cassandra_nodes | int) %}
+  cassandra-{{ i }}:
+{% endfor %}

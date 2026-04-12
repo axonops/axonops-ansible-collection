@@ -1,0 +1,14 @@
+---
+- name: Converge - Deploy AxonOps devcluster
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    devcluster_compose_dir: /tmp/axonops-devcluster-integration
+    devcluster_cassandra_nodes: 1
+
+  roles:
+    - role: devcluster
+
+# code: language=ansible

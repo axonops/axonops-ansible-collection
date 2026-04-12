@@ -1,0 +1,20 @@
+---
+- name: Deploy AxonOps devcluster (present)
+  community.docker.docker_compose_v2:
+    project_src: "{{ devcluster_compose_dir }}"
+    state: present
+    pull: always
+  when: devcluster_state == 'present'
+
+- name: Tear down AxonOps devcluster (absent)
+  community.docker.docker_compose_v2:
+    project_src: "{{ devcluster_compose_dir }}"
+    state: absent
+    remove_volumes: true
+  when: devcluster_state == 'absent'
+
+- name: Remove compose directory (absent)
+  ansible.builtin.file:
+    path: "{{ devcluster_compose_dir }}"
+    state: absent
+  when: devcluster_state == 'absent'
