@@ -4,7 +4,7 @@
 services:
 
   opensearch:
-    image: opensearchproject/opensearch:{{ devcluster_opensearch_version }}
+    image: "opensearchproject/opensearch:{{ devcluster_opensearch_version }}"
     environment:
       - discovery.type=single-node
       - DISABLE_SECURITY_PLUGIN=true
@@ -19,7 +19,7 @@ services:
       start_period: 30s
 
   axon-server:
-    image: {{ devcluster_registry }}/axon-server:{{ devcluster_axon_server_version }}
+    image: "{{ devcluster_registry }}/axon-server:{{ devcluster_axon_server_version }}"
     depends_on:
       opensearch:
         condition: service_healthy
@@ -33,7 +33,7 @@ services:
       start_period: 10s
 
   axon-dash:
-    image: {{ devcluster_registry }}/axon-dash:{{ devcluster_axon_dash_version }}
+    image: "{{ devcluster_registry }}/axon-dash:{{ devcluster_axon_dash_version }}"
     depends_on:
       axon-server:
         condition: service_healthy
@@ -50,7 +50,7 @@ services:
 
 {% for i in range(devcluster_cassandra_nodes | int) %}
   cassandra-{{ i }}:
-    image: {{ devcluster_registry }}/cassandra:{{ devcluster_cassandra_version }}
+    image: "{{ devcluster_registry }}/cassandra:{{ devcluster_cassandra_version }}"
     hostname: cassandra-{{ i }}
     restart: always
     depends_on:

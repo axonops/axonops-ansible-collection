@@ -3,7 +3,7 @@
   community.docker.docker_compose_v2:
     project_src: "{{ devcluster_compose_dir }}"
     state: present
-    pull: always
+    pull: "{{ devcluster_pull_policy }}"
   when: devcluster_state == 'present'
 
 - name: Tear down AxonOps devcluster (absent)

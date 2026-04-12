@@ -31,6 +31,13 @@ devcluster_axonops_org: "demo"
 # --- Container image registry ------------------------------------------------
 devcluster_registry: "registry.axonops.com/axonops-public/axonops-docker"
 
+# --- Docker image pull policy ------------------------------------------------
+# Controls when Docker pulls updated images.
+# always: pull on every run (default for dev — ensures latest images)
+# missing: only pull if image is not present locally (faster, less idempotency churn)
+# never: never pull (offline use)
+devcluster_pull_policy: always
+
 # --- Optional registry authentication ----------------------------------------
 # Leave empty ({}) for public access.
 # To authenticate: set registry, username, and password.

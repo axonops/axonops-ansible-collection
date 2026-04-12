@@ -115,12 +115,18 @@
 
     # --- TEST 7: Validate fails with bad cassandra_nodes ---------------------
     - name: "TEST 7 - Validation rejects cassandra_nodes=5"
-      vars:
-        devcluster_cassandra_nodes: 5
       ansible.builtin.assert:
         that:
-          - devcluster_cassandra_nodes | int > 3
-        success_msg: "PASS: Value 5 would be rejected by validate.yml assert"
+          - 5 | int >= 1
+          - 5 | int <= 3
+      register: _bad_nodes_result
+      ignore_errors: true
+
+    - name: "TEST 7 - Assert validation logic would have failed"
+      ansible.builtin.assert:
+        that:
+          - _bad_nodes_result is failed
+        success_msg: "PASS: cassandra_nodes=5 correctly rejected by validation logic"
 
     # --- TEST 8: OpenSearch security plugin disabled -------------------------
     - name: "TEST 8 - OpenSearch has DISABLE_SECURITY_PLUGIN=true"

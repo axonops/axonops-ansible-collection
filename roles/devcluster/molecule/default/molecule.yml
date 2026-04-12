@@ -17,6 +17,7 @@ provisioner:
   playbooks:
     converge: converge.yml
     verify: verify.yml
+    cleanup: cleanup.yml
   inventory:
     host_vars:
       localhost:
