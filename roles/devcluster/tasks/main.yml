@@ -3,6 +3,12 @@
   ansible.builtin.import_tasks: validate.yml
   tags: [always]
 
+- name: Install Docker (optional)
+  ansible.builtin.include_role:
+    name: axonops.axonops.docker
+  when: devcluster_install_docker | bool
+  tags: [docker]
+
 - name: Authenticate to container registry
   ansible.builtin.include_tasks: auth.yml
   when: devcluster_registry_auth | length > 0

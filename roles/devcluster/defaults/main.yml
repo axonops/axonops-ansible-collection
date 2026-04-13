@@ -38,6 +38,19 @@ devcluster_registry: "registry.axonops.com/axonops-public/axonops-docker"
 # never: never pull (offline use)
 devcluster_pull_policy: always
 
+# --- Docker installation (optional) -----------------------------------------
+# Set to true to install Docker CE and the Compose plugin via the docker role
+# before deploying the devcluster. Requires the axonops.axonops.docker role.
+devcluster_install_docker: false
+
+# --- Systemd service name ----------------------------------------------------
+devcluster_service_name: axonops-devcluster
+
+# --- Service start control ---------------------------------------------------
+# Set to false to deploy the systemd unit without starting the service.
+# Useful for molecule tests and environments where systemd is not available.
+devcluster_start_on_install: true
+
 # --- Optional registry authentication ----------------------------------------
 # Leave empty ({}) for public access.
 # To authenticate: set registry, username, and password.

@@ -5,3 +5,6 @@
     username: "{{ devcluster_registry_auth.username }}"
     password: "{{ devcluster_registry_auth.password }}"
   no_log: true
+  when:
+    - devcluster_registry_auth.username is defined
+    - devcluster_registry_auth.username | length > 0

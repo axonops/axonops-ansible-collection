@@ -1,0 +1,15 @@
+[Unit]
+Description=AxonOps devcluster (Docker Compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ devcluster_compose_dir }}
+ExecStart=/usr/bin/docker compose up -d --pull {{ devcluster_pull_policy }}
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target

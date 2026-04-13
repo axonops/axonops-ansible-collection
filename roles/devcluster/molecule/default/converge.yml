@@ -7,6 +7,8 @@
   vars:
     devcluster_compose_dir: /tmp/axonops-devcluster-integration
     devcluster_cassandra_nodes: 1
+    devcluster_install_docker: false
+    devcluster_start_on_install: false
 
   roles:
     - role: devcluster
