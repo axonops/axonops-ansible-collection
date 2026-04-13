@@ -60,16 +60,13 @@ options:
             - It can be read from the environment variable AXONOPS_CLUSTER_TYPE.
         required: false
         type: str
-TODO
 
 '''
 
 EXAMPLES = r'''
-TODO
 '''
 
 RETURN = r'''
-TODO
 '''
 
 from ansible.module_utils.basic import AnsibleModule

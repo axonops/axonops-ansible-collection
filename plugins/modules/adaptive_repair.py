@@ -92,7 +92,7 @@ options:
             - The default is TRUE.
         required: false
         type: bool
-    segmentretries: 3
+    segmentretries:
         description:
             - The maximum number segmentretries before fail a segment
             - The default is 3
