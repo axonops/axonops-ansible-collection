@@ -59,8 +59,7 @@ jobs:
           AXONOPS_URL: ${{ secrets.AXONOPS_URL }}
           AXONOPS_ORG: ${{ secrets.AXONOPS_ORG }}
           AXONOPS_CLUSTER: ${{ secrets.AXONOPS_CLUSTER }}
-          AXONOPS_USERNAME: ${{ secrets.AXONOPS_USERNAME }}
-          AXONOPS_PASSWORD: ${{ secrets.AXONOPS_PASSWORD }}
+          AXONOPS_TOKEN: ${{ secrets.AXONOPS_TOKEN }}
 
       - name: Run Molecule converge
         run: molecule -v converge
@@ -73,5 +72,4 @@ jobs:
           AXONOPS_URL: ${{ secrets.AXONOPS_URL }}
           AXONOPS_ORG: ${{ secrets.AXONOPS_ORG }}
           AXONOPS_CLUSTER: ${{ secrets.AXONOPS_CLUSTER }}
-          AXONOPS_USERNAME: ${{ secrets.AXONOPS_USERNAME }}
-          AXONOPS_PASSWORD: ${{ secrets.AXONOPS_PASSWORD }}
+          AXONOPS_TOKEN: ${{ secrets.AXONOPS_TOKEN }}
