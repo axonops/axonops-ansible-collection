@@ -1,0 +1,75 @@
+---
+name: AxonOps Configurations Molecule
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'roles/configurations/**'
+      - '.github/workflows/configurations-molecule.yml'
+  pull_request:
+    paths:
+      - 'roles/configurations/**'
+      - '.github/workflows/configurations-molecule.yml'
+
+defaults:
+  run:
+    working-directory: roles/configurations
+
+jobs:
+  molecule:
+    name: Molecule AxonOps Configurations
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distro:
+          - rockylinux9
+          - rockylinux10
+          - ubuntu2204
+          - ubuntu2404
+          - debian12
+          - debian13
+
+    steps:
+      - name: Check out the codebase.
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install test dependencies.
+        run: pip3 install ansible molecule molecule-plugins[docker] docker
+
+      - name: Install collection locally.
+        run: ansible-galaxy collection install $GITHUB_WORKSPACE --force
+        working-directory: ${{ github.workspace }}
+
+      - name: Run Molecule destroy (ignore failures)
+        run: molecule -v destroy
+        continue-on-error: true
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: configurations-${{ matrix.distro }}
+          AXONOPS_URL: ${{ secrets.AXONOPS_URL }}
+          AXONOPS_ORG: ${{ secrets.AXONOPS_ORG }}
+          AXONOPS_CLUSTER: ${{ secrets.AXONOPS_CLUSTER }}
+          AXONOPS_TOKEN: ${{ secrets.AXONOPS_TOKEN }}
+
+      - name: Run Molecule converge
+        run: molecule -v converge
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: configurations-${{ matrix.distro }}
+          AXONOPS_URL: ${{ secrets.AXONOPS_URL }}
+          AXONOPS_ORG: ${{ secrets.AXONOPS_ORG }}
+          AXONOPS_CLUSTER: ${{ secrets.AXONOPS_CLUSTER }}
+          AXONOPS_TOKEN: ${{ secrets.AXONOPS_TOKEN }}
