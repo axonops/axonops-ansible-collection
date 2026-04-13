@@ -4,6 +4,7 @@
     src: devcluster.service.j2
     dest: "/etc/systemd/system/{{ devcluster_service_name }}.service"
     mode: "0644"
+  become: true
   when: devcluster_state == 'present'
 
 - name: Enable and start devcluster service (present)
@@ -12,6 +13,7 @@
     state: started
     enabled: true
     daemon_reload: true
+  become: true
   when:
     - devcluster_state == 'present'
     - devcluster_start_on_install | bool
@@ -22,6 +24,7 @@
     state: stopped
     enabled: false
     daemon_reload: true
+  become: true
   when: devcluster_state == 'absent'
   failed_when: false
 
@@ -37,11 +40,13 @@
   ansible.builtin.file:
     path: "/etc/systemd/system/{{ devcluster_service_name }}.service"
     state: absent
+  become: true
   when: devcluster_state == 'absent'
 
 - name: Reload systemd daemon (absent)
   ansible.builtin.systemd:
     daemon_reload: true
+  become: true
   when: devcluster_state == 'absent'
   failed_when: false
 
