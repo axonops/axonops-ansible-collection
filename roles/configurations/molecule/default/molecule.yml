@@ -13,8 +13,7 @@ platforms:
       AXONOPS_URL: ${AXONOPS_URL:-https://dash.axonops.cloud/}
       AXONOPS_ORG: ${AXONOPS_ORG:-'axonops'}
       AXONOPS_CLUSTER: ${AXONOPS_CLUSTER:-'axonsaas'}
-      AXONOPS_USERNAME: ${AXONOPS_USERNAME}
-      AXONOPS_PASSWORD: ${AXONOPS_PASSWORD}
+      AXONOPS_TOKEN: ${AXONOPS_TOKEN}
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
       - ${HOME}/.ansible/collections/ansible_collections/axonops/axonops:/root/.ansible/collections/ansible_collections/axonops/axonops:ro
