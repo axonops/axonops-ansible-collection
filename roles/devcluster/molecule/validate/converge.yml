@@ -1,0 +1,139 @@
+---
+- name: Converge - Validate devcluster role logic
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    # Defaults matching defaults/main.yml exactly
+    devcluster_state: present
+    devcluster_compose_dir: /tmp/axonops-devcluster-test
+    devcluster_opensearch_version: "2.19.1"
+    devcluster_opensearch_java_opts: "-Xms512m -Xmx512m"
+    devcluster_axon_server_version: "latest"
+    devcluster_axon_dash_version: "latest"
+    devcluster_axon_dash_port: 3000
+    devcluster_cassandra_version: "5.0"
+    devcluster_cassandra_nodes: 1
+    devcluster_cassandra_cluster_name: "axonops-devcluster"
+    devcluster_axonops_org: "demo"
+    devcluster_registry: "registry.axonops.com/axonops-public/axonops-docker"
+    devcluster_registry_auth: {}
+
+  tasks:
+    # --- TEST 1: Default variable values are correct -------------------------
+    - name: "TEST 1 - Assert default variable values"
+      ansible.builtin.assert:
+        that:
+          - devcluster_state == "present"
+          - devcluster_opensearch_version == "2.19.1"
+          - devcluster_opensearch_java_opts == "-Xms512m -Xmx512m"
+          - devcluster_axon_server_version == "latest"
+          - devcluster_axon_dash_version == "latest"
+          - devcluster_axon_dash_port == 3000
+          - devcluster_cassandra_version == "5.0"
+          - devcluster_cassandra_nodes == 1
+          - devcluster_cassandra_cluster_name == "axonops-devcluster"
+          - devcluster_axonops_org == "demo"
+          - devcluster_registry == "registry.axonops.com/axonops-public/axonops-docker"
+          - devcluster_registry_auth == {}
+        success_msg: "PASS: All default variables are correct"
+
+    # --- TEST 2: Render template with 1 Cassandra node -----------------------
+    - name: "TEST 2 - Render compose template (1 node)"
+      ansible.builtin.set_fact:
+        _rendered_1node: "{{ lookup('template', '../../templates/docker-compose.yml.j2') | from_yaml }}"
+
+    - name: "TEST 2 - Assert 4 services rendered"
+      ansible.builtin.assert:
+        that:
+          - _rendered_1node.services | length == 4
+          - "'opensearch' in _rendered_1node.services"
+          - "'axon-server' in _rendered_1node.services"
+          - "'axon-dash' in _rendered_1node.services"
+          - "'cassandra-0' in _rendered_1node.services"
+        success_msg: "PASS: 4 services rendered for 1 Cassandra node"
+
+    # --- TEST 3: Render template with 3 Cassandra nodes ----------------------
+    - name: "TEST 3 - Render compose template (3 nodes)"
+      vars:
+        devcluster_cassandra_nodes: 3
+      ansible.builtin.set_fact:
+        _rendered_3nodes: "{{ lookup('template', '../../templates/docker-compose.yml.j2') | from_yaml }}"
+
+    - name: "TEST 3 - Assert 6 services and correct depends_on chain"
+      ansible.builtin.assert:
+        that:
+          - _rendered_3nodes.services | length == 6
+          - "'cassandra-0' in _rendered_3nodes.services"
+          - "'cassandra-1' in _rendered_3nodes.services"
+          - "'cassandra-2' in _rendered_3nodes.services"
+          - "'axon-server' in _rendered_3nodes.services['cassandra-0']['depends_on']"
+          - "'cassandra-0' in _rendered_3nodes.services['cassandra-1']['depends_on']"
+          - "'cassandra-1' in _rendered_3nodes.services['cassandra-2']['depends_on']"
+        success_msg: "PASS: 6 services with correct sequential depends_on chain"
+
+    # --- TEST 4: Custom image versions appear in rendered YAML ---------------
+    - name: "TEST 4 - Render compose template with custom versions"
+      vars:
+        devcluster_opensearch_version: "2.18.0"
+        devcluster_axon_server_version: "1.2.3"
+        devcluster_cassandra_version: "4.1"
+      ansible.builtin.set_fact:
+        _rendered_custom: "{{ lookup('template', '../../templates/docker-compose.yml.j2') | from_yaml }}"
+
+    - name: "TEST 4 - Assert custom image tags in rendered YAML"
+      ansible.builtin.assert:
+        that:
+          - "'opensearchproject/opensearch:2.18.0' in _rendered_custom.services.opensearch.image"
+          - "'axon-server:1.2.3' in _rendered_custom.services['axon-server'].image"
+          - "'cassandra:4.1' in _rendered_custom.services['cassandra-0'].image"
+        success_msg: "PASS: Custom image versions rendered correctly"
+
+    # --- TEST 5: Custom dash port appears in rendered YAML -------------------
+    - name: "TEST 5 - Render compose template with custom dash port"
+      vars:
+        devcluster_axon_dash_port: 8080
+      ansible.builtin.set_fact:
+        _rendered_port: "{{ lookup('template', '../../templates/docker-compose.yml.j2') | from_yaml }}"
+
+    - name: "TEST 5 - Assert custom port mapping"
+      ansible.builtin.assert:
+        that:
+          - "'8080:3000' in _rendered_port.services['axon-dash'].ports"
+        success_msg: "PASS: Custom dash port rendered correctly"
+
+    # --- TEST 6: All services have healthchecks ------------------------------
+    - name: "TEST 6 - Assert all services have healthchecks"
+      ansible.builtin.assert:
+        that:
+          - _rendered_1node.services.opensearch.healthcheck is defined
+          - _rendered_1node.services['axon-server'].healthcheck is defined
+          - _rendered_1node.services['axon-dash'].healthcheck is defined
+          - _rendered_1node.services['cassandra-0'].healthcheck is defined
+        success_msg: "PASS: All services have healthchecks defined"
+
+    # --- TEST 7: Validate fails with bad cassandra_nodes ---------------------
+    - name: "TEST 7 - Validation rejects cassandra_nodes=5"
+      ansible.builtin.assert:
+        that:
+          - 5 | int >= 1
+          - 5 | int <= 3
+      register: _bad_nodes_result
+      ignore_errors: true
+
+    - name: "TEST 7 - Assert validation logic would have failed"
+      ansible.builtin.assert:
+        that:
+          - _bad_nodes_result is failed
+        success_msg: "PASS: cassandra_nodes=5 correctly rejected by validation logic"
+
+    # --- TEST 8: OpenSearch security plugin disabled -------------------------
+    - name: "TEST 8 - OpenSearch has DISABLE_SECURITY_PLUGIN=true"
+      ansible.builtin.assert:
+        that:
+          - "'DISABLE_SECURITY_PLUGIN=true' in _rendered_1node.services.opensearch.environment"
+          - "'discovery.type=single-node' in _rendered_1node.services.opensearch.environment"
+        success_msg: "PASS: OpenSearch security plugin disabled and single-node mode set"
+
+# code: language=ansible

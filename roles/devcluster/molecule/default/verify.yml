@@ -1,0 +1,68 @@
+---
+- name: Verify - AxonOps devcluster configuration
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    devcluster_compose_dir: /tmp/axonops-devcluster-integration
+    devcluster_service_name: axonops-devcluster
+
+  tasks:
+    # --- Verify compose directory and rendered file ---------------------------
+    - name: Stat compose directory
+      ansible.builtin.stat:
+        path: "{{ devcluster_compose_dir }}"
+      register: _compose_dir
+
+    - name: Assert compose directory exists
+      ansible.builtin.assert:
+        that:
+          - _compose_dir.stat.exists
+          - _compose_dir.stat.isdir
+        success_msg: "PASS: Compose directory exists at {{ devcluster_compose_dir }}"
+
+    - name: Stat rendered docker-compose.yml
+      ansible.builtin.stat:
+        path: "{{ devcluster_compose_dir }}/docker-compose.yml"
+      register: _compose_file
+
+    - name: Assert docker-compose.yml was rendered
+      ansible.builtin.assert:
+        that:
+          - _compose_file.stat.exists
+          - _compose_file.stat.size > 0
+        success_msg: "PASS: docker-compose.yml rendered and non-empty"
+
+    - name: Read rendered docker-compose.yml
+      ansible.builtin.slurp:
+        src: "{{ devcluster_compose_dir }}/docker-compose.yml"
+      register: _compose_content
+
+    - name: Parse docker-compose.yml
+      ansible.builtin.set_fact:
+        _compose: "{{ _compose_content.content | b64decode | from_yaml }}"
+
+    - name: Assert expected services are present
+      ansible.builtin.assert:
+        that:
+          - "'opensearch' in _compose.services"
+          - "'axon-server' in _compose.services"
+          - "'axon-dash' in _compose.services"
+          - "'cassandra-0' in _compose.services"
+        success_msg: "PASS: All expected services present in docker-compose.yml"
+
+    # --- Verify systemd unit file deployed ------------------------------------
+    - name: Stat systemd unit file
+      ansible.builtin.stat:
+        path: "/etc/systemd/system/{{ devcluster_service_name }}.service"
+      register: _unit_file
+
+    - name: Assert systemd unit file exists
+      ansible.builtin.assert:
+        that:
+          - _unit_file.stat.exists
+          - _unit_file.stat.size > 0
+        success_msg: "PASS: systemd unit file deployed at /etc/systemd/system/{{ devcluster_service_name }}.service"
+
+# code: language=ansible

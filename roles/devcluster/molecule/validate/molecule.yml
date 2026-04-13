@@ -1,0 +1,23 @@
+---
+# Lightweight scenario: validates variable defaults and template rendering
+# without requiring a running Docker daemon or any containers to start.
+dependency:
+  name: galaxy
+  options:
+    ignore-errors: true
+driver:
+  name: default
+platforms:
+  - name: localhost
+    managed: false
+provisioner:
+  name: ansible
+  playbooks:
+    converge: converge.yml
+  inventory:
+    host_vars:
+      localhost:
+        ansible_connection: local
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+verifier:
+  name: ansible

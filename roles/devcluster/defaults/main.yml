@@ -1,0 +1,62 @@
+---
+# State: present = deploy stack, absent = tear down and remove volumes
+devcluster_state: present
+
+# Directory on target host where docker-compose.yml is rendered
+devcluster_compose_dir: /opt/axonops-devcluster
+
+# --- OpenSearch (metrics backend) -------------------------------------------
+devcluster_opensearch_version: "2.19.1"
+devcluster_opensearch_java_opts: "-Xms512m -Xmx512m"
+
+# --- AxonOps server ----------------------------------------------------------
+devcluster_axon_server_version: "latest"
+
+# --- AxonOps dash ------------------------------------------------------------
+devcluster_axon_dash_version: "latest"
+# Host port exposed for the AxonOps web UI
+devcluster_axon_dash_port: 3000
+
+# --- Cassandra (with AxonOps agent pre-baked) --------------------------------
+# Valid values: "5.0", "4.1", "4.0"
+devcluster_cassandra_version: "5.0"
+# Number of Cassandra nodes to deploy (1-3). Nodes start sequentially.
+devcluster_cassandra_nodes: 1
+devcluster_cassandra_cluster_name: "axonops-devcluster"
+
+# --- AxonOps agent configuration ---------------------------------------------
+# Organisation name shown in the AxonOps UI
+devcluster_axonops_org: "demo"
+
+# --- Container image registry ------------------------------------------------
+devcluster_registry: "registry.axonops.com/axonops-public/axonops-docker"
+
+# --- Docker image pull policy ------------------------------------------------
+# Controls when Docker pulls updated images.
+# always: pull on every run (default for dev — ensures latest images)
+# missing: only pull if image is not present locally (faster, less idempotency churn)
+# never: never pull (offline use)
+devcluster_pull_policy: always
+
+# --- Docker installation (optional) -----------------------------------------
+# Set to true to install Docker CE and the Compose plugin via the docker role
+# before deploying the devcluster. Requires the axonops.axonops.docker role.
+devcluster_install_docker: false
+
+# --- Systemd service name ----------------------------------------------------
+devcluster_service_name: axonops-devcluster
+
+# --- Service start control ---------------------------------------------------
+# Set to false to deploy the systemd unit without starting the service.
+# Useful for molecule tests and environments where systemd is not available.
+devcluster_start_on_install: true
+
+# --- Optional registry authentication ----------------------------------------
+# Leave empty ({}) for public access.
+# To authenticate: set registry, username, and password.
+# Use Ansible Vault to protect credentials.
+# devcluster_registry_auth:
+#   registry: registry.axonops.com
+#   username: myuser
+#   password: mypassword
+devcluster_registry_auth: {}

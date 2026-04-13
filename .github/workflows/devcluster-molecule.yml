@@ -1,0 +1,101 @@
+---
+name: Devcluster Molecule
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'roles/devcluster/**'
+      - '.github/workflows/devcluster-molecule.yml'
+  pull_request:
+    paths:
+      - 'roles/devcluster/**'
+      - '.github/workflows/devcluster-molecule.yml'
+
+defaults:
+  run:
+    working-directory: roles/devcluster
+
+jobs:
+  # Lightweight: validates template rendering and variable defaults
+  # No running containers or Docker daemon required beyond the CI runner itself.
+  validate:
+    name: Molecule Devcluster (validate)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the codebase
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install test dependencies
+        run: pip3 install ansible molecule
+
+      - name: Run Molecule converge (validate scenario)
+        run: molecule -v converge -s validate
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+
+  # Full integration: deploys the complete AxonOps devcluster stack.
+  # GitHub Actions ubuntu-latest runners have Docker pre-installed.
+  integration:
+    name: Molecule Devcluster (integration)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the codebase
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install test dependencies
+        run: pip3 install ansible molecule molecule-plugins[docker] docker
+
+      - name: Install Ansible collections
+        run: ansible-galaxy collection install community.docker
+
+      - name: Run Molecule destroy (ignore failures)
+        run: molecule -v destroy
+        continue-on-error: true
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+
+      - name: Run Molecule converge
+        run: molecule -v converge
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+
+      - name: Show container logs on failure
+        if: failure()
+        run: |
+          docker compose -p axonops-devcluster-integration logs --no-color || true
+        working-directory: /tmp/axonops-devcluster-integration
+
+      - name: Run Molecule verify
+        run: molecule -v verify
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+
+      - name: Run Molecule destroy (cleanup)
+        run: molecule -v destroy
+        if: always()
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles

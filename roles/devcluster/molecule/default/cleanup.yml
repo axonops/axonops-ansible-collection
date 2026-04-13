@@ -1,0 +1,26 @@
+---
+- name: Cleanup - Tear down AxonOps devcluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    devcluster_compose_dir: /tmp/axonops-devcluster-integration
+    devcluster_state: absent
+
+  roles:
+    - role: devcluster
+
+  post_tasks:
+    - name: Assert compose directory was removed
+      ansible.builtin.stat:
+        path: /tmp/axonops-devcluster-integration
+      register: _compose_dir
+
+    - name: Verify compose directory is gone
+      ansible.builtin.assert:
+        that:
+          - not _compose_dir.stat.exists
+        success_msg: "PASS: Compose directory removed after teardown"
+
+# code: language=ansible
