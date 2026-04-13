@@ -43,6 +43,7 @@
   ansible.builtin.systemd:
     daemon_reload: true
   when: devcluster_state == 'absent'
+  failed_when: false
 
 - name: Remove compose directory (absent)
   ansible.builtin.file:
