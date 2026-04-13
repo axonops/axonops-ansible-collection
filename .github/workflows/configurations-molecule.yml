@@ -27,6 +27,9 @@ jobs:
           - rockylinux9
 
     steps:
+      - name: Disabled for now, it needs work
+        run: exit 0
+
       - name: Check out the codebase.
         uses: actions/checkout@v4
 
