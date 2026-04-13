@@ -69,3 +69,18 @@ jobs:
             *.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    name: Publish to Ansible Galaxy
+    runs-on: ubuntu-latest
+    needs: [build]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Install ansible
+        run: sudo apt update && sudo apt-get -y install ansible
+      - name: Build and publish collection
+        run: |
+          ansible-galaxy collection build
+          ansible-galaxy collection publish *.tar.gz --token ${{ secrets.ANSIBLE_GALAXY_TOKEN }}
