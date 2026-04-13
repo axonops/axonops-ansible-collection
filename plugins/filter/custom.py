@@ -1,5 +1,13 @@
 __author__ = "dale mcdiarmid"
 
+DOCUMENTATION = r"""
+  name: axonops_filters
+  short_description: Utility filters for AxonOps collection
+  description:
+    - A set of Jinja2 filters used internally by the AxonOps Ansible collection.
+  author: dale mcdiarmid
+"""
+
 import re
 import os.path
 from six import string_types

@@ -98,7 +98,7 @@ options:
             - For how long in the past you want the scrape log.
         required: true
         type: str
-    operator
+    operator:
         description:
             - The operator to use un the alert query.
             - The default value is '>='.
