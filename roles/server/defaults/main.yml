@@ -58,8 +58,8 @@ axon_server_retention:
     local: 10d
     remote: 30d
 
-# Optional for multplie clusters
-# axon_server_org_name: "axonops"
+# REQUIRED — must be set by the caller; no default value
+# axon_server_org_name: "mycompany"
 
 # CQL configuration
 axon_server_cql_hosts: []

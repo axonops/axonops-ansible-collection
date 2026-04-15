@@ -69,9 +69,7 @@ alerting:
 retention:
   {{ axon_server_retention | to_nice_yaml(indent=2) | indent(2) }}
 
-{% if axon_server_org_name is defined %}
 org_name: {{ axon_server_org_name }}
-{% endif %}
 {% if axon_server_license_key is defined and axon_server_license_key != "" %}
 license_key: "{{ axon_server_license_key }}"
 {% endif %}
