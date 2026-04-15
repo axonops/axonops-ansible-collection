@@ -9,7 +9,9 @@
     that:
       - axon_server_state is defined
       - axon_server_state in ['present', 'absent']
-    fail_msg: "You must configured the axon_server_state variable with one of the following values: present, absent."
+      - axon_server_org_name is defined
+      - axon_server_org_name | length > 0
+    fail_msg: "axon_server_state must be 'present' or 'absent', and axon_server_org_name must be set."
 
 - name: Confirm if TLS is required
   ansible.builtin.assert:

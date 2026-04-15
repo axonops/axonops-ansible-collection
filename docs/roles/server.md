@@ -24,6 +24,7 @@ The `server` role installs and configures the AxonOps Server, which is the core 
 | `axon_server_version` | `latest` | Version of AxonOps Server to install |
 | `axon_server_hum` | `false` | Enable Human Readable IDs |
 | `axon_server_license_key` | - | License key for on-premises AxonOps deployment (required for self-hosted) |
+| `axon_server_org_name` | - | Organisation name used by AxonOps Server (**required**) |
 
 ### Network Configuration
 
@@ -134,6 +135,7 @@ using `single-node` mode with automatically generated TLS certificates:
     opensearch_domain_name: example.com
 
     # AxonOps Server configuration
+    axon_server_org_name: "mycompany"
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
@@ -159,6 +161,7 @@ using `single-node` mode with automatically generated TLS certificates:
   hosts: axon-server
   become: true
   vars:
+    axon_server_org_name: "mycompany"
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
@@ -197,6 +200,7 @@ using `single-node` mode with automatically generated TLS certificates:
     es_heap_size: 2g
 
     # AxonOps Server Configuration
+    axon_server_org_name: "mycompany"
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
@@ -236,6 +240,7 @@ using `single-node` mode with automatically generated TLS certificates:
   hosts: axon-server
   become: true
   vars:
+    axon_server_org_name: "mycompany"
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - cassandra-1.example.com:9042
@@ -262,6 +267,7 @@ using `single-node` mode with automatically generated TLS certificates:
   hosts: axon-server
   become: true
   vars:
+    axon_server_org_name: "mycompany"
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
@@ -298,6 +304,7 @@ using `single-node` mode with automatically generated TLS certificates:
   hosts: axon-server
   become: true
   vars:
+    axon_server_org_name: "mycompany"
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
@@ -326,6 +333,7 @@ using `single-node` mode with automatically generated TLS certificates:
   hosts: axon-server
   become: true
   vars:
+    axon_server_org_name: "mycompany"
     axon_server_license_key: "your-license-key-here"
     axon_server_cql_hosts:
       - localhost:9042
