@@ -275,23 +275,31 @@ using `single-node` mode with automatically generated TLS certificates:
       - http://127.0.0.1:9200
     axon_server_ldap_enabled: true
     axon_server_ldap_setting:
-      serverName: "production_ldap"
-      base: "dc=example,dc=com"
       host: "ldap.example.com"
       port: 636
       useSSL: true
+      startTLS: false
+      insecureSkipVerify: false
+      # serverName: "ldap.example.com"  # optional: override TLS SNI hostname (defaults to host)
+      base: "dc=example,dc=com"
       bindDN: "cn=admin,dc=example,dc=com"
       bindPassword: "{{ vault_ldap_password }}"
-      userFilter: "(uid=%s)"
+      userFilter: "(sAMAccountName=%s)"
       rolesAttribute: memberOf
       callAttempts: 3
       rolesMapping:
+        # Global defaults — applied to all clusters unless overridden below
         _global_:
-          superUserRole: 'cn=axonops_super,ou=Groups,dc=example,dc=com'
-          adminRole: 'cn=axonops_admin,ou=Groups,dc=example,dc=com'
-          readOnlyRole: 'cn=axonops_readonly,ou=Groups,dc=example,dc=com'
-          backupAdminRole: 'cn=axonops_backup,ou=Groups,dc=example,dc=com'
-          dbaRole: 'cn=axonops_dba,ou=Groups,dc=example,dc=com'
+          superUserRole: "cn=axonops_super,ou=Groups,dc=example,dc=com"
+          adminRole: "cn=axonops_admin,ou=Groups,dc=example,dc=com"
+          readOnlyRole: "cn=axonops_readonly,ou=Groups,dc=example,dc=com"
+          backupAdminRole: "cn=axonops_backup,ou=Groups,dc=example,dc=com"
+        # Optional: override roles for a specific cluster (org/type/cluster)
+        mycompany/cassandra/prod:
+          superUserRole: "cn=prod_superusers,ou=Groups,dc=example,dc=com"
+          adminRole: none
+          readOnlyRole: "cn=prod_readonly,ou=Groups,dc=example,dc=com"
+          backupAdminRole: none
 
   roles:
     - role: axonops.axonops.server

@@ -1,4 +1,16 @@
 ---
+- name: Add warning if no licence key
+  ansible.builtin.debug:
+    msg: "WARNING: No license key provided. Axon Server will run in development mode with limited features and a warning message on the UI. Please provide a valid license key to unlock all features and remove the warning message."
+  when: axon_server_license_key is not defined or axon_server_license_key == ""
+
+- name: LDAP cannot be used without a valid license key
+  ansible.builtin.debug:
+    msg: "WARNING: No license key provided. Axon Server will ignore the LDAP configuration and run in development mode with limited features and a warning message on the UI. Please provide a valid license key to unlock all features and remove the warning message."
+  when:
+    - axon_server_license_key is not defined or axon_server_license_key == ""
+    - axon_server_ldap_enabled
+
 - name: Include OS speficig config
   ansible.builtin.include_tasks: "repo/{{ ansible_os_family }}.yml"
   tags:
