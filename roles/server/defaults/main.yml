@@ -22,11 +22,13 @@ axon_server_agents_port: 1888     # Agent port (axon-server <> axon-agent)
 
 axon_server_ldap_enabled: false
 axon_server_ldap_setting:
-  serverName: "axonops_sample"
-  base: "dc=axonops,dc=io"
   host: "ldap.example.com"
   port: 636
   useSSL: true
+  startTLS: false
+  insecureSkipVerify: false
+  # serverName: "ldap.example.com"  # optional: override TLS SNI hostname (defaults to host)
+  base: "dc=axonops,dc=io"
   bindDN: ""
   bindPassword: "secret"
   userFilter: "(uid=%s)"
@@ -38,7 +40,6 @@ axon_server_ldap_setting:
       adminRole: 'cn=admin,o=Groups,dc=axonops,dc=io'
       readOnlyRole: 'cn=ro,o=Groups,dc=axonops,dc=io'
       backupAdminRole: 'cn=backups_ro,o=Groups,dc=axonops,dc=io'
-      dbaRole: 'cn=dba,o=Groups,dc=axonops,dc=io'
 
 axon_server_tls_mode: disabled
 
