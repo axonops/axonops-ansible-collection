@@ -61,6 +61,35 @@ For a complete guide including deployment patterns and quick references, see the
 
 ### Installing the collection
 
+#### From Ansible Galaxy (recommended)
+
+The collection is published on [Ansible Galaxy](https://galaxy.ansible.com/ui/repo/published/axonops/axonops/). Install it with:
+
+```sh
+ansible-galaxy collection install axonops.axonops
+```
+
+To install a specific version:
+
+```sh
+ansible-galaxy collection install axonops.axonops:==0.5.1
+```
+
+To declare it as a dependency, add it to your `requirements.yml`:
+
+```yaml
+collections:
+  - name: axonops.axonops
+```
+
+Then install with:
+
+```sh
+ansible-galaxy collection install -r requirements.yml
+```
+
+#### From GitHub
+
 Download the latest release from [GitHub](https://github.com/axonops/axonops-ansible-collection/releases/). Then use `ansible-galaxy`
 to install the tarball into a directory configured in [COLLECTIONS_PATHS](https://docs.ansible.com/ansible/latest/reference_appendices/config.html#collections-paths).
 
