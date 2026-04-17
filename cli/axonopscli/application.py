@@ -5,11 +5,24 @@ import sys
 from typing import Sequence
 
 from .axonops import AxonOps
+from .components.alerts import AlertsExporter
 from .components.dashboard import Dashboard
 from .components.repair import AdaptiveRepair
 from .components.scheduled_repair import ScheduledRepair
 from .components.silence import Silence
 from .utils import remove_not_alphanumeric
+
+# argparse.Namespace attributes that must never be printed, even in verbose
+# mode — they contain live credentials.
+_SENSITIVE_ARG_KEYS = frozenset({"token", "password"})
+
+
+def _scrubbed_args(args: argparse.Namespace) -> dict:
+    """Return a dict of argparse attrs with sensitive values masked."""
+    return {
+        k: ("***" if v else v) if k in _SENSITIVE_ARG_KEYS else v
+        for k, v in vars(args).items()
+    }
 
 
 class Application:
@@ -369,11 +382,10 @@ class Application:
         """ Run the alerts export """
         if args.v:
             print(f"Running alerts export on {args.org}/{args.cluster}")
-            print(args)
+            print(_scrubbed_args(args))
 
         axonops = self.get_axonops(args)
 
-        from .components.alerts import AlertsExporter
         exporter = AlertsExporter(axonops, args)
         exporter.fetch()
         exporter.export(args.exportpath, include_secrets=args.include_secrets)

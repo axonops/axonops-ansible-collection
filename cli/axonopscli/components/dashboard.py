@@ -124,7 +124,7 @@ class Dashboard:
 
             # Update AxonOps with the new list of dashboards
             update_payload = {
-                'type': 'cassandra',
+                'type': self.axonops.get_cluster_type(),
                 'dashboards': self.dashboard_data
             }
             response = self.axonops.do_request(
@@ -152,7 +152,7 @@ class Dashboard:
 
         # Update AxonOps with the new list of dashboards
         update_payload = {
-            'type': 'cassandra',
+            'type': self.axonops.get_cluster_type(),
             'dashboards': self.dashboard_data
         }
         response = self.axonops.do_request(

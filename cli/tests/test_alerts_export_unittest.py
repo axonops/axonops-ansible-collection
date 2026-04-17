@@ -497,6 +497,141 @@ class TestClusterTypeFix(unittest.TestCase):
 
         self.assertEqual(captured['cluster_type'], 'kafka')
 
+    def test_fetch_uses_cluster_type_in_url_for_kafka(self):
+        # The cluster_type fix must flow through to the alert-rules and
+        # integrations URLs, not just the AxonOps constructor.
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "kafka"
+        axonops.do_request.return_value = {}
+        args = _args(org="acme", cluster="prod")
+
+        exporter = AlertsExporter(axonops, args)
+        exporter.fetch()
+
+        call_urls = [c.kwargs.get('url') or c.args[0] for c in axonops.do_request.call_args_list]
+        self.assertIn("/api/v1/alert-rules/acme/kafka/prod", call_urls)
+        self.assertIn("/api/v1/integrations/acme/kafka/prod", call_urls)
+
+
+class TestDashboardClusterTypeInPayload(unittest.TestCase):
+    """Regression guard: dashboard PUT payloads must carry the actual
+    cluster_type, not a hardcoded 'cassandra'."""
+
+    def _make_dashboard(self, cluster_type):
+        from axonopscli.components.dashboard import Dashboard
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = cluster_type
+        args = SimpleNamespace(org="acme", cluster="prod", v=0)
+        d = Dashboard(axonops, args)
+        d.dashboard_data = [{"name": "existing"}]
+        return d, axonops
+
+    def test_import_dashboard_put_payload_uses_cluster_type(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # Prepare a minimal dashboard json to import
+            import_path = os.path.join(tmp, "new.json")
+            with open(import_path, "w") as f:
+                json.dump({"name": "new-board"}, f)
+
+            d, axonops = self._make_dashboard(cluster_type="kafka")
+            d.import_dashboard(import_path, dashboard_name=None, position=None, overwrite=False)
+
+            # Inspect the PUT json_data
+            put_calls = [
+                c for c in axonops.do_request.call_args_list
+                if (c.kwargs.get('method') or (c.args[1] if len(c.args) > 1 else None)) == 'PUT'
+            ]
+            self.assertTrue(put_calls, "expected a PUT call")
+            payload = put_calls[-1].kwargs.get('json_data')
+            self.assertEqual(payload['type'], 'kafka')
+
+    def test_delete_dashboard_put_payload_uses_cluster_type(self):
+        d, axonops = self._make_dashboard(cluster_type="kafka")
+        d.dashboard_data = [{"name": "target"}]
+
+        d.delete_dashboard("target")
+
+        put_calls = [
+            c for c in axonops.do_request.call_args_list
+            if (c.kwargs.get('method') or (c.args[1] if len(c.args) > 1 else None)) == 'PUT'
+        ]
+        self.assertTrue(put_calls, "expected a PUT call")
+        payload = put_calls[-1].kwargs.get('json_data')
+        self.assertEqual(payload['type'], 'kafka')
+
+
+class TestVerboseArgsScrub(unittest.TestCase):
+    """Verbose mode must not print raw secrets (token, password) when
+    running the alerts subcommand."""
+
+    def test_run_alerts_verbose_does_not_print_token(self):
+        from axonopscli.application import Application
+        from axonopscli.axonops import AxonOps
+        import io
+        import contextlib
+
+        buf = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(AxonOps, 'do_request', return_value={}):
+                with contextlib.redirect_stdout(buf):
+                    Application().run([
+                        "--org", "acme", "--cluster", "prod",
+                        "--token", "SUPER-SECRET-TOKEN-VALUE",
+                        "-v",
+                        "alerts", "--exportpath", tmp,
+                    ])
+
+        output = buf.getvalue()
+        self.assertNotIn("SUPER-SECRET-TOKEN-VALUE", output,
+                         f"Token leaked to stdout in verbose mode:\n{output}")
+
+    def test_run_alerts_verbose_does_not_print_password(self):
+        from axonopscli.application import Application
+        from axonopscli.axonops import AxonOps
+        import io
+        import contextlib
+
+        # Bypass AxonOps.__init__ entirely to avoid the pre-existing do_login
+        # AttributeError that triggers on the username/password auth path.
+        # This test is about whether run_alerts scrubs args.password from
+        # stdout, not about AxonOps construction.
+        def noop_init(self, *args, **kwargs):
+            self.cluster_type = kwargs.get('cluster_type', 'cassandra')
+
+        buf = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(AxonOps, '__init__', new=noop_init), \
+                 patch.object(AxonOps, 'do_request', return_value={}):
+                with contextlib.redirect_stdout(buf):
+                    Application().run([
+                        "--org", "acme", "--cluster", "prod",
+                        "--url", "https://example.com",
+                        "--username", "svc",
+                        "--password", "P@SSWORD-SENTINEL",
+                        "-v",
+                        "alerts", "--exportpath", tmp,
+                    ])
+
+        output = buf.getvalue()
+        self.assertNotIn("P@SSWORD-SENTINEL", output,
+                         f"Password leaked to stdout in verbose mode:\n{output}")
+
+
+class TestExportBeforeFetchContract(unittest.TestCase):
+    """Calling export() without fetch() must not crash with
+    AttributeError; it should fall through to the 'nothing to export'
+    branch."""
+
+    def test_export_before_fetch_falls_through_to_nothing_to_export(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            exporter = AlertsExporter(MagicMock(), _args(exportpath=tmp))
+            # Explicitly not calling fetch(); alert_rules and integrations
+            # remain at their None defaults.
+            exporter.export(tmp, include_secrets=False)
+
+            # Directory should be empty — no files written, no exceptions.
+            self.assertEqual(os.listdir(tmp), [])
+
 
 if __name__ == "__main__":
     unittest.main()
