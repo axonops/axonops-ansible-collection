@@ -63,7 +63,11 @@
     user: admin
     password: "{{ opensearch_admin_password }}"
     validate_certs: false
+    force_basic_auth: true
   register: _opensearch_health
+  retries: 5
+  delay: 5
+  until: _opensearch_health.status == 200
   when: opensearch_start_on_install and opensearch_security_enabled
   tags: health
 
