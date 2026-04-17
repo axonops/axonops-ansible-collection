@@ -26,11 +26,19 @@
       opensearch_tls_node_http_cert, opensearch_tls_node_http_key.
   when: opensearch_tls_mode == 'custom'
 
-# --- Default _certs_changed flag (overridden by generate/custom blocks) ------
+# --- Default flags -----------------------------------------------------------
 
 - name: Initialise certs changed flag
   ansible.builtin.set_fact:
     _certs_changed: false
+
+- name: Check if security index has been initialised by this role
+  ansible.builtin.stat:
+    path: "{{ opensearch_conf_dir }}/.security_initialized"
+    get_attributes: false
+    get_checksum: false
+    get_mime: false
+  register: _security_marker
 
 # =============================================================================
 # MODE: generate - Self-signed certificates via searchguard-tlstool
@@ -192,6 +200,14 @@
         _certs_changed: "{{ _custom_certs_copy.changed }}"
 
 # =============================================================================
+# Determine if security initialisation is needed
+# =============================================================================
+
+- name: Determine if security initialisation is needed
+  ansible.builtin.set_fact:
+    _security_init_needed: "{{ _certs_changed or opensearch_security_force_init or not _security_marker.stat.exists }}"
+
+# =============================================================================
 # Common security configuration (both TLS modes)
 # =============================================================================
 
@@ -238,7 +254,7 @@
     state: started
     enabled: true
     daemon_reload: true
-  when: _certs_changed or opensearch_security_force_init
+  when: _security_init_needed
 
 - name: Wait for OpenSearch to be ready
   ansible.builtin.wait_for:
@@ -247,7 +263,7 @@
     delay: 5
     connect_timeout: 1
     timeout: 120
-  when: _certs_changed or opensearch_security_force_init
+  when: _security_init_needed
 
 # --- Password hashing (hash before templating — no plaintext on disk) -------
 
@@ -263,7 +279,7 @@
   changed_when: false
   no_log: true
   run_once: true
-  when: _certs_changed or opensearch_security_force_init
+  when: _security_init_needed
 
 - name: Hash dashboards password
   ansible.builtin.command:
@@ -277,7 +293,7 @@
   changed_when: false
   no_log: true
   run_once: true
-  when: _certs_changed or opensearch_security_force_init
+  when: _security_init_needed
 
 - name: Hash custom user passwords
   ansible.builtin.command:
@@ -294,7 +310,7 @@
   loop: "{{ opensearch_users }}"
   loop_control:
     label: "{{ item.name }}"
-  when: _certs_changed or opensearch_security_force_init
+  when: _security_init_needed
 
 # --- Deploy security configuration files ------------------------------------
 
@@ -306,7 +322,7 @@
     group: "{{ opensearch_group }}"
     mode: "0640"
   run_once: true
-  when: _certs_changed or opensearch_security_force_init
+  when: _security_init_needed
 
 - name: Deploy roles configuration
   ansible.builtin.template:
@@ -316,7 +332,7 @@
     group: "{{ opensearch_group }}"
     mode: "0640"
   run_once: true
-  when: _certs_changed or opensearch_security_force_init
+  when: _security_init_needed
 
 - name: Deploy roles mapping configuration
   ansible.builtin.template:
@@ -326,7 +342,7 @@
     group: "{{ opensearch_group }}"
     mode: "0640"
   run_once: true
-  when: _certs_changed or opensearch_security_force_init
+  when: _security_init_needed
 
 - name: Deploy custom security configuration files
   ansible.builtin.template:
@@ -337,7 +353,7 @@
     backup: true
     mode: "0640"
   loop: "{{ opensearch_custom_security_configs }}"
-  when: opensearch_copy_custom_security_configs and (_certs_changed or opensearch_security_force_init)
+  when: opensearch_copy_custom_security_configs and _security_init_needed
 
 # --- Initialise security index -----------------------------------------------
 
@@ -361,7 +377,16 @@
   environment:
     JAVA_HOME: "{{ opensearch_install_root }}/jdk"
   run_once: true
-  when: _certs_changed or opensearch_security_force_init
+  when: _security_init_needed
   changed_when: true
+
+- name: Mark security index as initialised
+  ansible.builtin.copy:
+    content: "Initialised by axonops.axonops.opensearch role on {{ ansible_date_time.iso8601 | default('unknown') }}\n"
+    dest: "{{ opensearch_conf_dir }}/.security_initialized"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    mode: "0600"
+  when: _security_init_needed
 
 # code: language=ansible
