@@ -6,24 +6,39 @@ REDACTED = "***REDACTED***"
 GITIGNORE_FILENAME = ".gitignore"
 SECRETS_WARNING = (
     "WARNING: --include-secrets is set; the export contains live secrets "
-    "(webhook URLs, API keys, etc.). File mode is 0600 and the export "
-    "directory's .gitignore has been updated to exclude these files."
+    "(webhook URLs, API keys, etc.). File mode is 0600; the export "
+    "directory's .gitignore is maintained to exclude these files."
 )
 
 # Field names whose values are treated as secrets. Match is case-insensitive
-# against the full key. To extend: add a regex below. Keep patterns explicit
-# (avoid blanket `key`/`token` since those match unrelated fields).
+# against the full key. Deliberately permissive: false positives (redacting a
+# non-secret) are acceptable; false negatives (leaking a secret) are not.
+#
+# Exact matches cover the handful of API field names that don't follow a common
+# suffix pattern. Suffix matches cover future integration types without code
+# changes (which is why this pattern-based approach exists in the first place).
+#
+# Extend by adding a regex. If you add a pattern broad enough to match a
+# benign field in an existing integration response, add a test asserting the
+# benign field survives (see test_non_secret_url_variants_are_not_over_redacted).
 SECRET_FIELD_PATTERNS = [
     re.compile(p, re.IGNORECASE)
     for p in (
-        r'^webhook_url$',
-        r'^api_key$',
-        r'^integration_key$',
-        r'^service_key$',
-        r'^routing_key$',
-        r'^auth_token$',
+        # Exact matches
         r'^password$',
         r'^secret$',
+        r'^auth$',
+        r'^credentials$',
+        r'^bearer$',
+        r'^url$',           # Slack API stores the webhook under `url`
+        r'^webHookURL$',    # Teams API uses camelCase `webHookURL`
+        # Suffix matches (trailing part of an underscore-delimited key)
+        r'_key$',           # api_key, integration_key, opsgenie_key, service_key, routing_key
+        r'_token$',         # auth_token, access_token, refresh_token, bearer_token
+        r'_password$',      # smtp_password, basic_auth_password
+        r'_secret$',        # client_secret
+        r'_url$',           # webhook_url, any *_url (over-redaction is safer than under)
+        r'_webhook$',
     )
 ]
 
@@ -47,7 +62,9 @@ class SecretRedactor:
 
     @staticmethod
     def _is_secret_key(key):
-        return any(p.match(str(key)) for p in SECRET_FIELD_PATTERNS)
+        # re.search so patterns like `_key$` match "ends with _key".
+        # Exact-match patterns use explicit `^...$` anchors.
+        return any(p.search(str(key)) for p in SECRET_FIELD_PATTERNS)
 
 
 class AlertsExporter:
@@ -122,9 +139,14 @@ class AlertsExporter:
     def _write_resource(self, exportpath, filename, body, include_secrets):
         payload = body if include_secrets else SecretRedactor.redact(body)
         path = os.path.join(exportpath, filename)
-        with open(path, "w") as f:
+        # Atomic creation with restrictive mode. If a prior file exists with
+        # permissive mode, tighten it BEFORE writing so the secret payload
+        # never coexists with world-readable permissions (even transiently).
+        if os.path.exists(path):
+            os.chmod(path, 0o600)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
             json.dump(payload, f, indent=4)
-        os.chmod(path, 0o600)
 
     def _update_gitignore(self, exportpath, filenames):
         gitignore_path = os.path.join(exportpath, GITIGNORE_FILENAME)

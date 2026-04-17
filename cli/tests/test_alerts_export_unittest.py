@@ -35,14 +35,15 @@ class TestSecretRedactor(unittest.TestCase):
         self.assertEqual(result["Params"]["api_key"], REDACTED)
 
     def test_redacts_servicenow_password(self):
+        # Actual ServiceNow API response fields: instance_name, user, password.
         payload = {
             "Type": "servicenow",
-            "Params": {"username": "svc", "password": "p@ss", "instance_url": "https://x.service-now.com"},
+            "Params": {"user": "svc", "password": "p@ss", "instance_name": "my-instance"},
         }
         result = SecretRedactor.redact(payload)
         self.assertEqual(result["Params"]["password"], REDACTED)
-        self.assertEqual(result["Params"]["username"], "svc")  # username intentionally not redacted
-        self.assertEqual(result["Params"]["instance_url"], "https://x.service-now.com")  # not in patterns
+        self.assertEqual(result["Params"]["user"], "svc")             # not in patterns
+        self.assertEqual(result["Params"]["instance_name"], "my-instance")  # not in patterns
 
     def test_redacts_nested_definitions_list_preserves_structure(self):
         payload = {
@@ -72,6 +73,77 @@ class TestSecretRedactor(unittest.TestCase):
         payload = {"Params": {"webhook_url": "https://example.com"}}
         SecretRedactor.redact(payload)
         self.assertEqual(payload["Params"]["webhook_url"], "https://example.com")
+
+    def test_redacts_slack_api_field_url(self):
+        # Slack API stores the webhook under 'url', not 'webhook_url'.
+        payload = {"Type": "slack", "Params": {"name": "ops", "url": "https://hooks.slack.com/X"}}
+        result = SecretRedactor.redact(payload)
+        self.assertEqual(result["Params"]["url"], REDACTED)
+        self.assertEqual(result["Params"]["name"], "ops")
+
+    def test_redacts_teams_api_field_webHookURL_camelcase(self):
+        # Teams API uses camelCase 'webHookURL'.
+        payload = {"Type": "teams", "Params": {"webHookURL": "https://outlook.office.com/X"}}
+        result = SecretRedactor.redact(payload)
+        self.assertEqual(result["Params"]["webHookURL"], REDACTED)
+
+    def test_redacts_opsgenie_key_api_field(self):
+        # Opsgenie API stores the key under 'opsgenie_key', not 'api_key'.
+        payload = {"Type": "opsgenie", "Params": {"opsgenie_key": "real-secret"}}
+        result = SecretRedactor.redact(payload)
+        self.assertEqual(result["Params"]["opsgenie_key"], REDACTED)
+
+    def test_redacts_oauth_access_token(self):
+        payload = {"Params": {"access_token": "xoxb-real-slack-bot-token"}}
+        result = SecretRedactor.redact(payload)
+        self.assertEqual(result["Params"]["access_token"], REDACTED)
+
+    def test_redacts_oauth_client_secret(self):
+        payload = {"Params": {"client_secret": "abc"}}
+        result = SecretRedactor.redact(payload)
+        self.assertEqual(result["Params"]["client_secret"], REDACTED)
+
+    def test_redacts_bearer_token(self):
+        payload = {"Params": {"bearer_token": "eyJhbGciOiJ..."}}
+        result = SecretRedactor.redact(payload)
+        self.assertEqual(result["Params"]["bearer_token"], REDACTED)
+
+    def test_redacts_refresh_token(self):
+        payload = {"Params": {"refresh_token": "rf-xxx"}}
+        result = SecretRedactor.redact(payload)
+        self.assertEqual(result["Params"]["refresh_token"], REDACTED)
+
+    def test_redacts_credentials_field(self):
+        payload = {"Params": {"credentials": "user:pass"}}
+        result = SecretRedactor.redact(payload)
+        self.assertEqual(result["Params"]["credentials"], REDACTED)
+
+    def test_redaction_is_case_insensitive(self):
+        payload = {"Params": {"WEBHOOK_URL": "X", "Webhook_URL": "Y", "WebHookURL": "Z"}}
+        result = SecretRedactor.redact(payload)
+        self.assertEqual(result["Params"]["WEBHOOK_URL"], REDACTED)
+        self.assertEqual(result["Params"]["Webhook_URL"], REDACTED)
+        self.assertEqual(result["Params"]["WebHookURL"], REDACTED)
+
+    def test_non_secret_url_variants_are_not_over_redacted(self):
+        # These fields are non-secret metadata that appear in integration
+        # responses. They must not be redacted.
+        # Note: any field ending in _url IS redacted (e.g. axonops_url) on
+        # purpose — false positives (over-redaction of non-secrets) are
+        # acceptable; false negatives (leaked secrets) are not.
+        payload = {
+            "Params": {
+                "name": "ops",
+                "instance_name": "my-instance",
+                "user": "svc",
+                "axondashUrl": "https://dash.axonops.cloud/acme",  # camelCase, no _url suffix
+            }
+        }
+        result = SecretRedactor.redact(payload)
+        self.assertEqual(result["Params"]["name"], "ops")
+        self.assertEqual(result["Params"]["instance_name"], "my-instance")
+        self.assertEqual(result["Params"]["user"], "svc")
+        self.assertEqual(result["Params"]["axondashUrl"], "https://dash.axonops.cloud/acme")
 
 
 class TestAlertsExporterFetch(unittest.TestCase):
@@ -125,7 +197,7 @@ class TestAlertsExporterExport(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             ex = self._make_exporter(
                 alert_rules={"rules": [{"name": "r1"}]},
-                integrations={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "u"}}],
+                integrations={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "https://hooks.slack.com/SENTINEL-SECRET"}}],
                               "Routing": [], "Overrides": []},
                 exportpath=tmp,
             )
@@ -219,6 +291,26 @@ class TestAlertsExporterExport(unittest.TestCase):
             self.assertTrue(os.path.isdir(target))
             self.assertTrue(os.path.exists(os.path.join(target, "alert_rules.json")))
 
+    def test_export_tightens_mode_when_overwriting_world_readable_file(self):
+        # If an earlier run (or the user) left a world-readable file, the
+        # next export must end up 0600 regardless. Guards against the
+        # chmod-after-write race.
+        with tempfile.TemporaryDirectory() as tmp:
+            pre_existing = os.path.join(tmp, "alert_rules.json")
+            with open(pre_existing, "w") as f:
+                f.write("{}")
+            os.chmod(pre_existing, 0o644)  # simulate world-readable
+
+            ex = self._make_exporter(
+                alert_rules={"rules": [{"name": "r1"}]},
+                integrations={},
+                exportpath=tmp,
+            )
+            ex.export(tmp, include_secrets=False)
+
+            mode = stat.S_IMODE(os.stat(pre_existing).st_mode)
+            self.assertEqual(mode, 0o600)
+
     def test_export_raises_when_path_exists_as_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             file_path = os.path.join(tmp, "file_not_dir")
@@ -238,7 +330,7 @@ class TestAlertsExporterGitignore(unittest.TestCase):
     def _exporter_with_full_data(self, exportpath, include_secrets):
         ex = AlertsExporter(MagicMock(), _args(exportpath=exportpath, include_secrets=include_secrets))
         ex.alert_rules = {"rules": [{"name": "r1"}]}
-        ex.integrations = {"Definitions": [{"Type": "slack", "Params": {"webhook_url": "u"}}],
+        ex.integrations = {"Definitions": [{"Type": "slack", "Params": {"webhook_url": "https://hooks.slack.com/SENTINEL-SECRET"}}],
                            "Routing": [], "Overrides": []}
         return ex
 
@@ -310,7 +402,7 @@ class TestApplicationRunAlerts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self._patch_axonops(
                 alert_rules_response={"rules": [{"name": "r1"}]},
-                integrations_response={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "u"}}],
+                integrations_response={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "https://hooks.slack.com/SENTINEL-SECRET"}}],
                                        "Routing": [], "Overrides": []},
             ):
                 app = Application()
@@ -335,7 +427,7 @@ class TestApplicationRunAlerts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self._patch_axonops(
                 alert_rules_response={},
-                integrations_response={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "u"}}],
+                integrations_response={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "https://hooks.slack.com/SENTINEL-SECRET"}}],
                                        "Routing": [], "Overrides": []},
             ):
                 app = Application()
@@ -350,7 +442,10 @@ class TestApplicationRunAlerts(unittest.TestCase):
 
             with open(os.path.join(tmp, "integrations.json")) as f:
                 data = json.load(f)
-            self.assertEqual(data["Definitions"][0]["Params"]["webhook_url"], "u")
+            self.assertEqual(
+                data["Definitions"][0]["Params"]["webhook_url"],
+                "https://hooks.slack.com/SENTINEL-SECRET",
+            )
 
             with open(os.path.join(tmp, ".gitignore")) as f:
                 gi_lines = {line.strip() for line in f if line.strip()}
