@@ -25,9 +25,9 @@ kibanaserver:
     - "{{ role }}"
 {% endfor %}
 {% endif %}
-{% if user.roles is defined and user.roles | length > 0 %}
-  roles:
-{% for role in user.roles %}
+{% if user.opendistro_security_roles is defined and user.opendistro_security_roles | length > 0 %}
+  opendistro_security_roles:
+{% for role in user.opendistro_security_roles %}
     - "{{ role }}"
 {% endfor %}
 {% endif %}

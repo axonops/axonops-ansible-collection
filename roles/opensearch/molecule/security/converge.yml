@@ -30,7 +30,7 @@
         password: "App$User'Pass"
         backend_roles:
           - app_backend_role
-        roles:
+        opendistro_security_roles:
           - app_role
         attributes:
           department: engineering

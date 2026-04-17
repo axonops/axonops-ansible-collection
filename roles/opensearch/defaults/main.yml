@@ -80,8 +80,8 @@ opensearch_cert_valid_days: 730
 # --- User and Role Management -----------------------------------------------
 
 # Custom internal users (added alongside the built-in admin and kibanaserver).
-# Each entry requires 'name' and 'password'. Optional: backend_roles, roles,
-# attributes, description, reserved.
+# Each entry requires 'name' and 'password'. Optional: backend_roles,
+# opendistro_security_roles, attributes, description, reserved.
 # After changing this list on an existing cluster, set opensearch_security_force_init: true.
 opensearch_users: []
 # Example:
