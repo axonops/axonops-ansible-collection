@@ -1,0 +1,71 @@
+---
+_meta:
+  type: "rolesmapping"
+  config_version: 2
+
+all_access:
+  reserved: false
+  backend_roles:
+    - "admin"
+
+own_index:
+  reserved: false
+  users:
+    - "*"
+  description: "Allow full access to an index named like the username"
+
+logstash:
+  reserved: false
+  backend_roles:
+    - "logstash"
+
+kibana_user:
+  reserved: false
+  backend_roles:
+    - "kibanauser"
+  description: "Maps kibanauser backend role to kibana_user"
+
+readall:
+  reserved: false
+  backend_roles:
+    - "readall"
+
+manage_snapshots:
+  reserved: false
+  backend_roles:
+    - "snapshotrestore"
+
+kibana_server:
+  reserved: true
+  users:
+    - "kibanaserver"
+{% for role_name, role_mapping in opensearch_roles_mapping.items() %}
+
+{{ role_name }}:
+{% if role_mapping.reserved is defined %}
+  reserved: {{ role_mapping.reserved | lower }}
+{% else %}
+  reserved: false
+{% endif %}
+{% if role_mapping.backend_roles is defined and role_mapping.backend_roles | length > 0 %}
+  backend_roles:
+{% for br in role_mapping.backend_roles %}
+    - "{{ br }}"
+{% endfor %}
+{% endif %}
+{% if role_mapping.users is defined and role_mapping.users | length > 0 %}
+  users:
+{% for user in role_mapping.users %}
+    - "{{ user }}"
+{% endfor %}
+{% endif %}
+{% if role_mapping.hosts is defined and role_mapping.hosts | length > 0 %}
+  hosts:
+{% for host in role_mapping.hosts %}
+    - "{{ host }}"
+{% endfor %}
+{% endif %}
+{% if role_mapping.description is defined %}
+  description: "{{ role_mapping.description }}"
+{% endif %}
+{% endfor %}
