@@ -544,3 +544,39 @@ Create a new silence with a duration of 1 hour to a specific datacenter, rack an
 ```shell
 $ pipenv run python axonops.py silence --create --dcs '[{"Name": "dc2","Racks": [{"Name": "rack1","Nodes": ["a107315b-2cc1-4650-8363-386460421bcd"]}]}]'
 ```
+
+### `alerts` Subcommand
+
+Export configured alert rules and integrations from a single AxonOps cluster
+to JSON files. Mirrors the ergonomics of `dashboard --exportpath`.
+
+#### Options:
+
+* `--exportpath` (required) Directory to write the JSON files. Created if missing.
+* `--include-secrets` Include integration secrets (webhook URLs, API keys, etc.) in
+  the export instead of redacting them. When set, the exported filenames are
+  auto-appended to a `.gitignore` in the export directory as defense in depth
+  against accidental git commits.
+
+**Output:** writes `alert_rules.json` and `integrations.json` (each with file mode
+`0600`) into the export directory. Empty resources are skipped — if the cluster
+has no alert rules, no `alert_rules.json` is written.
+
+**Secret handling:** by default, secret-bearing fields in integration definitions
+(`webhook_url`, `api_key`, `service_key`, `integration_key`, `routing_key`,
+`auth_token`, `password`, `secret`) are replaced with `***REDACTED***`. To export
+raw values (e.g. for restore to another instance), pass `--include-secrets`.
+
+#### Examples:
+
+Export alert rules and integrations (secrets redacted):
+
+```shell
+$ pipenv run python axonops.py alerts --exportpath ./backup
+```
+
+Export with raw secret values (writes `.gitignore` automatically):
+
+```shell
+$ pipenv run python axonops.py alerts --exportpath ./backup --include-secrets
+```
