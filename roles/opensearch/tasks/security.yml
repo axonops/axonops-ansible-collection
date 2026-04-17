@@ -26,6 +26,12 @@
       opensearch_tls_node_http_cert, opensearch_tls_node_http_key.
   when: opensearch_tls_mode == 'custom'
 
+# --- Default _certs_changed flag (overridden by generate/custom blocks) ------
+
+- name: Initialise certs changed flag
+  ansible.builtin.set_fact:
+    _certs_changed: false
+
 # =============================================================================
 # MODE: generate - Self-signed certificates via searchguard-tlstool
 # =============================================================================
@@ -153,26 +159,6 @@
         - admin.pem
       when: (_cert_dir.changed and not opensearch_iac_enable) or (opensearch_iac_enable and _force_update_cert)
 
-    # --- Deploy generated TLS config snippet ---------------------------------
-
-    - name: Deploy TLS certificate paths to opensearch.yml (generated)
-      ansible.builtin.blockinfile:
-        block: "{{ lookup('file', '/tmp/opensearch-nodecerts/config/' + inventory_hostname + '_elasticsearch_config_snippet.yml') }}"
-        dest: "{{ opensearch_conf_dir }}/opensearch.yml"
-        backup: true
-        insertafter: EOF
-        marker: "## {mark} OpenSearch Security TLS configuration ##"
-        owner: "{{ opensearch_user }}"
-        group: "{{ opensearch_group }}"
-      when: _cert_dir.changed or opensearch_iac_enable
-
-    - name: Fix security plugin namespace in config (generated)
-      ansible.builtin.replace:
-        path: "{{ opensearch_conf_dir }}/opensearch.yml"
-        regexp: 'searchguard'
-        replace: 'plugins.security'
-      when: _cert_dir.changed or opensearch_iac_enable
-
     # --- Set _certs_changed flag for downstream tasks ------------------------
 
     - name: Set certs changed flag (generate mode)
@@ -197,7 +183,7 @@
 - name: Deploy custom TLS certificates
   when: opensearch_tls_mode == 'custom'
   block:
-    - name: Copy custom root CA certificate
+    - name: Copy custom certificates to OpenSearch nodes
       ansible.builtin.copy:
         src: "{{ item.src }}"
         dest: "{{ opensearch_conf_dir }}/{{ item.name }}"
@@ -217,16 +203,6 @@
         label: "{{ item.name }}"
       register: _custom_certs_copy
 
-    - name: Deploy custom TLS configuration to opensearch.yml
-      ansible.builtin.blockinfile:
-        block: "{{ lookup('template', 'security_tls_custom.yml.j2') }}"
-        dest: "{{ opensearch_conf_dir }}/opensearch.yml"
-        backup: true
-        insertafter: EOF
-        marker: "## {mark} OpenSearch Security TLS configuration ##"
-        owner: "{{ opensearch_user }}"
-        group: "{{ opensearch_group }}"
-
     - name: Set certs changed flag (custom mode)
       ansible.builtin.set_fact:
         _certs_changed: "{{ _custom_certs_copy.changed }}"
@@ -234,17 +210,6 @@
 # =============================================================================
 # Common security configuration (both TLS modes)
 # =============================================================================
-
-- name: Deploy security plugin configuration to opensearch.yml
-  ansible.builtin.blockinfile:
-    block: "{{ lookup('template', 'security_plugin_conf.yml.j2') }}"
-    dest: "{{ opensearch_conf_dir }}/opensearch.yml"
-    backup: true
-    insertafter: EOF
-    marker: "## {mark} OpenSearch Plugin Security configuration ##"
-    owner: "{{ opensearch_user }}"
-    group: "{{ opensearch_group }}"
-  when: opensearch_auth_type == 'oidc' or opensearch_copy_custom_security_configs
 
 - name: Create security plugin configuration directory
   ansible.builtin.file:
@@ -260,7 +225,7 @@
     dest: "{{ opensearch_conf_dir }}/opensearch-security/config.yml"
     owner: "{{ opensearch_user }}"
     group: "{{ opensearch_group }}"
-  when: _certs_changed or opensearch_iac_enable
+    mode: "0640"
 
 # --- File ownership and permissions ------------------------------------------
 
@@ -278,14 +243,18 @@
     group: "{{ opensearch_group }}"
     mode: "0700"
 
-# --- Start and initialise security index -------------------------------------
+# --- Start OpenSearch for security initialisation ----------------------------
 
-- name: Restart OpenSearch with security configuration
+- name: Flush handlers before security initialisation
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure OpenSearch is started for security initialisation
   ansible.builtin.systemd:
     name: opensearch
-    state: restarted
+    state: started
     enabled: true
     daemon_reload: true
+  when: _certs_changed or opensearch_security_force_init
 
 - name: Wait for OpenSearch to be ready
   ansible.builtin.wait_for:
@@ -294,17 +263,86 @@
     delay: 5
     connect_timeout: 1
     timeout: 120
+  when: _certs_changed or opensearch_security_force_init
 
-# --- Internal users and password hashing -------------------------------------
+# --- Password hashing (hash before templating — no plaintext on disk) -------
 
-- name: Deploy internal users template
+- name: Hash admin password
+  ansible.builtin.command:
+    argv:
+      - "{{ opensearch_install_root }}/plugins/opensearch-security/tools/hash.sh"
+      - -p
+      - "{{ opensearch_admin_password }}"
+  environment:
+    JAVA_HOME: "{{ opensearch_install_root }}/jdk"
+  register: _opensearch_admin_hash
+  changed_when: false
+  no_log: true
+  run_once: true
+  when: _certs_changed or opensearch_security_force_init
+
+- name: Hash dashboards password
+  ansible.builtin.command:
+    argv:
+      - "{{ opensearch_install_root }}/plugins/opensearch-security/tools/hash.sh"
+      - -p
+      - "{{ opensearch_dashboards_password | default(opensearch_admin_password) }}"
+  environment:
+    JAVA_HOME: "{{ opensearch_install_root }}/jdk"
+  register: _opensearch_dashboards_hash
+  changed_when: false
+  no_log: true
+  run_once: true
+  when: _certs_changed or opensearch_security_force_init
+
+- name: Hash custom user passwords
+  ansible.builtin.command:
+    argv:
+      - "{{ opensearch_install_root }}/plugins/opensearch-security/tools/hash.sh"
+      - -p
+      - "{{ item.password }}"
+  environment:
+    JAVA_HOME: "{{ opensearch_install_root }}/jdk"
+  register: _opensearch_user_hashes
+  changed_when: false
+  no_log: true
+  run_once: true
+  loop: "{{ opensearch_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: _certs_changed or opensearch_security_force_init
+
+# --- Deploy security configuration files ------------------------------------
+
+- name: Deploy internal users configuration
   ansible.builtin.template:
     src: internal_users.yml.j2
     dest: "{{ opensearch_install_root }}/config/opensearch-security/internal_users.yml"
     owner: "{{ opensearch_user }}"
     group: "{{ opensearch_group }}"
-    mode: "0644"
-  when: _certs_changed or opensearch_iac_enable
+    mode: "0640"
+  run_once: true
+  when: _certs_changed or opensearch_security_force_init
+
+- name: Deploy roles configuration
+  ansible.builtin.template:
+    src: roles.yml.j2
+    dest: "{{ opensearch_install_root }}/config/opensearch-security/roles.yml"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    mode: "0640"
+  run_once: true
+  when: _certs_changed or opensearch_security_force_init
+
+- name: Deploy roles mapping configuration
+  ansible.builtin.template:
+    src: roles_mapping.yml.j2
+    dest: "{{ opensearch_install_root }}/config/opensearch-security/roles_mapping.yml"
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    mode: "0640"
+  run_once: true
+  when: _certs_changed or opensearch_security_force_init
 
 - name: Deploy custom security configuration files
   ansible.builtin.template:
@@ -315,92 +353,31 @@
     backup: true
     mode: "0640"
   loop: "{{ opensearch_custom_security_configs }}"
-  when: opensearch_copy_custom_security_configs
-
-- name: Hash admin password
-  ansible.builtin.shell: >
-    sed -i '/hash: / s,{{ opensearch_admin_password }},'$(bash {{ opensearch_install_root }}/plugins/opensearch-security/tools/hash.sh -p {{ opensearch_admin_password }} | tail -1)','
-    {{ opensearch_install_root }}/config/opensearch-security/internal_users.yml
-  environment:
-    JAVA_HOME: "{{ opensearch_install_root }}/jdk"
-  when: _certs_changed or opensearch_iac_enable
-  changed_when: true
-
-- name: Hash dashboards password
-  ansible.builtin.shell: >
-    sed -i '/hash: / s,{{ opensearch_dashboards_password }},'$(bash {{ opensearch_install_root }}/plugins/opensearch-security/tools/hash.sh -p {{ opensearch_dashboards_password }} | tail -1)','
-    {{ opensearch_install_root }}/config/opensearch-security/internal_users.yml
-  environment:
-    JAVA_HOME: "{{ opensearch_install_root }}/jdk"
-  when:
-    - (_certs_changed or opensearch_iac_enable)
-    - opensearch_dashboards_password is defined
-  changed_when: true
-
-# --- Custom internal users ---------------------------------------------------
-
-- name: Check for custom internal users file
-  ansible.builtin.stat:
-    path: files/internal_users.yml
-  register: _custom_users_file
-  delegate_to: localhost
-  run_once: true
-  become: false
-
-- name: Process custom internal users
-  when: _custom_users_file.stat.exists
-  block:
-    - name: Load custom internal users
-      ansible.builtin.include_vars:
-        file: files/internal_users.yml
-        name: _custom_users
-      run_once: true
-
-    - name: Filter service keys from user list
-      ansible.builtin.set_fact:
-        _custom_users_filtered: '{{ _custom_users | dict2items | rejectattr("key", "equalto", "_meta") | list | items2dict }}'
-
-    - name: Hash passwords for custom users
-      ansible.builtin.shell: >
-        sed -i '/hash: / s,{{ lookup("vars", item + "_password") }},'$(bash {{ opensearch_install_root }}/plugins/opensearch-security/tools/hash.sh -p {{ lookup("vars", item + "_password") }} | tail -1)','
-        {{ opensearch_install_root }}/config/opensearch-security/internal_users.yml
-      environment:
-        JAVA_HOME: "{{ opensearch_install_root }}/jdk"
-      run_once: true
-      when: _certs_changed or opensearch_copy_custom_security_configs
-      loop: "{{ _custom_users_filtered | list }}"
-      changed_when: true
+  when: opensearch_copy_custom_security_configs and (_certs_changed or opensearch_security_force_init)
 
 # --- Initialise security index -----------------------------------------------
 
-- name: Initialise security index (custom configs)
-  ansible.builtin.shell: >
-    bash {{ opensearch_install_root }}/plugins/opensearch-security/tools/securityadmin.sh
-    -cacert {{ opensearch_conf_dir }}/root-ca.pem
-    -cert {{ opensearch_conf_dir }}/admin.pem
-    -key {{ opensearch_conf_dir }}/admin.key
-    -cd {{ opensearch_install_root }}/config/opensearch-security
-    -nhnv -icl
-    -h {{ opensearch_network_host }}
+- name: Initialise security index
+  ansible.builtin.command:
+    argv:
+      - bash
+      - "{{ opensearch_install_root }}/plugins/opensearch-security/tools/securityadmin.sh"
+      - -cacert
+      - "{{ opensearch_conf_dir }}/root-ca.pem"
+      - -cert
+      - "{{ opensearch_conf_dir }}/admin.pem"
+      - -key
+      - "{{ opensearch_conf_dir }}/admin.key"
+      - -cd
+      - "{{ opensearch_install_root }}/config/opensearch-security"
+      - -nhnv
+      - -icl
+      - -h
+      - "{{ opensearch_network_host }}"
   environment:
     JAVA_HOME: "{{ opensearch_install_root }}/jdk"
   run_once: true
-  when: _certs_changed and opensearch_copy_custom_security_configs
-  changed_when: true
-
-- name: Initialise security index (default configs)
-  ansible.builtin.shell: >
-    bash {{ opensearch_install_root }}/plugins/opensearch-security/tools/securityadmin.sh
-    -cacert {{ opensearch_conf_dir }}/root-ca.pem
-    -cert {{ opensearch_conf_dir }}/admin.pem
-    -key {{ opensearch_conf_dir }}/admin.key
-    -f {{ opensearch_install_root }}/config/opensearch-security/internal_users.yml
-    -nhnv -icl
-    -h {{ opensearch_network_host }}
-  environment:
-    JAVA_HOME: "{{ opensearch_install_root }}/jdk"
-  run_once: true
-  when: _certs_changed and not opensearch_copy_custom_security_configs
+  when: _certs_changed or opensearch_security_force_init
   changed_when: true
 
 # code: language=ansible

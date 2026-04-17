@@ -77,7 +77,50 @@ opensearch_cert_valid_days: 730
 # TLS distinguished names for node certificates
 # opensearch_tls_node_dn: "CN=*.example.com,OU=Ops,O=Example Inc.,DC=example.com"
 
-# Custom security plugin configuration files (list of template paths)
+# --- User and Role Management -----------------------------------------------
+
+# Custom internal users (added alongside the built-in admin and kibanaserver).
+# Each entry requires 'name' and 'password'. Optional: backend_roles, roles,
+# attributes, description, reserved.
+# After changing this list on an existing cluster, set opensearch_security_force_init: true.
+opensearch_users: []
+# Example:
+# opensearch_users:
+#   - name: logstash
+#     password: logstashpassword
+#     backend_roles: [logstash]
+#     description: "Logstash ingestion user"
+#   - name: readonly
+#     password: readonlypassword
+#     backend_roles: [readall]
+
+# Custom OpenSearch roles. Keys are role names; values follow the roles.yml schema.
+# Built-in static roles (all_access, readall, etc.) are always available.
+opensearch_roles: {}
+# Example:
+# opensearch_roles:
+#   my_app_role:
+#     cluster_permissions:
+#       - cluster_monitor
+#     index_permissions:
+#       - index_patterns: ["my_app_*"]
+#         allowed_actions: ["read", "write"]
+
+# Custom role mappings (backend roles / users → OpenSearch roles).
+# Standard mappings for admin and kibanaserver are always included automatically.
+opensearch_roles_mapping: {}
+# Example:
+# opensearch_roles_mapping:
+#   my_app_role:
+#     backend_roles: [my_app_users]
+#     description: "Maps my_app_users to my_app_role"
+
+# Force re-apply of all security configuration on an existing cluster.
+# Set to true after changing opensearch_users, opensearch_roles, or opensearch_roles_mapping.
+opensearch_security_force_init: false
+
+# Additional security config templates (list of template source paths).
+# Deployed alongside role-managed files and can override them.
 opensearch_custom_security_configs: []
 opensearch_copy_custom_security_configs: false
 
@@ -110,4 +153,7 @@ opensearch_iac_enable: false
 # --- Service -----------------------------------------------------------------
 
 opensearch_start_on_boot: true
+# Controls whether OpenSearch is started at the end of the play.
+# Note: when opensearch_security_enabled is true, the service is started
+# temporarily during security initialisation regardless of this setting.
 opensearch_start_on_install: true

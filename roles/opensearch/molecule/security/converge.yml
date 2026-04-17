@@ -1,0 +1,79 @@
+---
+- name: Converge — OpenSearch with security, custom users, roles, and role mappings
+  hosts: all
+  vars:
+    opensearch_version: "3.6.0"
+    opensearch_cluster_name: security-test
+    opensearch_cluster_type: single-node
+    opensearch_heap_size: "512m"
+    opensearch_security_enabled: true
+    opensearch_tls_mode: generate
+    opensearch_domain_name: molecule.test
+    opensearch_admin_password: "Admin,Pass/With&Special$Chars"
+    opensearch_dashboards_password: "Dashboards_12345!"
+    opensearch_populate_etc_hosts: false
+    opensearch_start_on_boot: false
+    opensearch_start_on_install: true
+
+    opensearch_users:
+      - name: logstash
+        password: "Logstash,Pass&123"
+        backend_roles:
+          - logstash
+        description: "Logstash ingestion user"
+      - name: readonlyuser
+        password: "ReadOnly/Pass\\456"
+        backend_roles:
+          - readall
+        description: "Read-only monitoring user"
+      - name: appuser
+        password: "App$User'Pass"
+        backend_roles:
+          - app_backend_role
+        roles:
+          - app_role
+        attributes:
+          department: engineering
+          team: platform
+        description: "Application service account"
+
+    opensearch_roles:
+      app_role:
+        cluster_permissions:
+          - cluster_composite_ops_ro
+        index_permissions:
+          - index_patterns:
+              - "app_*"
+            allowed_actions:
+              - "indices:data/read/*"
+              - "indices:data/write/*"
+              - "indices:admin/create"
+          - index_patterns:
+              - "logs_*"
+            allowed_actions:
+              - "indices:data/read/*"
+      readonly_custom:
+        cluster_permissions:
+          - cluster_monitor
+        index_permissions:
+          - index_patterns:
+              - "*"
+            allowed_actions:
+              - "read"
+
+    opensearch_roles_mapping:
+      app_role:
+        backend_roles:
+          - app_backend_role
+        description: "Maps app_backend_role to app_role"
+      readonly_custom:
+        backend_roles:
+          - readall
+        users:
+          - readonlyuser
+        description: "Maps readall backend role and readonlyuser to readonly_custom"
+
+  roles:
+    - role: opensearch
+
+# code: language=ansible
