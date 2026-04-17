@@ -270,6 +270,7 @@
 - name: Hash admin password
   ansible.builtin.command:
     argv:
+      - "/bin/bash"
       - "{{ opensearch_install_root }}/plugins/opensearch-security/tools/hash.sh"
       - -p
       - "{{ opensearch_admin_password }}"
@@ -284,6 +285,7 @@
 - name: Hash dashboards password
   ansible.builtin.command:
     argv:
+      - "/bin/bash"
       - "{{ opensearch_install_root }}/plugins/opensearch-security/tools/hash.sh"
       - -p
       - "{{ opensearch_dashboards_password | default(opensearch_admin_password) }}"
@@ -298,6 +300,7 @@
 - name: Hash custom user passwords
   ansible.builtin.command:
     argv:
+      - "/bin/bash"
       - "{{ opensearch_install_root }}/plugins/opensearch-security/tools/hash.sh"
       - -p
       - "{{ item.password }}"
