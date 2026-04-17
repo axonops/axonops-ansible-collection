@@ -1,6 +1,15 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch, MagicMock
 
-from axonopscli.components.alerts import SecretRedactor, REDACTED
+from axonopscli.components.alerts import SecretRedactor, REDACTED, AlertsExporter
+
+
+def _args(org="acme", cluster="prod", exportpath="/tmp/x", include_secrets=False, v=0):
+    return SimpleNamespace(
+        org=org, cluster=cluster, exportpath=exportpath,
+        include_secrets=include_secrets, v=v,
+    )
 
 
 class TestSecretRedactor(unittest.TestCase):
@@ -63,6 +72,218 @@ class TestSecretRedactor(unittest.TestCase):
         payload = {"Params": {"webhook_url": "https://example.com"}}
         SecretRedactor.redact(payload)
         self.assertEqual(payload["Params"]["webhook_url"], "https://example.com")
+
+
+class TestAlertsExporterFetch(unittest.TestCase):
+
+    def test_fetch_calls_alert_rules_and_integrations_endpoints(self):
+        axonops = MagicMock()
+        axonops.do_request.side_effect = [
+            {"rules": [{"name": "r1"}]},
+            {"Definitions": [], "Routing": []},
+        ]
+        args = _args(org="acme", cluster="prod")
+        exporter = AlertsExporter(axonops, args)
+
+        exporter.fetch()
+
+        self.assertEqual(axonops.do_request.call_count, 2)
+        call_urls = [c.kwargs.get('url') or c.args[0] for c in axonops.do_request.call_args_list]
+        self.assertIn("/api/v1/alert-rules/acme/cassandra/prod", call_urls)
+        self.assertIn("/api/v1/integrations/acme/cassandra/prod", call_urls)
+        self.assertEqual(exporter.alert_rules, {"rules": [{"name": "r1"}]})
+        self.assertEqual(exporter.integrations, {"Definitions": [], "Routing": []})
+
+    def test_fetch_normalizes_none_response_to_empty_dict(self):
+        axonops = MagicMock()
+        axonops.do_request.side_effect = [None, None]
+        exporter = AlertsExporter(axonops, _args())
+
+        exporter.fetch()
+
+        self.assertEqual(exporter.alert_rules, {})
+        self.assertEqual(exporter.integrations, {})
+
+
+import json
+import os
+import stat
+import tempfile
+
+
+class TestAlertsExporterExport(unittest.TestCase):
+
+    def _make_exporter(self, alert_rules, integrations, exportpath, include_secrets=False):
+        exporter = AlertsExporter(MagicMock(), _args(exportpath=exportpath, include_secrets=include_secrets))
+        exporter.alert_rules = alert_rules
+        exporter.integrations = integrations
+        return exporter
+
+    def test_export_writes_both_files_when_both_resources_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ex = self._make_exporter(
+                alert_rules={"rules": [{"name": "r1"}]},
+                integrations={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "u"}}],
+                              "Routing": [], "Overrides": []},
+                exportpath=tmp,
+            )
+            ex.export(tmp, include_secrets=False)
+
+            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.json")))
+            self.assertTrue(os.path.exists(os.path.join(tmp, "integrations.json")))
+
+    def test_export_default_redacts_secrets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ex = self._make_exporter(
+                alert_rules={"rules": [{"name": "r1"}]},
+                integrations={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "real-secret"}}],
+                              "Routing": [], "Overrides": []},
+                exportpath=tmp,
+            )
+            ex.export(tmp, include_secrets=False)
+
+            with open(os.path.join(tmp, "integrations.json")) as f:
+                data = json.load(f)
+            self.assertEqual(data["Definitions"][0]["Params"]["webhook_url"], REDACTED)
+
+    def test_export_include_secrets_keeps_real_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ex = self._make_exporter(
+                alert_rules={},
+                integrations={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "real-secret"}}],
+                              "Routing": [], "Overrides": []},
+                exportpath=tmp,
+            )
+            ex.export(tmp, include_secrets=True)
+
+            with open(os.path.join(tmp, "integrations.json")) as f:
+                data = json.load(f)
+            self.assertEqual(data["Definitions"][0]["Params"]["webhook_url"], "real-secret")
+
+    def test_export_files_have_mode_0600(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ex = self._make_exporter(
+                alert_rules={"rules": [{"name": "r1"}]},
+                integrations={"Definitions": [{"Type": "slack", "Params": {}}]},
+                exportpath=tmp,
+            )
+            ex.export(tmp, include_secrets=False)
+
+            for name in ("alert_rules.json", "integrations.json"):
+                mode = stat.S_IMODE(os.stat(os.path.join(tmp, name)).st_mode)
+                self.assertEqual(mode, 0o600, f"{name} mode is {oct(mode)}, expected 0o600")
+
+    def test_export_skips_empty_alert_rules(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ex = self._make_exporter(
+                alert_rules={},
+                integrations={"Definitions": [{"Type": "slack"}]},
+                exportpath=tmp,
+            )
+            ex.export(tmp, include_secrets=False)
+
+            self.assertFalse(os.path.exists(os.path.join(tmp, "alert_rules.json")))
+            self.assertTrue(os.path.exists(os.path.join(tmp, "integrations.json")))
+
+    def test_export_skips_empty_integrations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ex = self._make_exporter(
+                alert_rules={"rules": [{"name": "r1"}]},
+                integrations={"Definitions": [], "Routing": [], "Overrides": []},
+                exportpath=tmp,
+            )
+            ex.export(tmp, include_secrets=False)
+
+            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.json")))
+            self.assertFalse(os.path.exists(os.path.join(tmp, "integrations.json")))
+
+    def test_export_writes_nothing_when_both_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ex = self._make_exporter(alert_rules={}, integrations={}, exportpath=tmp)
+            ex.export(tmp, include_secrets=False)
+
+            self.assertEqual(os.listdir(tmp), [])
+
+    def test_export_creates_directory_if_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = os.path.join(tmp, "new_subdir")
+            ex = self._make_exporter(
+                alert_rules={"rules": [{"name": "r1"}]},
+                integrations={},
+                exportpath=target,
+            )
+            ex.export(target, include_secrets=False)
+
+            self.assertTrue(os.path.isdir(target))
+            self.assertTrue(os.path.exists(os.path.join(target, "alert_rules.json")))
+
+    def test_export_raises_when_path_exists_as_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            file_path = os.path.join(tmp, "file_not_dir")
+            with open(file_path, 'w') as f:
+                f.write("x")
+            ex = self._make_exporter(
+                alert_rules={"rules": [{"name": "r1"}]},
+                integrations={},
+                exportpath=file_path,
+            )
+            with self.assertRaises(NotADirectoryError):
+                ex.export(file_path, include_secrets=False)
+
+
+class TestAlertsExporterGitignore(unittest.TestCase):
+
+    def _exporter_with_full_data(self, exportpath, include_secrets):
+        ex = AlertsExporter(MagicMock(), _args(exportpath=exportpath, include_secrets=include_secrets))
+        ex.alert_rules = {"rules": [{"name": "r1"}]}
+        ex.integrations = {"Definitions": [{"Type": "slack", "Params": {"webhook_url": "u"}}],
+                           "Routing": [], "Overrides": []}
+        return ex
+
+    def test_gitignore_created_with_both_filenames_when_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ex = self._exporter_with_full_data(tmp, include_secrets=True)
+            ex.export(tmp, include_secrets=True)
+
+            gitignore_path = os.path.join(tmp, ".gitignore")
+            self.assertTrue(os.path.exists(gitignore_path))
+            with open(gitignore_path) as f:
+                lines = [line.strip() for line in f if line.strip()]
+            self.assertIn("alert_rules.json", lines)
+            self.assertIn("integrations.json", lines)
+
+    def test_gitignore_appends_only_missing_entries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            gitignore_path = os.path.join(tmp, ".gitignore")
+            with open(gitignore_path, "w") as f:
+                f.write("alert_rules.json\n*.tmp\n")
+            ex = self._exporter_with_full_data(tmp, include_secrets=True)
+            ex.export(tmp, include_secrets=True)
+
+            with open(gitignore_path) as f:
+                lines = [line.strip() for line in f if line.strip()]
+            self.assertEqual(lines.count("alert_rules.json"), 1)
+            self.assertIn("integrations.json", lines)
+            self.assertIn("*.tmp", lines)
+
+    def test_gitignore_unchanged_when_both_already_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            gitignore_path = os.path.join(tmp, ".gitignore")
+            original = "alert_rules.json\nintegrations.json\n"
+            with open(gitignore_path, "w") as f:
+                f.write(original)
+            ex = self._exporter_with_full_data(tmp, include_secrets=True)
+            ex.export(tmp, include_secrets=True)
+
+            with open(gitignore_path) as f:
+                self.assertEqual(f.read(), original)
+
+    def test_gitignore_not_written_when_secrets_redacted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ex = self._exporter_with_full_data(tmp, include_secrets=False)
+            ex.export(tmp, include_secrets=False)
+
+            self.assertFalse(os.path.exists(os.path.join(tmp, ".gitignore")))
 
 
 if __name__ == "__main__":
