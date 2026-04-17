@@ -208,6 +208,21 @@ class Application:
         silence_parser.add_argument('--silencescheduledreportsalerts', action='store_true',
                                     help='Silence Scheduled Reports Alerts', default=False)
 
+        alerts_parser = commands_subparser.add_parser(
+            "alerts",
+            help="Export AxonOps alert rules, routes, and integrations to JSON")
+
+        alerts_parser.set_defaults(func=self.run_alerts)
+
+        alerts_parser.add_argument('--exportpath', type=str, required=True,
+                                   help='Directory to write alert rules and integrations '
+                                        'JSON files. Created if missing.')
+        alerts_parser.add_argument('--include-secrets', action='store_true', default=False,
+                                   help='Include integration secrets (webhook URLs, API '
+                                        'keys, etc.) in the export instead of redacting. '
+                                        'When set, exported filenames are auto-appended '
+                                        'to a .gitignore in the export directory.')
+
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
         # ensure --tables is only used together with --keyspace
@@ -346,3 +361,16 @@ class Application:
             silence.delete_silence(args.deletesilence)
         else:
             print("No action specified for silence management.")
+
+    def run_alerts(self, args: argparse.Namespace):
+        """ Run the alerts export """
+        if args.v:
+            print(f"Running alerts export on {args.org}/{args.cluster}")
+            print(args)
+
+        axonops = self.get_axonops(args)
+
+        from .components.alerts import AlertsExporter
+        exporter = AlertsExporter(axonops, args)
+        exporter.fetch()
+        exporter.export(args.exportpath, include_secrets=args.include_secrets)

@@ -286,5 +286,74 @@ class TestAlertsExporterGitignore(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(tmp, ".gitignore")))
 
 
+class TestApplicationRunAlerts(unittest.TestCase):
+
+    def _patch_axonops(self, alert_rules_response, integrations_response):
+        """Patch AxonOps.do_request at the class level to return canned responses."""
+        from axonopscli.axonops import AxonOps
+
+        responses = {
+            "/api/v1/alert-rules/acme/cassandra/prod": alert_rules_response,
+            "/api/v1/integrations/acme/cassandra/prod": integrations_response,
+        }
+
+        def fake_do_request(self, url, method='GET', **kwargs):
+            return responses.get(url, {})
+
+        return patch.object(AxonOps, 'do_request', new=fake_do_request)
+
+    def test_application_run_alerts_writes_files(self):
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self._patch_axonops(
+                alert_rules_response={"rules": [{"name": "r1"}]},
+                integrations_response={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "u"}}],
+                                       "Routing": [], "Overrides": []},
+            ):
+                app = Application()
+                app.run([
+                    "--org", "acme",
+                    "--cluster", "prod",
+                    "--token", "t",
+                    "alerts",
+                    "--exportpath", tmp,
+                ])
+
+            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.json")))
+            self.assertTrue(os.path.exists(os.path.join(tmp, "integrations.json")))
+
+            with open(os.path.join(tmp, "integrations.json")) as f:
+                data = json.load(f)
+            self.assertEqual(data["Definitions"][0]["Params"]["webhook_url"], REDACTED)
+
+    def test_application_run_alerts_with_include_secrets(self):
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self._patch_axonops(
+                alert_rules_response={},
+                integrations_response={"Definitions": [{"Type": "slack", "Params": {"webhook_url": "u"}}],
+                                       "Routing": [], "Overrides": []},
+            ):
+                app = Application()
+                app.run([
+                    "--org", "acme",
+                    "--cluster", "prod",
+                    "--token", "t",
+                    "alerts",
+                    "--exportpath", tmp,
+                    "--include-secrets",
+                ])
+
+            with open(os.path.join(tmp, "integrations.json")) as f:
+                data = json.load(f)
+            self.assertEqual(data["Definitions"][0]["Params"]["webhook_url"], "u")
+
+            with open(os.path.join(tmp, ".gitignore")) as f:
+                gi_lines = {line.strip() for line in f if line.strip()}
+            self.assertIn("integrations.json", gi_lines)
+
+
 if __name__ == "__main__":
     unittest.main()
