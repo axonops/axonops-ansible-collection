@@ -56,8 +56,8 @@ class AlertsExporter:
     Single-cluster scope, mirroring `dashboard --exportpath` ergonomics.
     """
 
-    ALERT_RULES_URL = "/api/v1/alert-rules/{org}/cassandra/{cluster}"
-    INTEGRATIONS_URL = "/api/v1/integrations/{org}/cassandra/{cluster}"
+    ALERT_RULES_URL = "/api/v1/alert-rules/{org}/{cluster_type}/{cluster}"
+    INTEGRATIONS_URL = "/api/v1/integrations/{org}/{cluster_type}/{cluster}"
 
     def __init__(self, axonops, args):
         self.axonops = axonops
@@ -68,12 +68,13 @@ class AlertsExporter:
     def fetch(self):
         """Hit both endpoints and store responses. Raises HTTPCodeError on failure."""
         org, cluster = self.args.org, self.args.cluster
+        cluster_type = self.axonops.get_cluster_type()
         self.alert_rules = self.axonops.do_request(
-            url=self.ALERT_RULES_URL.format(org=org, cluster=cluster),
+            url=self.ALERT_RULES_URL.format(org=org, cluster_type=cluster_type, cluster=cluster),
             method='GET',
         ) or {}
         self.integrations = self.axonops.do_request(
-            url=self.INTEGRATIONS_URL.format(org=org, cluster=cluster),
+            url=self.INTEGRATIONS_URL.format(org=org, cluster_type=cluster_type, cluster=cluster),
             method='GET',
         ) or {}
 

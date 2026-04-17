@@ -7,7 +7,7 @@ class Dashboard:
     def __init__(self, axonops, args):
         self.axonops = axonops
         self.args = args
-        self.full_dashboard_url = f"{self.dashboardtemplate_url}/{args.org}/cassandra/{args.cluster}?dashver=2.0"
+        self.full_dashboard_url = f"{self.dashboardtemplate_url}/{args.org}/{axonops.get_cluster_type()}/{args.cluster}?dashver=2.0"
         self.dashboard_data = None
 
     def get_actual_dashboards(self):

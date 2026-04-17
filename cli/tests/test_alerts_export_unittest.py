@@ -78,6 +78,7 @@ class TestAlertsExporterFetch(unittest.TestCase):
 
     def test_fetch_calls_alert_rules_and_integrations_endpoints(self):
         axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
         axonops.do_request.side_effect = [
             {"rules": [{"name": "r1"}]},
             {"Definitions": [], "Routing": []},
@@ -96,6 +97,7 @@ class TestAlertsExporterFetch(unittest.TestCase):
 
     def test_fetch_normalizes_none_response_to_empty_dict(self):
         axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
         axonops.do_request.side_effect = [None, None]
         exporter = AlertsExporter(axonops, _args())
 
@@ -353,6 +355,52 @@ class TestApplicationRunAlerts(unittest.TestCase):
             with open(os.path.join(tmp, ".gitignore")) as f:
                 gi_lines = {line.strip() for line in f if line.strip()}
             self.assertIn("integrations.json", gi_lines)
+
+
+class TestClusterTypeFix(unittest.TestCase):
+
+    def test_application_passes_cluster_type_default_cassandra(self):
+        from axonopscli.axonops import AxonOps
+        from axonopscli.application import Application
+
+        captured = {}
+        original_init = AxonOps.__init__
+
+        def capturing_init(self, *args, **kwargs):
+            captured['cluster_type'] = kwargs.get('cluster_type')
+            original_init(self, *args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(AxonOps, '__init__', new=capturing_init), \
+                 patch.object(AxonOps, 'do_request', return_value={}):
+                Application().run([
+                    "--org", "acme", "--cluster", "prod", "--token", "t",
+                    "alerts", "--exportpath", tmp,
+                ])
+
+        self.assertEqual(captured['cluster_type'], 'cassandra')
+
+    def test_application_passes_cluster_type_when_overridden(self):
+        from axonopscli.axonops import AxonOps
+        from axonopscli.application import Application
+
+        captured = {}
+        original_init = AxonOps.__init__
+
+        def capturing_init(self, *args, **kwargs):
+            captured['cluster_type'] = kwargs.get('cluster_type')
+            original_init(self, *args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(AxonOps, '__init__', new=capturing_init), \
+                 patch.object(AxonOps, 'do_request', return_value={}):
+                Application().run([
+                    "--org", "acme", "--cluster", "prod", "--cluster-type", "kafka",
+                    "--token", "t",
+                    "alerts", "--exportpath", tmp,
+                ])
+
+        self.assertEqual(captured['cluster_type'], 'kafka')
 
 
 if __name__ == "__main__":

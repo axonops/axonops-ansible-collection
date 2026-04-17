@@ -29,7 +29,7 @@ class Application:
                                    base_url=args.url,
                                    username=args.username,
                                    password=args.password,
-                                   cluster_type=args.cluster,
+                                   cluster_type=args.cluster_type,
                                    verbose=args.v)
         return self.axonops
 
@@ -41,6 +41,9 @@ class Application:
                             help='Name of your organisation')
         parser.add_argument('--cluster', type=str, required=False, default=os.getenv('AXONOPS_CLUSTER'),
                             help='Name of your cluster')
+        parser.add_argument('--cluster-type', type=str, required=False,
+                            default=os.getenv('AXONOPS_CLUSTER_TYPE', 'cassandra'),
+                            help='Cluster type (e.g. cassandra, kafka). Defaults to cassandra.')
         parser.add_argument('--token', type=str, required=False, default=os.getenv('AXONOPS_TOKEN'),
                             help='AUTH_TOKEN used to authenticate with the API in SaaS')
         parser.add_argument('--username', type=str, required=False, default=os.getenv('AXONOPS_USERNAME'),
