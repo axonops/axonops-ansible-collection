@@ -103,3 +103,62 @@ def _format_value(v) -> str:
     if isinstance(v, float) and v.is_integer():
         return str(int(v))
     return str(v)
+
+
+import math
+import urllib.parse
+
+
+class MetricQuerier:
+    """Query /api/v1/query_range and return a flat list of numeric samples."""
+
+    QUERY_RANGE_URL = "/api/v1/query_range/{org}/{cluster_type}/{cluster}"
+
+    def __init__(self, axonops, args):
+        self.axonops = axonops
+        self.args = args
+
+    def query(self, promql: str, start: int, end: int, step: str = "1m") -> list:
+        """Return a flat list of non-null, finite, float samples across all series.
+
+        start/end are Unix epoch seconds. step is a Prometheus duration string
+        (e.g. '1m', '15s'). Raises HTTPCodeError on transport/server failure.
+        """
+        path = self.QUERY_RANGE_URL.format(
+            org=self.args.org,
+            cluster_type=self.axonops.get_cluster_type(),
+            cluster=self.args.cluster,
+        )
+        qs = urllib.parse.urlencode({
+            "query": promql,
+            "start": start,
+            "end": end,
+            "step": step,
+        })
+        url = f"{path}?{qs}"
+        response = self.axonops.do_request(url=url, method="GET")
+        return self._flatten(response)
+
+    @staticmethod
+    def _flatten(response: dict) -> list:
+        if not response:
+            return []
+        data = response.get("data") or {}
+        result = data.get("result") or []
+        out = []
+        for series in result:
+            for point in series.get("values") or []:
+                # point is [timestamp, value_string_or_null]
+                if len(point) != 2:
+                    continue
+                value_raw = point[1]
+                if value_raw is None:
+                    continue
+                try:
+                    value = float(value_raw)
+                except (TypeError, ValueError):
+                    continue
+                if math.isnan(value) or math.isinf(value):
+                    continue
+                out.append(value)
+        return out

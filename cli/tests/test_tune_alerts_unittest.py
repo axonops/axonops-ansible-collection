@@ -199,5 +199,111 @@ class TestExprRewriter(unittest.TestCase):
             ExprRewriter.rewrite("no_operator_or_value_here", new_warning=42)
 
 
+from unittest.mock import MagicMock
+from types import SimpleNamespace
+
+from axonopscli.components.tune_alerts import MetricQuerier
+
+
+def _args(org="acme", cluster="prod", v=0):
+    return SimpleNamespace(org=org, cluster=cluster, v=v)
+
+
+class TestMetricQuerier(unittest.TestCase):
+
+    def test_query_builds_correct_url_and_params(self):
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        axonops.do_request.return_value = {
+            "status": "success",
+            "data": {"resultType": "matrix", "result": []},
+        }
+        q = MetricQuerier(axonops, _args(org="acme", cluster="prod"))
+
+        q.query("foo_metric", start=1_700_000_000, end=1_700_604_800, step="1m")
+
+        self.assertEqual(axonops.do_request.call_count, 1)
+        call = axonops.do_request.call_args
+        url = call.kwargs.get('url') or call.args[0]
+        self.assertIn("/api/v1/query_range/acme/cassandra/prod", url)
+        self.assertIn("query=foo_metric", url)
+        self.assertIn("start=1700000000", url)
+        self.assertIn("end=1700604800", url)
+        self.assertIn("step=1m", url)
+
+    def test_query_flattens_prometheus_matrix_response(self):
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        axonops.do_request.return_value = {
+            "status": "success",
+            "data": {
+                "resultType": "matrix",
+                "result": [
+                    {
+                        "metric": {"host_id": "h1"},
+                        "values": [[1700000000, "10"], [1700000060, "20"], [1700000120, "30"]],
+                    },
+                    {
+                        "metric": {"host_id": "h2"},
+                        "values": [[1700000000, "15"], [1700000060, "25"]],
+                    },
+                ],
+            },
+        }
+        q = MetricQuerier(axonops, _args())
+
+        samples = q.query("foo", start=0, end=1, step="1m")
+
+        self.assertEqual(sorted(samples), [10.0, 15.0, 20.0, 25.0, 30.0])
+
+    def test_query_drops_nulls_and_non_numeric(self):
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        axonops.do_request.return_value = {
+            "status": "success",
+            "data": {
+                "resultType": "matrix",
+                "result": [{
+                    "metric": {},
+                    "values": [
+                        [1700000000, "10"],
+                        [1700000060, "NaN"],
+                        [1700000120, None],
+                        [1700000180, "30"],
+                    ],
+                }],
+            },
+        }
+        q = MetricQuerier(axonops, _args())
+
+        samples = q.query("foo", start=0, end=1, step="1m")
+
+        self.assertEqual(samples, [10.0, 30.0])
+
+    def test_query_returns_empty_list_for_empty_result(self):
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        axonops.do_request.return_value = {
+            "status": "success",
+            "data": {"resultType": "matrix", "result": []},
+        }
+        q = MetricQuerier(axonops, _args())
+
+        samples = q.query("foo", start=0, end=1, step="1m")
+
+        self.assertEqual(samples, [])
+
+    def test_query_propagates_http_errors(self):
+        from axonopscli.utils import HTTPCodeError
+
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        axonops.do_request.side_effect = HTTPCodeError("500 Internal Server Error")
+        q = MetricQuerier(axonops, _args())
+
+        with self.assertRaises(HTTPCodeError):
+            q.query("foo", start=0, end=1, step="1m")
+
+
 if __name__ == "__main__":
     unittest.main()
