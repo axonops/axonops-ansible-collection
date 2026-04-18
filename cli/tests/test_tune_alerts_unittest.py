@@ -143,5 +143,61 @@ class TestThresholdCalculator(unittest.TestCase):
         self.assertAlmostEqual(result.percentile_value, 9989.001, places=2)
 
 
+from axonopscli.components.tune_alerts import ExprRewriter
+
+
+class TestExprRewriter(unittest.TestCase):
+
+    def test_strip_threshold_simple(self):
+        bare, op, old = ExprRewriter.strip_threshold("foo_metric >= 50")
+        self.assertEqual(bare, "foo_metric")
+        self.assertEqual(op, ">=")
+        self.assertEqual(old, "50")
+
+    def test_strip_threshold_with_function_call(self):
+        bare, op, old = ExprRewriter.strip_threshold(
+            "avg(host_CPU{axonfunction='rate',mode='iowait'}) by (host_id) * 100 >= 50"
+        )
+        self.assertEqual(
+            bare,
+            "avg(host_CPU{axonfunction='rate',mode='iowait'}) by (host_id) * 100",
+        )
+        self.assertEqual(op, ">=")
+        self.assertEqual(old, "50")
+
+    def test_strip_threshold_with_abs_and_multiplication(self):
+        bare, op, old = ExprRewriter.strip_threshold("abs(host_ntp_offset_seconds{}) * 1000 >= 100")
+        self.assertEqual(bare, "abs(host_ntp_offset_seconds{}) * 1000")
+        self.assertEqual(op, ">=")
+        self.assertEqual(old, "100")
+
+    def test_strip_threshold_less_than(self):
+        bare, op, old = ExprRewriter.strip_threshold("disk_free_bytes < 1000000")
+        self.assertEqual(bare, "disk_free_bytes")
+        self.assertEqual(op, "<")
+        self.assertEqual(old, "1000000")
+
+    def test_rewrite_replaces_threshold_preserving_operator(self):
+        original = "jvm_GarbageCollector_G1_Young_Generation{axonfunction='rate',function='CollectionTime'} >= 1000"
+        new_expr = ExprRewriter.rewrite(original, new_warning=825)
+        self.assertEqual(
+            new_expr,
+            "jvm_GarbageCollector_G1_Young_Generation{axonfunction='rate',function='CollectionTime'} >= 825",
+        )
+
+    def test_rewrite_preserves_float_format(self):
+        new_expr = ExprRewriter.rewrite("foo >= 50", new_warning=44.5)
+        self.assertEqual(new_expr, "foo >= 44.5")
+
+    def test_rewrite_emits_integer_when_value_is_whole(self):
+        # 1089.0 → "1089" (avoid trailing .0 noise in the JSON)
+        new_expr = ExprRewriter.rewrite("foo >= 1000", new_warning=1089.0)
+        self.assertEqual(new_expr, "foo >= 1089")
+
+    def test_rewrite_raises_on_unparseable_expr(self):
+        with self.assertRaises(ValueError):
+            ExprRewriter.rewrite("no_operator_or_value_here", new_warning=42)
+
+
 if __name__ == "__main__":
     unittest.main()

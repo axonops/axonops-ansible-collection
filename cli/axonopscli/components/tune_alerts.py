@@ -64,3 +64,42 @@ def _percentile(samples: list, p: float) -> float:
     upper = min(lower + 1, n - 1)
     weight = pos - lower
     return sorted_samples[lower] * (1.0 - weight) + sorted_samples[upper] * weight
+
+
+import re
+
+
+# Pattern mirrors the stripping regex used by the existing Ansible
+# alert_rule.py module (line ~253): expressions always end with
+# ` <operator> <value>`.
+_TRAILING_THRESHOLD_RE = re.compile(r'^(.*)\s(<=|>=|<|>|==|!=)\s(\S+)$')
+
+
+class ExprRewriter:
+    """Strip or replace the trailing `<op> <value>` on an alert expression.
+
+    Pure; no I/O. If the expression doesn't match the expected shape,
+    raises ValueError so the orchestrator can skip the rule with a
+    clear reason.
+    """
+
+    @staticmethod
+    def strip_threshold(expr: str) -> tuple:
+        """Return (bare_metric, operator, old_value_str) or raise ValueError."""
+        m = _TRAILING_THRESHOLD_RE.match(expr.strip())
+        if not m:
+            raise ValueError(f"Cannot parse trailing threshold from expr: {expr!r}")
+        return m.group(1), m.group(2), m.group(3)
+
+    @staticmethod
+    def rewrite(expr: str, new_warning) -> str:
+        """Return a new expr with the trailing value replaced by new_warning."""
+        bare, op, _old = ExprRewriter.strip_threshold(expr)
+        return f"{bare} {op} {_format_value(new_warning)}"
+
+
+def _format_value(v) -> str:
+    """Format a numeric threshold without a trailing `.0` when it's whole."""
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
