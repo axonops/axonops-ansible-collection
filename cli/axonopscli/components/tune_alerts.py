@@ -140,16 +140,25 @@ class MetricQuerier:
         return self._flatten(response)
 
     @staticmethod
-    def _flatten(response: dict) -> list:
-        if not response:
+    def _flatten(response) -> list:
+        if not isinstance(response, dict):
             return []
-        data = response.get("data") or {}
-        result = data.get("result") or []
+        data = response.get("data")
+        if not isinstance(data, dict):
+            return []
+        result = data.get("result")
+        if not isinstance(result, list):
+            return []
         out = []
         for series in result:
-            for point in series.get("values") or []:
-                # point is [timestamp, value_string_or_null]
-                if len(point) != 2:
+            if not isinstance(series, dict):
+                continue
+            values = series.get("values")
+            if not isinstance(values, list):
+                continue
+            for point in values:
+                # point is expected to be [timestamp, value_string_or_null]
+                if not isinstance(point, (list, tuple)) or len(point) != 2:
                     continue
                 value_raw = point[1]
                 if value_raw is None:

@@ -304,6 +304,29 @@ class TestMetricQuerier(unittest.TestCase):
         with self.assertRaises(HTTPCodeError):
             q.query("foo", start=0, end=1, step="1m")
 
+    def test_query_tolerates_malformed_response_shapes(self):
+        """Must not crash on any non-conforming shape — return [] instead."""
+        malformed_cases = [
+            None,
+            "not a dict",
+            {"data": "oops"},
+            {"data": {"result": "oops"}},
+            {"data": {"result": ["not-a-dict"]}},
+            {"data": {"result": [{"values": "not-a-list"}]}},
+            {"data": {"result": [{"values": [42]}]}},  # point is int, not list
+            {"data": {"result": [{"values": [[1, "v1", "extra"]]}]}},  # 3-element point
+        ]
+        for bad in malformed_cases:
+            axonops = MagicMock()
+            axonops.get_cluster_type.return_value = "cassandra"
+            axonops.do_request.return_value = bad
+            q = MetricQuerier(axonops, _args())
+            # Must not raise; must return [] or a list of successfully-parsed samples
+            samples = q.query("foo", start=0, end=1, step="1m")
+            self.assertIsInstance(samples, list, f"non-list result for input: {bad!r}")
+            # Samples should be empty since none of these shapes contain valid values
+            self.assertEqual(samples, [], f"expected [] for malformed input: {bad!r}")
+
 
 if __name__ == "__main__":
     unittest.main()
