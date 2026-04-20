@@ -171,3 +171,397 @@ class MetricQuerier:
                     continue
                 out.append(value)
         return out
+
+
+import fnmatch
+
+
+class RuleFilter:
+    """Decide whether a given rule name passes the user's include/exclude/rules filters.
+
+    Semantics:
+      - If `rules` is non-empty: only rules whose name exactly matches one of those strings pass
+        the include check (acts as a whitelist). If `include` is also set, both apply (AND).
+      - If `include` is non-empty (and `rules` is empty): rule name must match at least one glob.
+      - If `exclude` is non-empty: rule name must NOT match any exclude glob. exclude wins over include.
+      - All three empty: accept everything.
+    """
+
+    def __init__(self, include: list, exclude: list, rules: list):
+        self.include = list(include or [])
+        self.exclude = list(exclude or [])
+        self.rules = list(rules or [])
+
+    def accepts(self, rule_name: str) -> bool:
+        # exclude first — it's a hard veto
+        for pat in self.exclude:
+            if fnmatch.fnmatchcase(rule_name, pat):
+                return False
+        # if --rule is specified, it's a whitelist
+        if self.rules:
+            if rule_name not in self.rules:
+                return False
+        # if --include specified, must match at least one
+        if self.include:
+            return any(fnmatch.fnmatchcase(rule_name, pat) for pat in self.include)
+        return True
+
+
+import json
+import os
+import time
+from copy import deepcopy
+
+
+@dataclass
+class TuneAlertsConfig:
+    profile: str                    # "noisy" | "default" | "quiet"
+    percentile: float
+    warning_headroom: float
+    critical_headroom: float
+    min_samples: int
+    max_delta: float
+    include: list
+    exclude: list
+    rules: list
+
+
+@dataclass
+class RuleOutcome:
+    rule_name: str
+    status: str                     # "tuned" | "skipped" | "filtered"
+    reason: Optional[str] = None    # populated for skipped/filtered
+    old_warning: Optional[float] = None
+    old_critical: Optional[float] = None
+    new_warning: Optional[float] = None
+    new_critical: Optional[float] = None
+    percentile_value: Optional[float] = None
+    sample_count: Optional[int] = None
+    operator: Optional[str] = None
+
+
+@dataclass
+class TuneRunResult:
+    cluster_name: str
+    window_start: int               # Unix epoch seconds
+    window_end: int
+    profile: str
+    percentile: float
+    warning_headroom: float
+    critical_headroom: float
+    outcomes: list                  # list[RuleOutcome]
+    tuned_json: dict                # the full JSON with in-place updates
+
+    @property
+    def tuned_count(self) -> int:
+        return sum(1 for o in self.outcomes if o.status == "tuned")
+
+    @property
+    def skipped_count(self) -> int:
+        return sum(1 for o in self.outcomes if o.status == "skipped")
+
+    @property
+    def filtered_count(self) -> int:
+        return sum(1 for o in self.outcomes if o.status == "filtered")
+
+
+class TuneAlertsOrchestrator:
+    """Orchestrate the full tune-alerts run for one cluster.
+
+    Does not do I/O itself beyond invoking MetricQuerier; the caller
+    is responsible for reading/writing files using load_input() /
+    write_output() / write_audit_report() / print_summary().
+    """
+
+    SEVEN_DAYS_SECS = 7 * 24 * 60 * 60
+
+    def __init__(self, axonops, args, config: TuneAlertsConfig):
+        self.axonops = axonops
+        self.args = args
+        self.config = config
+        self.filter = RuleFilter(
+            include=config.include,
+            exclude=config.exclude,
+            rules=config.rules,
+        )
+
+    # ---- file I/O (called by run_tune_alerts in application.py) ----
+
+    def load_input(self, path: str) -> dict:
+        """Read and validate the input JSON."""
+        with open(path, "r") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError(f"Input JSON must be an object, got {type(data).__name__}")
+        if "metricrules" not in data or not isinstance(data["metricrules"], list):
+            raise ValueError("Input JSON missing 'metricrules' list")
+        return data
+
+    # ---- main orchestration ----
+
+    def tune_all(self, input_json: dict) -> TuneRunResult:
+        cluster_name = input_json.get("name") or self.args.cluster
+        tuned_json = deepcopy(input_json)
+
+        end_ts = int(time.time())
+        start_ts = end_ts - self.SEVEN_DAYS_SECS
+
+        outcomes = []
+        for rule in tuned_json["metricrules"]:
+            outcome = self._tune_one(rule, start_ts, end_ts)
+            outcomes.append(outcome)
+
+        return TuneRunResult(
+            cluster_name=cluster_name,
+            window_start=start_ts,
+            window_end=end_ts,
+            profile=self.config.profile,
+            percentile=self.config.percentile,
+            warning_headroom=self.config.warning_headroom,
+            critical_headroom=self.config.critical_headroom,
+            outcomes=outcomes,
+            tuned_json=tuned_json,
+        )
+
+    def _tune_one(self, rule: dict, start_ts: int, end_ts: int) -> RuleOutcome:
+        from axonopscli.utils import HTTPCodeError
+
+        name = rule.get("alert", "<unnamed>")
+        expr = rule.get("expr", "")
+        old_warning = rule.get("warningValue")
+        old_critical = rule.get("criticalValue")
+
+        # Filter stage
+        if not self.filter.accepts(name):
+            return RuleOutcome(
+                rule_name=name, status="filtered", reason="excluded by filter",
+                old_warning=old_warning, old_critical=old_critical,
+            )
+
+        # Parse expr
+        try:
+            bare, operator, _old_str = ExprRewriter.strip_threshold(expr)
+        except ValueError as e:
+            return RuleOutcome(
+                rule_name=name, status="skipped", reason=f"cannot parse expr: {e}",
+                old_warning=old_warning, old_critical=old_critical,
+            )
+
+        # Query samples
+        querier = MetricQuerier(self.axonops, self.args)
+        try:
+            samples = querier.query(bare, start=start_ts, end=end_ts, step="1m")
+        except HTTPCodeError as e:
+            return RuleOutcome(
+                rule_name=name, status="skipped",
+                reason=f"query failed: {e}",
+                old_warning=old_warning, old_critical=old_critical,
+                operator=operator,
+            )
+
+        if len(samples) < self.config.min_samples:
+            return RuleOutcome(
+                rule_name=name, status="skipped",
+                reason=f"insufficient data ({len(samples)} samples)",
+                old_warning=old_warning, old_critical=old_critical,
+                operator=operator,
+                sample_count=len(samples),
+            )
+
+        # Compute thresholds
+        try:
+            calc = ThresholdCalculator.compute(
+                samples=samples,
+                operator=operator,
+                percentile=self.config.percentile,
+                warning_headroom=self.config.warning_headroom,
+                critical_headroom=self.config.critical_headroom,
+            )
+        except ValueError as e:
+            return RuleOutcome(
+                rule_name=name, status="skipped", reason=f"threshold compute error: {e}",
+                old_warning=old_warning, old_critical=old_critical, operator=operator,
+            )
+
+        # Sanity clamps
+        if calc.new_warning <= 0 or calc.new_critical <= 0:
+            return RuleOutcome(
+                rule_name=name, status="skipped",
+                reason=f"nonsensical (new warning={calc.new_warning}, critical={calc.new_critical})",
+                old_warning=old_warning, old_critical=old_critical, operator=operator,
+                sample_count=calc.sample_count,
+            )
+
+        if self._unreasonable_delta(old_warning, calc.new_warning) or \
+           self._unreasonable_delta(old_critical, calc.new_critical):
+            return RuleOutcome(
+                rule_name=name, status="skipped",
+                reason=f"unreasonable delta (max_delta={self.config.max_delta})",
+                old_warning=old_warning, old_critical=old_critical,
+                new_warning=calc.new_warning, new_critical=calc.new_critical,
+                operator=operator, sample_count=calc.sample_count,
+                percentile_value=calc.percentile_value,
+            )
+
+        # Apply
+        rule["warningValue"] = _round_threshold(calc.new_warning)
+        rule["criticalValue"] = _round_threshold(calc.new_critical)
+        rule["expr"] = ExprRewriter.rewrite(expr, new_warning=rule["warningValue"])
+
+        return RuleOutcome(
+            rule_name=name, status="tuned",
+            old_warning=old_warning, old_critical=old_critical,
+            new_warning=rule["warningValue"], new_critical=rule["criticalValue"],
+            operator=operator,
+            sample_count=calc.sample_count,
+            percentile_value=calc.percentile_value,
+        )
+
+    def _unreasonable_delta(self, old_val, new_val) -> bool:
+        try:
+            old_f = float(old_val)
+            new_f = float(new_val)
+        except (TypeError, ValueError):
+            return False
+        if old_f == 0:
+            return False
+        ratio = max(abs(new_f / old_f), abs(old_f / new_f))
+        return ratio > self.config.max_delta
+
+    # ---- output writers ----
+
+    def write_output(self, input_path: str, result: TuneRunResult) -> str:
+        """Write the tuned JSON sibling file. Returns the output path."""
+        out_path = self._output_json_path(input_path, result.cluster_name)
+        # Atomic creation with restrictive mode
+        if os.path.exists(out_path):
+            os.chmod(out_path, 0o600)
+        fd = os.open(out_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump(result.tuned_json, f, indent=4)
+        return out_path
+
+    def write_audit_report(self, input_path: str, result: TuneRunResult) -> str:
+        """Write the sidecar markdown audit report. Returns the report path."""
+        out_path = self._output_report_path(input_path, result.cluster_name)
+        content = self._render_audit_report(input_path, result)
+        with open(out_path, "w") as f:
+            f.write(content)
+        os.chmod(out_path, 0o644)
+        return out_path
+
+    def print_summary(self, result: TuneRunResult, json_path: str) -> None:
+        summary_parts = [f"Tuned {result.tuned_count}"]
+        if result.skipped_count:
+            reasons = {}
+            for o in result.outcomes:
+                if o.status == "skipped":
+                    # Bucket by the first word of the reason
+                    key = (o.reason or "unknown").split("(")[0].strip()
+                    reasons[key] = reasons.get(key, 0) + 1
+            parts = ", ".join(f"{k}: {v}" for k, v in sorted(reasons.items()))
+            summary_parts.append(f"skipped {result.skipped_count} ({parts})")
+        if result.filtered_count:
+            summary_parts.append(f"filtered {result.filtered_count}")
+        summary_parts.append(f"wrote {json_path}")
+        print(", ".join(summary_parts))
+
+        if self.args.v:
+            for o in result.outcomes:
+                self._print_verbose(o)
+
+    def _print_verbose(self, o: RuleOutcome) -> None:
+        if o.status == "tuned":
+            print(
+                f"  [tuned]    {o.rule_name}: "
+                f"warning {o.old_warning}→{o.new_warning}, "
+                f"critical {o.old_critical}→{o.new_critical}, "
+                f"p{self.config.percentile}={_format_value(o.percentile_value)}, "
+                f"{o.sample_count} samples"
+            )
+        elif o.status == "skipped":
+            print(f"  [skipped]  {o.rule_name}: {o.reason}")
+        elif o.status == "filtered":
+            print(f"  [filtered] {o.rule_name}: {o.reason}")
+
+    # ---- path helpers ----
+
+    def _output_json_path(self, input_path: str, cluster_name: str) -> str:
+        return os.path.join(
+            os.path.dirname(os.path.abspath(input_path)),
+            f"alert_rules.tuned.for.{cluster_name}.json",
+        )
+
+    def _output_report_path(self, input_path: str, cluster_name: str) -> str:
+        return os.path.join(
+            os.path.dirname(os.path.abspath(input_path)),
+            f"alert_rules.tuned.for.{cluster_name}.report.md",
+        )
+
+    # ---- audit report rendering ----
+
+    def _render_audit_report(self, input_path: str, result: TuneRunResult) -> str:
+        from datetime import datetime, timezone
+
+        gen_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        window_start = datetime.fromtimestamp(result.window_start, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        window_end = datetime.fromtimestamp(result.window_end, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        lines = [
+            f"# Alert tuning report — {result.cluster_name}",
+            "",
+            f"**Generated:** {gen_ts}",
+            f"**Source:** {input_path}",
+            f"**Profile:** {result.profile} "
+            f"(p{result.percentile}, warning +{int(result.warning_headroom * 100)}%, "
+            f"critical +{int(result.critical_headroom * 100)}%)",
+            f"**Window:** {window_start} → {window_end} (7 days)",
+            "",
+            "## Summary",
+            "",
+            f"- Tuned: {result.tuned_count} rules",
+            f"- Skipped: {result.skipped_count} rules",
+            f"- Filtered out: {result.filtered_count} rules",
+            "",
+        ]
+
+        tuned = [o for o in result.outcomes if o.status == "tuned"]
+        if tuned:
+            lines.extend([
+                "## Tuned rules",
+                "",
+                "| Rule | Op | warning (old → new) | critical (old → new) | percentile value | Samples |",
+                "|---|---|---|---|---|---|",
+            ])
+            for o in tuned:
+                lines.append(
+                    f"| {o.rule_name} | {o.operator} | "
+                    f"{o.old_warning} → {o.new_warning} | "
+                    f"{o.old_critical} → {o.new_critical} | "
+                    f"{_format_value(o.percentile_value)} | {o.sample_count} |"
+                )
+            lines.append("")
+
+        skipped = [o for o in result.outcomes if o.status == "skipped"]
+        if skipped:
+            lines.extend(["## Skipped rules", "", "| Rule | Reason |", "|---|---|"])
+            for o in skipped:
+                lines.append(f"| {o.rule_name} | {o.reason} |")
+            lines.append("")
+
+        filtered = [o for o in result.outcomes if o.status == "filtered"]
+        if filtered:
+            lines.extend(["## Filtered rules", "", "| Rule | Reason |", "|---|---|"])
+            for o in filtered:
+                lines.append(f"| {o.rule_name} | {o.reason} |")
+            lines.append("")
+
+        return "\n".join(lines)
+
+
+def _round_threshold(v: float):
+    """Round to int if whole, else 2 decimals. Keeps JSON idiomatic."""
+    rounded = round(v, 2)
+    if rounded == int(rounded):
+        return int(rounded)
+    return rounded
