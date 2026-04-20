@@ -889,6 +889,48 @@ class TestIncidentFlag(unittest.TestCase):
             self.assertIn("Incident coverage (2026-04-10)", report)
             self.assertIn("Incident coverage (2026-04-11)", report)
 
+    def test_multiple_incidents_chain_adjustments_reported_correctly(self):
+        """When two incidents both trigger adjustment, the second incident's
+        'action' should reference the value AFTER the first adjustment,
+        not the original baseline-derived value."""
+        from axonopscli.application import Application
+        from axonopscli.axonops import AxonOps
+
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = os.path.join(tmp, "alert_rules.json")
+            with open(input_path, "w") as f:
+                json.dump(_sample_input(cluster_name="bc1"), f)
+
+            incident_1_start, _ = _day_range("2026-04-10")
+            incident_2_start, _ = _day_range("2026-04-11")
+
+            def fake_query(self, promql, start, end, step="1m"):
+                if start == incident_1_start:
+                    return [50, 80, 100]
+                if start == incident_2_start:
+                    return [40, 70, 90]
+                return list(range(1, 101))  # baseline → p99 ≈ 99.01
+
+            with patch('axonopscli.components.tune_alerts.MetricQuerier.query', new=fake_query):
+                Application().run([
+                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "tune-alerts", "--input", input_path,
+                    "--incident", "2026-04-10", "--incident", "2026-04-11",
+                    "--max-delta", "100",
+                ])
+
+            with open(os.path.join(tmp, "alert_rules.tuned.for.bc1.report.md")) as f:
+                report = f.read()
+
+            inc2_idx = report.find("Incident coverage (2026-04-11)")
+            self.assertGreater(inc2_idx, 0, "Incident 2 section missing")
+            inc2_section = report[inc2_idx:inc2_idx + 2000]
+
+            # The "from" side of the adjustment should NOT be the baseline-derived
+            # critical (~118.81). It must be the post-incident-1 value (≈ 95).
+            self.assertNotIn("118.81", inc2_section,
+                             f"Incident 2 row references original baseline:\n{inc2_section}")
+
 
 if __name__ == "__main__":
     unittest.main()

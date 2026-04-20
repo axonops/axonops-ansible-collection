@@ -425,6 +425,9 @@ class TuneAlertsOrchestrator:
         # if the metric reflected the incident but threshold would miss.
         for window in incident_windows:
             inc_start, inc_end = window
+            # Snapshot values BEFORE any potential adjustment this iteration
+            pre_warning = new_warning
+            pre_critical = new_critical
             try:
                 incident_samples = querier.query(bare, start=inc_start, end=inc_end, step="1m")
             except HTTPCodeError as e:
@@ -476,7 +479,7 @@ class TuneAlertsOrchestrator:
                 new_warning = adjusted_warning
                 new_critical = adjusted_critical
                 entry["status"] = "Yes (adjusted)"
-                entry["action"] = f"critical {_format_value(calc.new_critical)} → {_format_value(adjusted_critical)}"
+                entry["action"] = f"critical {_format_value(pre_critical)} → {_format_value(adjusted_critical)}"
 
             incident_coverage.append(entry)
 
