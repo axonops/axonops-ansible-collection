@@ -580,3 +580,80 @@ Export with raw secret values (writes `.gitignore` automatically):
 ```shell
 $ pipenv run python axonops.py alerts --exportpath ./backup --include-secrets
 ```
+
+### `tune-alerts` Subcommand
+
+Read an existing `alert_rules.json` (produced by the `alerts` subcommand or
+hand-crafted in the same shape) and write a tuned sibling JSON whose
+`warningValue` and `criticalValue` are calibrated to the last 7 days of
+observed metric data. Companion markdown audit report lists every change
+with before/after/percentile/sample count, so you can review the tuning
+before re-applying.
+
+#### Options:
+
+* `--input` (required) Path to the source `alert_rules.json`. The tuned
+  output is written alongside it as `alert_rules.tuned.for.<cluster>.json`
+  plus a `<...>.report.md`.
+* `--profile {noisy,default,quiet}` Preset combining percentile and
+  headroom. Defaults to `default`.
+    * `noisy`: p95 with +5% warning / +10% critical headroom.
+    * `default`: p99 with +10% warning / +20% critical headroom.
+    * `quiet`: p99.9 with +20% warning / +50% critical headroom.
+* `--percentile FLOAT` Override the profile's percentile (0 < P < 100).
+* `--warning-headroom FLOAT` Override the profile's warning headroom
+  (e.g. `0.10` for +10%).
+* `--critical-headroom FLOAT` Override the profile's critical headroom.
+* `--min-samples N` Skip rules whose metric returns fewer than N samples
+  over the 7-day window. Default 100.
+* `--max-delta N` Skip rules whose new threshold differs from the original
+  by more than N× (either direction). Default 10.
+* `--include GLOB` Tune only rules whose name matches this fnmatch glob.
+  Repeatable.
+* `--exclude GLOB` Skip rules whose name matches this glob. Repeatable.
+  Overrides `--include`.
+* `--rule NAME` Tune only this exact rule name. Repeatable.
+
+#### Behavior:
+
+The tool loads the input, strips each rule's trailing ` <operator> <value>`
+suffix to isolate the bare metric, queries `/api/v1/query_range` over the
+last 7 days (1-minute step), and computes a baseline percentile. For `>=`
+and `>` operators, the upper percentile is used with positive headroom.
+For `<=` and `<`, the lower percentile is used with negative headroom —
+the "alert if it gets X% worse than last week" semantic applies to both
+tails.
+
+Rules that fail one of these checks are left unchanged in the output and
+listed in the stdout summary and the audit report:
+
+- **insufficient data**: fewer than `--min-samples` non-null samples
+- **nonsensical**: new threshold would be ≤ 0
+- **unreasonable delta**: new threshold differs from original by more than
+  `--max-delta`× (guards against metric instability or algorithm error)
+- **query failed**: metric endpoint returned an error
+- **cannot parse expr**: the rule's expression didn't match the expected
+  trailing-operator shape
+
+#### Examples:
+
+Tune with the default profile:
+
+```shell
+$ pipenv run python axonops.py --org $AXONOPS_ORG --cluster $AXONOPS_CLUSTER --token $AXONOPS_TOKEN \
+    tune-alerts --input ./exported/alert_rules.json
+```
+
+Use the noisy preset to catch smaller deviations:
+
+```shell
+$ pipenv run python axonops.py --org $AXONOPS_ORG --cluster $AXONOPS_CLUSTER --token $AXONOPS_TOKEN \
+    tune-alerts --input ./exported/alert_rules.json --profile noisy
+```
+
+Tune a subset of rules:
+
+```shell
+$ pipenv run python axonops.py --org $AXONOPS_ORG --cluster $AXONOPS_CLUSTER --token $AXONOPS_TOKEN \
+    tune-alerts --input ./exported/alert_rules.json --include 'GC*' --exclude '*_paxos*'
+```
