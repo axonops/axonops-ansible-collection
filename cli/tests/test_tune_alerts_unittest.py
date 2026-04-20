@@ -647,5 +647,72 @@ class TestTuneAlertsOrchestratorOutput(unittest.TestCase):
             self.assertIn("annotations", rule)
 
 
+class TestApplicationRunTuneAlerts(unittest.TestCase):
+
+    def test_application_run_tune_alerts_end_to_end(self):
+        from axonopscli.application import Application
+        from axonopscli.axonops import AxonOps
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # Write an input alert_rules.json
+            input_path = os.path.join(tmp, "alert_rules.json")
+            with open(input_path, "w") as f:
+                json.dump(_sample_input(cluster_name="bc1"), f)
+
+            # Canned query_range response yielding p99 ≈ 990
+            samples = list(range(1000))
+            prom_response = {
+                "status": "success",
+                "data": {
+                    "resultType": "matrix",
+                    "result": [{
+                        "metric": {},
+                        "values": [[i, str(float(v))] for i, v in enumerate(samples)],
+                    }],
+                },
+            }
+            with patch.object(AxonOps, 'do_request', return_value=prom_response):
+                Application().run([
+                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "tune-alerts", "--input", input_path,
+                ])
+
+            # Verify output files exist
+            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.tuned.for.bc1.json")))
+            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.tuned.for.bc1.report.md")))
+
+    def test_application_run_tune_alerts_profile_quiet(self):
+        from axonopscli.application import Application
+        from axonopscli.axonops import AxonOps
+
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = os.path.join(tmp, "alert_rules.json")
+            with open(input_path, "w") as f:
+                json.dump(_sample_input(cluster_name="bc1"), f)
+
+            samples = list(range(1000))
+            prom_response = {
+                "status": "success",
+                "data": {
+                    "resultType": "matrix",
+                    "result": [{
+                        "metric": {},
+                        "values": [[i, str(float(v))] for i, v in enumerate(samples)],
+                    }],
+                },
+            }
+            with patch.object(AxonOps, 'do_request', return_value=prom_response):
+                Application().run([
+                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "tune-alerts", "--input", input_path, "--profile", "quiet",
+                ])
+
+            out_path = os.path.join(tmp, "alert_rules.tuned.for.bc1.json")
+            with open(out_path) as f:
+                out = json.load(f)
+            # Quiet profile: p99.9 + 50% critical headroom on 1000 samples → p99.9 ≈ 999, critical ≈ 1498.5
+            self.assertGreater(out["metricrules"][0]["criticalValue"], 1400)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -239,6 +239,34 @@ class Application:
                                         'When set, exported filenames are auto-appended '
                                         'to a .gitignore in the export directory.')
 
+        tune_alerts_parser = commands_subparser.add_parser(
+            "tune-alerts",
+            help="Tune existing alert rule thresholds against the last 7 days of observed metrics")
+
+        tune_alerts_parser.set_defaults(func=self.run_tune_alerts)
+
+        tune_alerts_parser.add_argument('--input', type=str, required=True,
+                                        help='Path to alert_rules.json exported by the alerts subcommand')
+        tune_alerts_parser.add_argument('--profile', type=str, default='default',
+                                        choices=['noisy', 'default', 'quiet'],
+                                        help='Preset: noisy=p95/5%%-10%%, default=p99/10%%-20%%, quiet=p99.9/20%%-50%%')
+        tune_alerts_parser.add_argument('--percentile', type=float, default=None,
+                                        help='Override profile percentile (0 < P < 100)')
+        tune_alerts_parser.add_argument('--warning-headroom', type=float, default=None,
+                                        help='Override profile warning headroom (e.g. 0.10 = +10%%)')
+        tune_alerts_parser.add_argument('--critical-headroom', type=float, default=None,
+                                        help='Override profile critical headroom (e.g. 0.20 = +20%%)')
+        tune_alerts_parser.add_argument('--min-samples', type=int, default=100,
+                                        help='Skip rules with fewer samples than this (default 100)')
+        tune_alerts_parser.add_argument('--max-delta', type=float, default=10.0,
+                                        help='Skip rules whose new threshold differs from original by more than this multiple (default 10)')
+        tune_alerts_parser.add_argument('--include', action='append', default=[],
+                                        help='Include rules matching this glob (repeatable)')
+        tune_alerts_parser.add_argument('--exclude', action='append', default=[],
+                                        help='Exclude rules matching this glob (repeatable; overrides --include)')
+        tune_alerts_parser.add_argument('--rule', action='append', default=[],
+                                        help='Tune only this exact rule name (repeatable)')
+
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
         # ensure --tables is only used together with --keyspace
@@ -389,3 +417,46 @@ class Application:
         exporter = AlertsExporter(axonops, args)
         exporter.fetch()
         exporter.export(args.exportpath, include_secrets=args.include_secrets)
+
+    def run_tune_alerts(self, args: argparse.Namespace):
+        """ Run the alerts tuning """
+        if args.v:
+            print(f"Running alerts tuning on {args.org}/{args.cluster}")
+            print(_scrubbed_args(args))
+
+        axonops = self.get_axonops(args)
+
+        from .components.tune_alerts import TuneAlertsOrchestrator, TuneAlertsConfig
+
+        config = self._build_tune_alerts_config(args)
+        orchestrator = TuneAlertsOrchestrator(axonops, args, config)
+
+        input_json = orchestrator.load_input(args.input)
+        result = orchestrator.tune_all(input_json)
+        json_path = orchestrator.write_output(args.input, result)
+        orchestrator.write_audit_report(args.input, result)
+        orchestrator.print_summary(result, json_path)
+
+    @staticmethod
+    def _build_tune_alerts_config(args):
+        from .components.tune_alerts import TuneAlertsConfig
+
+        # Profile presets
+        presets = {
+            'noisy':   (95.0,  0.05, 0.10),
+            'default': (99.0,  0.10, 0.20),
+            'quiet':   (99.9,  0.20, 0.50),
+        }
+        p_percentile, p_warn, p_crit = presets[args.profile]
+
+        return TuneAlertsConfig(
+            profile=args.profile,
+            percentile=args.percentile if args.percentile is not None else p_percentile,
+            warning_headroom=args.warning_headroom if args.warning_headroom is not None else p_warn,
+            critical_headroom=args.critical_headroom if args.critical_headroom is not None else p_crit,
+            min_samples=args.min_samples,
+            max_delta=args.max_delta,
+            include=list(args.include or []),
+            exclude=list(args.exclude or []),
+            rules=list(args.rule or []),
+        )
