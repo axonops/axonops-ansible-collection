@@ -461,7 +461,16 @@ class Application:
 
         result = orchestrator.tune_all(input_json)
         json_path = orchestrator.write_output(source_label, result)
-        orchestrator.write_audit_report(source_label, result)
+        try:
+            orchestrator.write_audit_report(source_label, result)
+        except OSError as e:
+            print(
+                f"WARNING: tuned JSON written to {json_path} but audit report write failed: {e}. "
+                f"Re-run with the same arguments to regenerate the report.",
+                file=sys.stderr,
+            )
+            orchestrator.print_summary(result, json_path)
+            sys.exit(2)
         orchestrator.print_summary(result, json_path)
 
     @staticmethod

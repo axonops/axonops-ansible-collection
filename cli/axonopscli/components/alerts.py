@@ -158,8 +158,10 @@ class AlertsExporter:
         to_add = [name for name in filenames if name not in existing_set]
         if not to_add:
             return
-        with open(gitignore_path, "w") as f:
+        tmp_path = gitignore_path + ".tmp"
+        with open(tmp_path, "w") as f:
             for line in existing_lines:
                 f.write(line + "\n")
             for name in to_add:
                 f.write(name + "\n")
+        os.replace(tmp_path, gitignore_path)

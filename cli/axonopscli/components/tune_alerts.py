@@ -492,8 +492,19 @@ class TuneAlertsOrchestrator:
                 sample_count=calc.sample_count, incident_coverage=incident_coverage,
             )
 
-        if self._unreasonable_delta(old_warning, new_warning) or \
-           self._unreasonable_delta(old_critical, new_critical):
+        try:
+            warning_unreasonable = self._unreasonable_delta(old_warning, new_warning)
+            critical_unreasonable = self._unreasonable_delta(old_critical, new_critical)
+        except ValueError as e:
+            return RuleOutcome(
+                rule_name=name, status="skipped",
+                reason=f"cannot evaluate delta: {e}",
+                old_warning=old_warning, old_critical=old_critical,
+                operator=operator, sample_count=calc.sample_count,
+                incident_coverage=incident_coverage,
+            )
+
+        if warning_unreasonable or critical_unreasonable:
             return RuleOutcome(
                 rule_name=name, status="skipped",
                 reason=f"unreasonable delta (max_delta={self.config.max_delta})",
@@ -519,28 +530,52 @@ class TuneAlertsOrchestrator:
 
     def _baseline_samples_excluding(self, querier, promql, start_ts, end_ts, incident_windows):
         """Query the 7-day window minus incident-day windows as separate sub-queries."""
-        # Sort and merge incident windows
+        from axonopscli.utils import HTTPCodeError
+
         sorted_windows = sorted(incident_windows)
         cursor = start_ts
         baseline = []
+        sub_ranges_completed = 0
+        ranges_to_query = []
         for inc_start, inc_end in sorted_windows:
             if inc_end < start_ts or inc_start > end_ts:
-                continue  # incident entirely outside the 7-day window
+                continue
             clipped_start = max(inc_start, start_ts)
             clipped_end = min(inc_end, end_ts)
             if cursor < clipped_start:
-                baseline.extend(querier.query(promql, start=cursor, end=clipped_start - 1, step="1m"))
+                ranges_to_query.append((cursor, clipped_start - 1))
             cursor = max(cursor, clipped_end + 1)
         if cursor <= end_ts:
-            baseline.extend(querier.query(promql, start=cursor, end=end_ts, step="1m"))
+            ranges_to_query.append((cursor, end_ts))
+
+        for r_start, r_end in ranges_to_query:
+            try:
+                baseline.extend(querier.query(promql, start=r_start, end=r_end, step="1m"))
+                sub_ranges_completed += 1
+            except HTTPCodeError as e:
+                raise HTTPCodeError(
+                    f"{e} (after collecting {len(baseline)} samples from "
+                    f"{sub_ranges_completed}/{len(ranges_to_query)} sub-ranges)"
+                )
         return baseline
 
     def _unreasonable_delta(self, old_val, new_val) -> bool:
+        """Returns True if the magnitude change is unreasonable.
+
+        Raises ValueError if old_val is not coercible to float (caller should
+        skip the rule with a clear reason rather than silently tuning with
+        garbage).
+        """
+        if old_val is None:
+            return False  # first tune; no baseline to compare
         try:
             old_f = float(old_val)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"unparseable old threshold {old_val!r}: {e}")
+        try:
             new_f = float(new_val)
         except (TypeError, ValueError):
-            return False
+            return True  # treat unparseable new value as unreasonable
         if old_f == 0:
             return False
         ratio = max(abs(new_f / old_f), abs(old_f / new_f))
