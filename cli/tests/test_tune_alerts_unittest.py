@@ -557,6 +557,35 @@ class TestTuneAlertsOrchestrator(unittest.TestCase):
         # Other rule still tuned
         self.assertEqual(o["NTP offset"].status, "tuned")
 
+    def test_unreasonable_delta_treats_malformed_old_as_skip_reason(self):
+        """Old thresholds that aren't coercible to float should surface a
+        clear 'cannot evaluate delta' skip reason, not silently tune."""
+        # Construct an input with a malformed old threshold
+        input_json = {
+            "name": "bc1",
+            "metricrules": [
+                {
+                    "id": "rule-x",
+                    "alert": "Malformed Threshold Rule",
+                    "expr": "foo_metric >= 100",
+                    "for": "5m",
+                    "operator": ">=",
+                    "criticalValue": "N/A",  # malformed
+                    "warningValue": 100,
+                    "filters": [],
+                    "annotations": {},
+                    "integrations": {},
+                },
+            ],
+        }
+        orch = self._make_orch({"foo_metric": list(range(1000))})
+        with patch.object(MetricQuerier, 'query', new=orch._fake_query):
+            result = orch.tune_all(input_json)
+
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "skipped")
+        self.assertIn("cannot evaluate delta", outcome.reason)
+
 
 import stat
 
@@ -906,9 +935,9 @@ class TestIncidentFlag(unittest.TestCase):
 
             def fake_query(self, promql, start, end, step="1m"):
                 if start == incident_1_start:
-                    return [50, 80, 100]
+                    return [80, 95, 105]   # peak 105 > p99=99.01 → impacted, but 105 < critical_baseline=118.81 → adjust
                 if start == incident_2_start:
-                    return [40, 70, 90]
+                    return [80, 95, 99.5]  # peak 99.5 > p99=99.01 → impacted, but 99.5 < post-incident-1 critical (~99.75) → adjust
                 return list(range(1, 101))  # baseline → p99 ≈ 99.01
 
             with patch('axonopscli.components.tune_alerts.MetricQuerier.query', new=fake_query):
@@ -926,10 +955,12 @@ class TestIncidentFlag(unittest.TestCase):
             self.assertGreater(inc2_idx, 0, "Incident 2 section missing")
             inc2_section = report[inc2_idx:inc2_idx + 2000]
 
-            # The "from" side of the adjustment should NOT be the baseline-derived
-            # critical (~118.81). It must be the post-incident-1 value (≈ 95).
+            # With the bug: "critical 118.81 → ..." (original baseline)
+            # With the fix: "critical 99.75 → ..." (post-incident-1 value)
             self.assertNotIn("118.81", inc2_section,
                              f"Incident 2 row references original baseline:\n{inc2_section}")
+            self.assertIn("99.75", inc2_section,
+                          f"Expected incident 2 'from' to be post-incident-1 value:\n{inc2_section}")
 
 
 if __name__ == "__main__":

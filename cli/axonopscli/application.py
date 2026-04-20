@@ -250,7 +250,7 @@ class Application:
         tune_alerts_parser.add_argument('--from-api', action='store_true', default=False,
                                         help='Fetch alert rules from the live API instead of --input')
         tune_alerts_parser.add_argument('--output-dir', type=str, default=None,
-                                        help='Directory for output files (required with --from-api; defaults to the directory of --input)')
+                                        help='Directory for output files (only valid with --from-api).')
         tune_alerts_parser.add_argument('--profile', type=str, default='default',
                                         choices=['noisy', 'default', 'quiet'],
                                         help='Preset: noisy=p95/5%%-10%%, default=p99/10%%-20%%, quiet=p99.9/20%%-50%%')
@@ -297,6 +297,8 @@ class Application:
                 parser.error("tune-alerts requires either --input PATH or --from-api")
             if has_from_api and not getattr(parsed_result, 'output_dir', None):
                 parser.error("--from-api requires --output-dir")
+            if has_input and getattr(parsed_result, 'output_dir', None):
+                parser.error("--output-dir is only valid with --from-api")
 
         # if func() is not present it means that no command was inserted
         if hasattr(parsed_result, 'func'):
@@ -449,11 +451,10 @@ class Application:
         orchestrator = TuneAlertsOrchestrator(axonops, args, config)
 
         if args.from_api:
-            import os as _os
             input_json = orchestrator.fetch_from_api()
             # write_output/report use the directory from a synthetic "input path"
-            synthetic_input = _os.path.join(args.output_dir, "alert_rules.json")
-            _os.makedirs(args.output_dir, exist_ok=True)
+            synthetic_input = os.path.join(args.output_dir, "alert_rules.json")
+            os.makedirs(args.output_dir, exist_ok=True)
             source_label = synthetic_input
         else:
             input_json = orchestrator.load_input(args.input)

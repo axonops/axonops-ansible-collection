@@ -2,6 +2,8 @@ import json
 import os
 import re
 
+from axonopscli.api import ALERT_RULES_URL, INTEGRATIONS_URL
+
 REDACTED = "***REDACTED***"
 GITIGNORE_FILENAME = ".gitignore"
 SECRETS_WARNING = (
@@ -73,9 +75,6 @@ class AlertsExporter:
     Single-cluster scope, mirroring `dashboard --exportpath` ergonomics.
     """
 
-    ALERT_RULES_URL = "/api/v1/alert-rules/{org}/{cluster_type}/{cluster}"
-    INTEGRATIONS_URL = "/api/v1/integrations/{org}/{cluster_type}/{cluster}"
-
     def __init__(self, axonops, args):
         self.axonops = axonops
         self.args = args
@@ -87,11 +86,11 @@ class AlertsExporter:
         org, cluster = self.args.org, self.args.cluster
         cluster_type = self.axonops.get_cluster_type()
         self.alert_rules = self.axonops.do_request(
-            url=self.ALERT_RULES_URL.format(org=org, cluster_type=cluster_type, cluster=cluster),
+            url=ALERT_RULES_URL.format(org=org, cluster_type=cluster_type, cluster=cluster),
             method='GET',
         ) or {}
         self.integrations = self.axonops.do_request(
-            url=self.INTEGRATIONS_URL.format(org=org, cluster_type=cluster_type, cluster=cluster),
+            url=INTEGRATIONS_URL.format(org=org, cluster_type=cluster_type, cluster=cluster),
             method='GET',
         ) or {}
 

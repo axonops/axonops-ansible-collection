@@ -598,8 +598,9 @@ before re-applying.
 * `--from-api` Fetch alert rules directly from the live API instead of
   reading from `--input`. Requires `--output-dir`. Mutually exclusive
   with `--input`.
-* `--output-dir PATH` Directory for the tuned JSON and audit report when
-  `--from-api` is used.
+* `--output-dir PATH` Directory for the tuned JSON and audit report.
+  Only valid with `--from-api`; rejected when `--input` is used
+  (output is then written alongside the input file).
 * `--profile {noisy,default,quiet}` Preset combining percentile and
   headroom. Defaults to `default`.
     * `noisy`: p95 with +5% warning / +10% critical headroom.

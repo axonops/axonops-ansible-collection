@@ -1,5 +1,16 @@
+import fnmatch
+import json
+import math
+import os
+import re
+import time
+import urllib.parse
+from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
+
+from axonopscli.api import ALERT_RULES_URL, QUERY_RANGE_URL
 
 
 @dataclass
@@ -66,9 +77,6 @@ def _percentile(samples: list, p: float) -> float:
     return sorted_samples[lower] * (1.0 - weight) + sorted_samples[upper] * weight
 
 
-import re
-
-
 # Pattern mirrors the stripping regex used by the existing Ansible
 # alert_rule.py module (line ~253): expressions always end with
 # ` <operator> <value>`.
@@ -105,14 +113,15 @@ def _format_value(v) -> str:
     return str(v)
 
 
-import math
-import urllib.parse
+def _md_cell(s) -> str:
+    """Escape a value for use inside a markdown table cell."""
+    if s is None:
+        return ""
+    return str(s).replace("|", "\\|").replace("\n", " ")
 
 
 class MetricQuerier:
     """Query /api/v1/query_range and return a flat list of numeric samples."""
-
-    QUERY_RANGE_URL = "/api/v1/query_range/{org}/{cluster_type}/{cluster}"
 
     def __init__(self, axonops, args):
         self.axonops = axonops
@@ -124,7 +133,7 @@ class MetricQuerier:
         start/end are Unix epoch seconds. step is a Prometheus duration string
         (e.g. '1m', '15s'). Raises HTTPCodeError on transport/server failure.
         """
-        path = self.QUERY_RANGE_URL.format(
+        path = QUERY_RANGE_URL.format(
             org=self.args.org,
             cluster_type=self.axonops.get_cluster_type(),
             cluster=self.args.cluster,
@@ -173,9 +182,6 @@ class MetricQuerier:
         return out
 
 
-import fnmatch
-
-
 class RuleFilter:
     """Decide whether a given rule name passes the user's include/exclude/rules filters.
 
@@ -205,13 +211,6 @@ class RuleFilter:
         if self.include:
             return any(fnmatch.fnmatchcase(rule_name, pat) for pat in self.include)
         return True
-
-
-import json
-import os
-import time
-from copy import deepcopy
-from datetime import datetime, timezone, timedelta
 
 
 def _incident_day_range(date_str: str) -> tuple:
@@ -302,8 +301,6 @@ class TuneAlertsOrchestrator:
 
     # ---- file I/O (called by run_tune_alerts in application.py) ----
 
-    ALERT_RULES_URL = "/api/v1/alert-rules/{org}/{cluster_type}/{cluster}"
-
     def load_input(self, path: str) -> dict:
         """Read and validate the input JSON."""
         with open(path, "r") as f:
@@ -316,7 +313,7 @@ class TuneAlertsOrchestrator:
 
     def fetch_from_api(self) -> dict:
         """Fetch alert_rules.json directly from the AxonOps API."""
-        url = self.ALERT_RULES_URL.format(
+        url = ALERT_RULES_URL.format(
             org=self.args.org,
             cluster_type=self.axonops.get_cluster_type(),
             cluster=self.args.cluster,
@@ -654,8 +651,6 @@ class TuneAlertsOrchestrator:
     # ---- audit report rendering ----
 
     def _render_audit_report(self, input_path: str, result: TuneRunResult) -> str:
-        from datetime import datetime, timezone
-
         gen_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         window_start = datetime.fromtimestamp(result.window_start, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         window_end = datetime.fromtimestamp(result.window_end, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -688,10 +683,10 @@ class TuneAlertsOrchestrator:
             ])
             for o in tuned:
                 lines.append(
-                    f"| {o.rule_name} | {o.operator} | "
-                    f"{o.old_warning} → {o.new_warning} | "
-                    f"{o.old_critical} → {o.new_critical} | "
-                    f"{_format_value(o.percentile_value)} | {o.sample_count} |"
+                    f"| {_md_cell(o.rule_name)} | {_md_cell(o.operator)} | "
+                    f"{_md_cell(o.old_warning)} → {_md_cell(o.new_warning)} | "
+                    f"{_md_cell(o.old_critical)} → {_md_cell(o.new_critical)} | "
+                    f"{_md_cell(_format_value(o.percentile_value))} | {_md_cell(o.sample_count)} |"
                 )
             lines.append("")
 
@@ -699,14 +694,14 @@ class TuneAlertsOrchestrator:
         if skipped:
             lines.extend(["## Skipped rules", "", "| Rule | Reason |", "|---|---|"])
             for o in skipped:
-                lines.append(f"| {o.rule_name} | {o.reason} |")
+                lines.append(f"| {_md_cell(o.rule_name)} | {_md_cell(o.reason)} |")
             lines.append("")
 
         filtered = [o for o in result.outcomes if o.status == "filtered"]
         if filtered:
             lines.extend(["## Filtered rules", "", "| Rule | Reason |", "|---|---|"])
             for o in filtered:
-                lines.append(f"| {o.rule_name} | {o.reason} |")
+                lines.append(f"| {_md_cell(o.rule_name)} | {_md_cell(o.reason)} |")
             lines.append("")
 
         # Incident coverage sections (one per incident date)
@@ -730,8 +725,8 @@ class TuneAlertsOrchestrator:
                 ])
                 for rule_name, entry in rows:
                     lines.append(
-                        f"| {rule_name} | {entry['status']} | "
-                        f"{_format_value(entry.get('peak'))} | {entry['action']} |"
+                        f"| {_md_cell(rule_name)} | {_md_cell(entry['status'])} | "
+                        f"{_md_cell(_format_value(entry.get('peak')))} | {_md_cell(entry['action'])} |"
                     )
                 lines.append("")
 
