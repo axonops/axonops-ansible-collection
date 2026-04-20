@@ -618,6 +618,12 @@ before re-applying.
 * `--exclude GLOB` Skip rules whose name matches this glob. Repeatable.
   Overrides `--include`.
 * `--rule NAME` Tune only this exact rule name. Repeatable.
+* `--incident YYYY-MM-DD` UTC day to exclude from the baseline and verify
+  coverage for. When set, the tuned threshold is verified against the
+  incident peak: if the metric reflected the incident but the baseline-
+  derived threshold wouldn't have fired, the threshold is automatically
+  adjusted so it would. The audit report gains a "Incident coverage"
+  section per incident. Repeatable.
 
 #### Behavior:
 

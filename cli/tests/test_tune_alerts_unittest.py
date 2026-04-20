@@ -765,5 +765,130 @@ class TestTuneAlertsFromApi(unittest.TestCase):
             ])
 
 
+from datetime import datetime, timezone
+
+
+def _day_range(date_str):
+    """Return (start_ts, end_ts) for the given YYYY-MM-DD UTC day."""
+    day = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    start = int(day.timestamp())
+    end = start + 24 * 60 * 60 - 1
+    return (start, end)
+
+
+class TestIncidentFlag(unittest.TestCase):
+
+    def _run_with_incident(self, tmp, input_json, baseline_samples, incident_samples,
+                           incident_date="2026-04-10", extra_args=None):
+        """Helper: patches MetricQuerier so baseline query (excluding incident)
+        returns baseline_samples and incident-window query returns incident_samples.
+        The orchestrator differentiates calls by the start timestamp."""
+        from axonopscli.application import Application
+
+        input_path = os.path.join(tmp, "alert_rules.json")
+        with open(input_path, "w") as f:
+            json.dump(input_json, f)
+
+        incident_start, incident_end = _day_range(incident_date)
+
+        def fake_query(self, promql, start, end, step="1m"):
+            # If the window is exactly the incident day, return incident samples
+            if start == incident_start and end == incident_end:
+                return incident_samples
+            # Otherwise baseline (7d, excluding incident) — return baseline
+            return baseline_samples
+
+        argv = [
+            "--org", "acme", "--cluster", "bc1", "--token", "t",
+            "tune-alerts", "--input", input_path,
+            "--incident", incident_date,
+        ]
+        if extra_args:
+            argv.extend(extra_args)
+
+        with patch('axonopscli.components.tune_alerts.MetricQuerier.query', new=fake_query):
+            Application().run(argv)
+
+        with open(os.path.join(tmp, "alert_rules.tuned.for.bc1.json")) as f:
+            tuned = json.load(f)
+        with open(os.path.join(tmp, "alert_rules.tuned.for.bc1.report.md")) as f:
+            report = f.read()
+        return tuned, report
+
+    def test_incident_day_verified_no_adjustment_needed(self):
+        # Baseline range(100) → p99 ≈ 98.01; critical = 98.01 * 1.20 ≈ 117.612
+        # Incident peak = 700 → 700 >= 117.612 → "Yes (baseline)", no adjustment.
+        # --max-delta 100 prevents the GC rule (old_critical=1300) from being
+        # skipped by the delta clamp (ratio 1300/117.612 ≈ 11.05).
+        with tempfile.TemporaryDirectory() as tmp:
+            tuned, report = self._run_with_incident(
+                tmp,
+                _sample_input(cluster_name="bc1"),
+                baseline_samples=list(range(100)),   # p99 ≈ 98.01
+                incident_samples=[500, 600, 700],    # peak 700, way above 117.612
+                extra_args=["--max-delta", "100"],
+            )
+            self.assertIn("Incident coverage (2026-04-10)", report)
+            self.assertIn("Yes (baseline)", report)
+            # No adjustment → critical stays at baseline-derived value
+            rule = tuned["metricrules"][0]
+            self.assertLess(rule["criticalValue"], 200)
+
+    def test_incident_adjusts_threshold_when_baseline_would_miss(self):
+        # Baseline range(1000) → p99 ≈ 989.01; critical = 989.01 * 1.20 ≈ 1186.812
+        # Incident peak = 800 → 800 < 1186.812 (would miss) AND 800 < 989.01
+        # (peak within baseline normal) → metric NOT impacted → no adjustment.
+        with tempfile.TemporaryDirectory() as tmp:
+            tuned, report = self._run_with_incident(
+                tmp,
+                _sample_input(cluster_name="bc1"),
+                baseline_samples=list(range(1000)),  # p99 ≈ 989.01
+                incident_samples=[500, 700, 800],    # peak 800 < 989.01 (baseline p99)
+            )
+            self.assertIn("metric not impacted by incident", report)
+
+    def test_incident_metric_impacted_triggers_adjustment(self):
+        # Baseline range(1, 101) → p99 ≈ 99.01; critical = 99.01 * 1.20 ≈ 118.812
+        # Incident peak = 100 → 100 > 99.01 (impacted), but 100 < 118.812
+        # (would miss) → adjust critical to min(118.812, 100*0.95) = 95.
+        # --max-delta 100 prevents delta-clamp skip (1300/95 ≈ 13.68).
+        with tempfile.TemporaryDirectory() as tmp:
+            tuned, report = self._run_with_incident(
+                tmp,
+                _sample_input(cluster_name="bc1"),
+                baseline_samples=list(range(1, 101)),   # p99 ≈ 99.01
+                incident_samples=[50, 80, 100],          # peak 100 > 99.01 (impacted), but < 118.812 (would miss)
+                extra_args=["--max-delta", "100"],
+            )
+            self.assertIn("Yes (adjusted)", report)
+            rule = tuned["metricrules"][0]
+            # Adjusted critical = 100 * 0.95 = 95
+            self.assertLessEqual(rule["criticalValue"], 100)
+
+    def test_multiple_incidents(self):
+        # Both incident dates should appear in report.
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = os.path.join(tmp, "alert_rules.json")
+            with open(input_path, "w") as f:
+                json.dump(_sample_input(cluster_name="bc1"), f)
+
+            def fake_query(self, promql, start, end, step="1m"):
+                return list(range(1000))
+
+            with patch('axonopscli.components.tune_alerts.MetricQuerier.query', new=fake_query):
+                Application().run([
+                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "tune-alerts", "--input", input_path,
+                    "--incident", "2026-04-10", "--incident", "2026-04-11",
+                ])
+
+            with open(os.path.join(tmp, "alert_rules.tuned.for.bc1.report.md")) as f:
+                report = f.read()
+            self.assertIn("Incident coverage (2026-04-10)", report)
+            self.assertIn("Incident coverage (2026-04-11)", report)
+
+
 if __name__ == "__main__":
     unittest.main()

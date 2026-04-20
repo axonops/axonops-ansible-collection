@@ -211,6 +211,15 @@ import json
 import os
 import time
 from copy import deepcopy
+from datetime import datetime, timezone, timedelta
+
+
+def _incident_day_range(date_str: str) -> tuple:
+    """Return (start_ts, end_ts_inclusive) in Unix seconds for a YYYY-MM-DD UTC day."""
+    day = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    start = int(day.timestamp())
+    end = start + 24 * 60 * 60 - 1
+    return (start, end)
 
 
 @dataclass
@@ -224,6 +233,11 @@ class TuneAlertsConfig:
     include: list
     exclude: list
     rules: list
+    incidents: list = None          # list[str] of YYYY-MM-DD
+
+    def __post_init__(self):
+        if self.incidents is None:
+            self.incidents = []
 
 
 @dataclass
@@ -238,6 +252,7 @@ class RuleOutcome:
     percentile_value: Optional[float] = None
     sample_count: Optional[int] = None
     operator: Optional[str] = None
+    incident_coverage: Optional[list] = None   # list[dict] per incident
 
 
 @dataclass
@@ -345,14 +360,12 @@ class TuneAlertsOrchestrator:
         old_warning = rule.get("warningValue")
         old_critical = rule.get("criticalValue")
 
-        # Filter stage
         if not self.filter.accepts(name):
             return RuleOutcome(
                 rule_name=name, status="filtered", reason="excluded by filter",
                 old_warning=old_warning, old_critical=old_critical,
             )
 
-        # Parse expr
         try:
             bare, operator, _old_str = ExprRewriter.strip_threshold(expr)
         except ValueError as e:
@@ -361,31 +374,37 @@ class TuneAlertsOrchestrator:
                 old_warning=old_warning, old_critical=old_critical,
             )
 
-        # Query samples
+        # Build the list of incident windows
+        incident_windows = [_incident_day_range(d) for d in self.config.incidents]
+
         querier = MetricQuerier(self.axonops, self.args)
+
+        # Baseline: either a single 7-day query (no incidents) or multiple
+        # sub-range queries skipping over each incident window.
         try:
-            samples = querier.query(bare, start=start_ts, end=end_ts, step="1m")
+            if incident_windows:
+                baseline_samples = self._baseline_samples_excluding(
+                    querier, bare, start_ts, end_ts, incident_windows,
+                )
+            else:
+                baseline_samples = querier.query(bare, start=start_ts, end=end_ts, step="1m")
         except HTTPCodeError as e:
             return RuleOutcome(
-                rule_name=name, status="skipped",
-                reason=f"query failed: {e}",
-                old_warning=old_warning, old_critical=old_critical,
-                operator=operator,
+                rule_name=name, status="skipped", reason=f"query failed: {e}",
+                old_warning=old_warning, old_critical=old_critical, operator=operator,
             )
 
-        if len(samples) < self.config.min_samples:
+        if len(baseline_samples) < self.config.min_samples:
             return RuleOutcome(
                 rule_name=name, status="skipped",
-                reason=f"insufficient data ({len(samples)} samples)",
+                reason=f"insufficient data ({len(baseline_samples)} samples)",
                 old_warning=old_warning, old_critical=old_critical,
-                operator=operator,
-                sample_count=len(samples),
+                operator=operator, sample_count=len(baseline_samples),
             )
 
-        # Compute thresholds
         try:
             calc = ThresholdCalculator.compute(
-                samples=samples,
+                samples=baseline_samples,
                 operator=operator,
                 percentile=self.config.percentile,
                 warning_headroom=self.config.warning_headroom,
@@ -397,39 +416,121 @@ class TuneAlertsOrchestrator:
                 old_warning=old_warning, old_critical=old_critical, operator=operator,
             )
 
+        new_warning = calc.new_warning
+        new_critical = calc.new_critical
+        incident_coverage = []
+
+        # Incident coverage: for each incident, check whether the baseline-derived
+        # threshold would fire, and adjust downward (for >=/>) or upward (for <=/<)
+        # if the metric reflected the incident but threshold would miss.
+        for window in incident_windows:
+            inc_start, inc_end = window
+            try:
+                incident_samples = querier.query(bare, start=inc_start, end=inc_end, step="1m")
+            except HTTPCodeError as e:
+                incident_coverage.append({
+                    "date": datetime.fromtimestamp(inc_start, tz=timezone.utc).strftime("%Y-%m-%d"),
+                    "status": "query failed",
+                    "peak": None,
+                    "action": f"query failed: {e}",
+                })
+                continue
+
+            if not incident_samples:
+                incident_coverage.append({
+                    "date": datetime.fromtimestamp(inc_start, tz=timezone.utc).strftime("%Y-%m-%d"),
+                    "status": "no data",
+                    "peak": None,
+                    "action": "no samples during incident window",
+                })
+                continue
+
+            if operator in (">=", ">"):
+                incident_peak = max(incident_samples)
+                would_fire = incident_peak >= new_critical
+                metric_impacted = incident_peak > calc.percentile_value
+            else:  # <=, <
+                incident_peak = min(incident_samples)
+                would_fire = incident_peak <= new_critical
+                metric_impacted = incident_peak < calc.percentile_value
+
+            entry = {
+                "date": datetime.fromtimestamp(inc_start, tz=timezone.utc).strftime("%Y-%m-%d"),
+                "peak": incident_peak,
+            }
+
+            if would_fire:
+                entry["status"] = "Yes (baseline)"
+                entry["action"] = "none"
+            elif not metric_impacted:
+                entry["status"] = "N/A"
+                entry["action"] = "metric not impacted by incident"
+            else:
+                # Adjust
+                if operator in (">=", ">"):
+                    adjusted_critical = min(new_critical, incident_peak * 0.95)
+                    adjusted_warning = min(new_warning, incident_peak * 0.95 * (new_warning / new_critical) if new_critical else incident_peak * 0.95)
+                else:
+                    adjusted_critical = max(new_critical, incident_peak * 1.05)
+                    adjusted_warning = max(new_warning, incident_peak * 1.05 * (new_warning / new_critical) if new_critical else incident_peak * 1.05)
+                new_warning = adjusted_warning
+                new_critical = adjusted_critical
+                entry["status"] = "Yes (adjusted)"
+                entry["action"] = f"critical {_format_value(calc.new_critical)} → {_format_value(adjusted_critical)}"
+
+            incident_coverage.append(entry)
+
         # Sanity clamps
-        if calc.new_warning <= 0 or calc.new_critical <= 0:
+        if new_warning <= 0 or new_critical <= 0:
             return RuleOutcome(
                 rule_name=name, status="skipped",
-                reason=f"nonsensical (new warning={calc.new_warning}, critical={calc.new_critical})",
+                reason=f"nonsensical (new warning={new_warning}, critical={new_critical})",
                 old_warning=old_warning, old_critical=old_critical, operator=operator,
-                sample_count=calc.sample_count,
+                sample_count=calc.sample_count, incident_coverage=incident_coverage,
             )
 
-        if self._unreasonable_delta(old_warning, calc.new_warning) or \
-           self._unreasonable_delta(old_critical, calc.new_critical):
+        if self._unreasonable_delta(old_warning, new_warning) or \
+           self._unreasonable_delta(old_critical, new_critical):
             return RuleOutcome(
                 rule_name=name, status="skipped",
                 reason=f"unreasonable delta (max_delta={self.config.max_delta})",
                 old_warning=old_warning, old_critical=old_critical,
-                new_warning=calc.new_warning, new_critical=calc.new_critical,
+                new_warning=new_warning, new_critical=new_critical,
                 operator=operator, sample_count=calc.sample_count,
                 percentile_value=calc.percentile_value,
+                incident_coverage=incident_coverage,
             )
 
-        # Apply
-        rule["warningValue"] = _round_threshold(calc.new_warning)
-        rule["criticalValue"] = _round_threshold(calc.new_critical)
+        rule["warningValue"] = _round_threshold(new_warning)
+        rule["criticalValue"] = _round_threshold(new_critical)
         rule["expr"] = ExprRewriter.rewrite(expr, new_warning=rule["warningValue"])
 
         return RuleOutcome(
             rule_name=name, status="tuned",
             old_warning=old_warning, old_critical=old_critical,
             new_warning=rule["warningValue"], new_critical=rule["criticalValue"],
-            operator=operator,
-            sample_count=calc.sample_count,
+            operator=operator, sample_count=calc.sample_count,
             percentile_value=calc.percentile_value,
+            incident_coverage=incident_coverage,
         )
+
+    def _baseline_samples_excluding(self, querier, promql, start_ts, end_ts, incident_windows):
+        """Query the 7-day window minus incident-day windows as separate sub-queries."""
+        # Sort and merge incident windows
+        sorted_windows = sorted(incident_windows)
+        cursor = start_ts
+        baseline = []
+        for inc_start, inc_end in sorted_windows:
+            if inc_end < start_ts or inc_start > end_ts:
+                continue  # incident entirely outside the 7-day window
+            clipped_start = max(inc_start, start_ts)
+            clipped_end = min(inc_end, end_ts)
+            if cursor < clipped_start:
+                baseline.extend(querier.query(promql, start=cursor, end=clipped_start - 1, step="1m"))
+            cursor = max(cursor, clipped_end + 1)
+        if cursor <= end_ts:
+            baseline.extend(querier.query(promql, start=cursor, end=end_ts, step="1m"))
+        return baseline
 
     def _unreasonable_delta(self, old_val, new_val) -> bool:
         try:
@@ -569,6 +670,32 @@ class TuneAlertsOrchestrator:
             for o in filtered:
                 lines.append(f"| {o.rule_name} | {o.reason} |")
             lines.append("")
+
+        # Incident coverage sections (one per incident date)
+        if self.config.incidents:
+            for incident_date in sorted(self.config.incidents):
+                # Collect per-rule entries for this incident
+                rows = []
+                for o in result.outcomes:
+                    if not o.incident_coverage:
+                        continue
+                    for entry in o.incident_coverage:
+                        if entry.get("date") == incident_date:
+                            rows.append((o.rule_name, entry))
+                if not rows:
+                    continue
+                lines.extend([
+                    f"## Incident coverage ({incident_date})",
+                    "",
+                    "| Rule | Would have fired? | Incident peak | Action |",
+                    "|---|---|---|---|",
+                ])
+                for rule_name, entry in rows:
+                    lines.append(
+                        f"| {rule_name} | {entry['status']} | "
+                        f"{_format_value(entry.get('peak'))} | {entry['action']} |"
+                    )
+                lines.append("")
 
         return "\n".join(lines)
 

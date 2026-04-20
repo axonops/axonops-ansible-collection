@@ -270,6 +270,8 @@ class Application:
                                         help='Exclude rules matching this glob (repeatable; overrides --include)')
         tune_alerts_parser.add_argument('--rule', action='append', default=[],
                                         help='Tune only this exact rule name (repeatable)')
+        tune_alerts_parser.add_argument('--incident', action='append', default=[],
+                                        help='YYYY-MM-DD UTC day to exclude from baseline and verify coverage for (repeatable)')
 
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
@@ -484,4 +486,5 @@ class Application:
             include=list(args.include or []),
             exclude=list(args.exclude or []),
             rules=list(args.rule or []),
+            incidents=list(args.incident or []),
         )
