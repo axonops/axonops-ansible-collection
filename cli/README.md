@@ -592,9 +592,14 @@ before re-applying.
 
 #### Options:
 
-* `--input` (required) Path to the source `alert_rules.json`. The tuned
-  output is written alongside it as `alert_rules.tuned.for.<cluster>.json`
-  plus a `<...>.report.md`.
+* `--input` Path to the source `alert_rules.json`. Mutually exclusive
+  with `--from-api`. The tuned output is written alongside it as
+  `alert_rules.tuned.for.<cluster>.json` plus a `<...>.report.md`.
+* `--from-api` Fetch alert rules directly from the live API instead of
+  reading from `--input`. Requires `--output-dir`. Mutually exclusive
+  with `--input`.
+* `--output-dir PATH` Directory for the tuned JSON and audit report when
+  `--from-api` is used.
 * `--profile {noisy,default,quiet}` Preset combining percentile and
   headroom. Defaults to `default`.
     * `noisy`: p95 with +5% warning / +10% critical headroom.

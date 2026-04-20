@@ -287,6 +287,8 @@ class TuneAlertsOrchestrator:
 
     # ---- file I/O (called by run_tune_alerts in application.py) ----
 
+    ALERT_RULES_URL = "/api/v1/alert-rules/{org}/{cluster_type}/{cluster}"
+
     def load_input(self, path: str) -> dict:
         """Read and validate the input JSON."""
         with open(path, "r") as f:
@@ -295,6 +297,18 @@ class TuneAlertsOrchestrator:
             raise ValueError(f"Input JSON must be an object, got {type(data).__name__}")
         if "metricrules" not in data or not isinstance(data["metricrules"], list):
             raise ValueError("Input JSON missing 'metricrules' list")
+        return data
+
+    def fetch_from_api(self) -> dict:
+        """Fetch alert_rules.json directly from the AxonOps API."""
+        url = self.ALERT_RULES_URL.format(
+            org=self.args.org,
+            cluster_type=self.axonops.get_cluster_type(),
+            cluster=self.args.cluster,
+        )
+        data = self.axonops.do_request(url=url, method="GET") or {}
+        if "metricrules" not in data or not isinstance(data["metricrules"], list):
+            raise ValueError("Fetched API response missing 'metricrules' list")
         return data
 
     # ---- main orchestration ----

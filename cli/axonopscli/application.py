@@ -245,8 +245,12 @@ class Application:
 
         tune_alerts_parser.set_defaults(func=self.run_tune_alerts)
 
-        tune_alerts_parser.add_argument('--input', type=str, required=True,
-                                        help='Path to alert_rules.json exported by the alerts subcommand')
+        tune_alerts_parser.add_argument('--input', type=str, required=False,
+                                        help='Path to alert_rules.json (mutually exclusive with --from-api)')
+        tune_alerts_parser.add_argument('--from-api', action='store_true', default=False,
+                                        help='Fetch alert rules from the live API instead of --input')
+        tune_alerts_parser.add_argument('--output-dir', type=str, default=None,
+                                        help='Directory for output files (required with --from-api; defaults to the directory of --input)')
         tune_alerts_parser.add_argument('--profile', type=str, default='default',
                                         choices=['noisy', 'default', 'quiet'],
                                         help='Preset: noisy=p95/5%%-10%%, default=p99/10%%-20%%, quiet=p99.9/20%%-50%%')
@@ -280,6 +284,17 @@ class Application:
         # ensure --excludedtables is only used together with --keyspace
         if getattr(parsed_result, "excludedtables", None) and not getattr(parsed_result, "keyspace", None):
             parser.error("--excludedtables requires --keyspace")
+
+        # tune-alerts input source validation
+        if getattr(parsed_result, 'func', None) == self.run_tune_alerts:
+            has_input = bool(getattr(parsed_result, 'input', None))
+            has_from_api = bool(getattr(parsed_result, 'from_api', False))
+            if has_input and has_from_api:
+                parser.error("--input and --from-api are mutually exclusive")
+            if not has_input and not has_from_api:
+                parser.error("tune-alerts requires either --input PATH or --from-api")
+            if has_from_api and not getattr(parsed_result, 'output_dir', None):
+                parser.error("--from-api requires --output-dir")
 
         # if func() is not present it means that no command was inserted
         if hasattr(parsed_result, 'func'):
@@ -426,15 +441,25 @@ class Application:
 
         axonops = self.get_axonops(args)
 
-        from .components.tune_alerts import TuneAlertsOrchestrator, TuneAlertsConfig
+        from .components.tune_alerts import TuneAlertsOrchestrator
 
         config = self._build_tune_alerts_config(args)
         orchestrator = TuneAlertsOrchestrator(axonops, args, config)
 
-        input_json = orchestrator.load_input(args.input)
+        if args.from_api:
+            import os as _os
+            input_json = orchestrator.fetch_from_api()
+            # write_output/report use the directory from a synthetic "input path"
+            synthetic_input = _os.path.join(args.output_dir, "alert_rules.json")
+            _os.makedirs(args.output_dir, exist_ok=True)
+            source_label = synthetic_input
+        else:
+            input_json = orchestrator.load_input(args.input)
+            source_label = args.input
+
         result = orchestrator.tune_all(input_json)
-        json_path = orchestrator.write_output(args.input, result)
-        orchestrator.write_audit_report(args.input, result)
+        json_path = orchestrator.write_output(source_label, result)
+        orchestrator.write_audit_report(source_label, result)
         orchestrator.print_summary(result, json_path)
 
     @staticmethod

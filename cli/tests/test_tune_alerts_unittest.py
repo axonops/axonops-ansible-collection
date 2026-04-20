@@ -714,5 +714,56 @@ class TestApplicationRunTuneAlerts(unittest.TestCase):
             self.assertGreater(out["metricrules"][0]["criticalValue"], 1400)
 
 
+class TestTuneAlertsFromApi(unittest.TestCase):
+
+    def test_from_api_fetches_rules_endpoint_and_writes_output(self):
+        from axonopscli.application import Application
+        from axonopscli.axonops import AxonOps
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # Canned: /api/v1/alert-rules returns _sample_input; /query_range returns samples
+            alert_rules_body = _sample_input(cluster_name="bc1")
+            prom = {
+                "status": "success",
+                "data": {"resultType": "matrix", "result": [{"metric": {}, "values": [[i, str(float(v))] for i, v in enumerate(range(1000))]}]},
+            }
+
+            def fake_do_request(self, url, method='GET', **kwargs):
+                if "alert-rules" in url:
+                    return alert_rules_body
+                if "query_range" in url:
+                    return prom
+                return {}
+
+            with patch.object(AxonOps, 'do_request', new=fake_do_request):
+                Application().run([
+                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "tune-alerts", "--from-api", "--output-dir", tmp,
+                ])
+
+            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.tuned.for.bc1.json")))
+
+    def test_from_api_and_input_are_mutually_exclusive(self):
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit):
+                Application().run([
+                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "tune-alerts",
+                    "--from-api", "--output-dir", tmp,
+                    "--input", "/some/path.json",
+                ])
+
+    def test_neither_input_nor_from_api_errors(self):
+        from axonopscli.application import Application
+
+        with self.assertRaises(SystemExit):
+            Application().run([
+                "--org", "acme", "--cluster", "bc1", "--token", "t",
+                "tune-alerts",
+            ])
+
+
 if __name__ == "__main__":
     unittest.main()
