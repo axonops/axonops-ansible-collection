@@ -6,6 +6,26 @@ import requests
 from .utils import HTTPCodeError
 
 
+def _scrub_auth_headers(headers: dict) -> dict:
+    """Return a copy of headers with the Authorization value masked.
+
+    The value of Authorization — whether `Bearer <token>` or `AxonApi <token>` —
+    is a live credential. When -v prints the request line for debugging, we
+    must not leak it into stdout/stderr/CI logs.
+    """
+    if not headers:
+        return headers
+    if "Authorization" not in headers:
+        return headers
+    scrubbed = dict(headers)
+    original = scrubbed["Authorization"]
+    # Preserve the auth *scheme* (Bearer / AxonApi) since it's useful for
+    # debugging, but mask the actual token value.
+    scheme = original.split(" ", 1)[0] if original and " " in original else "***"
+    scrubbed["Authorization"] = f"{scheme} ***"
+    return scrubbed
+
+
 class AxonOps:
 
     def __init__(self, org_name: str, base_url: str = '', username: str = '', password: str = '',
@@ -108,7 +128,7 @@ class AxonOps:
 
         method = method.upper()
         if self.verbose:
-            print(f"{method} {full_url} {headers}")
+            print(f"{method} {full_url} {_scrub_auth_headers(headers)}")
 
         try:
             response = requests.request(method, full_url, headers=headers, data=data)
