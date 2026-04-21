@@ -225,7 +225,10 @@ class TestMetricQuerier(unittest.TestCase):
         self.assertEqual(axonops.do_request.call_count, 1)
         call = axonops.do_request.call_args
         url = call.kwargs.get('url') or call.args[0]
-        self.assertIn("/api/v1/query_range/acme/cassandra/prod", url)
+        # query_range is served at the base URL without org/cluster path
+        # segments; cluster context is carried by promql label filters.
+        self.assertTrue(url.startswith("/api/v1/query_range?"),
+                        f"unexpected URL: {url!r}")
         self.assertIn("query=foo_metric", url)
         self.assertIn("start=1700000000", url)
         self.assertIn("end=1700604800", url)

@@ -133,18 +133,13 @@ class MetricQuerier:
         start/end are Unix epoch seconds. step is a Prometheus duration string
         (e.g. '1m', '15s'). Raises HTTPCodeError on transport/server failure.
         """
-        path = QUERY_RANGE_URL.format(
-            org=self.args.org,
-            cluster_type=self.axonops.get_cluster_type(),
-            cluster=self.args.cluster,
-        )
         qs = urllib.parse.urlencode({
             "query": promql,
             "start": start,
             "end": end,
             "step": step,
         })
-        url = f"{path}?{qs}"
+        url = f"{QUERY_RANGE_URL}?{qs}"
         response = self.axonops.do_request(url=url, method="GET")
         return self._flatten(response)
 
