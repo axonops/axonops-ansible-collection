@@ -239,6 +239,28 @@ class Application:
                                         'When set, exported filenames are auto-appended '
                                         'to a .gitignore in the export directory.')
 
+        apply_tuned_alerts_parser = commands_subparser.add_parser(
+            "apply-tuned-alerts",
+            help="POST a tuned alert-rules JSON back to the live AxonOps cluster")
+
+        apply_tuned_alerts_parser.set_defaults(func=self.run_apply_tuned_alerts)
+
+        apply_tuned_alerts_parser.add_argument('--input', type=str, required=True,
+                                               help='Path to the tuned alert-rules JSON file')
+        apply_tuned_alerts_parser.add_argument('--dry-run', action='store_true', default=False,
+                                               help='Print what would be POSTed without making any API calls')
+        apply_tuned_alerts_parser.add_argument('--yes', action='store_true', default=False,
+                                               help='Skip the interactive confirmation prompt')
+        apply_tuned_alerts_parser.add_argument('--continue-on-error', action='store_true', default=False,
+                                               help='Continue applying remaining rules after a POST failure '
+                                                    '(default: stop on first failure). Exit non-zero if any '
+                                                    'rule failed.')
+        apply_tuned_alerts_parser.add_argument('--allow-redacted', action='store_true', default=False,
+                                               help='Allow applying an input file that contains '
+                                                    "'***REDACTED***' values (skipped safety check). Use "
+                                                    'only if you understand that the literal sentinel '
+                                                    'string will be POSTed to the server.')
+
         tune_alerts_parser = commands_subparser.add_parser(
             "tune-alerts",
             help="Tune existing alert rule thresholds against the last 7 days of observed metrics")
@@ -440,6 +462,80 @@ class Application:
         exporter = AlertsExporter(axonops, args)
         exporter.fetch()
         exporter.export(args.exportpath, include_secrets=args.include_secrets)
+
+    def run_apply_tuned_alerts(self, args: argparse.Namespace):
+        """Apply a tuned alert-rules JSON to the live cluster."""
+        if args.v:
+            print(f"Running apply-tuned-alerts on {args.org}/{args.cluster}")
+            print(_scrubbed_args(args))
+
+        from .components.apply_tuned_alerts import AlertsApplier, RedactedInputError
+
+        # Defer AxonOps construction until we've passed the prompt / validation
+        # gates below — we don't want a credentialed HTTP session sitting
+        # around if the user aborts. Load & validate input first.
+        axonops = self.get_axonops(args)
+        applier = AlertsApplier(axonops, args)
+
+        try:
+            input_json = applier.load_input(args.input)
+        except (ValueError, FileNotFoundError, PermissionError) as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(2)
+
+        rules = input_json.get("metricrules", [])
+        unexpected = [k for k in input_json.keys() if k not in (
+            "name", "metricrules", "eventrules", "logrules", "servicecheckrules",
+            "backuprules", "nodeprobes",
+        )]
+        if unexpected:
+            print(
+                f"WARNING: input contains unexpected top-level key(s): "
+                f"{', '.join(unexpected)} — these will be ignored.",
+                file=sys.stderr,
+            )
+
+        # Destructive operation: require explicit confirmation unless
+        # --yes is set (scripting opt-in) or --dry-run is set (no-op).
+        if not args.dry_run and not args.yes:
+            if not sys.stdin.isatty():
+                print(
+                    "ERROR: apply-tuned-alerts is destructive and stdin is not "
+                    "a TTY. Pass --yes to confirm non-interactively, or run from "
+                    "a terminal.",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+            prompt = (
+                f"About to POST {len(rules)} alert rules to "
+                f"{args.org}/{args.cluster}. Continue? [y/N] "
+            )
+            try:
+                reply = input(prompt)
+            except EOFError:
+                reply = ""
+            if reply.strip().lower() not in ("y", "yes"):
+                print("Aborted.", file=sys.stderr)
+                # 130 = "Script terminated by Control-C" convention; signals
+                # user-initiated abort to calling shells/scripts.
+                sys.exit(130)
+
+        try:
+            result = applier.apply(
+                input_json,
+                dry_run=args.dry_run,
+                continue_on_error=args.continue_on_error,
+                allow_redacted=args.allow_redacted,
+            )
+        except RedactedInputError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(2)
+
+        applier.print_summary(result)
+
+        # Exit non-zero if any rule failed (useful signal for CI pipelines).
+        if result.failed:
+            sys.exit(1)
 
     def run_tune_alerts(self, args: argparse.Namespace):
         """ Run the alerts tuning """
