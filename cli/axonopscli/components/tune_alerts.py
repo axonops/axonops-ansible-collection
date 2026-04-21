@@ -120,6 +120,38 @@ def _md_cell(s) -> str:
     return str(s).replace("|", "\\|").replace("\n", " ")
 
 
+def _looks_like_percentage(bare_metric: str, old_warning, old_critical) -> bool:
+    """Heuristic: does this expression define a metric that can't exceed 100?
+
+    Two signals count as "this is a percentage":
+      1. The bare metric ends with `* 100` (Prometheus idiom for converting
+         a 0..1 ratio to a percent, e.g. `avg(disk_used/disk_total) * 100`).
+      2. The bare metric contains `percent` (case-insensitive) or a literal
+         `%` — catches metric names like `host_Disk_UsedPercent` or
+         `cpu_percent_busy` that report a value already in 0..100.
+
+    Either signal triggers the clamp. Both original thresholds must be in
+    the 0..100 range as a sanity guard — protects against false positives
+    on expressions like `foo * 100 >= 500` where the `* 100` is a unit
+    conversion rather than a percentage conversion.
+    """
+    bare_l = bare_metric.lower()
+    has_percent_signal = (
+        bare_metric.rstrip().endswith("* 100")
+        or "percent" in bare_l
+        or "%" in bare_metric
+    )
+    if not has_percent_signal:
+        return False
+    for v in (old_warning, old_critical):
+        try:
+            if v is None or not (0 <= float(v) <= 100):
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
 class MetricQuerier:
     """Query /api/v1/query_range and return a flat list of numeric samples."""
 
@@ -410,6 +442,18 @@ class TuneAlertsOrchestrator:
 
         new_warning = calc.new_warning
         new_critical = calc.new_critical
+
+        # Percent-metric clamp: if the expression ends with `* 100`
+        # (the idiomatic Prometheus percentage-conversion pattern) AND
+        # the original thresholds were in the 0–100 range, clamp the
+        # tuned values so we never emit a nonsensical threshold like
+        # 101.44% disk usage. Skipped when either original threshold
+        # already exceeds 100 — in that case the metric is probably not
+        # a bounded percentage after all.
+        if _looks_like_percentage(bare, old_warning, old_critical):
+            new_warning = min(new_warning, 100.0)
+            new_critical = min(new_critical, 100.0)
+
         incident_coverage = []
 
         # Incident coverage: for each incident, check whether the baseline-derived

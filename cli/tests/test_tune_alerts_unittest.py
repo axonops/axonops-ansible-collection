@@ -589,6 +589,96 @@ class TestTuneAlertsOrchestrator(unittest.TestCase):
         self.assertEqual(outcome.status, "skipped")
         self.assertIn("cannot evaluate delta", outcome.reason)
 
+    def test_percent_metric_clamps_at_100_via_star_100(self):
+        """Expressions ending in '* 100' with 0-100 bounded old thresholds
+        are treated as percentages; tuned values cannot exceed 100."""
+        input_json = {
+            "name": "bc1",
+            "metricrules": [
+                {
+                    "id": "rule-disk",
+                    "alert": "Disk % Usage",
+                    "expr": "avg(disk_used / disk_total) * 100 >= 75",
+                    "for": "5m",
+                    "operator": ">=",
+                    "criticalValue": 80,
+                    "warningValue": 75,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        high_samples = [85] * 1000
+        orch = self._make_orch({"avg(disk_used / disk_total) * 100": high_samples})
+        with patch.object(MetricQuerier, 'query', new=orch._fake_query):
+            result = orch.tune_all(input_json)
+
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "tuned")
+        self.assertLessEqual(outcome.new_warning, 100.0)
+        self.assertLessEqual(outcome.new_critical, 100.0)
+
+    def test_percent_metric_clamps_at_100_via_metric_name(self):
+        """A metric name containing 'Percent' is treated as a 0-100 value
+        when both old thresholds are in 0-100. Catches expressions like
+        `host_Disk_UsedPercent{...} >= 75` which carry no `* 100` suffix."""
+        input_json = {
+            "name": "bc1",
+            "metricrules": [
+                {
+                    "id": "rule-disk",
+                    "alert": "Disk % Usage Workarea",
+                    "expr": "host_Disk_UsedPercent{mountpoint=~'/workarea'} >= 75",
+                    "for": "5m",
+                    "operator": ">=",
+                    "criticalValue": 80,
+                    "warningValue": 75,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        high_samples = [85] * 1000
+        orch = self._make_orch({
+            "host_Disk_UsedPercent{mountpoint=~'/workarea'}": high_samples,
+        })
+        with patch.object(MetricQuerier, 'query', new=orch._fake_query):
+            result = orch.tune_all(input_json)
+
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "tuned")
+        self.assertLessEqual(outcome.new_warning, 100.0)
+        self.assertLessEqual(outcome.new_critical, 100.0)
+
+    def test_percent_clamp_skipped_when_old_threshold_exceeds_100(self):
+        """If old threshold is already > 100, the `* 100` is a unit
+        conversion (e.g. ms→us), not a percentage — do not clamp."""
+        input_json = {
+            "name": "bc1",
+            "metricrules": [
+                {
+                    "id": "rule-latency",
+                    "alert": "Some latency",
+                    "expr": "rate(foo) * 100 >= 500",  # ms→us conversion idiom
+                    "for": "5m",
+                    "operator": ">=",
+                    "criticalValue": 750,
+                    "warningValue": 500,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        # p99 of range(1000) = 989.01 → new_warning ≈ 1087.91
+        # Not clamped (old=500 > 100 triggers the guard).
+        orch = self._make_orch({"rate(foo) * 100": list(range(1000))})
+        with patch.object(MetricQuerier, 'query', new=orch._fake_query):
+            result = orch.tune_all(input_json)
+
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "tuned")
+        # If the percent clamp had incorrectly fired, new_warning would have
+        # been 100. It should remain the unclamped p99 × headroom value.
+        self.assertGreater(outcome.new_warning, 100.0)
+        self.assertGreater(outcome.new_critical, 100.0)
+
 
 import stat
 
