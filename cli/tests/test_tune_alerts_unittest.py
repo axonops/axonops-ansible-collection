@@ -1056,5 +1056,234 @@ class TestIncidentFlag(unittest.TestCase):
                           f"Expected incident 2 'from' to be post-incident-1 value:\n{inc2_section}")
 
 
+class TestPolicyPinning(unittest.TestCase):
+    """Policy-pinned thresholds override workload-derived tuning for
+    matching rule-name globs."""
+
+    def _make_orch_with_policy(self, pinned_rules):
+        config = _default_config()
+        config.pinned_rules = pinned_rules
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        orch = TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="bc1"), config)
+        return orch
+
+    def test_pinned_rule_gets_fixed_values_without_querying_api(self):
+        # Canned query that would raise — if MetricQuerier is touched, test fails.
+        def exploding_query(self, promql, start, end, step="1m"):
+            raise AssertionError("MetricQuerier.query must not be called for a pinned rule")
+
+        input_json = {
+            "name": "bc1",
+            "metricrules": [
+                {
+                    "id": "rule-disk",
+                    "alert": "Disk % Usage Workarea",
+                    "expr": "host_Disk_UsedPercent{mountpoint=~'/workarea'} >= 75",
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 75, "criticalValue": 80,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        orch = self._make_orch_with_policy([
+            {"pattern": "Disk *", "warning": 70, "critical": 80},
+        ])
+        with patch.object(MetricQuerier, 'query', new=exploding_query):
+            result = orch.tune_all(input_json)
+
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "pinned")
+        self.assertEqual(outcome.new_warning, 70)
+        self.assertEqual(outcome.new_critical, 80)
+        self.assertEqual(outcome.pinned_pattern, "Disk *")
+
+    def test_pinned_rule_updates_expr_with_new_warning(self):
+        input_json = {
+            "name": "bc1",
+            "metricrules": [
+                {
+                    "id": "rule-disk",
+                    "alert": "Disk % Usage Workarea",
+                    "expr": "host_Disk_UsedPercent{} >= 75",
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 75, "criticalValue": 80,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        orch = self._make_orch_with_policy([
+            {"pattern": "Disk *", "warning": 70, "critical": 80},
+        ])
+        result = orch.tune_all(input_json)
+
+        self.assertEqual(result.tuned_json["metricrules"][0]["expr"],
+                         "host_Disk_UsedPercent{} >= 70")
+        self.assertEqual(result.tuned_json["metricrules"][0]["warningValue"], 70)
+        self.assertEqual(result.tuned_json["metricrules"][0]["criticalValue"], 80)
+
+    def test_non_matching_rule_follows_normal_tuning_pipeline(self):
+        input_json = _sample_input(cluster_name="bc1")
+        orch = self._make_orch_with_policy([
+            {"pattern": "Disk *", "warning": 70, "critical": 80},
+        ])
+
+        def canned_query(self, promql, start, end, step="1m"):
+            return list(range(1000))
+
+        with patch.object(MetricQuerier, 'query', new=canned_query):
+            result = orch.tune_all(input_json)
+
+        # Neither sample rule is named "Disk *"; both go through normal tuning.
+        for outcome in result.outcomes:
+            self.assertNotEqual(outcome.status, "pinned",
+                                f"{outcome.rule_name} should not be pinned")
+
+    def test_filtered_rule_is_not_pinned(self):
+        """Filter wins over pin: a rule excluded by --exclude is not considered
+        for pinning (no work is done on it at all)."""
+        input_json = {
+            "name": "bc1",
+            "metricrules": [
+                {
+                    "id": "rule-disk",
+                    "alert": "Disk % Usage Workarea",
+                    "expr": "host_Disk_UsedPercent{} >= 75",
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 75, "criticalValue": 80,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        config = _default_config(exclude=["Disk *"])
+        config.pinned_rules = [
+            {"pattern": "Disk *", "warning": 70, "critical": 80},
+        ]
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        orch = TuneAlertsOrchestrator(axonops, _args(), config)
+        result = orch.tune_all(input_json)
+
+        self.assertEqual(result.outcomes[0].status, "filtered")
+
+    def test_pinned_rule_with_unparseable_expr_skips(self):
+        """A pinned rule whose expr can't be parsed is surfaced as skipped
+        with a clear reason — we can't update the expr without knowing the
+        operator."""
+        input_json = {
+            "name": "bc1",
+            "metricrules": [
+                {
+                    "id": "rule-bad",
+                    "alert": "Bad Disk Rule",
+                    "expr": "malformed_no_operator",
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 75, "criticalValue": 80,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        orch = self._make_orch_with_policy([
+            {"pattern": "Bad *", "warning": 70, "critical": 80},
+        ])
+        result = orch.tune_all(input_json)
+
+        self.assertEqual(result.outcomes[0].status, "skipped")
+        self.assertIn("cannot parse expr for pinning", result.outcomes[0].reason)
+
+    def test_audit_report_includes_pinned_section(self):
+        import tempfile
+
+        input_json = {
+            "name": "bc1",
+            "metricrules": [
+                {
+                    "id": "rule-disk",
+                    "alert": "Disk % Usage Workarea",
+                    "expr": "host_Disk_UsedPercent{} >= 75",
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 75, "criticalValue": 80,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        orch = self._make_orch_with_policy([
+            {"pattern": "Disk *", "warning": 70, "critical": 80},
+        ])
+        result = orch.tune_all(input_json)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = os.path.join(tmp, "alert_rules.json")
+            with open(input_path, "w") as f:
+                json.dump(input_json, f)
+            report_path = orch.write_audit_report(input_path, result)
+            report = open(report_path).read()
+
+        self.assertIn("## Pinned rules (policy override)", report)
+        self.assertIn("Disk % Usage Workarea", report)
+        self.assertIn("Disk *", report)
+
+
+class TestPolicyFileLoader(unittest.TestCase):
+    """The --policy flag loads and validates a JSON policy file."""
+
+    def _write_policy(self, tmp, content):
+        import tempfile
+        path = os.path.join(tmp, "policy.json")
+        with open(path, "w") as f:
+            if isinstance(content, str):
+                f.write(content)
+            else:
+                json.dump(content, f)
+        return path
+
+    def test_loads_valid_policy(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_policy(tmp, {
+                "pinned_thresholds": [
+                    {"pattern": "Disk *", "warning": 70, "critical": 80},
+                ],
+            })
+            pinned = Application._load_policy_file(path)
+        self.assertEqual(pinned, [{"pattern": "Disk *", "warning": 70, "critical": 80}])
+
+    def test_missing_required_key_raises(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_policy(tmp, {
+                "pinned_thresholds": [
+                    {"pattern": "Disk *", "warning": 70},  # missing 'critical'
+                ],
+            })
+            with self.assertRaises(ValueError) as ctx:
+                Application._load_policy_file(path)
+            self.assertIn("critical", str(ctx.exception))
+
+    def test_non_object_top_level_raises(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_policy(tmp, "[]")
+            with self.assertRaises(ValueError) as ctx:
+                Application._load_policy_file(path)
+            self.assertIn("JSON object", str(ctx.exception))
+
+    def test_malformed_json_raises(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_policy(tmp, "{not json")
+            with self.assertRaises(ValueError) as ctx:
+                Application._load_policy_file(path)
+            self.assertIn("not valid JSON", str(ctx.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

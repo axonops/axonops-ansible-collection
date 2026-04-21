@@ -272,6 +272,10 @@ class Application:
                                         help='Tune only this exact rule name (repeatable)')
         tune_alerts_parser.add_argument('--incident', action='append', default=[],
                                         help='YYYY-MM-DD UTC day to exclude from baseline and verify coverage for (repeatable)')
+        tune_alerts_parser.add_argument('--policy', type=str, default=None,
+                                        help='Path to a JSON policy file with pinned thresholds that override '
+                                             'workload-derived tuning for matching rule-name globs. Format: '
+                                             '{"pinned_thresholds": [{"pattern": "Disk *", "warning": 70, "critical": 80}]}')
 
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
@@ -486,6 +490,10 @@ class Application:
         }
         p_percentile, p_warn, p_crit = presets[args.profile]
 
+        pinned_rules = []
+        if getattr(args, 'policy', None):
+            pinned_rules = Application._load_policy_file(args.policy)
+
         return TuneAlertsConfig(
             profile=args.profile,
             percentile=args.percentile if args.percentile is not None else p_percentile,
@@ -497,4 +505,28 @@ class Application:
             exclude=list(args.exclude or []),
             rules=list(args.rule or []),
             incidents=list(args.incident or []),
+            pinned_rules=pinned_rules,
         )
+
+    @staticmethod
+    def _load_policy_file(path):
+        """Load a JSON policy file. Returns the pinned_thresholds list.
+        Raises ValueError with a clear message on any shape problem."""
+        with open(path, "r") as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"policy file {path!r} is not valid JSON: {e}")
+        if not isinstance(data, dict):
+            raise ValueError(f"policy file {path!r} must be a JSON object at top level")
+        pinned = data.get("pinned_thresholds", [])
+        if not isinstance(pinned, list):
+            raise ValueError(f"policy file {path!r}: pinned_thresholds must be a list")
+        for i, entry in enumerate(pinned):
+            if not isinstance(entry, dict):
+                raise ValueError(f"policy file {path!r}: pinned_thresholds[{i}] must be an object")
+            for key in ("pattern", "warning", "critical"):
+                if key not in entry:
+                    raise ValueError(
+                        f"policy file {path!r}: pinned_thresholds[{i}] missing required key {key!r}")
+        return pinned

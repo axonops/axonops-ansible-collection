@@ -260,17 +260,20 @@ class TuneAlertsConfig:
     exclude: list
     rules: list
     incidents: list = None          # list[str] of YYYY-MM-DD
+    pinned_rules: list = None       # list[dict{pattern, warning, critical}]
 
     def __post_init__(self):
         if self.incidents is None:
             self.incidents = []
+        if self.pinned_rules is None:
+            self.pinned_rules = []
 
 
 @dataclass
 class RuleOutcome:
     rule_name: str
-    status: str                     # "tuned" | "skipped" | "filtered"
-    reason: Optional[str] = None    # populated for skipped/filtered
+    status: str                     # "tuned" | "skipped" | "filtered" | "pinned"
+    reason: Optional[str] = None    # populated for skipped/filtered/pinned
     old_warning: Optional[float] = None
     old_critical: Optional[float] = None
     new_warning: Optional[float] = None
@@ -279,6 +282,7 @@ class RuleOutcome:
     sample_count: Optional[int] = None
     operator: Optional[str] = None
     incident_coverage: Optional[list] = None   # list[dict] per incident
+    pinned_pattern: Optional[str] = None       # which policy pattern matched
 
 
 @dataclass
@@ -296,6 +300,10 @@ class TuneRunResult:
     @property
     def tuned_count(self) -> int:
         return sum(1 for o in self.outcomes if o.status == "tuned")
+
+    @property
+    def pinned_count(self) -> int:
+        return sum(1 for o in self.outcomes if o.status == "pinned")
 
     @property
     def skipped_count(self) -> int:
@@ -388,6 +396,33 @@ class TuneAlertsOrchestrator:
             return RuleOutcome(
                 rule_name=name, status="filtered", reason="excluded by filter",
                 old_warning=old_warning, old_critical=old_critical,
+            )
+
+        # Policy-pin stage: if the rule matches a pinned pattern, apply the
+        # fixed values and skip the whole tuning pipeline (no metric query,
+        # no percentile computation, no sanity clamps). Pinned values are
+        # policy — the caller knows the right number.
+        pin = self._find_pinned(name)
+        if pin is not None:
+            pinned_pattern, pinned_warning, pinned_critical = pin
+            try:
+                _bare, operator, _old = ExprRewriter.strip_threshold(expr)
+            except ValueError as e:
+                return RuleOutcome(
+                    rule_name=name, status="skipped",
+                    reason=f"cannot parse expr for pinning: {e}",
+                    old_warning=old_warning, old_critical=old_critical,
+                    pinned_pattern=pinned_pattern,
+                )
+            rule["warningValue"] = pinned_warning
+            rule["criticalValue"] = pinned_critical
+            rule["expr"] = ExprRewriter.rewrite(expr, new_warning=pinned_warning)
+            return RuleOutcome(
+                rule_name=name, status="pinned",
+                reason=f"matched policy pattern {pinned_pattern!r}",
+                old_warning=old_warning, old_critical=old_critical,
+                new_warning=pinned_warning, new_critical=pinned_critical,
+                operator=operator, pinned_pattern=pinned_pattern,
             )
 
         try:
@@ -595,6 +630,15 @@ class TuneAlertsOrchestrator:
                 )
         return baseline
 
+    def _find_pinned(self, rule_name: str):
+        """Return (pattern, warning, critical) for the first matching pinned
+        entry, or None. Uses fnmatch glob matching on rule names."""
+        for entry in self.config.pinned_rules:
+            pattern = entry.get("pattern")
+            if pattern and fnmatch.fnmatchcase(rule_name, pattern):
+                return (pattern, entry["warning"], entry["critical"])
+        return None
+
     def _unreasonable_delta(self, old_val, new_val) -> bool:
         """Returns True if the magnitude change is unreasonable.
 
@@ -641,6 +685,8 @@ class TuneAlertsOrchestrator:
 
     def print_summary(self, result: TuneRunResult, json_path: str) -> None:
         summary_parts = [f"Tuned {result.tuned_count}"]
+        if result.pinned_count:
+            summary_parts.append(f"pinned {result.pinned_count}")
         if result.skipped_count:
             reasons = {}
             for o in result.outcomes:
@@ -672,6 +718,13 @@ class TuneAlertsOrchestrator:
             print(f"  [skipped]  {o.rule_name}: {o.reason}")
         elif o.status == "filtered":
             print(f"  [filtered] {o.rule_name}: {o.reason}")
+        elif o.status == "pinned":
+            print(
+                f"  [pinned]   {o.rule_name}: "
+                f"warning {o.old_warning}→{o.new_warning}, "
+                f"critical {o.old_critical}→{o.new_critical} "
+                f"(policy pattern {o.pinned_pattern!r})"
+            )
 
     # ---- path helpers ----
 
@@ -707,6 +760,7 @@ class TuneAlertsOrchestrator:
             "## Summary",
             "",
             f"- Tuned: {result.tuned_count} rules",
+            f"- Pinned (policy override): {result.pinned_count} rules",
             f"- Skipped: {result.skipped_count} rules",
             f"- Filtered out: {result.filtered_count} rules",
             "",
@@ -734,6 +788,23 @@ class TuneAlertsOrchestrator:
             lines.extend(["## Skipped rules", "", "| Rule | Reason |", "|---|---|"])
             for o in skipped:
                 lines.append(f"| {_md_cell(o.rule_name)} | {_md_cell(o.reason)} |")
+            lines.append("")
+
+        pinned = [o for o in result.outcomes if o.status == "pinned"]
+        if pinned:
+            lines.extend([
+                "## Pinned rules (policy override)",
+                "",
+                "| Rule | Op | warning (old → new) | critical (old → new) | Policy pattern |",
+                "|---|---|---|---|---|",
+            ])
+            for o in pinned:
+                lines.append(
+                    f"| {_md_cell(o.rule_name)} | {_md_cell(o.operator)} | "
+                    f"{_md_cell(o.old_warning)} → {_md_cell(o.new_warning)} | "
+                    f"{_md_cell(o.old_critical)} → {_md_cell(o.new_critical)} | "
+                    f"{_md_cell(o.pinned_pattern)} |"
+                )
             lines.append("")
 
         filtered = [o for o in result.outcomes if o.status == "filtered"]
