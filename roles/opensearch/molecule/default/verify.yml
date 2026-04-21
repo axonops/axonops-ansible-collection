@@ -1,0 +1,81 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check OpenSearch binary exists
+      ansible.builtin.stat:
+        path: /usr/share/opensearch/bin/opensearch
+      register: _os_binary
+      failed_when: not _os_binary.stat.exists
+
+    - name: Check opensearch.yml exists
+      ansible.builtin.stat:
+        path: /usr/share/opensearch/config/opensearch.yml
+      register: _os_config
+      failed_when: not _os_config.stat.exists
+
+    - name: Read opensearch.yml
+      ansible.builtin.slurp:
+        src: /usr/share/opensearch/config/opensearch.yml
+      register: _os_config_content
+
+    - name: Verify cluster name in opensearch.yml
+      ansible.builtin.assert:
+        that:
+          - "'molecule-test' in (_os_config_content.content | b64decode)"
+        fail_msg: "opensearch.yml does not contain expected cluster name"
+
+    - name: Verify single-node discovery type
+      ansible.builtin.assert:
+        that:
+          - "'discovery.type: single-node' in (_os_config_content.content | b64decode)"
+        fail_msg: "opensearch.yml does not contain single-node discovery type"
+
+    - name: Verify security is disabled in config
+      ansible.builtin.assert:
+        that:
+          - "'plugins.security.disabled: true' in (_os_config_content.content | b64decode)"
+        fail_msg: "Security plugin should be disabled in molecule test"
+
+    - name: Check jvm.options exists
+      ansible.builtin.stat:
+        path: /usr/share/opensearch/config/jvm.options
+      register: _jvm_opts
+      failed_when: not _jvm_opts.stat.exists
+
+    - name: Read jvm.options
+      ansible.builtin.slurp:
+        src: /usr/share/opensearch/config/jvm.options
+      register: _jvm_content
+
+    - name: Verify heap size in jvm.options
+      ansible.builtin.assert:
+        that:
+          - "'-Xms512m' in (_jvm_content.content | b64decode)"
+          - "'-Xmx512m' in (_jvm_content.content | b64decode)"
+        fail_msg: "jvm.options does not contain expected heap size 512m"
+
+    - name: Check systemd service file exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/opensearch.service
+      register: _os_service
+      failed_when: not _os_service.stat.exists
+
+    - name: Check OpenSearch user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: opensearch
+
+    - name: Check config directory permissions
+      ansible.builtin.stat:
+        path: /usr/share/opensearch/config
+      register: _conf_dir
+
+    - name: Verify config directory ownership
+      ansible.builtin.assert:
+        that:
+          - _conf_dir.stat.pw_name == 'opensearch'
+          - _conf_dir.stat.gr_name == 'opensearch'
+
+# code: language=ansible

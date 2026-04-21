@@ -3,14 +3,12 @@
 # OpenSearch Role - Main Tasks
 # ============================================================================
 
-- name: Validate required variables
-  ansible.builtin.assert:
-    that:
-      - opensearch_cluster_name is defined and opensearch_cluster_name != 'opensearch'
-    fail_msg: >-
+- name: Warn about default cluster name
+  ansible.builtin.debug:
+    msg: >-
       WARNING: opensearch_cluster_name is set to 'opensearch'. For production
       deployments, set opensearch_cluster_name to a meaningful cluster name.
-  ignore_errors: true
+  when: opensearch_cluster_name is not defined or opensearch_cluster_name == 'opensearch'
   tags: always
 
 - name: Validate admin password is set when security is enabled
@@ -40,15 +38,6 @@
   when: opensearch_security_enabled
   tags: security
 
-# After the cluster forms successfully for the first time,
-# remove cluster.initial_master_nodes to allow dynamic membership
-- name: Remove cluster.initial_master_nodes from configuration
-  ansible.builtin.lineinfile:
-    path: "{{ opensearch_conf_dir }}/opensearch.yml"
-    regexp: '^cluster\.initial_master_nodes'
-    state: absent
-  when: opensearch_cluster_type == 'multi-node'
-
 - name: Ensure OpenSearch is started
   ansible.builtin.systemd:
     name: opensearch
@@ -74,7 +63,11 @@
     user: admin
     password: "{{ opensearch_admin_password }}"
     validate_certs: false
+    force_basic_auth: true
   register: _opensearch_health
+  retries: 5
+  delay: 5
+  until: _opensearch_health.status == 200
   when: opensearch_start_on_install and opensearch_security_enabled
   tags: health
 
