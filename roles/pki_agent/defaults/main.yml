@@ -1,27 +1,24 @@
 ---
-# Agent type: "vault" (HashiCorp Vault Agent) or "openbao" (OpenBao Agent)
-pki_agent_type: vault
-
 # Package version to install (empty string = latest from repo)
 pki_agent_version: ""
 
 # Install method: "pkg" (OS package manager) or "binary" (direct download)
 pki_agent_install_method: pkg
 
-# Vault / OpenBao server URL — REQUIRED
-pki_agent_vault_addr: ""
+# OpenBao server URL — REQUIRED
+pki_agent_addr: ""
 
-# Vault Enterprise namespace (optional)
-pki_agent_vault_namespace: ""
+# OpenBao namespace (optional)
+pki_agent_namespace: ""
 
-# Directories — defaults vary by agent type at runtime via vars files
-pki_agent_config_dir: "/etc/{{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}-agent.d"
-pki_agent_data_dir: "/var/lib/{{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}-agent"
-pki_agent_log_dir: "/var/log/{{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}-agent"
+# Directories
+pki_agent_config_dir: /etc/openbao-agent.d
+pki_agent_data_dir: /var/lib/openbao-agent
+pki_agent_log_dir: /var/log/openbao-agent
 
 # System user / group created for the agent daemon
-pki_agent_user: "{{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}-agent"
-pki_agent_group: "{{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}-agent"
+pki_agent_user: openbao-agent
+pki_agent_group: openbao-agent
 
 # Authentication method: "approle" or "token"
 pki_agent_auto_auth_method: approle
@@ -38,8 +35,8 @@ pki_agent_token: ""
 # List of certificates to manage.
 # Each entry supports:
 #   name            (str, required) — logical label used to name the template block
-#   pki_mount       (str, required) — Vault PKI secrets engine mount path
-#   pki_role        (str, required) — Vault PKI role name
+#   pki_mount       (str, required) — PKI secrets engine mount path
+#   pki_role        (str, required) — PKI role name
 #   common_name     (str, required) — certificate CN
 #   alt_names       (str, default "")  — comma-separated SANs; omitted when empty
 #   ip_sans         (str, default "")  — comma-separated IP SANs; omitted when empty

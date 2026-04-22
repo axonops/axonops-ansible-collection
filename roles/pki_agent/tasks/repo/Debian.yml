@@ -1,53 +1,4 @@
 ---
-# HashiCorp repo (vault)
-- name: Add HashiCorp apt repo prerequisites
-  ansible.builtin.apt:
-    name:
-      - gnupg
-      - apt-transport-https
-      - debian-archive-keyring
-    state: present
-    update_cache: true
-  when: pki_agent_type == 'vault'
-
-- name: Ensure keyrings directory exists
-  ansible.builtin.file:
-    path: /usr/share/keyrings
-    state: directory
-    mode: "0755"
-  when: pki_agent_type == 'vault'
-
-- name: Download HashiCorp apt key
-  ansible.builtin.get_url:
-    url: https://apt.releases.hashicorp.com/gpg
-    dest: /tmp/hashicorp-archive-keyring.gpg
-    mode: "0644"
-  when: pki_agent_type == 'vault'
-
-- name: Dearmor and save HashiCorp key
-  ansible.builtin.shell:
-    cmd: gpg --dearmor < /tmp/hashicorp-archive-keyring.gpg > /usr/share/keyrings/hashicorp-archive-keyring.gpg
-    creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
-  when: pki_agent_type == 'vault'
-
-- name: Set correct permissions on HashiCorp keyring
-  ansible.builtin.file:
-    path: /usr/share/keyrings/hashicorp-archive-keyring.gpg
-    mode: "0644"
-    owner: root
-    group: root
-  when: pki_agent_type == 'vault'
-
-- name: Add HashiCorp apt repository
-  ansible.builtin.apt_repository:
-    repo: >-
-      deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg]
-      https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main
-    state: present
-    update_cache: true
-  when: pki_agent_type == 'vault'
-
-# OpenBao repo
 - name: Add OpenBao apt repo prerequisites
   ansible.builtin.apt:
     name:
@@ -56,21 +7,18 @@
       - debian-archive-keyring
     state: present
     update_cache: true
-  when: pki_agent_type == 'openbao'
 
-- name: Ensure keyrings directory exists (openbao)
+- name: Ensure keyrings directory exists
   ansible.builtin.file:
     path: /usr/share/keyrings
     state: directory
     mode: "0755"
-  when: pki_agent_type == 'openbao'
 
 - name: Download OpenBao apt key
   ansible.builtin.get_url:
     url: https://packages.openbao.io/openbao-archive-keyring.gpg
     dest: /usr/share/keyrings/openbao-archive-keyring.gpg
     mode: "0644"
-  when: pki_agent_type == 'openbao'
 
 - name: Add OpenBao apt repository
   ansible.builtin.apt_repository:
@@ -79,6 +27,5 @@
       https://packages.openbao.io/openbao/stable/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} main
     state: present
     update_cache: true
-  when: pki_agent_type == 'openbao'
 
 # code: language=ansible

@@ -3,27 +3,34 @@
   hosts: pki-agent
   gather_facts: false
   tasks:
-    - name: Check vault binary exists and is executable
+    - name: Check bao binary exists and is executable
       ansible.builtin.stat:
-        path: /usr/bin/vault
-      register: _vault_bin
-      failed_when: not _vault_bin.stat.exists or not _vault_bin.stat.executable
+        path: /usr/bin/bao
+      register: _bao_bin
+      failed_when: not _bao_bin.stat.exists or not _bao_bin.stat.executable
 
     - name: Check agent config file exists
       ansible.builtin.stat:
-        path: /etc/vault-agent.d/agent.hcl
+        path: /etc/openbao-agent.d/agent.hcl
       register: _agent_hcl
       failed_when: not _agent_hcl.stat.exists
 
-    - name: Check agent config owned by vault-agent user
+    - name: Check agent config owned by openbao-agent user
       ansible.builtin.assert:
         that:
-          - _agent_hcl.stat.pw_name == 'vault-agent'
-        fail_msg: "agent.hcl not owned by vault-agent user"
+          - _agent_hcl.stat.pw_name == 'openbao-agent'
+        fail_msg: "agent.hcl not owned by openbao-agent user"
+
+    - name: Verify config uses bao stanza
+      ansible.builtin.command:
+        cmd: grep -c '^bao {' /etc/openbao-agent.d/agent.hcl
+      register: _bao_stanza
+      changed_when: false
+      failed_when: _bao_stanza.stdout | int < 1
 
     - name: Check systemd service is enabled and running
       ansible.builtin.systemd:
-        name: vault-agent
+        name: openbao-agent
       register: _svc
       failed_when: >
         _svc.status.ActiveState != 'active' or
@@ -67,14 +74,14 @@
 
     - name: Verify agent.hcl contains both certificate template blocks
       ansible.builtin.command:
-        cmd: grep -c 'pkiCert' /etc/vault-agent.d/agent.hcl
+        cmd: grep -c 'pkiCert' /etc/openbao-agent.d/agent.hcl
       register: _pkiCert_count
       changed_when: false
       failed_when: _pkiCert_count.stdout | int < 2
 
     - name: Verify exec stanza present for node-cert (has reload_command)
       ansible.builtin.command:
-        cmd: grep -c 'cert-rotated' /etc/vault-agent.d/agent.hcl
+        cmd: grep -c 'cert-rotated' /etc/openbao-agent.d/agent.hcl
       register: _exec_stanza
       changed_when: false
       failed_when: _exec_stanza.stdout | int < 1
@@ -84,8 +91,7 @@
         cmd: |
           python3 -c "
           import re, sys
-          content = open('/etc/vault-agent.d/agent.hcl').read()
-          # Find the client.crt template block and check it has no exec stanza
+          content = open('/etc/openbao-agent.d/agent.hcl').read()
           blocks = re.findall(r'# Certificate: client-cert.*?(?=# Certificate:|$)', content, re.DOTALL)
           if not blocks:
               sys.exit(1)

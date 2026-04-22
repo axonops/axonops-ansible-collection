@@ -1,16 +1,10 @@
 ---
-- name: Preflight — vault address is set
+- name: Preflight — server address is set
   ansible.builtin.assert:
     that:
-      - pki_agent_vault_addr is defined
-      - pki_agent_vault_addr | length > 0
-    fail_msg: "pki_agent_vault_addr must be defined and non-empty."
-
-- name: Preflight — agent type is valid
-  ansible.builtin.assert:
-    that:
-      - pki_agent_type in ['vault', 'openbao']
-    fail_msg: "pki_agent_type must be 'vault' or 'openbao', got: {{ pki_agent_type }}"
+      - pki_agent_addr is defined
+      - pki_agent_addr | length > 0
+    fail_msg: "pki_agent_addr must be defined and non-empty."
 
 - name: Preflight — auth method is valid
   ansible.builtin.assert:

@@ -1,10 +1,7 @@
 ---
 - name: Set agent package name
   ansible.builtin.set_fact:
-    _pki_agent_pkg: "{{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}\
-      {{ '=' + pki_agent_version if pki_agent_version | length > 0 else '' }}"
-    _pki_agent_binary: "{{ 'vault' if pki_agent_type == 'vault' else 'bao' }}"
-    _pki_agent_service: "{{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}-agent"
+    _pki_agent_pkg: "openbao{{ '=' + pki_agent_version if pki_agent_version | length > 0 else '' }}"
 
 - name: Create agent system group
   ansible.builtin.group:
@@ -65,7 +62,7 @@
   block:
     - name: Check installed version
       ansible.builtin.command:
-        cmd: "{{ _pki_agent_binary }} version"
+        cmd: bao version
       register: _pki_agent_installed_version
       changed_when: false
       failed_when: false
@@ -83,46 +80,25 @@
         - name: Resolve latest version
           when: pki_agent_version | length == 0
           block:
-            - name: Get latest release tag (vault)
-              ansible.builtin.uri:
-                url: https://api.github.com/repos/hashicorp/vault/releases/latest
-                return_content: true
-              register: _vault_latest
-              when: pki_agent_type == 'vault'
-
-            - name: Get latest release tag (openbao)
+            - name: Get latest release tag
               ansible.builtin.uri:
                 url: https://api.github.com/repos/openbao/openbao/releases/latest
                 return_content: true
               register: _openbao_latest
-              when: pki_agent_type == 'openbao'
 
             - name: Set resolved version
               ansible.builtin.set_fact:
-                _pki_agent_resolved_version: >-
-                  {{ (_vault_latest.json.tag_name if pki_agent_type == 'vault'
-                      else _openbao_latest.json.tag_name) | regex_replace('^v', '') }}
+                _pki_agent_resolved_version: "{{ _openbao_latest.json.tag_name | regex_replace('^v', '') }}"
 
         - name: Use pinned version
           ansible.builtin.set_fact:
             _pki_agent_resolved_version: "{{ pki_agent_version }}"
           when: pki_agent_version | length > 0
 
-        - name: Set download URL (vault)
-          ansible.builtin.set_fact:
-            _pki_agent_download_url: >-
-              https://releases.hashicorp.com/vault/{{ _pki_agent_resolved_version }}/vault_{{ _pki_agent_resolved_version }}_linux_amd64.zip
-            _pki_agent_checksum_url: >-
-              https://releases.hashicorp.com/vault/{{ _pki_agent_resolved_version }}/vault_{{ _pki_agent_resolved_version }}_SHA256SUMS
-          when: pki_agent_type == 'vault'
-
-        - name: Set download URL (openbao)
+        - name: Set download URL
           ansible.builtin.set_fact:
             _pki_agent_download_url: >-
               https://github.com/openbao/openbao/releases/download/v{{ _pki_agent_resolved_version }}/bao_{{ _pki_agent_resolved_version }}_linux_amd64.zip
-            _pki_agent_checksum_url: >-
-              https://github.com/openbao/openbao/releases/download/v{{ _pki_agent_resolved_version }}/bao_{{ _pki_agent_resolved_version }}_SHA256SUMS
-          when: pki_agent_type == 'openbao'
 
         - name: Download binary archive
           ansible.builtin.get_url:

@@ -1,18 +1,16 @@
 ---
-- name: Pre-provision Vault dev server
-  hosts: vault-dev
+- name: Pre-provision OpenBao dev server
+  hosts: openbao-dev
   gather_facts: false
   tasks:
-    - name: Wait for Vault to be ready
+    - name: Wait for OpenBao to be ready
       ansible.builtin.uri:
         url: http://localhost:8200/v1/sys/health
         status_code: [200, 473]
-      register: _vault_health
-      until: _vault_health.status in [200, 473]
+      register: _bao_health
+      until: _bao_health.status in [200, 473]
       retries: 30
       delay: 2
-      environment:
-        VAULT_ADDR: "http://localhost:8200"
 
     - name: Enable PKI secrets engine
       ansible.builtin.uri:
@@ -119,7 +117,7 @@
         status_code: [200, 204]
       register: _approle_secret_id
 
-    - name: Store credentials as host facts for use in converge
+    - name: Store credentials as host facts
       ansible.builtin.set_fact:
         molecule_role_id: "{{ _approle_role_id.json.data.role_id }}"
         molecule_secret_id: "{{ _approle_secret_id.json.data.secret_id }}"
@@ -127,11 +125,10 @@
 - name: Converge
   hosts: pki-agent
   vars:
-    pki_agent_type: vault
-    pki_agent_vault_addr: "http://vault-dev:8200"
+    pki_agent_addr: "http://openbao-dev:8200"
     pki_agent_auto_auth_method: approle
-    pki_agent_approle_role_id: "{{ hostvars['vault-dev']['molecule_role_id'] }}"
-    pki_agent_approle_secret_id: "{{ hostvars['vault-dev']['molecule_secret_id'] }}"
+    pki_agent_approle_role_id: "{{ hostvars['openbao-dev']['molecule_role_id'] }}"
+    pki_agent_approle_secret_id: "{{ hostvars['openbao-dev']['molecule_secret_id'] }}"
     pki_agent_certificates:
       - name: node-cert
         pki_mount: pki

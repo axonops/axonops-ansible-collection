@@ -1,6 +1,6 @@
 galaxy_info:
   author: AxonOps Limited
-  description: Installs and configures Vault Agent / OpenBao Agent for automated PKI certificate lifecycle management
+  description: Installs and configures OpenBao Agent for automated PKI certificate lifecycle management
   company: AxonOps Limited
   license: Apache 2.0
   min_ansible_version: "2.10"
@@ -25,7 +25,6 @@ galaxy_info:
     - axonops
     - pki
     - tls
-    - vault
     - openbao
     - certificates
 

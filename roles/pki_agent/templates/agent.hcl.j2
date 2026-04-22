@@ -1,20 +1,11 @@
 # Managed by Ansible — do not edit manually
 
-{% if pki_agent_type == 'vault' %}
-vault {
-  address = "{{ pki_agent_vault_addr }}"
-{% if pki_agent_vault_namespace | length > 0 %}
-  namespace = "{{ pki_agent_vault_namespace }}"
-{% endif %}
-}
-{% else %}
 bao {
-  address = "{{ pki_agent_vault_addr }}"
-{% if pki_agent_vault_namespace | length > 0 %}
-  namespace = "{{ pki_agent_vault_namespace }}"
+  address = "{{ pki_agent_addr }}"
+{% if pki_agent_namespace | length > 0 %}
+  namespace = "{{ pki_agent_namespace }}"
 {% endif %}
 }
-{% endif %}
 
 auto_auth {
 {% if pki_agent_auto_auth_method == 'approle' %}
