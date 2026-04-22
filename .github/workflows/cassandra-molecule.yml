@@ -1,7 +1,7 @@
 ---
 name: Apache Cassandra Molecule
 
-on:
+"on":
   push:
     branches:
       - main

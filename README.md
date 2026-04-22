@@ -1,5 +1,17 @@
 # AxonOps Ansible Collection
 
+```html
+<p align="center">
+  <a href="https://axonops.com">
+    <img src="https://digitalis-marketplace-assets.s3.us-east-1.amazonaws.com/AxonopsDigitalMaster_AxonopsFullLogoBlue.jpg" alt="AxonOps" width="300">
+  </a>
+</p>
+
+<p align="center">
+  <em>Built and maintained by <a href="https://axonops.com">AxonOps</a></em>
+</p>
+```
+
 [AxonOps](https://axonops.com/) can be used either via our SaaS service or you can install it locally in your environment.
 
 This collection provides Ansible roles and playbooks to deploy [AxonOps](https://axonops.com/) components. The examples below

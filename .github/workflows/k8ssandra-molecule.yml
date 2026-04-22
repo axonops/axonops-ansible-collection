@@ -1,7 +1,7 @@
 ---
 name: K8ssandra Molecule
 
-on:
+"on":
   push:
     branches:
       - main

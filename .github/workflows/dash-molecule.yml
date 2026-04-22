@@ -1,7 +1,7 @@
 ---
 name: AxonOps Dashboard Molecule
 
-on:
+"on":
   push:
     branches:
       - main

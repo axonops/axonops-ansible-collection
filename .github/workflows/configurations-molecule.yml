@@ -1,7 +1,7 @@
 ---
 name: AxonOps Configurations Molecule
 
-on:
+"on":
   push:
     branches:
       - main
