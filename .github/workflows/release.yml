@@ -1,6 +1,6 @@
 name: Release collection
 
-"on":
+on:
   push:
     tags:
       - 'v*'

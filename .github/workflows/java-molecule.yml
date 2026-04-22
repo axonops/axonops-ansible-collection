@@ -1,7 +1,7 @@
 ---
 name: Java Molecule
 
-"on":
+on:
   push:
     branches:
       - main

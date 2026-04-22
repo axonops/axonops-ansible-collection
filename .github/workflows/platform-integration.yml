@@ -11,7 +11,7 @@
 
 name: AxonOps Platform Integration
 
-"on":
+on:
   push:
     branches:
       - develop

@@ -1,7 +1,7 @@
 ---
 name: PKI Agent Molecule
 
-"on":
+on:
   push:
     branches:
       - main

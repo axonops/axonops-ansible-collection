@@ -1,7 +1,7 @@
 ---
 name: AxonOps Agent Molecule
 
-"on":
+on:
   push:
     branches:
       - main

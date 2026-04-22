@@ -1,7 +1,7 @@
 ---
 name: AxonOps Server Molecule
 
-"on":
+on:
   push:
     branches:
       - main
