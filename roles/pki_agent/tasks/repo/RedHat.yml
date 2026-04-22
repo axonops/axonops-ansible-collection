@@ -1,0 +1,24 @@
+---
+- name: Add HashiCorp yum repository
+  ansible.builtin.yum_repository:
+    name: hashicorp
+    description: HashiCorp Stable - $basearch
+    baseurl: https://rpm.releases.hashicorp.com/RHEL/$releasever/$basearch/stable
+    gpgkey: https://rpm.releases.hashicorp.com/gpg
+    gpgcheck: true
+    repo_gpgcheck: true
+    enabled: true
+  when: pki_agent_type == 'vault'
+
+- name: Add OpenBao yum repository
+  ansible.builtin.yum_repository:
+    name: openbao
+    description: OpenBao Stable - $basearch
+    baseurl: https://packages.openbao.io/openbao/stable/centos/$releasever/$basearch
+    gpgkey: https://packages.openbao.io/openbao-archive-keyring.gpg
+    gpgcheck: true
+    repo_gpgcheck: false
+    enabled: true
+  when: pki_agent_type == 'openbao'
+
+# code: language=ansible

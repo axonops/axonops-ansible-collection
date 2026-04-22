@@ -1,0 +1,12 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart pki-agent
+  ansible.builtin.systemd:
+    name: "{{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}-agent"
+    state: restarted
+    daemon_reload: true
+
+# code: language=ansible

@@ -1,0 +1,29 @@
+---
+- name: Render agent HCL configuration
+  ansible.builtin.template:
+    src: agent.hcl.j2
+    dest: "{{ pki_agent_config_dir }}/agent.hcl"
+    owner: "{{ pki_agent_user }}"
+    group: "{{ pki_agent_group }}"
+    mode: "0640"
+  notify: Restart pki-agent
+
+- name: Render systemd unit file
+  ansible.builtin.template:
+    src: pki-agent.service.j2
+    dest: "/etc/systemd/system/{{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}-agent.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart pki-agent
+
+- name: Enable and start agent service
+  ansible.builtin.systemd:
+    name: "{{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}-agent"
+    enabled: "{{ pki_agent_service_enabled }}"
+    state: "{{ pki_agent_service_state }}"
+    daemon_reload: true
+
+# code: language=ansible

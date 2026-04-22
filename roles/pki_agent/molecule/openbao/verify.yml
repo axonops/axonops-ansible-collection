@@ -1,0 +1,66 @@
+---
+- name: Verify OpenBao agent
+  hosts: pki-agent-openbao
+  gather_facts: false
+  tasks:
+    - name: Check bao binary exists and is executable
+      ansible.builtin.stat:
+        path: /usr/bin/bao
+      register: _bao_bin
+      failed_when: not _bao_bin.stat.exists or not _bao_bin.stat.executable
+
+    - name: Verify vault binary is NOT installed
+      ansible.builtin.stat:
+        path: /usr/bin/vault
+      register: _vault_bin
+      failed_when: _vault_bin.stat.exists
+
+    - name: Check agent config file exists
+      ansible.builtin.stat:
+        path: /etc/openbao-agent.d/agent.hcl
+      register: _agent_hcl
+      failed_when: not _agent_hcl.stat.exists
+
+    - name: Check agent config owned by openbao-agent user
+      ansible.builtin.assert:
+        that:
+          - _agent_hcl.stat.pw_name == 'openbao-agent'
+        fail_msg: "agent.hcl not owned by openbao-agent user"
+
+    - name: Verify config uses bao stanza (not vault)
+      ansible.builtin.command:
+        cmd: grep -c '^bao {' /etc/openbao-agent.d/agent.hcl
+      register: _bao_stanza
+      changed_when: false
+      failed_when: _bao_stanza.stdout | int < 1
+
+    - name: Verify config does NOT use vault stanza
+      ansible.builtin.command:
+        cmd: grep -c '^vault {' /etc/openbao-agent.d/agent.hcl
+      register: _vault_stanza
+      changed_when: false
+      failed_when: _vault_stanza.stdout | int > 0
+
+    - name: Check systemd service is enabled and running
+      ansible.builtin.systemd:
+        name: openbao-agent
+      register: _svc
+      failed_when: >
+        _svc.status.ActiveState != 'active' or
+        _svc.status.UnitFileState not in ['enabled', 'static']
+
+    - name: Check node cert exists
+      ansible.builtin.stat:
+        path: /etc/pki-agent-test/node.crt
+      register: _node_cert
+      failed_when: not _node_cert.stat.exists
+
+    - name: Check node key exists with restricted mode
+      ansible.builtin.stat:
+        path: /etc/pki-agent-test/node.key
+      register: _node_key
+      failed_when: >
+        not _node_key.stat.exists or
+        _node_key.stat.mode != '0600'
+
+# code: language=ansible

@@ -1,0 +1,53 @@
+---
+- name: Preflight — vault address is set
+  ansible.builtin.assert:
+    that:
+      - pki_agent_vault_addr is defined
+      - pki_agent_vault_addr | length > 0
+    fail_msg: "pki_agent_vault_addr must be defined and non-empty."
+
+- name: Preflight — agent type is valid
+  ansible.builtin.assert:
+    that:
+      - pki_agent_type in ['vault', 'openbao']
+    fail_msg: "pki_agent_type must be 'vault' or 'openbao', got: {{ pki_agent_type }}"
+
+- name: Preflight — auth method is valid
+  ansible.builtin.assert:
+    that:
+      - pki_agent_auto_auth_method in ['approle', 'token']
+    fail_msg: "pki_agent_auto_auth_method must be 'approle' or 'token', got: {{ pki_agent_auto_auth_method }}"
+
+- name: Preflight — AppRole credentials are set
+  ansible.builtin.assert:
+    that:
+      - pki_agent_approle_role_id is defined
+      - pki_agent_approle_role_id | length > 0
+      - (pki_agent_approle_secret_id | length > 0) or (pki_agent_approle_secret_id_file | length > 0)
+    fail_msg: >
+      pki_agent_approle_role_id must be set, and at least one of
+      pki_agent_approle_secret_id or pki_agent_approle_secret_id_file must be non-empty.
+  when: pki_agent_auto_auth_method == 'approle'
+
+- name: Preflight — token is set
+  ansible.builtin.assert:
+    that:
+      - pki_agent_token is defined
+      - pki_agent_token | length > 0
+    fail_msg: "pki_agent_token must be defined and non-empty when pki_agent_auto_auth_method is 'token'."
+  when: pki_agent_auto_auth_method == 'token'
+
+- name: Preflight — at least one certificate defined
+  ansible.builtin.assert:
+    that:
+      - pki_agent_certificates is defined
+      - pki_agent_certificates | length > 0
+    fail_msg: "pki_agent_certificates must be defined and contain at least one entry."
+
+- name: Install
+  ansible.builtin.import_tasks: install.yml
+
+- name: Configure
+  ansible.builtin.import_tasks: configure.yml
+
+# code: language=ansible

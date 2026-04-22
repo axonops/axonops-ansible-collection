@@ -1,0 +1,27 @@
+# Managed by Ansible — do not edit manually
+[Unit]
+Description={{ 'HashiCorp Vault' if pki_agent_type == 'vault' else 'OpenBao' }} Agent (PKI certificate management)
+Documentation=https://{{ 'developer.hashicorp.com/vault/docs/agent-and-proxy/agent' if pki_agent_type == 'vault' else 'openbao.org/docs/agent-and-proxy/agent' }}
+Requires=network-online.target
+After=network-online.target
+ConditionFileNotEmpty={{ pki_agent_config_dir }}/agent.hcl
+
+[Service]
+Type=notify
+User={{ pki_agent_user }}
+Group={{ pki_agent_group }}
+ExecStart=/usr/bin/{{ 'vault' if pki_agent_type == 'vault' else 'bao' }} agent -config={{ pki_agent_config_dir }}/agent.hcl
+ExecReload=/bin/kill --signal HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65536
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+NoNewPrivileges=true
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={{ 'vault' if pki_agent_type == 'vault' else 'openbao' }}-agent
+
+[Install]
+WantedBy=multi-user.target

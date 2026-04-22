@@ -1,0 +1,171 @@
+---
+- name: Pre-provision Vault dev server
+  hosts: vault-dev
+  gather_facts: false
+  tasks:
+    - name: Wait for Vault to be ready
+      ansible.builtin.uri:
+        url: http://localhost:8200/v1/sys/health
+        status_code: [200, 473]
+      register: _vault_health
+      until: _vault_health.status in [200, 473]
+      retries: 30
+      delay: 2
+      environment:
+        VAULT_ADDR: "http://localhost:8200"
+
+    - name: Enable PKI secrets engine
+      ansible.builtin.uri:
+        url: http://localhost:8200/v1/sys/mounts/pki
+        method: POST
+        headers:
+          X-Vault-Token: molecule-root-token
+        body_format: json
+        body:
+          type: pki
+        status_code: [200, 204, 400]
+
+    - name: Configure PKI max TTL
+      ansible.builtin.uri:
+        url: http://localhost:8200/v1/sys/mounts/pki/tune
+        method: POST
+        headers:
+          X-Vault-Token: molecule-root-token
+        body_format: json
+        body:
+          max_lease_ttl: "87600h"
+        status_code: [200, 204]
+
+    - name: Generate root CA
+      ansible.builtin.uri:
+        url: http://localhost:8200/v1/pki/root/generate/internal
+        method: POST
+        headers:
+          X-Vault-Token: molecule-root-token
+        body_format: json
+        body:
+          common_name: "molecule-root-ca"
+          ttl: "87600h"
+        status_code: [200, 204]
+
+    - name: Create PKI role
+      ansible.builtin.uri:
+        url: http://localhost:8200/v1/pki/roles/molecule-role
+        method: POST
+        headers:
+          X-Vault-Token: molecule-root-token
+        body_format: json
+        body:
+          allowed_domains: ["molecule.test", "localhost"]
+          allow_subdomains: true
+          allow_bare_domains: true
+          allow_localhost: true
+          allow_ip_sans: true
+          max_ttl: "72h"
+        status_code: [200, 204]
+
+    - name: Enable AppRole auth
+      ansible.builtin.uri:
+        url: http://localhost:8200/v1/sys/auth/approle
+        method: POST
+        headers:
+          X-Vault-Token: molecule-root-token
+        body_format: json
+        body:
+          type: approle
+        status_code: [200, 204, 400]
+
+    - name: Create policy for PKI issuance
+      ansible.builtin.uri:
+        url: http://localhost:8200/v1/sys/policies/acl/pki-issue
+        method: POST
+        headers:
+          X-Vault-Token: molecule-root-token
+        body_format: json
+        body:
+          policy: |
+            path "pki/issue/*" { capabilities = ["create", "update"] }
+            path "pki/sign/*"  { capabilities = ["create", "update"] }
+        status_code: [200, 204]
+
+    - name: Create AppRole role
+      ansible.builtin.uri:
+        url: http://localhost:8200/v1/auth/approle/role/molecule
+        method: POST
+        headers:
+          X-Vault-Token: molecule-root-token
+        body_format: json
+        body:
+          policies: ["pki-issue"]
+          token_ttl: "1h"
+          token_max_ttl: "4h"
+        status_code: [200, 204]
+
+    - name: Read role_id
+      ansible.builtin.uri:
+        url: http://localhost:8200/v1/auth/approle/role/molecule/role-id
+        headers:
+          X-Vault-Token: molecule-root-token
+      register: _approle_role_id
+
+    - name: Generate secret_id
+      ansible.builtin.uri:
+        url: http://localhost:8200/v1/auth/approle/role/molecule/secret-id
+        method: POST
+        headers:
+          X-Vault-Token: molecule-root-token
+        body_format: json
+        body: {}
+        status_code: [200, 204]
+      register: _approle_secret_id
+
+    - name: Store credentials as host facts for use in converge
+      ansible.builtin.set_fact:
+        molecule_role_id: "{{ _approle_role_id.json.data.role_id }}"
+        molecule_secret_id: "{{ _approle_secret_id.json.data.secret_id }}"
+
+- name: Converge
+  hosts: pki-agent
+  vars:
+    pki_agent_type: vault
+    pki_agent_vault_addr: "http://vault-dev:8200"
+    pki_agent_auto_auth_method: approle
+    pki_agent_approle_role_id: "{{ hostvars['vault-dev']['molecule_role_id'] }}"
+    pki_agent_approle_secret_id: "{{ hostvars['vault-dev']['molecule_secret_id'] }}"
+    pki_agent_certificates:
+      - name: node-cert
+        pki_mount: pki
+        pki_role: molecule-role
+        common_name: "{{ inventory_hostname }}.molecule.test"
+        ttl: 72h
+        cert_path: /etc/pki-agent-test/node.crt
+        key_path: /etc/pki-agent-test/node.key
+        ca_path: /etc/pki-agent-test/ca.crt
+        cert_owner: root
+        cert_group: root
+        cert_mode: "0644"
+        key_mode: "0600"
+        reload_command: "echo cert-rotated"
+        reload_timeout: "5s"
+      - name: client-cert
+        pki_mount: pki
+        pki_role: molecule-role
+        common_name: "client.molecule.test"
+        ttl: 72h
+        cert_path: /etc/pki-agent-test/client.crt
+        key_path: /etc/pki-agent-test/client.key
+        cert_owner: root
+        cert_group: root
+        cert_mode: "0644"
+        key_mode: "0600"
+        reload_command: ""
+  pre_tasks:
+    - name: Create cert destination directories
+      ansible.builtin.file:
+        path: /etc/pki-agent-test
+        state: directory
+        mode: "0755"
+  roles:
+    - role: pki_agent
+
+# code: language=ansible
