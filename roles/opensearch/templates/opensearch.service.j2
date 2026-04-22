@@ -12,7 +12,7 @@ WorkingDirectory={{ opensearch_install_root }}
 User={{ opensearch_user }}
 Group={{ opensearch_group }}
 
-ExecStart={{ opensearch_install_root }}/bin/opensearch -p {{ opensearch_install_root }}/opensearch.pid -q
+ExecStart={{ opensearch_install_root }}/opensearch-tar-install.sh -p {{ opensearch_install_root }}/opensearch.pid -q
 
 StandardOutput=journal
 StandardError=inherit
