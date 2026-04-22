@@ -62,7 +62,12 @@ This collection provides the following Ansible roles. Click on each role for det
 - **[elastic](docs/roles/elastic.md)** - Install and configure Elasticsearch for AxonOps
 - **[java](docs/roles/java.md)** - Install Java (OpenJDK or Azul Zulu)
 
+### Security
+
+- **[pki_agent](docs/roles/pki_agent.md)** - Automated PKI certificate management using OpenBao Agent
+
 ### Utilities
+
 - **[preflight](docs/roles/preflight.md)** - Run pre-installation system checks
 
 For a complete guide including deployment patterns and quick references, see the [Role Documentation Index](docs/roles/README.md).
