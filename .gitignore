@@ -6,3 +6,4 @@ examples/full-example/roles
 # Ignore Python Virtual Environment
 venv/
 .venv
+.claude/settings.local.json
