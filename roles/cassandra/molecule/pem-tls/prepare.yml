@@ -8,10 +8,18 @@
         name: openssl
         state: present
 
-    - name: Generate self-signed test key and certificate
+    # PEMBasedSslContextFactory requires PKCS#8 format (BEGIN PRIVATE KEY).
+    # openssl req -newkey produces PKCS#1 (BEGIN RSA PRIVATE KEY) — not accepted.
+    - name: Generate PKCS#8 private key
       ansible.builtin.command: >-
-        openssl req -x509 -newkey rsa:2048
-        -keyout /tmp/test.key -out /tmp/test.crt
-        -days 1 -nodes -subj "/CN=cassandra-pem-tls-test"
+        openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048
+        -out /tmp/test.key
       args:
         creates: /tmp/test.key
+
+    - name: Generate self-signed certificate
+      ansible.builtin.command: >-
+        openssl req -new -x509 -key /tmp/test.key -out /tmp/test.crt
+        -days 1 -subj "/CN=cassandra-pem-tls-test"
+      args:
+        creates: /tmp/test.crt
