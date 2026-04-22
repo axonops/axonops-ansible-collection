@@ -16,7 +16,7 @@ platforms:
     pre_build_image: true
     networks:
       - name: pki-net
-  - name: ${MOLECULE_INSTANCE_NAME:-"openbao-dev"}
+  - name: ${MOLECULE_BAO_INSTANCE_NAME:-"openbao-dev"}
     image: "geerlingguy/docker-${MOLECULE_DISTRO:-rockylinux9}-ansible:latest"
     env:
       BAO_DEV_ROOT_TOKEN_ID: molecule-root-token

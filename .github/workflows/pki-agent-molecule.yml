@@ -51,6 +51,7 @@ jobs:
           MOLECULE_DISTRO: ${{ matrix.distro }}
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
           MOLECULE_INSTANCE_NAME: pki-agent-${{ matrix.distro }}
+          MOLECULE_BAO_INSTANCE_NAME: openbao-dev-${{ matrix.distro }}
 
       - name: Run Molecule converge
         run: molecule -v converge
@@ -60,6 +61,7 @@ jobs:
           MOLECULE_DISTRO: ${{ matrix.distro }}
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
           MOLECULE_INSTANCE_NAME: pki-agent-${{ matrix.distro }}
+          MOLECULE_BAO_INSTANCE_NAME: openbao-dev-${{ matrix.distro }}
 
       - name: Run Molecule verify
         run: molecule -v verify
@@ -69,6 +71,7 @@ jobs:
           MOLECULE_DISTRO: ${{ matrix.distro }}
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
           MOLECULE_INSTANCE_NAME: pki-agent-${{ matrix.distro }}
+          MOLECULE_BAO_INSTANCE_NAME: openbao-dev-${{ matrix.distro }}
 
       - name: Run Molecule idempotence
         run: molecule -v idempotence
@@ -78,3 +81,4 @@ jobs:
           MOLECULE_DISTRO: ${{ matrix.distro }}
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
           MOLECULE_INSTANCE_NAME: pki-agent-${{ matrix.distro }}
+          MOLECULE_BAO_INSTANCE_NAME: openbao-dev-${{ matrix.distro }}
