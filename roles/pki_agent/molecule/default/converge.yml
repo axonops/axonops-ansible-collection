@@ -1,8 +1,21 @@
 ---
 - name: Pre-provision OpenBao dev server
-  hosts: openbao-dev
-  gather_facts: false
+  hosts: all
+  gather_facts: true
+  vars:
+    _bao_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'x86_64' }}"
   tasks:
+    - name: Download and run OpenBao dev container
+      ansible.builtin.unarchive:
+        src: "https://github.com/openbao/openbao/releases/download/v2.5.3/bao_2.5.3_Linux_{{ _bao_arch }}.tar.gz"
+        dest: /tmp
+        remote_src: true
+
+    - name: Start OpenBao dev server
+      ansible.builtin.command: "/tmp/bao server -dev -dev-root-token-id=molecule-root-token -dev-listen-address=0.0.0.0:8200"
+      async: 3600
+      poll: 0
+
     - name: Wait for OpenBao to be ready
       ansible.builtin.uri:
         url: http://localhost:8200/v1/sys/health
