@@ -18,8 +18,8 @@ defaults:
     working-directory: roles/pki_agent
 
 jobs:
-  molecule-vault:
-    name: Molecule PKI Agent / vault (${{ matrix.distro }})
+  molecule:
+    name: Molecule PKI Agent (${{ matrix.distro }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -78,64 +78,3 @@ jobs:
           MOLECULE_DISTRO: ${{ matrix.distro }}
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
           MOLECULE_INSTANCE_NAME: pki-agent-${{ matrix.distro }}
-
-  molecule-openbao:
-    name: Molecule PKI Agent / openbao (${{ matrix.distro }})
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        distro:
-          - rockylinux9
-          - rockylinux10
-          - ubuntu2204
-          - ubuntu2404
-          - debian12
-
-    steps:
-      - name: Check out the codebase.
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Install test dependencies.
-        run: pip3 install ansible molecule molecule-plugins[docker] docker
-
-      - name: Run Molecule destroy (ignore failures)
-        run: molecule -v destroy --scenario-name openbao
-        continue-on-error: true
-        env:
-          PY_COLORS: '1'
-          ANSIBLE_FORCE_COLOR: '1'
-          MOLECULE_DISTRO: ${{ matrix.distro }}
-          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
-          MOLECULE_INSTANCE_NAME: pki-agent-openbao-${{ matrix.distro }}
-
-      - name: Run Molecule converge (openbao)
-        run: molecule -v converge --scenario-name openbao
-        env:
-          PY_COLORS: '1'
-          ANSIBLE_FORCE_COLOR: '1'
-          MOLECULE_DISTRO: ${{ matrix.distro }}
-          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
-          MOLECULE_INSTANCE_NAME: pki-agent-openbao-${{ matrix.distro }}
-
-      - name: Run Molecule verify (openbao)
-        run: molecule -v verify --scenario-name openbao
-        env:
-          PY_COLORS: '1'
-          ANSIBLE_FORCE_COLOR: '1'
-          MOLECULE_DISTRO: ${{ matrix.distro }}
-          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
-          MOLECULE_INSTANCE_NAME: pki-agent-openbao-${{ matrix.distro }}
-
-      - name: Run Molecule idempotence (openbao)
-        run: molecule -v idempotence --scenario-name openbao
-        env:
-          PY_COLORS: '1'
-          ANSIBLE_FORCE_COLOR: '1'
-          MOLECULE_DISTRO: ${{ matrix.distro }}
-          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
-          MOLECULE_INSTANCE_NAME: pki-agent-openbao-${{ matrix.distro }}
