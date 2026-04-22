@@ -231,6 +231,34 @@ cassandra_ssl_client_require_client_auth: false
 cassandra_ssl_client_require_endpoint_verification: false
 cassandra_ssl_client_encryption_protocol: "TLS"
 
+# PEM-based TLS (Cassandra 4.1+)
+# Set to 'pem' to use PEMBasedSslContextFactory instead of the JKS keystore approach.
+# Any other value (including empty string) keeps the existing keystore path.
+# Requires cassandra_version >= 4.1.
+cassandra_ssl_internode_ssl_context_factory: ""
+
+# Inbound (server) identity for internode TLS — inline PEM strings.
+# private_key must contain the private key AND certificate chain concatenated
+# (PEMBasedSslContextFactory extracts both key and cert from this single value).
+# Store sensitive values in Ansible Vault.
+cassandra_ssl_internode_pem_private_key: ""
+cassandra_ssl_internode_pem_private_key_password: ""  # leave empty for unencrypted keys
+cassandra_ssl_internode_pem_trusted_certificates: ""
+
+# Outbound internode identity — used when mTLS requires a distinct client certificate.
+# If empty, Cassandra reuses the inbound private_key for outbound connections.
+cassandra_ssl_internode_pem_outbound_private_key: ""
+cassandra_ssl_internode_pem_outbound_private_key_password: ""
+cassandra_ssl_internode_pem_outbound_trusted_certificates: ""
+
+# PEM-based TLS for CQL client connections (client_encryption_options).
+# outbound_* parameters do not apply here — Cassandra never initiates connections to CQL clients.
+# private_key must contain the private key AND certificate chain concatenated.
+cassandra_ssl_client_ssl_context_factory: ""
+cassandra_ssl_client_pem_private_key: ""
+cassandra_ssl_client_pem_private_key_password: ""
+cassandra_ssl_client_pem_trusted_certificates: ""
+
 # Internode Compression
 cassandra_internode_compression: "dc"
 cassandra_inter_dc_tcp_nodelay: false

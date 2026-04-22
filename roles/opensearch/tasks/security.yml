@@ -183,14 +183,22 @@
         owner: "{{ opensearch_user }}"
         group: "{{ opensearch_group }}"
       loop:
-        - {src: "{{ opensearch_tls_root_ca }}", name: "root-ca.pem"}
-        - {src: "{{ opensearch_tls_root_ca_key }}", name: "root-ca.key"}
-        - {src: "{{ opensearch_tls_admin_cert }}", name: "admin.pem"}
-        - {src: "{{ opensearch_tls_admin_key }}", name: "admin.key"}
-        - {src: "{{ opensearch_tls_node_cert }}", name: "{{ inventory_hostname }}.pem"}
-        - {src: "{{ opensearch_tls_node_key }}", name: "{{ inventory_hostname }}.key"}
-        - {src: "{{ opensearch_tls_node_http_cert }}", name: "{{ inventory_hostname }}_http.pem"}
-        - {src: "{{ opensearch_tls_node_http_key }}", name: "{{ inventory_hostname }}_http.key"}
+        - src: "{{ opensearch_tls_root_ca }}"
+          name: "root-ca.pem"
+        - src: "{{ opensearch_tls_root_ca_key }}"
+          name: "root-ca.key"
+        - src: "{{ opensearch_tls_admin_cert }}"
+          name: "admin.pem"
+        - src: "{{ opensearch_tls_admin_key }}"
+          name: "admin.key"
+        - src: "{{ opensearch_tls_node_cert }}"
+          name: "{{ inventory_hostname }}.pem"
+        - src: "{{ opensearch_tls_node_key }}"
+          name: "{{ inventory_hostname }}.key"
+        - src: "{{ opensearch_tls_node_http_cert }}"
+          name: "{{ inventory_hostname }}_http.pem"
+        - src: "{{ opensearch_tls_node_http_key }}"
+          name: "{{ inventory_hostname }}_http.key"
       loop_control:
         label: "{{ item.name }}"
       register: _custom_certs_copy
