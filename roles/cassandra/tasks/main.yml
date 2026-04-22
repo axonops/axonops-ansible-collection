@@ -27,6 +27,16 @@
       starting with '4.1' or '5.'. Please set cassandra_version to a supported value.
   tags: always
 
+- name: Assert Cassandra version supports PEMBasedSslContextFactory
+  ansible.builtin.assert:
+    that:
+      - cassandra_version is version('4.1', '>=')
+    fail_msg: "PEMBasedSslContextFactory requires Cassandra 4.1 or later."
+  when: >-
+    cassandra_ssl_internode_ssl_context_factory | default('') == 'pem' or
+    cassandra_ssl_client_ssl_context_factory | default('') == 'pem'
+  tags: always
+
 - name: Import vars for 4.1
   ansible.builtin.include_vars: cassandra-4.1.yml
   when: cassandra_version.startswith('4.1')

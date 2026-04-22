@@ -1,0 +1,22 @@
+---
+- name: Converge — cassandra role with PEM-based TLS
+  hosts: all
+  vars:
+    cassandra_version: "4.1.7"
+    cassandra_start_on_install: false
+    cassandra_install_format: tar
+    cassandra_cluster_name: pem-tls-test
+    cassandra_seeds: "127.0.0.1"
+
+    cassandra_ssl_internode_encryption: all
+    cassandra_ssl_internode_ssl_context_factory: pem
+    cassandra_ssl_internode_pem_private_key: "{{ lookup('file', '/tmp/test.key') }}"
+    cassandra_ssl_internode_pem_trusted_certificates: "{{ lookup('file', '/tmp/test.crt') }}"
+
+    cassandra_ssl_client_encryption_enabled: true
+    cassandra_ssl_client_ssl_context_factory: pem
+    cassandra_ssl_client_pem_private_key: "{{ lookup('file', '/tmp/test.key') }}"
+    cassandra_ssl_client_pem_trusted_certificates: "{{ lookup('file', '/tmp/test.crt') }}"
+
+  roles:
+    - role: axonops.axonops.cassandra

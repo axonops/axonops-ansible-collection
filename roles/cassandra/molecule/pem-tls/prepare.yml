@@ -1,0 +1,17 @@
+---
+- name: Generate test PEM fixtures
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Install openssl
+      ansible.builtin.package:
+        name: openssl
+        state: present
+
+    - name: Generate self-signed test key and certificate
+      ansible.builtin.command: >-
+        openssl req -x509 -newkey rsa:2048
+        -keyout /tmp/test.key -out /tmp/test.crt
+        -days 1 -nodes -subj "/CN=cassandra-pem-tls-test"
+      args:
+        creates: /tmp/test.key
