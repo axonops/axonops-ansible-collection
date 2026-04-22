@@ -11,11 +11,17 @@
         dest: /tmp
         remote_src: true
 
+    - name: Check if OpenBao is already running
+      ansible.builtin.command: pgrep -f '/tmp/bao server'
+      register: _bao_running
+      failed_when: false
+      changed_when: false
+
     - name: Start OpenBao dev server
-      ansible.builtin.command: |
-        ps -ef | grep '/tmp/bao server' || nohup /tmp/bao server -dev -dev-root-token-id=molecule-root-token -dev-listen-address=0.0.0.0:8200 > /tmp/bao.log 2>&1
+      ansible.builtin.command: /tmp/bao server -dev -dev-root-token-id=molecule-root-token -dev-listen-address=0.0.0.0:8200
       async: 3600
       poll: 0
+      when: _bao_running.rc != 0
 
     - name: Wait for OpenBao to be ready
       ansible.builtin.uri:
