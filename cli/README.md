@@ -6,7 +6,7 @@ This CLI is designed to extend the AxonOps Configuration Automation Ansible modu
 
 ### Install Python dependencies
 
-This project provides multiple ways to install Python dependencies.  
+This project provides multiple ways to install Python dependencies.
 Choose the method that best fits your workflow.
 
 All install commands should be run from the root of the project directory.
@@ -16,7 +16,7 @@ The application should instead be run from the `cli` directory to avoid import i
 
 #### Option 1: Using pipenv (recommended)
 
-Pipenv is a popular tool for managing Python dependencies and virtual environments. 
+Pipenv is a popular tool for managing Python dependencies and virtual environments.
 It provides an easy way to create isolated environments and manage dependencies.
 
 ```shell
@@ -58,7 +58,7 @@ You can load the environment variables from the file using the following command
 
 ```shell
 source .env.axonops
-``` 
+```
 Now we specify the required environment variables for the most common cases of connecting to AxonOps.
 
 #### connect to AxonOps Cloud
@@ -73,7 +73,7 @@ export AXONOPS_TOKEN='aaaaabbbbccccddddeeee'
 ```
 
 #### connect to AxonOps Self-Hosted
-AxonOps Self-Hosted requires the `AXONOPS_URL` to specify the URL of your AxonOps instance. 
+AxonOps Self-Hosted requires the `AXONOPS_URL` to specify the URL of your AxonOps instance.
 If authentication is enabled, you also need to set the `AXONOPS_USERNAME` and `AXONOPS_PASSWORD` environment variables.
 
 Example of variables for AxonOps Self-Hosted with authentication enabled:
@@ -440,7 +440,7 @@ Manage the AxonOps Alert Silences.
 * `--deletesilence` Delete a silence by its ID.
 * `--cronexpr` Cron Expression for Recurring Silence. If not set, the silence will be created immediately. Crontab are in UTC time.
 * `--duration` Duration of the silence. Accepted values are a number followed by a time unit (s for seconds, m for minutes, h for hours, d for days). If not set, the default duration of the silence will be 1 hour.
-* `--dcs` JSON array of datacenters to include in the silence. If not set, all datacenters will be included. 
+* `--dcs` JSON array of datacenters to include in the silence. If not set, all datacenters will be included.
 The format of the JSON array should be `{"Name": "dc1","Racks": [{"Name": "RAC1","Nodes": ["b167aca6-b6b1-4bd5-bc45-3e27632e844d"]}]}`.
 * `--silencemetricsalerts` Silence Metrics Alerts. If not set, all alerts will be silenced.
 * `--silenceservicechecksalerts` Silence Service Checks Alerts. If not set, all alerts will be silenced.

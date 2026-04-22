@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for:*)",
+      "Bash(done)",
+      "Bash(mkdir:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "mcp__github__update_pull_request",
+      "Bash(git -C /Users/sergio.rua/BitBucket/axonops/axonops-ansible-collection log --oneline -15)",
+      "Bash(git -C /Users/sergio.rua/BitBucket/axonops/axonops-ansible-collection branch -a)",
+      "WebFetch(domain:docs.axonops.com)",
+      "WebFetch(domain:axonops.com)",
+      "Bash(git -C /Users/sergio.rua/BitBucket/axonops/axonops-ansible-collection status)",
+      "mcp__github__issue_write",
+      "mcp__plugin_github_github__issue_write",
+      "Bash(ANSIBLE_ROLES_PATH=/Users/sergio.rua/BitBucket/axonops/axonops-ansible-collection/roles molecule -v converge -s validate)",
+      "mcp__github__issue_read",
+      "Bash(python3 -c ':*)",
+      "Bash(python3)",
+      "mcp__plugin_github_github__issue_read",
+      "Bash(git checkout:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

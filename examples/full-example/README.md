@@ -103,7 +103,7 @@ This example is pre-configured for a `dev-01` environment. To deploy it:
     ```
 
 3.  **Deploy**:
-    The `Makefile` defaults to the `dev-01` environment and the `root` user. You 
+    The `Makefile` defaults to the `dev-01` environment and the `root` user. You
     ```bash
     export ENVIRONMENT=dev-01 # change environment if you need
     export INVENTORY=inventories/${ENVIRONMENT}/hosts.ini
@@ -251,7 +251,7 @@ The `make alerts` command executes the [alerts.yml](alerts.yml) playbook. This p
 3.  Loads and merges all `.yml` configuration files from `alerts-config/<org_name>/<cluster_name>/`, allowing cluster-specific overrides.
 4.  Passes these configurations as variables to the `axonops.axonops.alerts` role, which communicates with the AxonOps API to apply the settings.
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > Before you can use this playbook, you will need to create the directories `alerts-config/<org_name>/` and `alerts-config/<org_name>/<cluster_name>/` using the examples provided **
 
 ### Configuration Structure (`alerts-config`)
