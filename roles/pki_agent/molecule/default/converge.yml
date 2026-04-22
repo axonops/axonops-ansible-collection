@@ -12,7 +12,8 @@
         remote_src: true
 
     - name: Start OpenBao dev server
-      ansible.builtin.command: "/tmp/bao server -dev -dev-root-token-id=molecule-root-token -dev-listen-address=0.0.0.0:8200"
+      ansible.builtin.command: |
+        ps -ef | grep '/tmp/bao server' || nohup /tmp/bao server -dev -dev-root-token-id=molecule-root-token -dev-listen-address=0.0.0.0:8200 > /tmp/bao.log 2>&1
       async: 3600
       poll: 0
 
