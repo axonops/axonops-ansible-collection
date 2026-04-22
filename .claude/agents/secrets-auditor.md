@@ -1,1 +1,0 @@
-../../shared/agents/secrets-auditor.md
