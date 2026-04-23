@@ -6,13 +6,13 @@
 
 - name: reload systemd
   systemd:
-    daemon_reload: yes
+    daemon_reload: true
 
 - name: Restart axon-agent
   systemd:
     name: axon-agent
     state: restarted
-    daemon_reload: yes
+    daemon_reload: true
 
 - name: Restart Cassandra
   ansible.builtin.systemd:

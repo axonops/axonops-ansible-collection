@@ -1,0 +1,40 @@
+---
+dependency:
+  name: galaxy
+  options:
+    ignore-errors: true
+driver:
+  name: docker
+platforms:
+  - name: ${MOLECULE_INSTANCE_NAME:-"pki-agent"}
+    image: "geerlingguy/docker-${MOLECULE_DISTRO:-rockylinux9}-ansible:latest"
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    networks:
+      - name: pki-net
+  - name: ${MOLECULE_BAO_INSTANCE_NAME:-"openbao-dev"}
+    image: "geerlingguy/docker-${MOLECULE_DISTRO:-rockylinux9}-ansible:latest"
+    env:
+      BAO_DEV_ROOT_TOKEN_ID: molecule-root-token
+      BAO_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    networks:
+      - name: pki-net
+
+provisioner:
+  name: ansible
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+  env:
+    VAULT_ADDR: "http://openbao-dev:8200"
+    VAULT_TOKEN: molecule-root-token

@@ -1,0 +1,57 @@
+---
+# Package version to install (empty string = latest from repo)
+pki_agent_version: ""
+
+# Install method: "pkg" (OS package manager) or "binary" (direct download)
+pki_agent_install_method: pkg
+
+# OpenBao server URL — REQUIRED
+pki_agent_addr: ""
+
+# OpenBao namespace (optional)
+pki_agent_namespace: ""
+
+# Directories
+pki_agent_config_dir: /etc/openbao-agent.d
+pki_agent_data_dir: /var/lib/openbao-agent
+pki_agent_log_dir: /var/log/openbao-agent
+
+# System user / group created for the agent daemon
+pki_agent_user: openbao-agent
+pki_agent_group: openbao-agent
+
+# Authentication method: "approle" or "token"
+pki_agent_auto_auth_method: approle
+
+# AppRole credentials — required when pki_agent_auto_auth_method == "approle"
+pki_agent_approle_role_id: ""
+# Provide exactly one of these two:
+pki_agent_approle_secret_id: ""       # inline value
+pki_agent_approle_secret_id_file: ""  # path to file containing the secret_id
+
+# Token — required when pki_agent_auto_auth_method == "token"
+pki_agent_token: ""
+
+# List of certificates to manage.
+# Each entry supports:
+#   name            (str, required) — logical label used to name the template block
+#   pki_mount       (str, required) — PKI secrets engine mount path
+#   pki_role        (str, required) — PKI role name
+#   common_name     (str, required) — certificate CN
+#   alt_names       (str, default "")  — comma-separated SANs; omitted when empty
+#   ip_sans         (str, default "")  — comma-separated IP SANs; omitted when empty
+#   ttl             (str, default "72h")
+#   cert_path       (str, required) — destination path for cert + CA chain
+#   key_path        (str, required) — destination path for private key
+#   ca_path         (str, default "")  — destination for issuing CA cert; omitted when empty
+#   cert_owner      (str, default "root")
+#   cert_group      (str, default "root")
+#   cert_mode       (str, default "0640")
+#   key_mode        (str, default "0600")
+#   reload_command  (str, default "")  — command to run after cert is rendered; omitted when empty
+#   reload_timeout  (str, default "5s")
+pki_agent_certificates: []
+
+# Systemd service state
+pki_agent_service_enabled: true
+pki_agent_service_state: started

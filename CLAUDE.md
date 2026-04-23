@@ -21,6 +21,8 @@ Run the **issue-writer** agent. Every issue must have: summary, detailed require
 
 Run the **docs-writer** agent to update role READMEs, examples, and any user-facing documentation affected by the change. A PR must not be created until documentation is current.
 
+When a new role is added or an existing role is renamed/removed, `README.md` (root) MUST be updated to list it under the correct section in the **Role Documentation** table. The `docs/roles/README.md` index must also be kept in sync.
+
 ### After completing any feature:
 
 1. **code-reviewer** — on all changed role files
