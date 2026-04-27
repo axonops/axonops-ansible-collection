@@ -28,6 +28,7 @@ jobs:
           - rockylinux10
           - ubuntu2204
           - ubuntu2404
+          - ubuntu2604
           - debian12
           - debian13
         scenario:
