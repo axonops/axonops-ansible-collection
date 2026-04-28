@@ -6,63 +6,6 @@
 
 axonops_alert_rules:
 
-######## JVM ALERTS (all components) ########
-
-- name: JVM Heap Utilization High
-  dashboard: System
-  chart: JVM Heap Utilization
-  operator: '>='
-  warning_value: 80
-  critical_value: 90
-  duration: 5m
-  description: JVM heap usage is high. Increase -Xmx or investigate memory leaks in custom interceptors or serialisers.
-
-- name: JVM GC Time High
-  dashboard: System
-  chart: Time Spent On GC Per Minute - G1_Young
-  operator: '>='
-  warning_value: 30
-  critical_value: 60
-  duration: 5m
-  description: JVM is spending excessive time in garbage collection. Indicates heap pressure. Tune -XX:MaxGCPauseMillis=20 and review heap sizing (4-8 GB recommended for brokers).
-
-- name: JVM GC Rate High
-  dashboard: System
-  chart: GC Count rate per sec - G1_Young
-  operator: '>='
-  warning_value: 5
-  critical_value: 20
-  duration: 5m
-  description: High GC frequency indicates heap pressure. Review object allocation rates and increase -Xmx if sustained.
-
-- name: JVM Thread Count High
-  dashboard: System
-  chart: JVM Thread Count
-  operator: '>='
-  warning_value: 800
-  critical_value: 1200
-  duration: 10m
-  description: Unusually high thread count may indicate thread leaks in custom interceptors or connectors.
-
-- name: JVM File Descriptors High
-  dashboard: System
-  chart: "% File Descriptors Allocated"
-  operator: '>='
-  warning_value: 70
-  critical_value: 85
-  duration: 10m
-  description: Kafka opens one file descriptor per log segment. Exhausting the OS limit causes broker failure. Increase ulimit -n (recommended 100000+).
-
-- name: JVM CPU Utilization High
-  dashboard: System
-  chart: JVM Utilization
-  operator: '>='
-  warning_value: 80
-  critical_value: 95
-  duration: 5m
-  description: Sustained JVM CPU saturation indicates broker overload. Check request handler idle percent and partition distribution.
-
-
 ######## KAFKA CLUSTER HEALTH — MUST ALERT ########
 # These three alerts are the minimum every Kafka cluster must have.
 
