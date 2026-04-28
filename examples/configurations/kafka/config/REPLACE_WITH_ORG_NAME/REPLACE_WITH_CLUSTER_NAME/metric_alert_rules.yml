@@ -1,0 +1,7 @@
+######## Kafka Cluster-Specific Metric Alert Overrides ########
+# Add cluster-specific metric alert rules here.
+# These are APPENDED to the org-level rules in config/<org>/metric_alert_rules.yml
+# Use this file to tune thresholds, add cluster-specific alerts, or re-define
+# org-level rules with different values for this cluster only.
+
+axonops_alert_rules: []
