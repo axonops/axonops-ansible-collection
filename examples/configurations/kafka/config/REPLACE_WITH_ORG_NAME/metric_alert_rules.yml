@@ -11,7 +11,7 @@ axonops_alert_rules:
 
 - name: No Active Controller
   dashboard: Kafka Overview
-  chart: Active Controllers
+  chart: Active Controller
   operator: '<'
   warning_value: 1
   critical_value: 1
@@ -20,7 +20,7 @@ axonops_alert_rules:
 
 - name: Multiple Active Controllers
   dashboard: Kafka Overview
-  chart: Active Controllers
+  chart: Active Controller
   operator: '>='
   warning_value: 2
   critical_value: 2
@@ -28,7 +28,7 @@ axonops_alert_rules:
   description: More than one active controller — split-brain condition. Page immediately.
 
 - name: Offline Partitions
-  dashboard: Kafka Overview
+  dashboard: Kafka Replication
   chart: Offline Partitions
   operator: '>='
   warning_value: 1
@@ -66,15 +66,6 @@ axonops_alert_rules:
   duration: 1m
   description: Partitions below min.insync.replicas. Producers using acks=all will receive NotEnoughReplicas and writes will fail.
 
-- name: Under Min ISR Partitions (Overview)
-  dashboard: Kafka Overview
-  chart: Under min insync replicas partitions
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 1m
-  description: Cluster-level view of partitions below min.insync.replicas. Producers using acks=all will receive NotEnoughReplicas.
-
 - name: ISR Shrinks High
   dashboard: Kafka Replication
   chart: IsrShrinks per Sec by Host
@@ -86,15 +77,6 @@ axonops_alert_rules:
 
 
 ######## KRAFT CONTROLLER ########
-
-- name: Fenced Broker Count
-  dashboard: Kafka Controller
-  chart: Fenced Broker Count
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 5m
-  description: One or more brokers are fenced (registered but not active). Fenced brokers do not serve traffic. Investigate why the broker failed to unfence.
 
 - name: Controller Metadata Error Rate
   dashboard: Kafka Controller
@@ -177,18 +159,9 @@ axonops_alert_rules:
 
 ######## KAFKA CONNECT ########
 
-- name: Connect Connector Failed
-  dashboard: Connect Workers
-  chart: Connector Failed
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 5m
-  description: One or more connectors are in FAILED state. Connect does NOT automatically restart failed connectors. Restart via REST API POST /connectors/{name}/restart.
-
 - name: Connect Tasks Failed
-  dashboard: Connect Overview
-  chart: Connector Tasks Failed
+  dashboard: Connect Workers
+  chart: Connector Failed Tasks
   operator: '>='
   warning_value: 1
   critical_value: 1
@@ -242,7 +215,7 @@ axonops_alert_rules:
 
 - name: Connect Workers Rebalancing
   dashboard: Connect Overview
-  chart: Connectors Rebalancing
+  chart: Rebalances
   operator: '>='
   warning_value: 1
   critical_value: 1
