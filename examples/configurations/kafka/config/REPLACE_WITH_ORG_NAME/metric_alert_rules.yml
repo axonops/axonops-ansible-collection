@@ -1,7 +1,6 @@
 ######## Kafka Monitoring Metric Alert Rules ########
 # Comprehensive alert rule set for Apache Kafka clusters monitored by AxonOps.
-# Covers: JVM, Broker cluster health, replication, KRaft controller, network,
-# storage, Kafka Connect, and consumer lag.
+# All dashboard and chart names verified against AxonOps Kafka dashboard panels.
 # These rules are applied to ALL clusters in the organisation.
 # Override or extend per-cluster in config/<org>/<cluster>/metric_alert_rules.yml
 
@@ -9,63 +8,63 @@ axonops_alert_rules:
 
 ######## JVM ALERTS (all components) ########
 
-- name: JVM Heap Usage High
+- name: JVM Heap Utilization High
   dashboard: System
-  chart: JVM Heap Memory Usage
+  chart: JVM Heap Utilization
   operator: '>='
   warning_value: 80
   critical_value: 90
   duration: 5m
-  description: JVM heap usage is high. Increase -Xmx or investigate memory leaks.
+  description: JVM heap usage is high. Increase -Xmx or investigate memory leaks in custom interceptors or serialisers.
 
-- name: JVM Full GC Occurred
+- name: JVM GC Time High
   dashboard: System
-  chart: JVM GC Old Generation Collection Count
+  chart: Time Spent On GC Per Minute - G1_Young
   operator: '>='
-  warning_value: 1
-  critical_value: 5
+  warning_value: 30
+  critical_value: 60
   duration: 5m
-  description: Full (stop-the-world) GC event occurred. Investigate heap sizing. Expected to be rare with G1GC.
+  description: JVM is spending excessive time in garbage collection. Indicates heap pressure. Tune -XX:MaxGCPauseMillis=20 and review heap sizing (4-8 GB recommended for brokers).
 
-- name: JVM GC Pause Duration High
+- name: JVM GC Rate High
   dashboard: System
-  chart: JVM GC Pause Duration
+  chart: GC Count rate per sec - G1_Young
   operator: '>='
-  warning_value: 1000
-  critical_value: 5000
+  warning_value: 5
+  critical_value: 20
   duration: 5m
-  description: GC pause exceeding 1s can trigger consumer rebalances and ISR shrinkage. Tune -XX:MaxGCPauseMillis=20.
+  description: High GC frequency indicates heap pressure. Review object allocation rates and increase -Xmx if sustained.
 
-- name: JVM Thread Deadlock Detected
+- name: JVM Thread Count High
   dashboard: System
-  chart: JVM Thread Deadlock Count
+  chart: JVM Thread Count
   operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 1m
-  description: JVM threads are deadlocked. Capture a thread dump (jstack) and restart the affected process.
+  warning_value: 800
+  critical_value: 1200
+  duration: 10m
+  description: Unusually high thread count may indicate thread leaks in custom interceptors or connectors.
 
-- name: JVM File Descriptor Usage High
+- name: JVM File Descriptors High
   dashboard: System
-  chart: JVM Open File Descriptors
+  chart: "% File Descriptors Allocated"
   operator: '>='
   warning_value: 70
   critical_value: 85
   duration: 10m
   description: Kafka opens one file descriptor per log segment. Exhausting the OS limit causes broker failure. Increase ulimit -n (recommended 100000+).
 
-- name: JVM Process CPU High
+- name: JVM CPU Utilization High
   dashboard: System
-  chart: JVM Process CPU Load
+  chart: JVM Utilization
   operator: '>='
   warning_value: 80
   critical_value: 95
   duration: 5m
-  description: Sustained CPU saturation on the JVM process. Check request handler idle percent and partition distribution.
+  description: Sustained JVM CPU saturation indicates broker overload. Check request handler idle percent and partition distribution.
 
 
 ######## KAFKA CLUSTER HEALTH — MUST ALERT ########
-# These three alerts are the minimum set every Kafka cluster must have.
+# These three alerts are the minimum every Kafka cluster must have.
 
 - name: No Active Controller
   dashboard: Kafka Overview
@@ -95,7 +94,7 @@ axonops_alert_rules:
   description: Partitions with no active leader are unreadable and unwritable. Restore the failed broker.
 
 - name: Unclean Leader Elections
-  dashboard: Kafka Replication
+  dashboard: Kafka Overview
   chart: Unclean Leader Elections Per Sec
   operator: '>='
   warning_value: 1
@@ -124,41 +123,23 @@ axonops_alert_rules:
   duration: 1m
   description: Partitions below min.insync.replicas. Producers using acks=all will receive NotEnoughReplicas and writes will fail.
 
-- name: At Min ISR Partitions
-  dashboard: Kafka Replication
-  chart: At Min ISR Partitions
+- name: Under Min ISR Partitions (Overview)
+  dashboard: Kafka Overview
+  chart: Under min insync replicas partitions
   operator: '>='
   warning_value: 1
-  critical_value: 5
-  duration: 5m
-  description: Partitions at exactly min.insync.replicas. One more broker failure would block writes. Use as early warning.
+  critical_value: 1
+  duration: 1m
+  description: Cluster-level view of partitions below min.insync.replicas. Producers using acks=all will receive NotEnoughReplicas.
 
-- name: ISR Shrink Rate High
+- name: ISR Shrinks High
   dashboard: Kafka Replication
-  chart: ISR Shrink Rate
+  chart: IsrShrinks per Sec by Host
   operator: '>='
   warning_value: 1
   critical_value: 5
   duration: 5m
   description: Replicas are falling out of sync. Expected value is 0 in steady state. Sustained shrinks indicate disk I/O or network degradation.
-
-- name: Failed ISR Updates
-  dashboard: Kafka Replication
-  chart: Failed ISR Updates Per Sec
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 5m
-  description: ISR update to the controller failed. Expected value is 0. Indicates controller communication issues.
-
-- name: Offline Replica Count
-  dashboard: Kafka Replication
-  chart: Offline Replica Count
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 1m
-  description: One or more replicas are offline. Investigate the broker(s) hosting those replicas.
 
 
 ######## KRAFT CONTROLLER ########
@@ -170,18 +151,9 @@ axonops_alert_rules:
   warning_value: 1
   critical_value: 1
   duration: 5m
-  description: One or more brokers are fenced (registered but not active). Fenced brokers do not serve traffic.
+  description: One or more brokers are fenced (registered but not active). Fenced brokers do not serve traffic. Investigate why the broker failed to unfence.
 
-- name: Timed Out Broker Heartbeats
-  dashboard: Kafka Controller
-  chart: Timed Out Broker Heartbeat Count
-  operator: '>='
-  warning_value: 1
-  critical_value: 5
-  duration: 5m
-  description: Broker heartbeats are timing out on the active controller. Indicates network issues between broker and controller nodes.
-
-- name: Controller Metadata Errors
+- name: Controller Metadata Error Rate
   dashboard: Kafka Controller
   chart: Metadata Error Rate
   operator: '>='
@@ -190,59 +162,23 @@ axonops_alert_rules:
   duration: 1m
   description: Errors during metadata log processing on the controller. Investigate immediately.
 
-- name: Broker Metadata Load Errors
+- name: Raft Commit Latency High
   dashboard: Kafka Controller
-  chart: Broker Metadata Load Error Count
+  chart: Commit Latency Avg
   operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 1m
-  description: The BrokerMetadataListener encountered errors loading the metadata log. Risk of broker state inconsistency.
-
-- name: Broker Metadata Apply Errors
-  dashboard: Kafka Controller
-  chart: Broker Metadata Apply Error Count
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 1m
-  description: The BrokerMetadataPublisher failed to apply a new MetadataImage. Indicates a serious broker state issue.
-
-- name: Broker Metadata Lag High
-  dashboard: Kafka Controller
-  chart: Broker Last Applied Record Lag Ms
-  operator: '>='
-  warning_value: 10000
-  critical_value: 30000
+  warning_value: 500
+  critical_value: 2000
   duration: 5m
-  description: Brokers are falling behind applying metadata records from the controller. May indicate slow disk or network between broker and controllers.
-
-- name: Metadata Snapshot Age High
-  dashboard: Kafka Controller
-  chart: Latest Snapshot Generated Age Ms
-  operator: '>='
-  warning_value: 1800000
-  critical_value: 3600000
-  duration: 15m
-  description: No new metadata snapshot generated in over an hour. Long periods without snapshots increase startup recovery time.
+  description: Average commit latency for the raft log is high, indicating quorum throughput degradation.
 
 - name: Preferred Replica Imbalance
-  dashboard: Kafka Controller
-  chart: Preferred Replica Imbalance Count
+  dashboard: Kafka Overview
+  chart: Preferred Replica Imbalance
   operator: '>='
   warning_value: 1
   critical_value: 10
   duration: 15m
-  description: Partition leaders are not distributed optimally. Run preferred replica election or enable auto.leader.rebalance.enable.
-
-- name: Leader Election Rate High
-  dashboard: Kafka Controller
-  chart: Leader Election Rate
-  operator: '>='
-  warning_value: 1
-  critical_value: 5
-  duration: 5m
-  description: Leader elections occurring indicates broker failures or instability. Expected to be 0 in steady state.
+  description: Partition leaders are not distributed optimally across brokers. Run preferred replica election or enable auto.leader.rebalance.enable.
 
 
 ######## NETWORK & REQUEST PROCESSING ########
@@ -254,7 +190,7 @@ axonops_alert_rules:
   warning_value: 30
   critical_value: 10
   duration: 5m
-  description: Network I/O threads are saturated. Increase num.network.threads or scale the broker.
+  description: Network I/O threads are saturated. Normal range is above 30%. Increase num.network.threads or scale the broker.
 
 - name: Request Handler Avg Idle Percent Low
   dashboard: Kafka Performance
@@ -263,7 +199,7 @@ axonops_alert_rules:
   warning_value: 30
   critical_value: 10
   duration: 5m
-  description: Request handler threads are saturated. Increase num.io.threads or reduce per-broker partition count.
+  description: Request handler threads are saturated. Normal range is above 30%. Increase num.io.threads or reduce per-broker partition count.
 
 - name: Request Queue Size High
   dashboard: Kafka Performance
@@ -272,190 +208,124 @@ axonops_alert_rules:
   warning_value: 200
   critical_value: 500
   duration: 5m
-  description: Requests backing up in the network queue, indicating handler saturation.
+  description: Requests are backing up in the network queue, indicating handler saturation. Correlate with request handler idle percent.
 
-- name: Produce Request P99 Latency High
+- name: Request Total Time High
   dashboard: Kafka Performance
-  chart: Produce Request Total Time Ms 99th Percentile
+  chart: Total time (produce/fetch) $percentile
   operator: '>='
   warning_value: 500
   critical_value: 1000
   duration: 5m
-  description: P99 produce latency above 500ms indicates broker pressure. Above 1s is critical.
-
-- name: Fetch Consumer Request P99 Latency High
-  dashboard: Kafka Performance
-  chart: Fetch Consumer Request Total Time Ms 99th Percentile
-  operator: '>='
-  warning_value: 1000
-  critical_value: 3000
-  duration: 5m
-  description: Fetch latency above 1s suggests disk I/O pressure or broker overload.
-
-- name: Failed Produce Requests
-  dashboard: Kafka Performance
-  chart: Failed Produce Requests Per Sec
-  operator: '>='
-  warning_value: 1
-  critical_value: 10
-  duration: 5m
-  description: Produce requests are failing. Investigate min.insync.replicas violations, ACL errors, or quota throttling.
-
-- name: Failed Fetch Requests
-  dashboard: Kafka Performance
-  chart: Failed Fetch Requests Per Sec
-  operator: '>='
-  warning_value: 1
-  critical_value: 10
-  duration: 5m
-  description: Fetch requests failing at the broker level. Check for NotLeaderForPartition errors or authorization issues.
-
-
-######## THROUGHPUT & MESSAGE VALIDATION ########
-
-- name: Invalid Magic Number Records
-  dashboard: Kafka Performance
-  chart: Invalid Magic Number Records Per Sec
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 5m
-  description: Malformed record batches arriving at broker. Expected value is 0. Indicates corrupted data or mismatched client protocol version.
-
-- name: Invalid CRC Records
-  dashboard: Kafka Performance
-  chart: Invalid Message CRC Records Per Sec
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 5m
-  description: CRC checksum validation failures. Expected value is 0. Indicates data corruption in transit or on the producer side.
-
-- name: No-Key Compacted Topic Records
-  dashboard: Kafka Performance
-  chart: No Key Compacted Topic Records Per Sec
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 5m
-  description: Records without a key written to a compacted topic. Such records cannot be properly compacted.
+  description: P99 request latency above 500ms indicates broker pressure. Above 1s is critical.
 
 
 ######## STORAGE ########
 
-- name: Offline Log Directory Count
-  dashboard: Kafka Overview
-  chart: Offline Log Directory Count
+- name: Log Directories Offline
+  dashboard: Kafka Topics
+  chart: Log Directories Offline
   operator: '>='
   warning_value: 1
   critical_value: 1
   duration: 1m
   description: A log directory has gone offline (disk failure or filesystem unmount). Broker may still serve other partitions but data is unavailable on the failed directory.
 
-- name: Log Flush P99 Latency High
-  dashboard: Kafka Performance
-  chart: Log Flush Rate And Time Ms 99th Percentile
-  operator: '>='
-  warning_value: 100
-  critical_value: 500
-  duration: 5m
-  description: Disk flush latency above 100ms P99 indicates disk I/O pressure.
-
-- name: Disk Free Space Low
+- name: Disk Usage High
   dashboard: System
   chart: Disk % Usage $mountpoint
   operator: '>='
   warning_value: 75
   critical_value: 90
   duration: 15m
-  description: Kafka logs will consume all available disk space if retention is not well-configured. Review retention or expand capacity.
+  description: Kafka logs will consume all available disk space if retention is not well-configured. Review retention settings or expand capacity.
 
 
 ######## KAFKA CONNECT ########
 
-- name: Connect Task Startup Failure Rate High
-  dashboard: Kafka Connect
-  chart: Task Startup Failure Percentage
+- name: Connect Connector Failed
+  dashboard: Connect Workers
+  chart: Connector Failed
   operator: '>='
   warning_value: 1
   critical_value: 1
   duration: 5m
-  description: Connect tasks are failing to start. Investigate connector configuration and resource availability.
+  description: One or more connectors are in FAILED state. Connect does NOT automatically restart failed connectors. Restart via REST API POST /connectors/{name}/restart.
 
-- name: Connect Connector Startup Failure Rate High
-  dashboard: Kafka Connect
-  chart: Connector Startup Failure Percentage
+- name: Connect Tasks Failed
+  dashboard: Connect Overview
+  chart: Connector Tasks Failed
   operator: '>='
   warning_value: 1
   critical_value: 1
   duration: 5m
-  description: Connectors are failing during startup. Check connector config, plugin classpath, and credentials.
+  description: One or more connector tasks have failed. Connect does NOT automatically restart failed tasks. Restart via REST API POST /connectors/{name}/tasks/{id}/restart.
 
 - name: Connect Task Running Ratio Low
-  dashboard: Kafka Connect
-  chart: Task Running Ratio
+  dashboard: Connect Tasks
+  chart: Connector Task Running Ratio
   operator: '<'
   warning_value: 75
   critical_value: 50
   duration: 5m
-  description: A task is spending more than half its time not running (paused or backpressured).
+  description: A task is spending more than half its time not running (paused or backpressured). Investigate downstream system performance.
 
-- name: Connect Offset Commit Failure Rate High
-  dashboard: Kafka Connect
-  chart: Offset Commit Failure Percentage
-  operator: '>='
-  warning_value: 5
-  critical_value: 20
+- name: Connect Task Commit Success Rate Low
+  dashboard: Connect Tasks
+  chart: Connector Task Commit Success %
+  operator: '<'
+  warning_value: 95
+  critical_value: 80
   duration: 5m
-  description: More than 5% of offset commit attempts are failing. Indicates consumer group instability or timeout issues.
+  description: Offset commit success rate is low. Indicates consumer group instability or timeout issues. Increase session.timeout.ms or reduce max.poll.records.
 
 - name: Connect DLQ Produce Failures
-  dashboard: Kafka Connect
-  chart: Dead Letter Queue Produce Failures
+  dashboard: Connect Tasks
+  chart: Deadletter Produce Failures
   operator: '>='
   warning_value: 1
   critical_value: 1
   duration: 5m
-  description: Failed writes to the dead letter queue mean error records are being silently lost. Check DLQ topic configuration.
+  description: Failed writes to the dead letter queue mean error records are being silently lost. Check DLQ topic configuration and broker connectivity.
 
 - name: Connect Record Errors High
-  dashboard: Kafka Connect
-  chart: Total Record Errors
+  dashboard: Connect Tasks
+  chart: Record Errors
   operator: '>='
   warning_value: 1
   critical_value: 100
   duration: 5m
   description: Record processing errors are accumulating. Investigate upstream data quality or schema compatibility.
 
-- name: Connect Failed Authentication Rate
-  dashboard: Kafka Connect
-  chart: Failed Authentication Rate
+- name: Connect Failed Authentication
+  dashboard: Connect Overview
+  chart: Failed Authentication
   operator: '>='
   warning_value: 1
   critical_value: 10
   duration: 5m
   description: Connect worker cannot authenticate to Kafka. Check SASL/SSL configuration and credentials.
 
-- name: Connect Worker Rebalancing
-  dashboard: Kafka Connect
-  chart: Worker Rebalancing State
+- name: Connect Workers Rebalancing
+  dashboard: Connect Overview
+  chart: Connectors Rebalancing
   operator: '>='
   warning_value: 1
   critical_value: 1
   duration: 5m
-  description: Connect worker group is stuck in rebalancing. May indicate a failed worker or incompatible connector config.
+  description: Connect worker group is in rebalancing state. Sustained rebalancing (>5 min) may indicate a failed worker or incompatible connector config.
 
 
-######## CONSUMER LAG ########
+######## CONSUMER GROUPS ########
 
-- name: Consumer Lag High
-  dashboard: Kafka Overview
-  chart: Consumer Lag Max
+- name: Consumer Group Lag High
+  dashboard: Consumer Groups
+  chart: Consumer Group Lag
   operator: '>='
   warning_value: 10000
   critical_value: 100000
   duration: 5m
-  description: Consumer group is significantly behind. Investigate consumer throughput, partition distribution, or broker pressure.
+  description: Consumer group is significantly behind the latest offset. Investigate consumer throughput, partition distribution, or broker pressure.
 
 
 ######## SYSTEM ########
@@ -512,4 +382,4 @@ axonops_alert_rules:
   warning_value: 10
   critical_value: 50
   duration: 15m
-  description: Failed authentication requests against Kafka
+  description: Failed authentication requests against Kafka. Check SASL/SSL configuration and client credentials.
