@@ -13,8 +13,8 @@ axonops_alert_rules:
   dashboard: Kafka Overview
   chart: Active Controller
   operator: '>='
-  warning_value: 2
-  critical_value: 2
+  warning_value: 1
+  critical_value: 1
   duration: 1m
   description: More than one active controller — split-brain condition. Page immediately.
 
@@ -126,16 +126,6 @@ axonops_alert_rules:
   duration: 5m
   description: Requests are backing up in the network queue, indicating handler saturation. Correlate with request handler idle percent.
 
-- name: Request Total Time High
-  dashboard: Kafka Performance
-  chart: Total time (produce/fetch) $percentile
-  operator: '>='
-  warning_value: 500
-  critical_value: 1000
-  duration: 5m
-  description: P99 request latency above 500ms indicates broker pressure. Above 1s is critical.
-
-
 ######## KAFKA CONNECT ########
 
 - name: Connect Connector Failed
@@ -209,15 +199,6 @@ axonops_alert_rules:
   critical_value: 5
   duration: 15m
   description: Connect worker group is rebalancing repeatedly. A single rebalance is normal on worker join/leave; sustained or frequent rebalances (>15 min) indicate a failed worker or incompatible connector config.
-
-- name: Connect Failed Rebalances
-  dashboard: Connect Overview
-  chart: Failed Rebalances
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 5m
-  description: Connect worker group rebalance failed to complete. More severe than a rebalance in progress — indicates split-brain or incompatible connector configuration during reconfiguration.
 
 - name: Connect Record Skipped High
   dashboard: Connect Tasks
