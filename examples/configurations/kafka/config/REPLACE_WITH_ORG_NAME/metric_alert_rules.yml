@@ -165,15 +165,6 @@ axonops_alert_rules:
 
 ######## STORAGE ########
 
-- name: Log Directories Offline
-  dashboard: Kafka Topics
-  chart: Log Directories Offline
-  operator: '>='
-  warning_value: 1
-  critical_value: 1
-  duration: 1m
-  description: A log directory has gone offline (disk failure or filesystem unmount). Broker may still serve other partitions but data is unavailable on the failed directory.
-
 - name: Disk Usage High
   dashboard: System
   chart: Disk % Usage $mountpoint
