@@ -3,7 +3,7 @@ Create a new GitHub release of this Ansible Collection following the steps in or
 - Find out the next tag number to use:
 
 ```sh
-git tag | sort -V
+git tag | sort -V | tail -1
 ```
 
 - Unless otherwise stated, use the next minor version. For example:
