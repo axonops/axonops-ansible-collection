@@ -9,15 +9,6 @@ axonops_alert_rules:
 ######## KAFKA CLUSTER HEALTH — MUST ALERT ########
 # These three alerts are the minimum every Kafka cluster must have.
 
-- name: No Active Controller
-  dashboard: Kafka Overview
-  chart: Active Controller
-  operator: '<'
-  warning_value: 1
-  critical_value: 1
-  duration: 1m
-  description: No active controller exists. The cluster cannot elect partition leaders. Page immediately.
-
 - name: Multiple Active Controllers
   dashboard: Kafka Overview
   chart: Active Controller
