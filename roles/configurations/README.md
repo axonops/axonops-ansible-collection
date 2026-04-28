@@ -37,17 +37,27 @@ AXONOPS_PASSWORD: secret
 
 ## Kafka Alert Pack
 
-A comprehensive set of default Kafka alert rules is provided in `examples/configurations/kafka/`. It covers:
+A comprehensive set of default Kafka alert rules is provided in `examples/configurations/kafka/`. The pack is split into two files per scope level:
 
-- **JVM** — heap usage, GC pauses, thread deadlocks, file descriptor exhaustion
-- **Broker cluster health** — active controller count, offline partitions, unclean leader elections (the three must-alert metrics)
-- **Replication** — under-replicated partitions, ISR shrink rate, offline replicas, min-ISR violations
-- **KRaft controller** — fenced brokers, metadata errors, broker metadata lag, snapshot age
-- **Network & request processing** — idle percent thresholds, P99 produce/fetch latency, failed requests
-- **Storage** — offline log directories, log flush latency, disk usage
-- **Kafka Connect** — task/connector startup failures, offset commit failures, DLQ failures, authentication errors
-- **Consumer lag** — consumer group lag max
-- **Log-based alerts** — broker `server.log`, KRaft `controller.log`, GC log, Connect `connect.log`, authorizer log
+**Metric alert rules** (`metric_alert_rules.yml`) — 31 rules covering:
+
+- **Broker cluster health** — active controller count, offline partitions, unclean leader elections (the minimum three alerts every cluster must have)
+- **Replication** — under-replicated partitions, ISR shrink rate, under-min-ISR partitions
+- **KRaft controller** — metadata error rate, raft commit latency, preferred replica imbalance
+- **Network & request processing** — network and request handler idle percent, request queue depth, request total time
+- **Storage** — disk usage percentage
+- **Kafka Connect** — connector/task failures, task running ratio, offset commit success rate, DLQ produce failures, record errors and skips, authentication failures, rebalance failures
+- **Consumer groups** — consumer group lag
+- **System** — CPU usage, disk usage, I/O wait, memory usage, authentication failure rate
+
+**Log-based alert rules** (`log_alert_rules.yml`) — 31 rules covering:
+
+- **Broker startup and availability** — startup failure, OOM, FATAL errors, storage exceptions, data directory failures, log flush I/O errors, disk lock errors (`server.log`)
+- **Replication and partition health** — under-replicated partitions, ISR shrink events (`server.log`, `state-change.log`)
+- **Security and authentication** — authorisation failures (`kafka-authorizer.log`), authentication failures (`server.log`)
+- **JVM GC** — full GC events, long GC pauses, G1GC mark abort, OOM (`kafkaServer-gc.log`)
+- **KRaft controller** — no-quorum leader, FATAL and ERROR conditions, OOM, quorum instability, metadata load errors (`controller.log`)
+- **Kafka Connect** — worker FATAL errors, startup failures, task FAILED transitions, offset commit failures, deserialisation errors, REST API unreachable, broker connection loss (`connect.log`)
 
 ### Quick Start
 
