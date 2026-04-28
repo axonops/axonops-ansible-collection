@@ -20,7 +20,6 @@ axonops_log_alert_rule:
   content: \"Fatal error during KafkaServer startup\"
   source: "/var/log/kafka/server.log"
   description: Broker failed to start. Check port conflicts, config errors, or permissions. Verify server.properties and listener ports.
-  present: true
 
 - name: Broker JVM OOM
   warning_value: 1
@@ -29,7 +28,6 @@ axonops_log_alert_rule:
   content: \"OutOfMemoryError\"
   source: "/var/log/kafka/server.log"
   description: JVM heap exhausted. Increase -Xmx, review message sizes, check for memory leaks in custom interceptors or serialisers.
-  present: true
 
 - name: Broker FATAL Error
   warning_value: 1
@@ -38,7 +36,6 @@ axonops_log_alert_rule:
   content: '] FATAL '
   source: "/var/log/kafka/server.log"
   description: Fatal condition causing broker abort. Investigate immediately; check full stack trace.
-  present: true
 
 - name: Kafka Storage Exception
   warning_value: 1
@@ -47,7 +44,6 @@ axonops_log_alert_rule:
   content: \"KafkaStorageException\"
   source: "/var/log/kafka/server.log"
   description: Disk-level failure. Check disk health, SMART status, and filesystem mount state.
-  present: true
 
 - name: Data Directory Failure
   warning_value: 1
@@ -56,7 +52,6 @@ axonops_log_alert_rule:
   content: \"Failed to create or validate data directory\"
   source: "/var/log/kafka/server.log"
   description: Kafka cannot access a log directory. Verify directory exists, permissions are correct, and the filesystem is mounted and writable.
-  present: true
 
 - name: Log Flush IO Error
   warning_value: 1
@@ -65,7 +60,6 @@ axonops_log_alert_rule:
   content: \"Error while flushing log\"
   source: "/var/log/kafka/server.log"
   description: Typically java.io.IOException — No space left on device. Expand storage, reduce retention, or delete unused topics.
-  present: true
 
 - name: Disk Lock Error
   warning_value: 1
@@ -74,7 +68,6 @@ axonops_log_alert_rule:
   content: \"Disk error while locking directory\"
   source: "/var/log/kafka/server.log"
   description: Another process is holding the data directory lock or the filesystem is read-only. Ensure no duplicate Kafka processes are running.
-  present: true
 
 
 ######## KAFKA BROKER — REPLICATION & PARTITION HEALTH ########
@@ -86,7 +79,6 @@ axonops_log_alert_rule:
   content: \"under replicated\"
   source: "/var/log/kafka/server.log"
   description: Partitions have fewer in-sync replicas than the replication factor. Risk of data loss if another broker fails.
-  present: true
 
 - name: ISR Shrunk
   warning_value: 3
@@ -95,7 +87,6 @@ axonops_log_alert_rule:
   content: \"ISR shrunk\"
   source: "/var/log/kafka/server.log"
   description: A replica fell behind and was removed from the ISR. Check the lagging broker's disk I/O, network latency, and resource utilisation.
-  present: true
 
 - name: ISR Shrunk (state-change log)
   warning_value: 3
@@ -104,7 +95,6 @@ axonops_log_alert_rule:
   content: \"Shrinking ISR from\"
   source: "/var/log/kafka/state-change.log"
   description: ISR shrink logged in state-change log. Indicates replication performance issues.
-  present: true
 
 - name: Offline Partition
   warning_value: 1
@@ -113,7 +103,6 @@ axonops_log_alert_rule:
   content: \"OfflinePartition\"
   source: "/var/log/kafka/state-change.log"
   description: A partition has no active leader. Restore the failed broker or trigger partition reassignment.
-  present: true
 
 
 ######## KAFKA BROKER — SECURITY & AUTHENTICATION ########
@@ -125,7 +114,6 @@ axonops_log_alert_rule:
   content: \"Authorization failed\"
   source: "/var/log/kafka/kafka-authorizer.log"
   description: A client request was denied by the ACL authoriser. If unexpected, investigate potential misconfiguration or security breach.
-  present: true
 
 - name: Authentication Failure
   warning_value: 1
@@ -134,7 +122,6 @@ axonops_log_alert_rule:
   content: \"Failed authentication\"
   source: "/var/log/kafka/server.log"
   description: Client failed SASL/mTLS authentication. Check client credentials, SASL configuration, and SCRAM user store.
-  present: true
 
 
 ######## KAFKA BROKER — JVM GC ########
@@ -146,7 +133,6 @@ axonops_log_alert_rule:
   content: \"Full GC\"
   source: "/var/log/kafka/kafkaServer-gc.log"
   description: Stop-the-world full GC occurred. If frequent, increase heap size. Kafka recommends G1GC with -XX:MaxGCPauseMillis=20.
-  present: true
 
 - name: Broker Long GC Pause
   warning_value: 1
@@ -155,7 +141,6 @@ axonops_log_alert_rule:
   content: 'GC.* pause .* [0-9]{4,}ms'
   source: "/var/log/kafka/kafkaServer-gc.log"
   description: GC pause exceeding 1s can cause consumer lag spikes and request timeouts. Tune JVM heap (4-8 GB recommended).
-  present: true
 
 - name: Broker G1GC Mark Abort
   warning_value: 1
@@ -164,7 +149,6 @@ axonops_log_alert_rule:
   content: \"concurrent-mark-abort\"
   source: "/var/log/kafka/kafkaServer-gc.log"
   description: G1GC marking cycle aborted due to heap pressure, often preceding an OOM. Review heap sizing immediately.
-  present: true
 
 - name: Broker GC OOM
   warning_value: 1
@@ -173,7 +157,6 @@ axonops_log_alert_rule:
   content: \"OutOfMemoryError\"
   source: "/var/log/kafka/kafkaServer-gc.log"
   description: JVM heap exhausted as detected in GC log. Increase -Xmx immediately.
-  present: true
 
 
 ######## KRAFT CONTROLLER — QUORUM & LEADER ELECTION ########
@@ -185,7 +168,6 @@ axonops_log_alert_rule:
   content: \"the leader is (none)\"
   source: "/var/log/kafka/controller.log"
   description: The KRaft quorum has no elected leader. The cluster cannot process metadata changes. Check connectivity between all controller nodes.
-  present: true
 
 - name: Controller FATAL Error
   warning_value: 1
@@ -194,7 +176,6 @@ axonops_log_alert_rule:
   content: '] FATAL '
   source: "/var/log/kafka/controller.log"
   description: Fatal condition in the controller process. Investigate the full stack trace immediately.
-  present: true
 
 - name: Controller ERROR
   warning_value: 3
@@ -203,7 +184,6 @@ axonops_log_alert_rule:
   content: '] ERROR '
   source: "/var/log/kafka/controller.log"
   description: Error in the controller log. Any error indicates a significant operational event.
-  present: true
 
 - name: Controller OOM
   warning_value: 1
@@ -212,7 +192,6 @@ axonops_log_alert_rule:
   content: \"OutOfMemoryError\"
   source: "/var/log/kafka/controller.log"
   description: Controller JVM heap exhausted. Increase controller heap — larger clusters require more memory for in-memory metadata.
-  present: true
 
 - name: Controller Quorum Instability
   warning_value: 3
@@ -221,7 +200,6 @@ axonops_log_alert_rule:
   content: \"Completed transition to Unattached\"
   source: "/var/log/kafka/controller.log"
   description: Controller is frequently losing its quorum attachment. May indicate network instability between controller nodes. A few occurrences per week can be normal but sustained frequency is not.
-  present: true
 
 - name: Controller Metadata Load Error
   warning_value: 1
@@ -230,7 +208,6 @@ axonops_log_alert_rule:
   content: \"MetadataLoadError\"
   source: "/var/log/kafka/controller.log"
   description: The BrokerMetadataListener encountered errors loading the metadata log. Data integrity risk; investigate immediately.
-  present: true
 
 
 ######## KAFKA CONNECT — WORKER HEALTH ########
@@ -242,7 +219,6 @@ axonops_log_alert_rule:
   content: '] FATAL '
   source: "/var/log/kafka/connect.log"
   description: The Connect worker process has encountered a fatal error. Restart the worker and investigate the root cause.
-  present: true
 
 - name: Connect Worker Startup Failure
   warning_value: 1
@@ -251,7 +227,6 @@ axonops_log_alert_rule:
   content: \"Failed to start worker\"
   source: "/var/log/kafka/connect.log"
   description: Worker failed to start, typically due to configuration errors. Validate connect-distributed.properties.
-  present: true
 
 
 ######## KAFKA CONNECT — CONNECTOR & TASK STATE ########
@@ -263,7 +238,6 @@ axonops_log_alert_rule:
   content: 'WorkerSinkTask.*FAILED'
   source: "/var/log/kafka/connect.log"
   description: A sink connector task has transitioned to FAILED state. Connect does NOT automatically restart failed tasks. Restart via REST API POST /connectors/{name}/tasks/{id}/restart.
-  present: true
 
 - name: Connect Source Task FAILED
   warning_value: 1
@@ -272,7 +246,6 @@ axonops_log_alert_rule:
   content: 'WorkerSourceTask.*FAILED'
   source: "/var/log/kafka/connect.log"
   description: A source connector task has transitioned to FAILED state. Connect does NOT automatically restart failed tasks. Restart via REST API POST /connectors/{name}/tasks/{id}/restart.
-  present: true
 
 - name: Connect Offset Commit Failure
   warning_value: 1
@@ -281,7 +254,6 @@ axonops_log_alert_rule:
   content: \"Failed to commit offsets\"
   source: "/var/log/kafka/connect.log"
   description: Offset commit failed, typically due to consumer group rebalance timeout. Increase session.timeout.ms or reduce max.poll.records.
-  present: true
 
 - name: Connect Deserialization Error
   warning_value: 1
@@ -290,7 +262,6 @@ axonops_log_alert_rule:
   content: \"DeserializationException\"
   source: "/var/log/kafka/connect.log"
   description: Schema or serialisation mismatch. Check schema registry configuration and producer schema compatibility settings.
-  present: true
 
 - name: Connect Worker REST API Unreachable
   warning_value: 1
@@ -299,7 +270,6 @@ axonops_log_alert_rule:
   content: \"Connection refused.*8083\"
   source: "/var/log/kafka/connect.log"
   description: The Connect worker REST API is unreachable — indicates a worker crash or network issue.
-  present: true
 
 - name: Connect Broker Connection Loss
   warning_value: 1
@@ -308,4 +278,3 @@ axonops_log_alert_rule:
   content: \"Disconnected from node\"
   source: "/var/log/kafka/connect.log"
   description: Connect worker lost connectivity to a Kafka broker. Check broker health and network path between Connect and Kafka.
-  present: true
