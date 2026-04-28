@@ -1,0 +1,52 @@
+---
+# Kafka Alert Pack — Example Playbook
+#
+# Deploys the full Kafka monitoring alert pack to an AxonOps organisation.
+# Loads all metric and log alert rules from the config/ directory structure.
+#
+# Prerequisites:
+#   - axonops.axonops collection installed
+#   - AXONOPS_TOKEN environment variable set (or AXONOPS_USERNAME + AXONOPS_PASSWORD)
+#   - config/<org>/metric_alert_rules.yml and log_alert_rules.yml present
+#   - config/<org>/<cluster>/metric_alert_rules.yml and log_alert_rules.yml present
+#
+# Usage:
+#   AXONOPS_TOKEN=<token> ansible-playbook kafka-alerts.yml \
+#     -e org=<your-org> -e cluster=<your-cluster>
+#
+# Or with environment variables:
+#   export AXONOPS_ORG=<your-org>
+#   export AXONOPS_CLUSTER=<your-kafka-cluster>
+#   export AXONOPS_TOKEN=<your-token>
+#   ansible-playbook kafka-alerts.yml
+
+- name: Configure Kafka monitoring alerts in AxonOps
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    cluster_type: kafka
+
+  pre_tasks:
+    - name: Get org from environment if not set
+      ansible.builtin.set_fact:
+        org: "{{ lookup('env', 'AXONOPS_ORG') }}"
+      when: org is not defined
+
+    - name: Get cluster from environment if not set
+      ansible.builtin.set_fact:
+        cluster: "{{ lookup('env', 'AXONOPS_CLUSTER') }}"
+      when: cluster is not defined
+
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - org is defined and org | length > 0
+          - cluster is defined and cluster | length > 0
+        fail_msg: "org and cluster must be set via -e or AXONOPS_ORG / AXONOPS_CLUSTER environment variables"
+
+  roles:
+    - role: axonops.axonops.configurations
+
+# code: language=ansible

@@ -1,3 +1,17 @@
+######## Kafka Default Alert Pack ########
+# This file is the default Kafka alert pack for AxonOps.
+# It is retained for backwards compatibility. The canonical alert definitions
+# have been moved to the config/ directory structure:
+#
+#   config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml  — 50+ metric alerts
+#   config/REPLACE_WITH_ORG_NAME/log_alert_rules.yml     — 30+ log pattern alerts
+#
+# For new deployments, use the config/ structure with the configurations role:
+#
+#   ansible-playbook kafka-alerts.yml
+#
+# The rules below are a minimal legacy reference set.
+
 axonops_alert_rules:
 
 ######## KAFKA OVERVIEW ALERTS ########
@@ -94,8 +108,6 @@ axonops_alert_rules:
   warning_value: 10
   duration: 15m
   description: Failed Auth requests against Kafka Controller
-
-
 
 
 ######## SYSTEM ALERTS ########

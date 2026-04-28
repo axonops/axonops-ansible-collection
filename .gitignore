@@ -7,3 +7,4 @@ examples/full-example/roles
 venv/
 .venv
 .claude/settings.local.json
+.ansible

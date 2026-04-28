@@ -1,0 +1,279 @@
+######## Kafka Monitoring Metric Alert Rules ########
+# Comprehensive alert rule set for Apache Kafka clusters monitored by AxonOps.
+# All dashboard and chart names verified against AxonOps Kafka dashboard panels.
+# These rules are applied to ALL clusters in the organisation.
+# Override or extend per-cluster in config/<org>/<cluster>/metric_alert_rules.yml
+
+axonops_alert_rules:
+
+######## KAFKA CLUSTER HEALTH — MUST ALERT ########
+# These three alerts are the minimum every Kafka cluster must have.
+
+- name: Multiple Active Controllers
+  dashboard: Kafka Overview
+  chart: Active Controller
+  operator: '>='
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  description: More than one active controller — split-brain condition. Page immediately.
+
+- name: Offline Partitions
+  dashboard: Kafka Replication
+  chart: Offline Partitions
+  operator: '>='
+  warning_value: 1
+  critical_value: 1
+  duration: 5m
+  description: Partitions with no active leader are unreadable and unwritable. Restore the failed broker.
+
+- name: Unclean Leader Elections
+  dashboard: Kafka Overview
+  chart: Unclean Leader Elections Per Sec
+  operator: '>='
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  description: A partition leader was elected from a replica outside the ISR — potential data loss. Expected value is always 0.
+
+
+######## KAFKA REPLICATION ########
+
+- name: Under Replicated Partitions
+  dashboard: Kafka Replication
+  chart: Under Replicated Partitions
+  operator: '>='
+  warning_value: 1
+  critical_value: 1
+  duration: 5m
+  description: Partitions have fewer ISR members than the replication factor. Data durability at risk. Investigate slow followers and network I/O.
+
+- name: Under Min ISR Partitions
+  dashboard: Kafka Replication
+  chart: Under Min ISR Partitions
+  operator: '>='
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  description: Partitions below min.insync.replicas. Producers using acks=all will receive NotEnoughReplicas and writes will fail.
+
+- name: ISR Shrinks High
+  dashboard: Kafka Replication
+  chart: IsrShrinks per Sec by Host
+  operator: '>='
+  warning_value: 1
+  critical_value: 5
+  duration: 5m
+  description: Replicas are falling out of sync. Expected value is 0 in steady state. Sustained shrinks indicate disk I/O or network degradation.
+
+
+######## KRAFT CONTROLLER ########
+
+- name: Controller Metadata Error Rate
+  dashboard: Kafka Controller
+  chart: Metadata Error Rate
+  operator: '>='
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  description: Errors during metadata log processing on the controller. Investigate immediately.
+
+- name: Raft Commit Latency High
+  dashboard: Kafka Controller
+  chart: Commit Latency Avg
+  operator: '>='
+  warning_value: 500
+  critical_value: 2000
+  duration: 5m
+  description: Average commit latency for the raft log is high, indicating quorum throughput degradation.
+
+- name: Preferred Replica Imbalance
+  dashboard: Kafka Overview
+  chart: Preferred Replica Imbalance
+  operator: '>='
+  warning_value: 1
+  critical_value: 10
+  duration: 15m
+  description: Partition leaders are not distributed optimally across brokers. Run preferred replica election or enable auto.leader.rebalance.enable.
+
+
+######## NETWORK & REQUEST PROCESSING ########
+
+- name: Network Processor Avg Idle Percent Low
+  dashboard: Kafka Performance
+  chart: Network Processor Avg Idle Percent
+  operator: '<'
+  warning_value: 30
+  critical_value: 10
+  duration: 5m
+  description: Network I/O threads are saturated. Normal range is above 30%. Increase num.network.threads or scale the broker.
+
+- name: Request Handler Avg Idle Percent Low
+  dashboard: Kafka Performance
+  chart: Request Handler Avg Idle Percent
+  operator: '<'
+  warning_value: 30
+  critical_value: 10
+  duration: 5m
+  description: Request handler threads are saturated. Normal range is above 30%. Increase num.io.threads or reduce per-broker partition count.
+
+- name: Request Queue Size High
+  dashboard: Kafka Performance
+  chart: Request Queue Size
+  operator: '>='
+  warning_value: 200
+  critical_value: 500
+  duration: 5m
+  description: Requests are backing up in the network queue, indicating handler saturation. Correlate with request handler idle percent.
+
+######## KAFKA CONNECT ########
+
+- name: Connect Connector Failed
+  dashboard: Connect Workers
+  chart: Connector Failed
+  operator: '>='
+  warning_value: 1
+  critical_value: 1
+  duration: 5m
+  description: One or more connectors are in FAILED state (connector-level, distinct from task failures). Connect does NOT automatically restart failed connectors. Restart via REST API POST /connectors/{name}/restart.
+
+- name: Connect Tasks Failed
+  dashboard: Connect Workers
+  chart: Connector Failed Tasks
+  operator: '>='
+  warning_value: 1
+  critical_value: 1
+  duration: 5m
+  description: One or more connector tasks have failed. Connect does NOT automatically restart failed tasks. Restart via REST API POST /connectors/{name}/tasks/{id}/restart.
+
+- name: Connect Task Running Ratio Low
+  dashboard: Connect Tasks
+  chart: Connector Task Running Ratio
+  operator: '<'
+  warning_value: 75
+  critical_value: 50
+  duration: 5m
+  description: A task is spending more than half its time not running (paused or backpressured). Investigate downstream system performance.
+
+- name: Connect Task Commit Success Rate Low
+  dashboard: Connect Tasks
+  chart: Connector Task Commit Success %
+  operator: '<'
+  warning_value: 95
+  critical_value: 80
+  duration: 5m
+  description: Offset commit success rate is low. Indicates consumer group instability or timeout issues. Increase session.timeout.ms or reduce max.poll.records.
+
+- name: Connect DLQ Produce Failures
+  dashboard: Connect Tasks
+  chart: Deadletter Produce Failures
+  operator: '>='
+  warning_value: 1
+  critical_value: 1
+  duration: 5m
+  description: Failed writes to the dead letter queue mean error records are being silently lost. Check DLQ topic configuration and broker connectivity.
+
+- name: Connect Record Errors High
+  dashboard: Connect Tasks
+  chart: Record Errors
+  operator: '>='
+  warning_value: 1
+  critical_value: 100
+  duration: 5m
+  description: Record processing errors are accumulating. Investigate upstream data quality or schema compatibility.
+
+- name: Connect Failed Authentication
+  dashboard: Connect Overview
+  chart: Failed Authentication
+  operator: '>='
+  warning_value: 1
+  critical_value: 10
+  duration: 5m
+  description: Connect worker cannot authenticate to Kafka. Check SASL/SSL configuration and credentials.
+
+- name: Connect Workers Rebalancing
+  dashboard: Connect Overview
+  chart: Rebalances
+  operator: '>='
+  warning_value: 1
+  critical_value: 5
+  duration: 15m
+  description: Connect worker group is rebalancing repeatedly. A single rebalance is normal on worker join/leave; sustained or frequent rebalances (>15 min) indicate a failed worker or incompatible connector config.
+
+- name: Connect Record Skipped High
+  dashboard: Connect Tasks
+  chart: Record Skipped
+  operator: '>='
+  warning_value: 1
+  critical_value: 100
+  duration: 5m
+  description: Records are being silently skipped due to errors with errors.tolerance=all. Data loss in progress. Review upstream data quality and connector error handling configuration.
+
+
+######## CONSUMER GROUPS ########
+
+- name: Consumer Group Lag High
+  dashboard: Consumer Groups
+  chart: Consumer Group Lag
+  operator: '>='
+  warning_value: 10000
+  critical_value: 100000
+  duration: 5m
+  description: Consumer group is significantly behind the latest offset. Investigate consumer throughput, partition distribution, or broker pressure.
+
+
+######## SYSTEM ########
+
+- name: CPU usage per host
+  dashboard: System
+  chart: CPU usage per host
+  operator: '>='
+  warning_value: 90
+  critical_value: 99
+  duration: 1h
+  description: Detected High CPU usage
+
+- name: CPU is Underutilized
+  dashboard: System
+  chart: CPU usage per host
+  operator: <=
+  warning_value: 5
+  critical_value: 1
+  duration: 1w
+  description: CPU load has been very low for 1 week
+
+- name: Disk % Usage $mountpoint
+  dashboard: System
+  chart: Disk % Usage $mountpoint
+  operator: '>='
+  warning_value: 75
+  critical_value: 90
+  duration: 12h
+  description: Detected High disk utilization
+
+- name: Avg IO wait CPU per Host
+  dashboard: System
+  chart: Avg IO wait CPU per Host
+  operator: '>='
+  warning_value: 20
+  critical_value: 50
+  duration: 2h
+  description: Detected high Average IOWait
+
+- name: Used Memory Percentage
+  dashboard: System
+  chart: Used Memory Percentage
+  operator: '>='
+  warning_value: 80
+  critical_value: 90
+  duration: 1h
+  description: High memory utilization detected
+
+- name: Failed Auth Rate
+  dashboard: Kafka Controller
+  chart: Failed Auth Rate
+  operator: '>='
+  warning_value: 10
+  critical_value: 50
+  duration: 15m
+  description: Failed authentication requests against Kafka. Check SASL/SSL configuration and client credentials.
