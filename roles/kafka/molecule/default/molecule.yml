@@ -19,6 +19,9 @@ provisioner:
   connection_options:
     ansible_user: root
     ansible_become_method: su
+  config_options:
+    defaults:
+      pipelining: true
   playbooks:
     converge: converge.yml
     verify: verify.yml
