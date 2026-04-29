@@ -1,4 +1,12 @@
 ---
+- name: Ensure kafka user tmp dir exists
+  become: true
+  ansible.builtin.file:
+    path: /tmp/.ansible_kafka
+    state: directory
+    owner: "{{ kafka_user }}"
+    mode: "0700"
+
 - name: Check if data directories are already formatted
   become: true
   ansible.builtin.stat:
@@ -17,7 +25,8 @@
 - name: Generate cluster UUID
   become: true
   become_user: "{{ kafka_user }}"
-  become_flags: "-s /bin/bash"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.command:
     cmd: "{{ kafka__home }}/bin/kafka-storage.sh random-uuid"
   register: kafka__reg_new_uuid
@@ -29,7 +38,8 @@
 - name: Persist cluster UUID to lock file
   become: true
   become_user: "{{ kafka_user }}"
-  become_flags: "-s /bin/bash"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.copy:
     content: "{{ kafka__reg_new_uuid.stdout }}"
     dest: "{{ kafka__uuid_file }}"
@@ -53,7 +63,8 @@
 - name: Format Kafka storage
   become: true
   become_user: "{{ kafka_user }}"
-  become_flags: "-s /bin/bash"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.command:
     cmd: >-
       {{ kafka__home }}/bin/kafka-storage.sh format
