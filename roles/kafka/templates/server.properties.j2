@@ -19,9 +19,7 @@ inter.broker.listener.name={{ kafka_inter_broker_listener_name }}
 advertised.listeners=PLAINTEXT://{{ kafka_node_ip }}:9092
 {% endif %}
 
-{% if kafka__has_controller | bool %}
 controller.listener.names=CONTROLLER
-{% endif %}
 
 listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
 
