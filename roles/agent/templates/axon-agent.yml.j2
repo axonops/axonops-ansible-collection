@@ -108,6 +108,34 @@ NTP:
     #nodetoolPath : "/path/to/nodetool"
     warningThresholdMillis: 200 # This will warn in logs when a MBean takes longer than the specified value.
     logFormat: "%4$s %1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS,%1$tL %5$s%6$s%n"
+{% elif "axon-kafka" in axon_java_agent %}
+kafka:
+    tier0: # metrics collected every 5 seconds
+        metrics:
+            jvm_:
+              - "java.lang:*"
+            kafka_:
+              - "kafka.server:*"
+              - "kafka.controller:*"
+              - "kafka.network:*"
+              - "kafka.log:*"
+              - "kafka.cluster:*"
+
+    tier1:
+        frequency: 300 # metrics collected every 300 seconds (5m)
+        metrics:
+            kafka_:
+              - "kafka.server:type=BrokerTopicMetrics,*"
+
+    blacklist:
+      - ".*999thPercentile|.*50thPercentile|.*FifteenMinuteRate|.*FiveMinuteRate|.*MeanRate|.*Mean|.*OneMinuteRate|.*StdDev"
+
+    JMXOperationsBlacklist:
+      - "getThreadInfo"
+
+    warningThresholdMillis: {{ axon_agent_warn_threshold_millis | default(1000) }}
+
+    logFormat: "%4$s %1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS,%1$tL %5$s%6$s%n"
 {% elif "axon-cassandra" in axon_java_agent %}
 cassandra:
     tier0: # metrics collected every 5 seconds

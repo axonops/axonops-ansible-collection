@@ -112,3 +112,27 @@ kafka_topics: []
 # Key/value pairs appended verbatim to server.properties.
 kafka_additional_config: {}
 # message.max.bytes: 1000000
+
+# --- AxonOps Agent Integration ----------------------------------------------
+
+# Set to true to install and configure the AxonOps agent on Kafka nodes.
+kafka_axonops_agent_enabled: false
+
+# Required when kafka_axonops_agent_enabled is true.
+# kafka_axonops_org: ""
+
+# SaaS API key (required for axonops.cloud).
+# kafka_axonops_key: ""
+
+# AxonOps server host. Defaults to the SaaS endpoint.
+kafka_axonops_server_host: "agents.axonops.cloud"
+
+# Kafka Java agent package name.
+kafka_axonops_java_agent: "axon-kafka3-agent"
+
+# Pin agent versions. Leave empty to install the latest available.
+# kafka_axonops_agent_version: ""
+# kafka_axonops_java_agent_version: ""
+
+# Optional: override the cluster name shown in AxonOps.
+# kafka_axonops_cluster_name: ""

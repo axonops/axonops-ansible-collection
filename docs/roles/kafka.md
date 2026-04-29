@@ -15,20 +15,20 @@ Installs and configures Apache Kafka in **KRaft mode** (no ZooKeeper) on RHEL/De
 ## Requirements
 
 - Ansible 2.10+
-- Java 17 on target hosts (installed by the role via `kafka_java_version`)
-- `ansible.posix` collection for `synchronize` (not required by this role directly, but recommended for the collection)
+- Java 17 on target hosts (installed by the role via `kafka_java_version` unless `kafka_java_install: false`)
+- All Kafka hosts must be in the **same play** — the role builds the controller quorum voters list from `ansible_play_hosts`
 
 ## How It Works
 
 1. Creates the `kafka` system user and group
-2. Downloads and extracts the Kafka tarball with checksum verification
-3. Creates a symlink at `/opt/kafka` → `/opt/kafka_2.13-<version>`
+2. Downloads and extracts the Kafka tarball with checksum verification (SHA-512 fetched from `downloads.apache.org`; tarball fetched from `archive.apache.org`)
+3. Creates a symlink at `/opt/kafka` pointing to `/opt/kafka_2.13-<version>`
 4. Writes `/etc/sysconfig/kafka` with JVM heap and opts settings
 5. Templates `server.properties` for KRaft mode based on `kafka_node_roles`
-6. On first run: generates a cluster UUID, persists it to a lock file, and formats storage directories
+6. On first run: generates a cluster UUID, persists it to `/opt/kafka/CLUSTER_UUID.lock`, and formats storage directories
 7. On subsequent runs: reads the UUID from the lock file — UUID is never regenerated
 8. Enables and optionally starts the `kafka` systemd service
-9. Creates any topics defined in `kafka_topics` (idempotent)
+9. Creates any topics defined in `kafka_topics` (idempotent — requires a running broker)
 
 ## Role Variables
 
@@ -39,6 +39,7 @@ Installs and configures Apache Kafka in **KRaft mode** (no ZooKeeper) on RHEL/De
 | `kafka_version` | `"4.0.0"` | Kafka version to install |
 | `kafka_scala_version` | `"2.13"` | Scala version for tarball selection |
 | `kafka_java_version` | `17` | OpenJDK version to install |
+| `kafka_java_install` | `true` | Set to `false` to skip Java installation if it is already managed separately |
 | `kafka_install_root` | `/opt` | Base directory for Kafka installation |
 | `kafka_user` | `kafka` | System user that runs Kafka |
 | `kafka_group` | `kafka` | System group for Kafka |
@@ -55,9 +56,9 @@ Installs and configures Apache Kafka in **KRaft mode** (no ZooKeeper) on RHEL/De
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `kafka_node_id` | **required** | Unique integer ID for this node. Must be set per host in inventory. |
-| `kafka_node_roles` | `[broker, controller]` | Roles for this node. Valid: `broker`, `controller`, or both. |
+| `kafka_node_roles` | `[broker, controller]` | Roles for this node. Valid values: `broker`, `controller`, or both. |
 | `kafka_node_ip` | `ansible_default_ipv4.address` | IP this node advertises. Override when the default interface is wrong. |
-| `kafka_cluster_id` | auto-generated | Cluster UUID. Auto-generated on first run and persisted. Set explicitly to pin a known UUID. |
+| `kafka_cluster_id` | auto-generated | Cluster UUID. Auto-generated on first run and persisted to `/opt/kafka/CLUSTER_UUID.lock`. Set explicitly to pin a known UUID. |
 
 ### Listeners
 
@@ -78,7 +79,7 @@ Auto-derived listener defaults by topology:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `kafka_heap_size` | `1G` | JVM heap size (Xmx and Xms) |
+| `kafka_heap_size` | `1G` | JVM heap size (sets both Xmx and Xms) |
 | `kafka_opts` | `[]` | Additional JVM flags (list or string) |
 | `kafka_num_network_threads` | `3` | Network handler threads |
 | `kafka_num_io_threads` | `8` | I/O handler threads |
@@ -116,9 +117,9 @@ Auto-derived listener defaults by topology:
 
 ### Topics
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `kafka_topics` | `[]` | List of topics to create idempotently. See example below. |
+| Variable | Default | Description                                                                                                          |
+|----------|---------|----------------------------------------------------------------------------------------------------------------------|
+| `kafka_topics` | `[]` | List of topics to create idempotently. Requires `kafka_start_on_install: true` or a running broker on the target hosts. |
 
 Topic entry fields:
 
@@ -127,14 +128,29 @@ Topic entry fields:
 | `name` | yes | Topic name |
 | `partitions` | no | Number of partitions (defaults to `kafka_num_partitions`) |
 | `replication_factor` | no | Replication factor (defaults to `kafka_replication_factor`) |
-| `config` | no | Dict of topic config keys (underscores converted to dots) |
+| `config` | no | Dict of topic config keys (underscores converted to dots automatically) |
 
 ### Miscellaneous
 
+| Variable                  | Default      | Description                                                                                        |
+|---------------------------|--------------|----------------------------------------------------------------------------------------------------|
+| `kafka_additional_config` | `{}`         | Extra key/value pairs appended verbatim to `server.properties`                                     |
+| `kafka_checksum`          | auto-fetched | Override the tarball SHA-512 checksum. Only needed if the Apache checksum endpoint is unreachable. |
+
+### AxonOps Agent Integration
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `kafka_additional_config` | `{}` | Extra key/value pairs appended verbatim to `server.properties` |
-| `kafka_checksum` | auto-fetched | Override the tarball checksum if the Apache mirror is unreachable |
+| `kafka_axonops_agent_enabled` | `false` | Set to `true` to install and configure the AxonOps agent on Kafka nodes |
+| `kafka_axonops_org` | — | **Required when enabled.** Your AxonOps organisation name |
+| `kafka_axonops_key` | — | SaaS API key (required for `axonops.cloud`) |
+| `kafka_axonops_server_host` | `agents.axonops.cloud` | AxonOps server host |
+| `kafka_axonops_java_agent` | `axon-kafka3-agent` | Kafka Java agent package name |
+| `kafka_axonops_agent_version` | latest | Pin the `axon-agent` package version |
+| `kafka_axonops_java_agent_version` | latest | Pin the Java agent JAR version |
+| `kafka_axonops_cluster_name` | — | Override the cluster name shown in AxonOps |
+
+When enabled, the role invokes `axonops.axonops.agent` with the Kafka-specific package and injects the agent JVM options into `kafka-server-start.sh` before the `exec` line.
 
 ## Tags
 
@@ -146,6 +162,7 @@ Topic entry fields:
 | `topics` | Topic creation |
 | `service` | Start/enable systemd service |
 | `axonops_user` | Create `axonops` user and cross-group membership |
+| `axonops_agent` | Install and configure AxonOps agent |
 
 ## Example Playbooks
 
@@ -163,7 +180,7 @@ Topic entry fields:
 
 ### Three-node cluster (combined broker + controller)
 
-Set per-host in inventory:
+Set per-host variables in inventory:
 
 ```ini
 [kafka]
@@ -194,6 +211,10 @@ kafka3 ansible_host=192.168.1.13 kafka_node_id=3 kafka_node_ip=192.168.1.13
 
 ### Separated broker and controller nodes
 
+> **Important**: All nodes — both controllers and brokers — must be targeted by a **single play**. The role uses `ansible_play_hosts` to build the controller quorum voters list. If controllers and brokers run in separate plays, brokers will not know about the controllers and the cluster will not form.
+
+Inventory:
+
 ```ini
 [kafka_controllers]
 ctrl1 ansible_host=10.0.0.1 kafka_node_id=1 kafka_node_ip=10.0.0.1
@@ -210,21 +231,35 @@ kafka_controllers
 kafka_brokers
 ```
 
-```yaml
-- hosts: kafka
-  roles:
-    - role: axonops.axonops.kafka
+`group_vars/kafka_controllers/main.yml`:
 
-# group_vars/kafka_controllers.yml
+```yaml
 kafka_node_roles:
   - controller
+```
 
-# group_vars/kafka_brokers.yml
+`group_vars/kafka_brokers/main.yml`:
+
+```yaml
 kafka_node_roles:
   - broker
 ```
 
-> All hosts must be in the same play so the role can build the dynamic controller quorum voters list.
+Playbook — targets the parent `kafka` group so that all nodes are in the same play:
+
+```yaml
+- hosts: kafka
+  roles:
+    - role: axonops.axonops.kafka
+  vars:
+    kafka_heap_size: 4G
+    kafka_replication_factor: 3
+    kafka_offsets_topic_replication_factor: 3
+    kafka_transaction_state_log_replication_factor: 3
+    kafka_transaction_state_log_min_isr: 2
+    kafka_start_on_install: true
+    kafka_start_on_boot: true
+```
 
 ### Custom topics with retention
 
@@ -247,11 +282,12 @@ kafka_topics:
 ## Notes
 
 - **`kafka_node_id` is mandatory** — the role fails immediately if it is not defined for a host.
-- **UUID persistence** — the cluster UUID is written to `kafka__home/CLUSTER_UUID.lock` on the first controller node and is never regenerated. Delete this file only if you are intentionally re-initialising the cluster.
-- **Storage format** — `kafka-storage.sh format` is skipped if `meta.properties` already exists in any data directory. This makes re-runs safe.
-- **Java 17** — Kafka 4.x requires Java 17. The role installs `openjdk-17-jre-headless` (Debian) or `java-17-openjdk-headless` (RHEL).
+- **UUID persistence** — the cluster UUID is written to `/opt/kafka/CLUSTER_UUID.lock` on the first controller node and is never regenerated. Delete this file only if you are intentionally re-initialising the cluster.
+- **Storage format** — `kafka-storage.sh format` is skipped if `meta.properties` already exists in any data directory. Re-runs are safe.
+- **Java 17** — Kafka 4.x requires Java 17. The role installs `openjdk-17-jre-headless` (Debian) or `java-17-openjdk-headless` (RHEL). Set `kafka_java_install: false` to skip this step if Java is managed by another role.
+- **Topics require a running broker** — `kafka_topics` is processed only when `kafka_start_on_install: true` and the broker port is reachable. Topics are not created on configuration-only runs.
 - **TLS/SASL** — not supported in this release. Planned for a future version.
-- **AxonOps agent** — the role creates the `axonops` user in the `kafka` group so that `axon-agent` can access Kafka files.
+- **AxonOps agent** — the role adds the `axonops` user to the `kafka` group and the `kafka` user to the `axonops` group so that `axon-agent` can access Kafka files without requiring root.
 
 ## License
 
