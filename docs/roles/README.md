@@ -55,6 +55,11 @@ Installs and configures Apache Cassandra (versions 3.11, 4.x, and 5.x).
 
 **Use when**: You need to deploy new Cassandra nodes or manage existing installations.
 
+#### [kafka](kafka.md)
+Installs and configures Apache Kafka in KRaft mode (no ZooKeeper). Supports combined broker+controller nodes, dedicated broker-only nodes, and dedicated controller-only nodes.
+
+**Use when**: You need to deploy a native Kafka cluster on VMs or bare metal with AxonOps monitoring.
+
 #### [opensearch](opensearch.md)
 Installs and configures OpenSearch as the search backend for AxonOps Server.
 
@@ -90,6 +95,7 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **k8ssandra** | Cassandra on Kubernetes | Kubernetes cluster |
 | **strimzi** | Kafka on Kubernetes | Kubernetes cluster |
 | **cassandra** | Apache Cassandra installation | Agent, Java |
+| **kafka** | Apache Kafka (KRaft) installation | Agent |
 | **opensearch** | OpenSearch installation (preferred for on-premises) | Server |
 | **elastic** | Elasticsearch installation (legacy / existing deployments) | Server |
 | **java** | Java installation | Cassandra, Elastic |

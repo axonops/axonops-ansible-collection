@@ -1,0 +1,23 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    kafka_version: "4.0.0"
+    kafka_node_id: 1
+    kafka_node_roles:
+      - broker
+      - controller
+    kafka_heap_size: "512m"
+    kafka_opts:
+      - "-XX:NewSize=64m"
+      - "-XX:MaxNewSize=64m"
+    kafka_data_dirs:
+      - /var/lib/kafka
+    kafka_start_on_install: false
+    kafka_start_on_boot: false
+
+  roles:
+    - role: kafka
+
+# code: language=ansible

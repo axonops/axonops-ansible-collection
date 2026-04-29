@@ -1,0 +1,114 @@
+---
+# ============================================================================
+# Kafka Role - Default Variables
+# ============================================================================
+
+# --- Version & Download -----------------------------------------------------
+
+kafka_version: "4.0.0"
+kafka_scala_version: "2.13"
+# Java version passed to the axonops.axonops.java role as java_pkg. Kafka 4.x requires Java 17.
+kafka_java_version: 17
+kafka_java_install: true
+
+# --- Installation -----------------------------------------------------------
+
+kafka_install_root: /opt
+kafka_user: kafka
+kafka_group: kafka
+
+# --- Paths ------------------------------------------------------------------
+
+# JVM / service stdout logs (not Kafka topic partition data)
+kafka_log_dir: /var/log/kafka
+
+# Kafka topic/partition data directories
+kafka_data_dirs:
+  - /var/lib/kafka
+
+# --- JVM --------------------------------------------------------------------
+
+kafka_heap_size: 1G
+
+# Additional JVM flags — list or plain string
+# kafka_opts:
+#   - -XX:NewSize=256m
+kafka_opts: []
+
+# --- KRaft Cluster ----------------------------------------------------------
+
+# REQUIRED per host — role fails without it
+# kafka_node_id: 1
+
+# Node roles for this host. All three combinations are supported:
+#   [broker, controller]  — combined (default, recommended for small clusters)
+#   [broker]              — broker-only  (dedicated broker node)
+#   [controller]          — controller-only (dedicated controller quorum node)
+kafka_node_roles:
+  - broker
+  - controller
+
+# Optional: override the IP this node advertises. Defaults to ansible_default_ipv4.address
+# kafka_node_ip: 192.168.1.10
+
+# Optional: fix the cluster UUID. Auto-generated and persisted on first run if omitted.
+# kafka_cluster_id: ""
+
+# --- Listeners --------------------------------------------------------------
+
+# Override auto-derived listeners. Auto-derivation:
+#   combined node  → [PLAINTEXT://:9092, CONTROLLER://:9093]
+#   broker-only    → [PLAINTEXT://:9092]
+#   controller-only → [CONTROLLER://:9093]
+kafka_listeners: []
+
+kafka_inter_broker_listener_name: PLAINTEXT
+
+# --- Performance ------------------------------------------------------------
+
+kafka_num_network_threads: 3
+kafka_num_io_threads: 8
+kafka_socket_send_buffer_bytes: 102400
+kafka_socket_receive_buffer_bytes: 102400
+kafka_socket_request_max_bytes: 104857600
+
+# --- Topic Defaults ---------------------------------------------------------
+
+kafka_num_partitions: 1
+kafka_replication_factor: 1
+
+# --- Internal Topic Settings ------------------------------------------------
+
+kafka_offsets_topic_replication_factor: 1
+kafka_transaction_state_log_replication_factor: 1
+kafka_transaction_state_log_min_isr: 1
+
+# --- Log Retention ----------------------------------------------------------
+
+kafka_log_retention_hours: 168
+kafka_log_retention_bytes: -1
+kafka_log_segment_bytes: 1073741824
+kafka_log_retention_check_interval_ms: 300000
+
+# --- Service Control --------------------------------------------------------
+
+# It is recommended to leave these false and start Kafka manually after validating the cluster.
+kafka_start_on_install: false
+kafka_start_on_boot: false
+
+# --- Topics -----------------------------------------------------------------
+
+# Idempotent topic management. Topics are created only if they do not already exist.
+# Requires kafka_start_on_install: true or a running broker.
+kafka_topics: []
+# - name: my-topic
+#   partitions: 3
+#   replication_factor: 1
+#   config:
+#     retention_ms: 86400000
+
+# --- Arbitrary Extra Config -------------------------------------------------
+
+# Key/value pairs appended verbatim to server.properties.
+kafka_additional_config: {}
+# message.max.bytes: 1000000

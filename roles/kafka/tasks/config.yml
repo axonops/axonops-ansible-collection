@@ -1,0 +1,27 @@
+---
+- name: Configure Kafka heap size
+  ansible.builtin.lineinfile:
+    path: /etc/sysconfig/kafka
+    regexp: "^KAFKA_HEAP_OPTS"
+    line: 'KAFKA_HEAP_OPTS="-Xmx{{ kafka_heap_size }} -Xms{{ kafka_heap_size }}"'
+    create: true
+    mode: "0644"
+  notify: Restart Kafka
+
+- name: Configure Kafka JVM opts
+  ansible.builtin.lineinfile:
+    path: /etc/sysconfig/kafka
+    regexp: "^KAFKA_OPTS"
+    line: 'KAFKA_OPTS="{{ kafka__opts }}"'
+    create: true
+    mode: "0644"
+  notify: Restart Kafka
+
+- name: Deploy server.properties
+  ansible.builtin.template:
+    src: server.properties.j2
+    dest: "{{ kafka__config_path }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0640"
+  notify: Restart Kafka
