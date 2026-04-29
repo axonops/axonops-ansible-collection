@@ -20,6 +20,7 @@
     name: axonops.axonops.java
   vars:
     java_pkg: "{{ kafka__java_pkg }}"
+    java_zulu_version: "{{ kafka_java_version }}"
   when: kafka_java_install | default(true)
 
 - name: Get Kafka checksum from Apache

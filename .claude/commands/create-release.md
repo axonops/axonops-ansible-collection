@@ -18,4 +18,3 @@ Next: v0.5.4
 - Create the git tag
 - Push the git tag to origin
 - Create a PR to merge this branch to `main`
-
