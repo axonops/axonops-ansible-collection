@@ -45,6 +45,11 @@
   ansible.builtin.import_tasks: install.yml
   tags: install
 
+- name: Configure firewall
+  ansible.builtin.import_tasks: firewall.yml
+  when: kafka_configure_firewall | bool
+  tags: firewall
+
 - name: Create AxonOps user
   tags: axonops_user
   block:

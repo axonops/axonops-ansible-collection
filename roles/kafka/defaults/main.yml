@@ -96,6 +96,10 @@ kafka_log_retention_check_interval_ms: 300000
 kafka_start_on_install: false
 kafka_start_on_boot: false
 
+# Open Kafka ports in firewalld/ufw if either is active on the host.
+# Broker port 9092, controller port 9093 — only opened for the roles this node runs.
+kafka_configure_firewall: true
+
 # --- Topics -----------------------------------------------------------------
 
 # Idempotent topic management. Topics are created only if they do not already exist.
@@ -128,7 +132,7 @@ kafka_axonops_agent_enabled: false
 kafka_axonops_server_host: "agents.axonops.cloud"
 
 # Kafka Java agent package name.
-kafka_axonops_java_agent: "axon-kafka3-agent"
+kafka_axonops_java_agent: "axon-kafka4-agent"
 
 # Pin agent versions. Leave empty to install the latest available.
 # kafka_axonops_agent_version: ""

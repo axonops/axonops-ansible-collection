@@ -112,6 +112,7 @@ Auto-derived listener defaults by topology:
 |----------|---------|-------------|
 | `kafka_start_on_install` | `false` | Start Kafka at the end of the play |
 | `kafka_start_on_boot` | `false` | Enable Kafka service at boot |
+| `kafka_configure_firewall` | `true` | Open broker/controller ports in firewalld or ufw if either is active. Set to `false` to skip. |
 
 > **Note**: It is recommended to leave both `false` on new multi-node clusters. Start brokers manually after validating all nodes are configured correctly.
 
@@ -157,6 +158,7 @@ When enabled, the role invokes `axonops.axonops.agent` with the Kafka-specific p
 | Tag | What it runs |
 |-----|-------------|
 | `install` | Download, extract, user/group, symlink, service unit |
+| `firewall` | Open broker/controller ports in firewalld or ufw |
 | `config` | `server.properties` and `/etc/sysconfig/kafka` |
 | `cluster` | UUID management and storage formatting |
 | `topics` | Topic creation |
