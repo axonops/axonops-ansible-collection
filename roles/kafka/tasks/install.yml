@@ -13,7 +13,7 @@
     group: "{{ kafka_group }}"
     home: "{{ kafka__home }}"
     create_home: false
-    shell: /sbin/nologin
+    shell: /bin/bash
 
 - name: Install Java
   ansible.builtin.include_role:
