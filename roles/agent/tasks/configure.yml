@@ -90,6 +90,7 @@
       ansible.builtin.lineinfile:
         path: "{{ axon_agent_kafka_config_directory }}/kafka-server-start.sh"
         line: "{{ axon_agent_kafka_config }}"
+        regexp: '(axonops|axon-agent|axon-kafka)'
         insertbefore: "^exec "
         firstmatch: true
 

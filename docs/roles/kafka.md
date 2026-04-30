@@ -146,7 +146,7 @@ Topic entry fields:
 | `kafka_axonops_org` | — | **Required when enabled.** Your AxonOps organisation name |
 | `kafka_axonops_key` | — | SaaS API key (required for `axonops.cloud`) |
 | `kafka_axonops_server_host` | `agents.axonops.cloud` | AxonOps server host |
-| `kafka_axonops_java_agent` | `axon-kafka3-agent` | Kafka Java agent package name |
+| `kafka_axonops_java_agent` | `axon-kafka4-agent` | Kafka Java agent package name |
 | `kafka_axonops_agent_version` | latest | Pin the `axon-agent` package version |
 | `kafka_axonops_java_agent_version` | latest | Pin the Java agent JAR version |
 | `kafka_axonops_cluster_name` | — | Override the cluster name shown in AxonOps |

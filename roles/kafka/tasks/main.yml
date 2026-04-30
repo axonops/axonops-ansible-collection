@@ -52,6 +52,7 @@
 
 - name: Create AxonOps user
   tags: axonops_user
+  when: kafka_axonops_agent_enabled | bool
   block:
     - name: Gather group information
       ansible.builtin.getent:

@@ -44,24 +44,37 @@
       }}
   when: kafka_checksum is not defined
 
-- name: Download Kafka
-  ansible.builtin.get_url:
-    url: "{{ kafka__download_url }}"
-    checksum: "{{ kafka_checksum }}"
-    dest: "{{ kafka__download_destination }}"
-    mode: "0644"
-    timeout: 60
-  retries: 3
-  delay: 5
+- name: Check if Kafka is already installed
+  ansible.builtin.stat:
+    path: "{{ kafka__install_path }}"
+  register: kafka__reg_install_check
 
-- name: Extract Kafka
-  ansible.builtin.unarchive:
-    src: "{{ kafka__download_destination }}"
-    dest: "{{ kafka_install_root }}"
-    remote_src: true
-    owner: "{{ kafka_user }}"
-    group: "{{ kafka_group }}"
-    creates: "{{ kafka__install_path }}"
+- name: Download and install Kafka
+  when: not kafka__reg_install_check.stat.exists
+  block:
+    - name: Download Kafka
+      ansible.builtin.get_url:
+        url: "{{ kafka__download_url }}"
+        checksum: "{{ kafka_checksum }}"
+        dest: "{{ kafka__download_destination }}"
+        mode: "0644"
+        timeout: 60
+      retries: 3
+      delay: 5
+
+    - name: Extract Kafka
+      ansible.builtin.unarchive:
+        src: "{{ kafka__download_destination }}"
+        dest: "{{ kafka_install_root }}"
+        remote_src: true
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+        creates: "{{ kafka__install_path }}"
+
+    - name: Remove downloaded tarball
+      ansible.builtin.file:
+        path: "{{ kafka__download_destination }}"
+        state: absent
 
 - name: Create Kafka home symlink
   ansible.builtin.file:
