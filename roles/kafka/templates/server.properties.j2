@@ -1,0 +1,58 @@
+# {{ ansible_managed }}
+
+############################# Server Basics #############################
+
+process.roles={{ kafka_node_roles | join(',') }}
+node.id={{ kafka_node_id }}
+
+# Controller quorum voters: id@host:port for every controller in the cluster
+controller.quorum.voters={% for host in groups['kafka__group_controller_nodes'] %}{{ hostvars[host]['kafka_node_id'] }}@{{ hostvars[host]['kafka_node_ip'] }}:9093{% if not loop.last %},{% endif %}{% endfor %}
+
+
+############################# Socket Server Settings #############################
+
+listeners={{ kafka__effective_listeners | join(',') }}
+
+inter.broker.listener.name={{ kafka_inter_broker_listener_name }}
+
+{% if kafka__has_broker | bool %}
+advertised.listeners=PLAINTEXT://{{ kafka_node_ip }}:9092
+{% endif %}
+
+controller.listener.names=CONTROLLER
+
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
+
+num.network.threads={{ kafka_num_network_threads }}
+num.io.threads={{ kafka_num_io_threads }}
+socket.send.buffer.bytes={{ kafka_socket_send_buffer_bytes }}
+socket.receive.buffer.bytes={{ kafka_socket_receive_buffer_bytes }}
+socket.request.max.bytes={{ kafka_socket_request_max_bytes }}
+
+############################# Log Basics #############################
+
+log.dirs={{ kafka_data_dirs | join(',') }}
+num.partitions={{ kafka_num_partitions }}
+num.recovery.threads.per.data.dir=1
+
+############################# Internal Topic Settings #############################
+
+offsets.topic.replication.factor={{ kafka_offsets_topic_replication_factor }}
+transaction.state.log.replication.factor={{ kafka_transaction_state_log_replication_factor }}
+transaction.state.log.min.isr={{ kafka_transaction_state_log_min_isr }}
+
+############################# Log Retention Policy #############################
+
+log.retention.hours={{ kafka_log_retention_hours }}
+{% if kafka_log_retention_bytes | int > 0 %}
+log.retention.bytes={{ kafka_log_retention_bytes }}
+{% endif %}
+log.segment.bytes={{ kafka_log_segment_bytes }}
+log.retention.check.interval.ms={{ kafka_log_retention_check_interval_ms }}
+
+{% if kafka_additional_config | length > 0 %}
+############################# Additional Config #############################
+{% for k, v in kafka_additional_config.items() %}
+{{ k }}={{ v }}
+{% endfor %}
+{% endif %}

@@ -73,4 +73,25 @@
         line: "{{ axon_agent_cassandra_config }}"
         insertafter: EOF
 
+- name: Add AxonOps agent config to kafka-server-start.sh
+  when: axon_agent_kafka_config_directory is defined and axon_agent_kafka_config_directory != ""
+  block:
+    - name: Check kafka-server-start.sh can be found
+      ansible.builtin.stat:
+        path: "{{ axon_agent_kafka_config_directory }}/kafka-server-start.sh"
+      register: _kafka_start
+
+    - name: Fail if kafka-server-start.sh not found
+      ansible.builtin.fail:
+        msg: "{{ axon_agent_kafka_config_directory }}/kafka-server-start.sh not found"
+      when: not _kafka_start.stat.exists
+
+    - name: Add AxonOps agent config to kafka-server-start.sh
+      ansible.builtin.lineinfile:
+        path: "{{ axon_agent_kafka_config_directory }}/kafka-server-start.sh"
+        line: "{{ axon_agent_kafka_config }}"
+        regexp: '(axonops|axon-agent|axon-kafka)'
+        insertbefore: "^exec "
+        firstmatch: true
+
 # code: language=ansible

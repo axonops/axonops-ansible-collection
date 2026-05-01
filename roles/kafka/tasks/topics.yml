@@ -1,0 +1,39 @@
+---
+- name: Wait for broker port
+  ansible.builtin.wait_for:
+    host: localhost
+    port: 9092
+    timeout: 60
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true
+
+- name: List existing topics
+  become_user: "{{ kafka_user }}"
+  ansible.builtin.command:
+    cmd: "{{ kafka__home }}/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"
+  register: kafka__reg_existing_topics
+  changed_when: false
+  check_mode: false
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true
+
+- name: Create topics
+  become_user: "{{ kafka_user }}"
+  ansible.builtin.command:
+    cmd: >-
+      {{ kafka__home }}/bin/kafka-topics.sh
+      --create
+      --bootstrap-server localhost:9092
+      --topic {{ item.name }}
+      --partitions {{ item.partitions | default(kafka_num_partitions) }}
+      --replication-factor {{ item.replication_factor | default(kafka_replication_factor) }}
+      {% for k, v in (item.config | default({})) | dictsort %}
+      --config {{ k | replace('_', '.') }}={{ v }}
+      {% endfor %}
+  when: item.name not in kafka__reg_existing_topics.stdout_lines
+  loop: "{{ kafka_topics }}"
+  changed_when: true
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true
+  loop_control:
+    label: "{{ item.name }}"

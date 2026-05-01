@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+
+[Unit]
+Description=Apache Kafka (KRaft mode)
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/kafka
+User={{ kafka_user }}
+Group={{ kafka_group }}
+WorkingDirectory={{ kafka__home }}
+ExecStart={{ kafka__home }}/bin/kafka-server-start.sh {{ kafka__config_path }}
+ExecStop={{ kafka__home }}/bin/kafka-server-stop.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

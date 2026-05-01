@@ -1,0 +1,208 @@
+---
+# ============================================================================
+# Kafka Role - Main Tasks
+# ============================================================================
+
+- name: Assert kafka_node_id is defined
+  ansible.builtin.assert:
+    that:
+      - kafka_node_id is defined
+    fail_msg: >-
+      kafka_node_id must be set for every Kafka host. Add it to your inventory:
+        [kafka]
+        broker1 kafka_node_id=1
+        broker2 kafka_node_id=2
+  tags: always
+
+- name: Assert kafka_opts type
+  ansible.builtin.assert:
+    that:
+      - kafka_opts | type_debug in ["list", "AnsibleUnicode", "str"]
+    fail_msg: "kafka_opts must be a list or a string."
+  tags: always
+
+- name: Assert AxonOps agent required vars when enabled
+  ansible.builtin.assert:
+    that:
+      - kafka_axonops_org is defined
+      - kafka_axonops_org | length > 0
+      - kafka_axonops_cluster_name is defined
+      - kafka_axonops_cluster_name | length > 0
+    fail_msg: >-
+      kafka_axonops_agent_enabled is true but kafka_axonops_org and/or
+      kafka_axonops_cluster_name are not set. The Kafka Java agent requires
+      both. Set kafka_axonops_org (organisation name), kafka_axonops_cluster_name
+      (cluster identifier shown in AxonOps), and kafka_axonops_key for SaaS at
+      agents.axonops.cloud.
+  when: kafka_axonops_agent_enabled | bool
+  tags: always
+
+- name: Warn about replication factor of 1 in multi-node play
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: kafka_replication_factor is 1 but there are {{ ansible_play_hosts | length }}
+      hosts in this play. Consider setting kafka_replication_factor: 3 for production.
+  when:
+    - kafka_replication_factor | int == 1
+    - ansible_play_hosts | length > 1
+  tags: always
+
+# Promote per-host vars to hostvars so the server.properties.j2 template
+# can access them via hostvars[host][...] when building controller.quorum.voters.
+# Play-level vars are not accessible through hostvars; set_fact is required.
+- name: Promote per-host vars to hostvars
+  ansible.builtin.set_fact:
+    kafka_node_id: "{{ kafka_node_id }}"
+    kafka_node_roles: "{{ kafka_node_roles }}"
+    kafka_node_ip: "{{ kafka_node_ip | default(ansible_default_ipv4.address) }}"
+  tags: always
+
+- name: Install Kafka
+  ansible.builtin.import_tasks: install.yml
+  tags: install
+
+- name: Configure firewall
+  ansible.builtin.import_tasks: firewall.yml
+  when: kafka_configure_firewall | bool
+  tags: firewall
+
+- name: Create AxonOps user
+  tags: axonops_user
+  when: kafka_axonops_agent_enabled | bool
+  block:
+    - name: Gather group information
+      ansible.builtin.getent:
+        database: group
+      register: kafka__reg_group_info
+
+    - name: Gather axonops user information
+      ansible.builtin.getent:
+        database: passwd
+        key: axonops
+      register: kafka__reg_axonops_user
+      failed_when: false
+
+    - name: Populate service facts
+      ansible.builtin.service_facts:
+      tags: service, always
+
+    - name: Stop axon-agent if axonops user is not in kafka group
+      ansible.builtin.systemd:
+        name: axon-agent
+        state: stopped
+      register: kafka__reg_stop_agent
+      failed_when:
+        - kafka__reg_stop_agent.failed
+        - '"Could not find the requested service" not in kafka__reg_stop_agent.msg'
+      when:
+        - ansible_facts.services['axon-agent.service'] is defined
+        - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
+        - kafka__reg_axonops_user.ansible_facts.getent_passwd.axonops is defined
+        - >-
+          'kafka' not in (
+            kafka__reg_group_info.ansible_facts.getent_group
+            | dict2items
+            | selectattr('value.2', 'search', kafka__reg_axonops_user.ansible_facts.getent_passwd.axonops.1)
+            | map(attribute='key')
+            | list
+          )
+
+    - name: Add axonops user to kafka group
+      ansible.builtin.user:
+        name: axonops
+        groups: "{{ kafka_group }}"
+        shell: /bin/bash
+        home: /home/axonops
+
+    - name: Add kafka user to axonops group
+      ansible.builtin.user:
+        name: "{{ kafka_user }}"
+        groups: axonops
+        append: true
+
+    - name: Start axon-agent
+      ansible.builtin.systemd:
+        name: axon-agent
+        state: started
+      when:
+        - ansible_facts.services['axon-agent.service'] is defined
+        - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
+
+# Populate dynamic groups before config.yml renders the template that references them.
+- name: Add controller nodes to dynamic group
+  ansible.builtin.add_host:
+    name: "{{ hostvars[item]['inventory_hostname'] }}"
+    group: kafka__group_controller_nodes
+  when: "'controller' in hostvars[item]['kafka_node_roles'] | default(kafka_node_roles)"
+  loop: "{{ ansible_play_hosts }}"
+  changed_when: false
+  loop_control:
+    label: "{{ hostvars[item]['inventory_hostname'] }}"
+  tags: cluster
+
+- name: Add broker nodes to dynamic group
+  ansible.builtin.add_host:
+    name: "{{ hostvars[item]['inventory_hostname'] }}"
+    group: kafka__group_broker_nodes
+  when: "'broker' in hostvars[item]['kafka_node_roles'] | default(kafka_node_roles)"
+  loop: "{{ ansible_play_hosts }}"
+  changed_when: false
+  loop_control:
+    label: "{{ hostvars[item]['inventory_hostname'] }}"
+  tags: cluster
+
+- name: Assert at least one controller node is in the play
+  ansible.builtin.assert:
+    that:
+      - groups['kafka__group_controller_nodes'] | default([]) | length > 0
+    fail_msg: >-
+      No controller nodes found. At least one host must have 'controller' in kafka_node_roles.
+  run_once: true
+  tags: cluster
+
+- name: Configure Kafka
+  ansible.builtin.import_tasks: config.yml
+  tags: config
+
+- name: Initialise KRaft cluster
+  ansible.builtin.import_tasks: cluster.yml
+  tags: cluster
+
+- name: Flush handlers before service start
+  ansible.builtin.meta: flush_handlers
+
+- name: Start Kafka service
+  ansible.builtin.systemd:
+    name: kafka
+    daemon_reload: true
+    enabled: "{{ kafka_start_on_boot | bool }}"
+    state: started
+  when: kafka_start_on_install | bool
+  tags: service
+
+- name: Wait for Kafka controller port
+  ansible.builtin.wait_for:
+    port: 9093
+    timeout: 60
+  when:
+    - kafka_start_on_install | bool
+    - "'controller' in kafka_node_roles"
+  tags: service
+
+- name: Wait for Kafka broker port
+  ansible.builtin.wait_for:
+    port: 9092
+    timeout: 60
+  when:
+    - kafka_start_on_install | bool
+    - "'broker' in kafka_node_roles"
+  tags: service
+
+- name: Create Kafka topics
+  ansible.builtin.import_tasks: topics.yml
+  when:
+    - kafka_start_on_install | bool
+    - kafka_topics | length > 0
+  tags: topics
+
+# code: language=ansible

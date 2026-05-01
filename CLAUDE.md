@@ -74,6 +74,7 @@ When a new role is added or an existing role is renamed/removed, `README.md` (ro
 | --- | --- | --- |
 | `agent` | AxonOps agent (Cassandra/Kafka monitoring sidecar) | ✅ |
 | `cassandra` | Apache Cassandra install + configuration (tar) | ✅ |
+| `kafka` | Apache Kafka install + configuration (KRaft, tar) | ✅ |
 | `configurations` | AxonOps configuration resources (alerts, silences) | ✅ |
 | `cqlai` | CQL AI assistant component | ✅ |
 | `dash` | AxonOps dashboard web UI | ✅ |

@@ -58,6 +58,7 @@ This collection provides the following Ansible roles. Click on each role for det
 
 ### Infrastructure Components
 - **[cassandra](docs/roles/cassandra.md)** - Install and configure Apache Cassandra (3.11, 4.x, 5.x)
+- **[kafka](docs/roles/kafka.md)** - Install and configure Apache Kafka in KRaft mode (no ZooKeeper)
 - **[opensearch](docs/roles/opensearch.md)** - Install and configure OpenSearch for AxonOps (preferred for on-premises)
 - **[elastic](docs/roles/elastic.md)** - Install and configure Elasticsearch for AxonOps
 - **[java](docs/roles/java.md)** - Install Java (OpenJDK or Azul Zulu)
