@@ -119,6 +119,31 @@ kafka_tls_generate_local_dir: "/tmp/kafka-tls-{{ kafka_axonops_cluster_name | de
 # pki_agent mode reads directly from the kafka_tls_pki_* paths above.
 kafka_tls_remote_dir: /etc/kafka/tls
 
+# --- SASL -------------------------------------------------------------------
+
+# Requires kafka_security_enabled: true.
+kafka_sasl_enabled: false
+
+# Mechanism for client and inter-broker auth.
+#   SCRAM-SHA-512 — recommended; bootstrapped at format time, KRaft-native
+#   PLAIN         — credentials in JAAS, simpler, no salting (use only with TLS)
+kafka_sasl_mechanism: SCRAM-SHA-512
+
+# Inter-broker / controller credentials. The same identity is used for
+# broker↔broker and broker↔controller traffic and is added to super.users.
+kafka_sasl_inter_broker_user: kafka-admin
+kafka_sasl_inter_broker_password: ""
+
+# Additional SCRAM users created on first start via kafka-configs.sh.
+# Ignored when kafka_sasl_mechanism is PLAIN.
+# - { name: app1, password: secret }
+kafka_sasl_users: []
+
+# Static credentials for PLAIN mechanism. Ignored when SCRAM is used.
+# Each entry must include the inter-broker user as well.
+# - { name: kafka-admin, password: secret }
+kafka_sasl_plain_users: []
+
 # --- Topic Defaults ---------------------------------------------------------
 
 kafka_num_partitions: 1
@@ -189,3 +214,15 @@ kafka_axonops_java_agent: "axon-kafka4-agent"
 # Required when kafka_axonops_agent_enabled is true.
 # Cluster name shown in AxonOps; the Kafka Java agent fails without it.
 # kafka_axonops_cluster_name: ""
+
+# Optionally install the Kconduit kafka cli client
+kafka_kconduit_enabled: false
+kafka_kconduit_version: "0.0.4"
+# Architecture mapping (uname values → release asset names)
+kafka_kconduit_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+
+# Package extension mapping
+kafka_kconduit_pkg_ext: "{{ 'rpm' if ansible_os_family == 'RedHat' else 'deb' }}"
+
+# Final URL
+kafka_kconduit_download_url: "https://github.com/digitalis-io/kconduit/releases/download/v{{ kafka_kconduit_version }}/kconduit_{{ kafka_kconduit_version }}_linux_{{ kafka_kconduit_arch }}.{{ kafka_kconduit_pkg_ext }}"

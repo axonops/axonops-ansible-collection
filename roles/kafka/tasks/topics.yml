@@ -7,8 +7,21 @@
   delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
   run_once: true
 
+- name: Ensure kafka user tmp dir exists
+  become: true
+  ansible.builtin.file:
+    path: /tmp/.ansible_kafka
+    state: directory
+    owner: "{{ kafka_user }}"
+    mode: "0700"
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true
+
 - name: List existing topics
+  become: true
   become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.command:
     cmd: >-
       {{ kafka__home }}/bin/kafka-topics.sh
@@ -22,7 +35,10 @@
   run_once: true
 
 - name: Create topics
+  become: true
   become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.command:
     cmd: >-
       {{ kafka__home }}/bin/kafka-topics.sh

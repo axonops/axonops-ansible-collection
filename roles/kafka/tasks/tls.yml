@@ -120,14 +120,6 @@
     mode: "0644"
   notify: Restart Kafka
 
-- name: Render admin client properties
-  ansible.builtin.template:
-    src: admin.properties.j2
-    dest: "{{ kafka__admin_props_file }}"
-    owner: "{{ kafka_user }}"
-    group: "{{ kafka_group }}"
-    mode: "0640"
-
 - name: Install pki_agent reload helper script
   ansible.builtin.template:
     src: kafka-reload-tls.sh.j2

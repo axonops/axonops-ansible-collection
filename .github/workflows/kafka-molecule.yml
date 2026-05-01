@@ -34,6 +34,7 @@ jobs:
         scenario:
           - default
           - tls
+          - sasl
 
     steps:
       - name: Check out the codebase.

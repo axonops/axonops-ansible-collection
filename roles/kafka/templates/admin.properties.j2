@@ -1,9 +1,10 @@
 # {{ ansible_managed }}
-# Bootstrap admin client properties for kafka-topics.sh / kafka-acls.sh.
-# Mirrors the broker's listener security so the CLI can talk to it.
-{% if kafka_security_enabled | bool and kafka_tls_enabled | bool %}
-security.protocol=SSL
+# Bootstrap admin client properties for kafka-topics.sh / kafka-acls.sh /
+# kafka-configs.sh. Mirrors the broker's listener security so the CLI
+# can talk to it.
+security.protocol={{ kafka__broker_protocol }}
 
+{% if kafka__tls_on | bool %}
 ssl.keystore.type=PEM
 ssl.keystore.location={{ kafka__tls_keystore_file }}
 
@@ -11,6 +12,9 @@ ssl.truststore.type=PEM
 ssl.truststore.location={{ kafka__tls_truststore_file }}
 
 ssl.endpoint.identification.algorithm=
-{% else %}
-security.protocol=PLAINTEXT
+{% endif %}
+
+{% if kafka__sasl_on | bool %}
+sasl.mechanism={{ kafka_sasl_mechanism }}
+sasl.jaas.config={{ kafka__sasl_login_module }} required username="{{ kafka_sasl_inter_broker_user }}" password="{{ kafka_sasl_inter_broker_password }}";
 {% endif %}

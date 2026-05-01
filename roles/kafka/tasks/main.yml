@@ -203,6 +203,16 @@
     - "'broker' in kafka_node_roles"
   tags: service
 
+- name: Manage SCRAM users
+  ansible.builtin.import_tasks: sasl_users.yml
+  when:
+    - kafka_start_on_install | bool
+    - kafka_security_enabled | bool
+    - kafka_sasl_enabled | bool
+    - kafka_sasl_mechanism is match('^SCRAM')
+    - kafka_sasl_users | length > 0
+  tags: sasl
+
 - name: Create Kafka topics
   ansible.builtin.import_tasks: topics.yml
   when:

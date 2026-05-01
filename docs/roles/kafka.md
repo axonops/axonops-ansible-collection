@@ -198,6 +198,42 @@ kafka_tls_enabled: true
 kafka_tls_mode: generate
 ```
 
+### Security (SASL)
+
+SASL authentication layers on top of the listener protocol. With both
+`kafka_tls_enabled` and `kafka_sasl_enabled`, listeners use `SASL_SSL`. Without
+TLS, listeners use `SASL_PLAINTEXT` (not recommended in production).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `kafka_sasl_enabled` | `false` | Enable SASL on broker and controller listeners |
+| `kafka_sasl_mechanism` | `SCRAM-SHA-512` | `SCRAM-SHA-512` \| `SCRAM-SHA-256` \| `PLAIN` |
+| `kafka_sasl_inter_broker_user` | `kafka-admin` | Identity used for broker↔broker and broker↔controller traffic |
+| `kafka_sasl_inter_broker_password` | `""` | **Required**. Bootstrap password for the inter-broker user |
+| `kafka_sasl_users` | `[]` | Additional SCRAM users created via `kafka-configs.sh` after start |
+| `kafka_sasl_plain_users` | `[]` | Static credentials for the PLAIN mechanism (must include the inter-broker user) |
+
+KRaft requires the inter-broker SCRAM user to exist before any listener opens.
+The role passes `--add-scram` to `kafka-storage.sh format` on first run, so the
+credential is committed to `__cluster_metadata` ahead of the first broker start.
+
+```yaml
+kafka_security_enabled: true
+kafka_tls_enabled: true
+kafka_tls_mode: generate
+kafka_sasl_enabled: true
+kafka_sasl_mechanism: SCRAM-SHA-512
+kafka_sasl_inter_broker_user: kafka-admin
+kafka_sasl_inter_broker_password: "{{ vault_kafka_admin_password }}"
+kafka_sasl_users:
+  - name: app1
+    password: "{{ vault_app1_password }}"
+```
+
+The role renders `/opt/kafka/config/admin.properties` (mode `0600`) so
+`kafka-topics.sh` / `kafka-configs.sh` / `kafka-acls.sh` can run with the
+inter-broker credentials via `--command-config`.
+
 ### AxonOps Agent Integration
 
 | Variable | Default | Description |
@@ -221,6 +257,7 @@ When enabled, the role invokes `axonops.axonops.agent` with the Kafka-specific p
 | `firewall` | Open broker/controller ports in firewalld or ufw |
 | `security` | TLS material distribution (stage 1 only — SASL/ACL pending) |
 | `tls` | Subset of `security` covering certificate handling |
+| `sasl` | Subset of `security` covering SASL pre-flight and SCRAM user management |
 | `config` | `server.properties` and `/etc/sysconfig/kafka` |
 | `cluster` | UUID management and storage formatting |
 | `topics` | Topic creation |

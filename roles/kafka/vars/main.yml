@@ -20,9 +20,26 @@ kafka__has_broker: "{{ 'broker' in kafka_node_roles }}"
 kafka__has_controller: "{{ 'controller' in kafka_node_roles }}"
 
 # Effective broker / controller listener protocol, derived from security flags.
-# Stage 1 supports SSL (TLS only); SASL_SSL is added in stage 2.
-kafka__broker_protocol: "{{ 'SSL' if (kafka_security_enabled | bool and kafka_tls_enabled | bool) else 'PLAINTEXT' }}"
-kafka__controller_protocol: "{{ 'SSL' if (kafka_security_enabled | bool and kafka_tls_enabled | bool) else 'PLAINTEXT' }}"
+#   tls + sasl → SASL_SSL
+#   sasl only  → SASL_PLAINTEXT
+#   tls only   → SSL
+#   neither    → PLAINTEXT
+kafka__sec_on: "{{ kafka_security_enabled | bool }}"
+kafka__tls_on: "{{ kafka__sec_on and (kafka_tls_enabled | bool) }}"
+kafka__sasl_on: "{{ kafka__sec_on and (kafka_sasl_enabled | bool) }}"
+
+kafka__broker_protocol: >-
+  {{ 'SASL_SSL' if (kafka__tls_on and kafka__sasl_on)
+     else ('SASL_PLAINTEXT' if kafka__sasl_on
+     else ('SSL' if kafka__tls_on else 'PLAINTEXT')) }}
+kafka__controller_protocol: "{{ kafka__broker_protocol }}"
+
+# Lowercase mechanism for listener.name.<>.<mech>.sasl.jaas.config keys.
+kafka__sasl_mech_lower: "{{ kafka_sasl_mechanism | lower }}"
+kafka__sasl_login_module: >-
+  {{ 'org.apache.kafka.common.security.scram.ScramLoginModule'
+     if kafka_sasl_mechanism.startswith('SCRAM')
+     else 'org.apache.kafka.common.security.plain.PlainLoginModule' }}
 
 # Listener name = protocol family. Keeps listener.security.protocol.map simple.
 kafka__broker_listener_name: "{{ kafka__broker_protocol }}"

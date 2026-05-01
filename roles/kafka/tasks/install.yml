@@ -148,3 +148,19 @@
     axon_agent_include_service_config: true
   when: kafka_axonops_agent_enabled | bool
   tags: axonops_agent
+
+- name: Install KConduit Kafka CLI client
+  when: kafka_kconduit_enabled | bool
+  block:
+    - name: Download KConduit Kafka CLI client
+      ansible.builtin.get_url:
+        url: "{{ kafka_kconduit_download_url}}"
+        dest: "/tmp/kconduit_{{ kafka_kconduit_version }}_linux_{{ kafka_kconduit_arch }}.{{ kafka_kconduit_pkg_ext }}"
+        mode: "0644"
+
+    - name: Ensure KConduit is installed
+      ansible.builtin.package:
+        name: "/tmp/kconduit_{{ kafka_kconduit_version }}_linux_{{ kafka_kconduit_arch }}.{{ kafka_kconduit_pkg_ext }}"
+        state: present
+        disable_gpg_check: true
+
