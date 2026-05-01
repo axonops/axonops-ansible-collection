@@ -123,3 +123,21 @@
     group: root
     mode: "0644"
   notify: Reload systemd
+
+- name: Install and configure AxonOps agent
+  ansible.builtin.include_role:
+    name: axonops.axonops.agent
+  vars:
+    axon_java_agent: "{{ kafka_axonops_java_agent }}"
+    axon_agent_customer_name: "{{ kafka_axonops_org }}"
+    axon_agent_server_host: "{{ kafka_axonops_server_host }}"
+    axon_agent_key: "{{ kafka_axonops_key | default(omit) }}"
+    axon_agent_server_port: "{{ kafka_axonops_agent_server_port }}"
+    axon_agent_cluster_name: "{{ kafka_axonops_cluster_name | default(omit) }}"
+    # axon_agent_version: "{{ kafka_axonops_agent_version | default(omit) }}"
+    # axon_java_agent_version: "{{ kafka_axonops_java_agent_version | default(omit) }}"
+    axon_agent_kafka_config_directory: "{{ kafka__home }}/bin"
+    axon_agent_kafka_config: ". /usr/share/axonops/axonops-jvm.options"
+    axon_agent_include_service_config: true
+  when: kafka_axonops_agent_enabled | bool
+  tags: axonops_agent
