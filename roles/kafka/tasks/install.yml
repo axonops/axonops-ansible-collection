@@ -1,4 +1,14 @@
 ---
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when:
+    - ansible_os_family == "Debian"
+    - kafka_security_enabled | bool
+    - kafka_tls_enabled | bool
+  tags: tls,security,acl
+
 - name: Ensure python3-cryptography is installed for SSL management
   ansible.builtin.package:
     name: python3-cryptography
