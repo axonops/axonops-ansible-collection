@@ -8,9 +8,7 @@
   run_once: true
 
 - name: List existing topics
-  become: true
   become_user: "{{ kafka_user }}"
-  become_flags: "-s /bin/bash"
   ansible.builtin.command:
     cmd: "{{ kafka__home }}/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"
   register: kafka__reg_existing_topics
@@ -20,9 +18,7 @@
   run_once: true
 
 - name: Create topics
-  become: true
   become_user: "{{ kafka_user }}"
-  become_flags: "-s /bin/bash"
   ansible.builtin.command:
     cmd: >-
       {{ kafka__home }}/bin/kafka-topics.sh

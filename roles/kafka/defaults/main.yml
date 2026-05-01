@@ -130,6 +130,7 @@ kafka_axonops_agent_enabled: false
 
 # AxonOps server host. Defaults to the SaaS endpoint.
 kafka_axonops_server_host: "agents.axonops.cloud"
+kafka_axonops_agent_server_port: "{% if kafka_axonops_server_host == 'agents.axonops.cloud' %}443{% else %}1888{% endif %}"
 
 # Kafka Java agent package name.
 kafka_axonops_java_agent: "axon-kafka4-agent"
@@ -138,5 +139,6 @@ kafka_axonops_java_agent: "axon-kafka4-agent"
 # kafka_axonops_agent_version: ""
 # kafka_axonops_java_agent_version: ""
 
-# Optional: override the cluster name shown in AxonOps.
+# Required when kafka_axonops_agent_enabled is true.
+# Cluster name shown in AxonOps; the Kafka Java agent fails without it.
 # kafka_axonops_cluster_name: ""

@@ -25,7 +25,7 @@ The `agent` role installs and configures the AxonOps Agent on Cassandra nodes. T
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `axon_java_agent` | `axon-cassandra5.0-agent-jdk17` | Java agent version to install. Options: `axon-cassandra3.11-agent`, `axon-cassandra4.1-agent`, `axon-cassandra5.0-agent-jdk17`, `axon-dse6.0-agent`, `axon-dse6.7-agent`, `axon-dse5.1-agent`, or empty string to skip |
-| `axon_agent_version` | `2.0.2` | Version of the AxonOps agent to install |
+| `axon_agent_version` | `2.0.21` | Version of the AxonOps agent to install |
 | `axon_java_agent_version` | `1.0.10` | Version of the Java agent to install |
 
 ### Network Configuration
@@ -89,7 +89,7 @@ None
     axon_agent_server_host: "{{ groups['axon-server'] | first }}"
     axon_agent_customer_name: mycompany
     axon_java_agent: "axon-cassandra5.0-agent-jdk17"
-    axon_agent_version: "2.0.2"
+    axon_agent_version: "2.0.21"
     axon_java_agent_version: "1.0.10"
 
   roles:
