@@ -1,0 +1,52 @@
+---
+# ============================================================================
+# Kafka Role - ACL management (post-start)
+# ============================================================================
+# Applies declarative ACLs via kafka-acls.sh. StandardAuthorizer dedupes
+# additions internally, so re-running is safe; rules are not removed if they
+# disappear from kafka_acls (intentional — out of scope for this iteration).
+
+- name: Ensure kafka user tmp dir exists
+  become: true
+  ansible.builtin.file:
+    path: /tmp/.ansible_kafka
+    state: directory
+    owner: "{{ kafka_user }}"
+    mode: "0700"
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true
+
+- name: Add ACL rules
+  become: true
+  become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
+    _perm: "{{ item.permission | default('Allow') | lower }}"
+    _rt: "{{ item.resource_type | lower }}"
+    _resource_args: >-
+      {{ ['--cluster'] if _rt == 'cluster'
+         else (['--' ~ _rt, item.resource_name]) }}
+    _host_flag: "{{ '--allow-host' if _perm == 'allow' else '--deny-host' }}"
+  ansible.builtin.command:
+    argv: >-
+      {{
+        [
+          kafka__home ~ '/bin/kafka-acls.sh',
+          '--bootstrap-server', 'localhost:9092',
+          '--command-config', kafka__admin_props_file,
+          '--add',
+          '--' ~ _perm ~ '-principal', item.principal,
+          '--operation', item.operation,
+        ] + _resource_args + [
+          '--resource-pattern-type', item.pattern_type | default('LITERAL'),
+          _host_flag, item.host | default('*'),
+        ]
+      }}
+  loop: "{{ kafka_acls }}"
+  loop_control:
+    label: "{{ item.principal }} {{ item.operation }} {{ item.resource_type }}:{{ item.resource_name | default('cluster') }}"
+  # StandardAuthorizer dedupes server-side, but kafka-acls.sh does not surface
+  # whether the rule was new. Reporting changed=true is the honest default.
+  changed_when: true
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true

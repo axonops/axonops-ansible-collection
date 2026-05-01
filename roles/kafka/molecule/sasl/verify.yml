@@ -52,4 +52,19 @@
           - "'security.protocol=SASL_SSL' in (kafka_admin_content.content | b64decode)"
           - "'sasl.mechanism=SCRAM-SHA-512' in (kafka_admin_content.content | b64decode)"
 
+    - name: Note skipped post-start tasks
+      ansible.builtin.debug:
+        msg: >-
+          sasl_users.yml and acls.yml are skipped here because
+          kafka_start_on_install=false. Those code paths require a live broker
+          and are exercised manually against real VMs (see issue #90).
+
+    - name: Assert StandardAuthorizer + super.users configured
+      ansible.builtin.assert:
+        that:
+          - "'authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer' in kafka_props"
+          - "'super.users=User:kafka-admin' in kafka_props"
+          - "'allow.everyone.if.no.acl.found=false' in kafka_props"
+        fail_msg: "ACL block missing or incorrect"
+
 # code: language=ansible

@@ -42,22 +42,29 @@ ssl.endpoint.identification.algorithm=
 
 sasl.enabled.mechanisms={{ kafka_sasl_mechanism }}
 sasl.mechanism.inter.broker.protocol={{ kafka_sasl_mechanism }}
-{% if kafka__has_controller | bool %}
+# Required on broker-only nodes too — they connect to controllers as clients.
 sasl.mechanism.controller.protocol={{ kafka_sasl_mechanism }}
-{% endif %}
 
 # Per-listener mechanism + JAAS. Per-listener overrides shadow the global
 # sasl.enabled.mechanisms once any listener.name.* SASL key is set, so both
 # must be declared explicitly for each SASL listener.
+# Broker-only nodes still need the controller listener JAAS (used as the
+# client config when they fetch from the Raft quorum).
 {% if kafka__has_broker | bool %}
 listener.name.{{ kafka__broker_listener_name | lower }}.sasl.enabled.mechanisms={{ kafka_sasl_mechanism }}
 listener.name.{{ kafka__broker_listener_name | lower }}.{{ kafka__sasl_mech_lower }}.sasl.jaas.config={{ kafka__sasl_login_module }} required username="{{ kafka_sasl_inter_broker_user }}" password="{{ kafka_sasl_inter_broker_password }}"{% if kafka_sasl_mechanism == 'PLAIN' %}{% for u in kafka_sasl_plain_users %} user_{{ u.name }}="{{ u.password }}"{% endfor %}{% endif %};
 {% endif %}
 
-{% if kafka__has_controller | bool %}
 listener.name.{{ kafka__controller_listener_name | lower }}.sasl.enabled.mechanisms={{ kafka_sasl_mechanism }}
 listener.name.{{ kafka__controller_listener_name | lower }}.{{ kafka__sasl_mech_lower }}.sasl.jaas.config={{ kafka__sasl_login_module }} required username="{{ kafka_sasl_inter_broker_user }}" password="{{ kafka_sasl_inter_broker_password }}"{% if kafka_sasl_mechanism == 'PLAIN' %}{% for u in kafka_sasl_plain_users %} user_{{ u.name }}="{{ u.password }}"{% endfor %}{% endif %};
 {% endif %}
+
+{% if kafka__sec_on | bool and (kafka_acl_enabled | bool) %}
+############################# ACLs #############################
+
+authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer
+super.users={{ (['User:' ~ kafka_sasl_inter_broker_user] + kafka_acl_super_users) | unique | join(';') }}
+allow.everyone.if.no.acl.found={{ kafka_acl_allow_everyone_if_no_acl | bool | string | lower }}
 {% endif %}
 
 num.network.threads={{ kafka_num_network_threads }}

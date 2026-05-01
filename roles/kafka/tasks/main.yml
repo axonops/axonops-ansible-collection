@@ -213,6 +213,15 @@
     - kafka_sasl_users | length > 0
   tags: sasl
 
+- name: Apply ACLs
+  ansible.builtin.import_tasks: acls.yml
+  when:
+    - kafka_start_on_install | bool
+    - kafka_security_enabled | bool
+    - kafka_acl_enabled | bool
+    - kafka_acls | length > 0
+  tags: acl
+
 - name: Create Kafka topics
   ansible.builtin.import_tasks: topics.yml
   when:

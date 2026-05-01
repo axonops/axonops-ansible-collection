@@ -3,7 +3,9 @@
   ansible.builtin.package:
     name: python3-cryptography
     state: present
-  when: kafka_security_enabled | bool or kafka_tls_enabled | bool
+  when:
+    - kafka_security_enabled | bool
+    - kafka_tls_enabled | bool
   tags: tls,security,acl
 
 - name: Ensure Kafka group exists
@@ -131,6 +133,27 @@
     mode: "0644"
   notify: Reload systemd
 
+- name: Ensure /etc/axonops directory exists
+  ansible.builtin.file:
+    path: /etc/axonops
+    state: directory
+    mode: "0755"
+  when: kafka_axonops_agent_enabled | bool
+  tags: axonops_agent
+
+- name: Render AxonOps agent Kafka client properties
+  ansible.builtin.template:
+    src: agent_client.properties.j2
+    dest: "{{ kafka_axonops_client_properties_path }}"
+    owner: root
+    group: axonops
+    mode: "0640"
+  no_log: "{{ kafka_sasl_enabled | bool }}"
+  when:
+    - kafka_axonops_agent_enabled | bool
+    - kafka_security_enabled | bool
+  tags: axonops_agent
+
 - name: Install and configure AxonOps agent
   ansible.builtin.include_role:
     name: axonops.axonops.agent
@@ -145,6 +168,8 @@
     # axon_java_agent_version: "{{ kafka_axonops_java_agent_version | default(omit) }}"
     axon_agent_kafka_config_directory: "{{ kafka__home }}/bin"
     axon_agent_kafka_config: ". /usr/share/axonops/axonops-jvm.options"
+    axon_agent_kafka_client_properties: >-
+      {{ kafka_axonops_client_properties_path if (kafka_security_enabled | bool) else '' }}
     axon_agent_include_service_config: true
   when: kafka_axonops_agent_enabled | bool
   tags: axonops_agent
@@ -163,4 +188,3 @@
         name: "/tmp/kconduit_{{ kafka_kconduit_version }}_linux_{{ kafka_kconduit_arch }}.{{ kafka_kconduit_pkg_ext }}"
         state: present
         disable_gpg_check: true
-

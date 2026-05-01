@@ -144,6 +144,40 @@ kafka_sasl_users: []
 # - { name: kafka-admin, password: secret }
 kafka_sasl_plain_users: []
 
+# --- ACLs -------------------------------------------------------------------
+
+# Enable StandardAuthorizer (KRaft-native, no ZooKeeper). Requires
+# kafka_security_enabled: true. Inter-broker user is always added to
+# super.users so brokers can manage cluster metadata.
+kafka_acl_enabled: false
+
+# Additional principals granted super-user privileges. The inter-broker
+# user is appended automatically; do not list it again.
+kafka_acl_super_users: []
+
+# When false (production default), denied-by-default for unmatched topics.
+kafka_acl_allow_everyone_if_no_acl: false
+
+# Declarative ACL rules applied via kafka-acls.sh after the broker starts.
+# Each entry:
+#   principal     (str, required) — e.g. "User:app1"
+#   operation     (str, required) — Read | Write | Create | Delete | Alter |
+#                                   Describe | ClusterAction | AlterConfigs |
+#                                   DescribeConfigs | IdempotentWrite | All
+#   resource_type (str, required) — Topic | Group | Cluster | TransactionalId |
+#                                   DelegationToken
+#   resource_name (str, required) — name or "*"
+#   permission    (str, default Allow) — Allow | Deny
+#   host          (str, default "*")
+#   pattern_type  (str, default LITERAL) — LITERAL | PREFIXED
+kafka_acls: []
+# - principal: "User:app1"
+#   operation: Read
+#   resource_type: Topic
+#   resource_name: events
+#   permission: Allow
+#   host: "*"
+
 # --- Topic Defaults ---------------------------------------------------------
 
 kafka_num_partitions: 1
@@ -214,6 +248,16 @@ kafka_axonops_java_agent: "axon-kafka4-agent"
 # Required when kafka_axonops_agent_enabled is true.
 # Cluster name shown in AxonOps; the Kafka Java agent fails without it.
 # kafka_axonops_cluster_name: ""
+
+# When kafka_security_enabled is true, the role renders a client.properties
+# file matching the cluster's auth mode and passes it to the agent role via
+# axon_agent_kafka_client_properties. The agent uses these credentials for
+# its Kafka admin client (consumer-group lag, topic metadata, etc.).
+# Defaults reuse the inter-broker identity when SASL is enabled; override
+# to use a dedicated, lower-privileged user.
+kafka_axonops_sasl_user: "{{ kafka_sasl_inter_broker_user }}"
+kafka_axonops_sasl_password: "{{ kafka_sasl_inter_broker_password }}"
+kafka_axonops_client_properties_path: /etc/axonops/kafka_client.properties
 
 # Optionally install the Kconduit kafka cli client
 kafka_kconduit_enabled: false

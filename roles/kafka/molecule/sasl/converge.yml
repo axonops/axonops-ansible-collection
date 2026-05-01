@@ -30,6 +30,12 @@
     kafka_sasl_users:
       - name: app1
         password: "molecule-app1-secret"
+    kafka_acl_enabled: true
+    kafka_acls:
+      - principal: "User:app1"
+        operation: Read
+        resource_type: Topic
+        resource_name: events
 
   roles:
     - role: kafka
