@@ -249,7 +249,7 @@ The `make alerts` command executes the [alerts.yml](alerts.yml) playbook. This p
 1.  Identifies your AxonOps organization and cluster name from Ansible variables.
 2.  Loads all `.yml` configuration files from `alerts-config/<org_name>/`.
 3.  Loads and merges all `.yml` configuration files from `alerts-config/<org_name>/<cluster_name>/`, allowing cluster-specific overrides.
-4.  Passes these configurations as variables to the `axonops.axonops.alerts` role, which communicates with the AxonOps API to apply the settings.
+4.  Passes these configurations as variables to the `axonops.axonops.configurations` role, which communicates with the AxonOps API to apply the settings.
 
 > [!IMPORTANT]
 > Before you can use this playbook, you will need to create the directories `alerts-config/<org_name>/` and `alerts-config/<org_name>/<cluster_name>/` using the examples provided **

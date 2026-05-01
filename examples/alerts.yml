@@ -55,6 +55,12 @@
         cluster: "{{ axon_agent_customer_name | default(lookup('env', 'AXONOPS_CLUSTER')) }}"
       when: cluster is not defined
 
+    - name: Get the cluster type
+      tags: always
+      ansible.builtin.set_fact:
+        cluster_type: "{{ cluster_type | default(lookup('env', 'AXONOPS_CLUSTER_TYPE')) }}"
+      when: cluster_type is not defined
+
     - name: Fail if no org
       ansible.builtin.assert:
         that:
@@ -74,7 +80,7 @@
         - "alerts/config/{{ org }}/{{ cluster }}/alert_routes.yml"
 
   roles:
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
       vars:
         present: true
 
