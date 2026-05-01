@@ -1278,7 +1278,7 @@ sstable:
 # in use (64 KiB for BIG, 16KiB for BTI).
 # Min unit: KiB
 # column_index_size: 4KiB
-{% if cassandra_column_index_size is defined  and column_index_size != ''%}
+{% if cassandra_column_index_size is defined and cassandra_column_index_size != '' %}
 column_index_size: {{ cassandra_column_index_size }}
 {% endif %}
 
