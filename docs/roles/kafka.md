@@ -138,6 +138,66 @@ Topic entry fields:
 | `kafka_additional_config` | `{}`         | Extra key/value pairs appended verbatim to `server.properties`                                     |
 | `kafka_checksum`          | auto-fetched | Override the tarball SHA-512 checksum. Only needed if the Apache checksum endpoint is unreachable. |
 
+### Security (TLS)
+
+Security is opt-in via `kafka_security_enabled`. When `false` (default), behaviour is unchanged and listeners stay PLAINTEXT.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `kafka_security_enabled` | `false` | Master switch; nothing in `security.yml` runs unless `true` |
+| `kafka_tls_enabled` | `false` | Encrypt broker and controller listeners with TLS |
+| `kafka_tls_mode` | `custom` | `custom` \| `pki_agent` \| `generate` |
+| `kafka_tls_client_auth` | `required` | `required` (mTLS) \| `requested` \| `none` |
+| `kafka_tls_cert` / `kafka_tls_key` / `kafka_tls_ca` | `""` | Control-node PEM paths (custom mode) |
+| `kafka_tls_key_password` | `""` | Password for an encrypted private key (optional) |
+| `kafka_tls_pki_cert_path` / `kafka_tls_pki_key_path` / `kafka_tls_pki_ca_path` | `/opt/tls/kafka/{cert,key,ca}.pem` | Broker-host paths written by `axonops.axonops.pki_agent` |
+| `kafka_tls_generate_ca_cn` | `Kafka Dev CA` | CN of the self-signed CA in `generate` mode |
+| `kafka_tls_generate_validity_days` | `3650` | Validity of generated CA + per-host certs |
+| `kafka_tls_remote_dir` | `/etc/kafka/tls` | On-disk location of `keystore.pem` and `ca.pem` |
+
+The role assembles `keystore.pem` (cert chain + key concatenated) and `ca.pem` in `kafka_tls_remote_dir` regardless of source mode. Kafka loads them via `ssl.keystore.type=PEM`.
+
+**`custom` mode** — supply paths to PEM files on the control node:
+
+```yaml
+kafka_security_enabled: true
+kafka_tls_enabled: true
+kafka_tls_mode: custom
+kafka_tls_cert: /home/ops/secrets/kafka.crt
+kafka_tls_key: /home/ops/secrets/kafka.key
+kafka_tls_ca: /home/ops/secrets/ca.crt
+```
+
+**`pki_agent` mode** — pair with `axonops.axonops.pki_agent`. Set the agent's `reload_command` to the helper script the role installs at `/usr/local/sbin/kafka-reload-tls.sh`; it reassembles the keystore on rotation and restarts Kafka:
+
+```yaml
+- role: axonops.axonops.pki_agent
+  vars:
+    pki_agent_certificates:
+      - name: kafka
+        pki_mount: pki
+        pki_role: kafka
+        common_name: "{{ inventory_hostname }}"
+        cert_path: /opt/tls/kafka/cert.pem
+        key_path: /opt/tls/kafka/key.pem
+        ca_path: /opt/tls/kafka/ca.pem
+        reload_command: /usr/local/sbin/kafka-reload-tls.sh
+
+- role: axonops.axonops.kafka
+  vars:
+    kafka_security_enabled: true
+    kafka_tls_enabled: true
+    kafka_tls_mode: pki_agent
+```
+
+**`generate` mode (DEV ONLY)** — role creates a self-signed CA on the control node and signs per-host certs. Requires `community.crypto` and the Python `cryptography` package on the control node. **Do not use in production.**
+
+```yaml
+kafka_security_enabled: true
+kafka_tls_enabled: true
+kafka_tls_mode: generate
+```
+
 ### AxonOps Agent Integration
 
 | Variable | Default | Description |
@@ -159,6 +219,8 @@ When enabled, the role invokes `axonops.axonops.agent` with the Kafka-specific p
 |-----|-------------|
 | `install` | Download, extract, user/group, symlink, service unit |
 | `firewall` | Open broker/controller ports in firewalld or ufw |
+| `security` | TLS material distribution (stage 1 only — SASL/ACL pending) |
+| `tls` | Subset of `security` covering certificate handling |
 | `config` | `server.properties` and `/etc/sysconfig/kafka` |
 | `cluster` | UUID management and storage formatting |
 | `topics` | Topic creation |

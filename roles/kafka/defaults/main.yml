@@ -62,7 +62,9 @@ kafka_node_roles:
 #   controller-only → [CONTROLLER://:9093]
 kafka_listeners: []
 
-kafka_inter_broker_listener_name: PLAINTEXT
+# Override the inter-broker listener name. Leave empty to auto-derive from
+# the security state (PLAINTEXT or SSL).
+kafka_inter_broker_listener_name: ""
 
 # --- Performance ------------------------------------------------------------
 
@@ -71,6 +73,51 @@ kafka_num_io_threads: 8
 kafka_socket_send_buffer_bytes: 102400
 kafka_socket_receive_buffer_bytes: 102400
 kafka_socket_request_max_bytes: 104857600
+
+# --- Security (master switch) ----------------------------------------------
+
+# When false (default), nothing in security.yml runs and listeners stay PLAINTEXT.
+# This preserves backward compatibility with existing deployments.
+kafka_security_enabled: false
+
+# --- TLS --------------------------------------------------------------------
+
+# Enable TLS on broker and controller listeners. Requires kafka_security_enabled: true.
+kafka_tls_enabled: false
+
+# Provisioning mode: how PEM material reaches the broker hosts.
+#   custom    — user supplies PEM files on the control node, role copies them
+#   pki_agent — read PEM files written locally by axonops.axonops.pki_agent
+#   generate  — role creates a self-signed CA and per-host certs (DEV ONLY)
+kafka_tls_mode: custom
+
+# Client authentication on TLS listeners.
+#   required  — mTLS, client must present a trusted cert (default)
+#   requested — client may present a cert, validated if so
+#   none      — server-auth only
+kafka_tls_client_auth: required
+
+# custom mode — paths on the CONTROL NODE; copied to brokers
+kafka_tls_cert: ""
+kafka_tls_key: ""
+kafka_tls_ca: ""
+kafka_tls_key_password: ""
+
+# pki_agent mode — paths on the BROKER HOST where pki_agent writes the PEM files
+kafka_tls_pki_cert_path: /opt/tls/kafka/cert.pem
+kafka_tls_pki_key_path: /opt/tls/kafka/key.pem
+kafka_tls_pki_ca_path: /opt/tls/kafka/ca.pem
+
+# generate mode — dev/test convenience only; do not use in production
+kafka_tls_generate_ca_cn: "Kafka Dev CA"
+kafka_tls_generate_validity_days: 3650
+# Control-node directory used to stage the generated CA between hosts
+kafka_tls_generate_local_dir: "/tmp/kafka-tls-{{ kafka_axonops_cluster_name | default('dev') }}"
+
+# Remote directory the broker reads PEM files from. The role places
+# kafka.crt, kafka.key and ca.crt here for custom and generate modes;
+# pki_agent mode reads directly from the kafka_tls_pki_* paths above.
+kafka_tls_remote_dir: /etc/kafka/tls
 
 # --- Topic Defaults ---------------------------------------------------------
 

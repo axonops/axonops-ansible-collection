@@ -1,4 +1,11 @@
 ---
+- name: Ensure python3-cryptography is installed for SSL management
+  ansible.builtin.package:
+    name: python3-cryptography
+    state: present
+  when: kafka_security_enabled | bool or kafka_tls_enabled | bool
+  tags: tls,security,acl
+
 - name: Ensure Kafka group exists
   ansible.builtin.group:
     name: "{{ kafka_group }}"

@@ -13,15 +13,29 @@ controller.quorum.voters={% for host in groups['kafka__group_controller_nodes'] 
 
 listeners={{ kafka__effective_listeners | join(',') }}
 
-inter.broker.listener.name={{ kafka_inter_broker_listener_name }}
+inter.broker.listener.name={{ kafka_inter_broker_listener_name | default('', true) or kafka__broker_listener_name }}
 
 {% if kafka__has_broker | bool %}
-advertised.listeners=PLAINTEXT://{{ kafka_node_ip }}:9092
+advertised.listeners={{ kafka__broker_listener_name }}://{{ kafka_node_ip }}:9092
 {% endif %}
 
-controller.listener.names=CONTROLLER
+controller.listener.names={{ kafka__controller_listener_name }}
 
-listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
+listener.security.protocol.map={{ kafka__controller_listener_name }}:{{ kafka__controller_protocol }},PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
+
+{% if kafka_security_enabled | bool and kafka_tls_enabled | bool %}
+############################# TLS #############################
+
+ssl.keystore.type=PEM
+ssl.keystore.location={{ kafka__tls_keystore_file }}
+{% if kafka_tls_key_password | length > 0 %}
+ssl.key.password={{ kafka_tls_key_password }}
+{% endif %}
+ssl.truststore.type=PEM
+ssl.truststore.location={{ kafka__tls_truststore_file }}
+ssl.client.auth={{ kafka_tls_client_auth }}
+ssl.endpoint.identification.algorithm=
+{% endif %}
 
 num.network.threads={{ kafka_num_network_threads }}
 num.io.threads={{ kafka_num_io_threads }}

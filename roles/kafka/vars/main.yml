@@ -19,10 +19,46 @@ kafka__java_pkg: >-
 kafka__has_broker: "{{ 'broker' in kafka_node_roles }}"
 kafka__has_controller: "{{ 'controller' in kafka_node_roles }}"
 
+# Effective broker / controller listener protocol, derived from security flags.
+# Stage 1 supports SSL (TLS only); SASL_SSL is added in stage 2.
+kafka__broker_protocol: "{{ 'SSL' if (kafka_security_enabled | bool and kafka_tls_enabled | bool) else 'PLAINTEXT' }}"
+kafka__controller_protocol: "{{ 'SSL' if (kafka_security_enabled | bool and kafka_tls_enabled | bool) else 'PLAINTEXT' }}"
+
+# Listener name = protocol family. Keeps listener.security.protocol.map simple.
+kafka__broker_listener_name: "{{ kafka__broker_protocol }}"
+kafka__controller_listener_name: CONTROLLER
+
 kafka__default_listeners: >-
   {{
-    (['PLAINTEXT://:9092'] if kafka__has_broker | bool else []) +
-    (['CONTROLLER://:9093'] if kafka__has_controller | bool else [])
+    ([kafka__broker_listener_name ~ '://:9092'] if kafka__has_broker | bool else []) +
+    ([kafka__controller_listener_name ~ '://:9093'] if kafka__has_controller | bool else [])
   }}
 
 kafka__effective_listeners: "{{ (kafka_listeners | length > 0) | ternary(kafka_listeners, kafka__default_listeners) }}"
+
+# TLS material paths used by template + tasks.
+# Kafka 4.x PEM keystore loads a single file containing the cert chain followed
+# by the private key. The role assembles this combined file in kafka_tls_remote_dir
+# regardless of source mode.
+kafka__tls_keystore_file: "{{ kafka_tls_remote_dir }}/keystore.pem"
+kafka__tls_truststore_file: "{{ kafka_tls_remote_dir }}/ca.pem"
+
+# Source paths for the keystore assembly step.
+# custom    — copied from control node
+# pki_agent — already on disk at user-supplied paths, read directly
+# generate  — produced locally then copied
+kafka__tls_src_cert: "{{ kafka_tls_pki_cert_path if kafka_tls_mode == 'pki_agent' else (kafka_tls_remote_dir ~ '/source.crt') }}"
+kafka__tls_src_key: "{{ kafka_tls_pki_key_path if kafka_tls_mode == 'pki_agent' else (kafka_tls_remote_dir ~ '/source.key') }}"
+kafka__tls_src_ca: "{{ kafka_tls_pki_ca_path if kafka_tls_mode == 'pki_agent' else (kafka_tls_remote_dir ~ '/source.ca.crt') }}"
+
+# Normalised key (PKCS#8) used to build the keystore. Kafka's PEM keystore
+# loader rejects PKCS#1 RSA keys, so source keys are converted in place.
+kafka__tls_normalised_key: "{{ kafka_tls_remote_dir }}/normalised.key"
+
+# Reload helper script used as pki_agent reload_command. Reassembles keystore on
+# cert rotation then restarts kafka.
+kafka__tls_reload_script: /usr/local/sbin/kafka-reload-tls.sh
+
+# Admin client properties consumed by kafka-topics.sh / kafka-acls.sh via
+# --command-config when security is enabled.
+kafka__admin_props_file: "{{ kafka__home }}/config/admin.properties"
