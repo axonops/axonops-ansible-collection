@@ -4,10 +4,11 @@
 # These rules are applied to ALL clusters in the organisation.
 # Override or extend per-cluster in config/<org>/<cluster>/log_alert_rules.yml
 #
-# Log phrases must be wrapped as: \"text to search\"
-# For regex patterns use single-quoted strings without escaping.
-# Match FATAL and ERROR as standalone tokens at the log level field position
-# (e.g. '] FATAL ' or '] ERROR ') to avoid false positives.
+# The content field uses simple_query_string syntax:
+#   Single word: timeout        Phrase: \"GC pause\"
+#   AND: +timeout +error        OR: timeout error
+#   NOT: timeout -warning       Wildcard: time*
+# Regex (e.g. .*, [a-z]+) is NOT supported.
 
 axonops_log_alert_rule:
 
@@ -17,7 +18,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"Fatal error during KafkaServer startup\"
+  content: +Fatal +error +KafkaServer +startup
   source: "/var/log/kafka/server.log"
   description: Broker failed to start. Check port conflicts, config errors, or permissions. Verify server.properties and listener ports.
 
@@ -25,7 +26,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"OutOfMemoryError\"
+  content: +OutOfMemoryError
   source: "/var/log/kafka/server.log"
   description: JVM heap exhausted. Increase -Xmx, review message sizes, check for memory leaks in custom interceptors or serialisers.
 
@@ -33,7 +34,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: '] FATAL '
+  content: FATAL
   source: "/var/log/kafka/server.log"
   description: Fatal condition causing broker abort. Investigate immediately; check full stack trace.
 
@@ -41,7 +42,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"KafkaStorageException\"
+  content: +KafkaStorageException
   source: "/var/log/kafka/server.log"
   description: Disk-level failure. Check disk health, SMART status, and filesystem mount state.
 
@@ -49,7 +50,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"Failed to create or validate data directory\"
+  content: +Failed +create +validate +data +directory
   source: "/var/log/kafka/server.log"
   description: Kafka cannot access a log directory. Verify directory exists, permissions are correct, and the filesystem is mounted and writable.
 
@@ -57,7 +58,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"Error while flushing log\"
+  content: +Error +flushing +log
   source: "/var/log/kafka/server.log"
   description: Typically java.io.IOException — No space left on device. Expand storage, reduce retention, or delete unused topics.
 
@@ -65,7 +66,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"Disk error while locking directory\"
+  content: +Disk +error +locking +directory
   source: "/var/log/kafka/server.log"
   description: Another process is holding the data directory lock or the filesystem is read-only. Ensure no duplicate Kafka processes are running.
 
@@ -76,7 +77,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 5
   duration: 5m
-  content: \"under replicated\"
+  content: +under +replicated
   source: "/var/log/kafka/server.log"
   description: Partitions have fewer in-sync replicas than the replication factor. Risk of data loss if another broker fails.
 
@@ -84,7 +85,7 @@ axonops_log_alert_rule:
   warning_value: 3
   critical_value: 20
   duration: 5m
-  content: \"ISR shrunk\"
+  content: +ISR +shrunk
   source: "/var/log/kafka/server.log"
   description: A replica fell behind and was removed from the ISR. Check the lagging broker's disk I/O, network latency, and resource utilisation.
 
@@ -92,7 +93,7 @@ axonops_log_alert_rule:
   warning_value: 3
   critical_value: 20
   duration: 5m
-  content: \"Shrinking ISR from\"
+  content: +Shrinking +ISR
   source: "/var/log/kafka/state-change.log"
   description: ISR shrink logged in state-change log. Indicates replication performance issues.
 
@@ -100,7 +101,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"OfflinePartition\"
+  content: +OfflinePartition
   source: "/var/log/kafka/state-change.log"
   description: A partition has no active leader. Restore the failed broker or trigger partition reassignment.
 
@@ -111,7 +112,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 10
   duration: 5m
-  content: \"Authorization failed\"
+  content: +Authorization +failed
   source: "/var/log/kafka/kafka-authorizer.log"
   description: A client request was denied by the ACL authoriser. If unexpected, investigate potential misconfiguration or security breach.
 
@@ -119,7 +120,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 20
   duration: 5m
-  content: \"Failed authentication\"
+  content: +Failed +authentication
   source: "/var/log/kafka/server.log"
   description: Client failed SASL/mTLS authentication. Check client credentials, SASL configuration, and SCRAM user store.
 
@@ -130,7 +131,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 3
   duration: 15m
-  content: \"Full GC\"
+  content: +Full +GC
   source: "/var/log/kafka/kafkaServer-gc.log"
   description: Stop-the-world full GC occurred. If frequent, increase heap size. Kafka recommends G1GC with -XX:MaxGCPauseMillis=20.
 
@@ -138,15 +139,15 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 3
   duration: 15m
-  content: 'GC.* pause .* [0-9]{4,}ms'
+  content: +GC +pause
   source: "/var/log/kafka/kafkaServer-gc.log"
-  description: GC pause exceeding 1s can cause consumer lag spikes and request timeouts. Tune JVM heap (4-8 GB recommended).
+  description: GC pause detected. Long pauses (over 1s) can cause consumer lag spikes and request timeouts. Tune JVM heap (4-8 GB recommended). This rule matches all GC pauses; use warning/critical thresholds to control alert sensitivity.
 
 - name: Broker G1GC Mark Abort
   warning_value: 1
   critical_value: 1
   duration: 5m
-  content: \"concurrent-mark-abort\"
+  content: +concurrent-mark-abort
   source: "/var/log/kafka/kafkaServer-gc.log"
   description: G1GC marking cycle aborted due to heap pressure, often preceding an OOM. Review heap sizing immediately.
 
@@ -154,7 +155,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"OutOfMemoryError\"
+  content: +OutOfMemoryError
   source: "/var/log/kafka/kafkaServer-gc.log"
   description: JVM heap exhausted as detected in GC log. Increase -Xmx immediately.
 
@@ -165,7 +166,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"the leader is (none)\"
+  content: +leader +none
   source: "/var/log/kafka/controller.log"
   description: The KRaft quorum has no elected leader. The cluster cannot process metadata changes. Check connectivity between all controller nodes.
 
@@ -173,7 +174,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: '] FATAL '
+  content: FATAL
   source: "/var/log/kafka/controller.log"
   description: Fatal condition in the controller process. Investigate the full stack trace immediately.
 
@@ -181,7 +182,7 @@ axonops_log_alert_rule:
   warning_value: 3
   critical_value: 20
   duration: 5m
-  content: '] ERROR '
+  content: ERROR
   source: "/var/log/kafka/controller.log"
   description: Error in the controller log. Any error indicates a significant operational event.
 
@@ -189,7 +190,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"OutOfMemoryError\"
+  content: +OutOfMemoryError
   source: "/var/log/kafka/controller.log"
   description: Controller JVM heap exhausted. Increase controller heap — larger clusters require more memory for in-memory metadata.
 
@@ -197,7 +198,7 @@ axonops_log_alert_rule:
   warning_value: 3
   critical_value: 20
   duration: 15m
-  content: \"Completed transition to Unattached\"
+  content: +Completed +transition +Unattached
   source: "/var/log/kafka/controller.log"
   description: Controller is frequently losing its quorum attachment. May indicate network instability between controller nodes. A few occurrences per week can be normal but sustained frequency is not.
 
@@ -205,7 +206,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"MetadataLoadError\"
+  content: +MetadataLoadError
   source: "/var/log/kafka/controller.log"
   description: The BrokerMetadataListener encountered errors loading the metadata log. Data integrity risk; investigate immediately.
 
@@ -216,7 +217,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: '] FATAL '
+  content: FATAL
   source: "/var/log/kafka/connect.log"
   description: The Connect worker process has encountered a fatal error. Restart the worker and investigate the root cause.
 
@@ -224,7 +225,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"Failed to start worker\"
+  content: +Failed +start +worker
   source: "/var/log/kafka/connect.log"
   description: Worker failed to start, typically due to configuration errors. Validate connect-distributed.properties.
 
@@ -235,7 +236,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: 'WorkerSinkTask.*FAILED'
+  content: +WorkerSinkTask +FAILED
   source: "/var/log/kafka/connect.log"
   description: A sink connector task has transitioned to FAILED state. Connect does NOT automatically restart failed tasks. Restart via REST API POST /connectors/{name}/tasks/{id}/restart.
 
@@ -243,7 +244,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: 'WorkerSourceTask.*FAILED'
+  content: +WorkerSourceTask +FAILED
   source: "/var/log/kafka/connect.log"
   description: A source connector task has transitioned to FAILED state. Connect does NOT automatically restart failed tasks. Restart via REST API POST /connectors/{name}/tasks/{id}/restart.
 
@@ -251,7 +252,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 5
   duration: 5m
-  content: \"Failed to commit offsets\"
+  content: +Failed +commit +offsets
   source: "/var/log/kafka/connect.log"
   description: Offset commit failed, typically due to consumer group rebalance timeout. Increase session.timeout.ms or reduce max.poll.records.
 
@@ -259,7 +260,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 10
   duration: 5m
-  content: \"DeserializationException\"
+  content: +DeserializationException
   source: "/var/log/kafka/connect.log"
   description: Schema or serialisation mismatch. Check schema registry configuration and producer schema compatibility settings.
 
@@ -267,7 +268,7 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 1
   duration: 1m
-  content: \"Connection refused.*8083\"
+  content: +\"Connection refused\" +8083
   source: "/var/log/kafka/connect.log"
   description: The Connect worker REST API is unreachable — indicates a worker crash or network issue.
 
@@ -275,6 +276,6 @@ axonops_log_alert_rule:
   warning_value: 1
   critical_value: 5
   duration: 5m
-  content: \"Disconnected from node\"
+  content: +Disconnected +node
   source: "/var/log/kafka/connect.log"
   description: Connect worker lost connectivity to a Kafka broker. Check broker health and network path between Connect and Kafka.
