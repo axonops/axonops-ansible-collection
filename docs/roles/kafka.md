@@ -10,7 +10,7 @@ Installs and configures Apache Kafka in **KRaft mode** (no ZooKeeper) on RHEL/De
 | Mode | KRaft only (no ZooKeeper) |
 | Installation | Tar archive from Apache mirrors |
 | Topologies | Combined broker+controller, broker-only, controller-only |
-| TLS/SASL | Not included — planned for a future release |
+| TLS/SASL/ACL | Opt-in via `kafka_security_enabled`; PLAINTEXT remains the default |
 
 ## Requirements
 
@@ -65,7 +65,7 @@ Installs and configures Apache Kafka in **KRaft mode** (no ZooKeeper) on RHEL/De
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `kafka_listeners` | `[]` | Override auto-derived listeners. Leave empty to use role defaults based on `kafka_node_roles`. |
-| `kafka_inter_broker_listener_name` | `PLAINTEXT` | Listener name used for inter-broker communication. |
+| `kafka_inter_broker_listener_name` | `""` | Listener name used for inter-broker communication. Leave empty to auto-derive from the security state (`PLAINTEXT`, `SSL`, `SASL_PLAINTEXT`, or `SASL_SSL`). |
 
 Auto-derived listener defaults by topology:
 
@@ -138,6 +138,153 @@ Topic entry fields:
 | `kafka_additional_config` | `{}`         | Extra key/value pairs appended verbatim to `server.properties`                                     |
 | `kafka_checksum`          | auto-fetched | Override the tarball SHA-512 checksum. Only needed if the Apache checksum endpoint is unreachable. |
 
+### Security (TLS)
+
+Security is opt-in via `kafka_security_enabled`. When `false` (default), behaviour is unchanged and listeners stay PLAINTEXT.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `kafka_security_enabled` | `false` | Master switch; nothing in `security.yml` runs unless `true` |
+| `kafka_tls_enabled` | `false` | Encrypt broker and controller listeners with TLS |
+| `kafka_tls_mode` | `custom` | `custom` \| `pki_agent` \| `generate` |
+| `kafka_tls_client_auth` | `required` | `required` (mTLS) \| `requested` \| `none` |
+| `kafka_tls_cert` / `kafka_tls_key` / `kafka_tls_ca` | `""` | Control-node PEM paths (custom mode) |
+| `kafka_tls_key_password` | `""` | Password for an encrypted private key (optional) |
+| `kafka_tls_pki_cert_path` / `kafka_tls_pki_key_path` / `kafka_tls_pki_ca_path` | `/opt/tls/kafka/{cert,key,ca}.pem` | Broker-host paths written by `axonops.axonops.pki_agent` |
+| `kafka_tls_generate_ca_cn` | `Kafka Dev CA` | CN of the self-signed CA in `generate` mode |
+| `kafka_tls_generate_validity_days` | `3650` | Validity of generated CA + per-host certs |
+| `kafka_tls_generate_local_dir` | `/tmp/kafka-tls-{{ kafka_axonops_cluster_name \| default('dev') }}` | Control-node staging directory for the generated CA and per-host PEM material |
+| `kafka_tls_remote_dir` | `/etc/kafka/tls` | On-disk location of `keystore.pem` and `ca.pem` |
+
+The role assembles `keystore.pem` (cert chain + key concatenated) and `ca.pem` in `kafka_tls_remote_dir` regardless of source mode. Kafka loads them via `ssl.keystore.type=PEM`.
+
+**`custom` mode** — supply paths to PEM files on the control node:
+
+```yaml
+kafka_security_enabled: true
+kafka_tls_enabled: true
+kafka_tls_mode: custom
+kafka_tls_cert: /home/ops/secrets/kafka.crt
+kafka_tls_key: /home/ops/secrets/kafka.key
+kafka_tls_ca: /home/ops/secrets/ca.crt
+```
+
+**`pki_agent` mode** — pair with `axonops.axonops.pki_agent`. Set the agent's `reload_command` to the helper script the role installs at `/usr/local/sbin/kafka-reload-tls.sh`; it reassembles the keystore on rotation and restarts Kafka:
+
+```yaml
+- role: axonops.axonops.pki_agent
+  vars:
+    pki_agent_certificates:
+      - name: kafka
+        pki_mount: pki
+        pki_role: kafka
+        common_name: "{{ inventory_hostname }}"
+        cert_path: /opt/tls/kafka/cert.pem
+        key_path: /opt/tls/kafka/key.pem
+        ca_path: /opt/tls/kafka/ca.pem
+        reload_command: /usr/local/sbin/kafka-reload-tls.sh
+
+- role: axonops.axonops.kafka
+  vars:
+    kafka_security_enabled: true
+    kafka_tls_enabled: true
+    kafka_tls_mode: pki_agent
+```
+
+**`generate` mode (DEV ONLY)** — role creates a self-signed CA on the control node and signs per-host certs. Requires `community.crypto` and the Python `cryptography` package on the control node. **Do not use in production.**
+
+```yaml
+kafka_security_enabled: true
+kafka_tls_enabled: true
+kafka_tls_mode: generate
+```
+
+### Security (SASL)
+
+SASL authentication layers on top of the listener protocol. With both
+`kafka_tls_enabled` and `kafka_sasl_enabled`, listeners use `SASL_SSL`. Without
+TLS, listeners use `SASL_PLAINTEXT` (not recommended in production).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `kafka_sasl_enabled` | `false` | Enable SASL on broker and controller listeners |
+| `kafka_sasl_mechanism` | `SCRAM-SHA-512` | `SCRAM-SHA-512` \| `SCRAM-SHA-256` \| `PLAIN` |
+| `kafka_sasl_inter_broker_user` | `kafka-admin` | Identity used for broker↔broker and broker↔controller traffic |
+| `kafka_sasl_inter_broker_password` | `""` | **Required**. Bootstrap password for the inter-broker user |
+| `kafka_sasl_users` | `[]` | Additional SCRAM users created via `kafka-configs.sh` after start |
+| `kafka_sasl_plain_users` | `[]` | Static credentials for the PLAIN mechanism (must include the inter-broker user) |
+
+KRaft requires the inter-broker SCRAM user to exist before any listener opens.
+The role passes `--add-scram` to `kafka-storage.sh format` on first run, so the
+credential is committed to `__cluster_metadata` ahead of the first broker start.
+
+```yaml
+kafka_security_enabled: true
+kafka_tls_enabled: true
+kafka_tls_mode: generate
+kafka_sasl_enabled: true
+kafka_sasl_mechanism: SCRAM-SHA-512
+kafka_sasl_inter_broker_user: kafka-admin
+kafka_sasl_inter_broker_password: "{{ vault_kafka_admin_password }}"
+kafka_sasl_users:
+  - name: app1
+    password: "{{ vault_app1_password }}"
+```
+
+The role renders `/opt/kafka/config/admin.properties` (mode `0600`) so
+`kafka-topics.sh` / `kafka-configs.sh` / `kafka-acls.sh` can run with the
+inter-broker credentials via `--command-config`.
+
+**Production example — SASL_SSL with user-supplied PEM material**:
+
+```yaml
+kafka_security_enabled: true
+kafka_tls_enabled: true
+kafka_tls_mode: custom
+kafka_tls_cert: "/secrets/kafka/{{ inventory_hostname }}.crt"
+kafka_tls_key: "/secrets/kafka/{{ inventory_hostname }}.key"
+kafka_tls_ca: "/secrets/kafka/ca.crt"
+kafka_sasl_enabled: true
+kafka_sasl_mechanism: SCRAM-SHA-512
+kafka_sasl_inter_broker_user: kafka-admin
+kafka_sasl_inter_broker_password: "{{ vault_kafka_admin_password }}"
+kafka_sasl_users:
+  - name: app1
+    password: "{{ vault_app1_password }}"
+```
+
+### Security (ACLs)
+
+Authorisation is opt-in via `kafka_acl_enabled` and uses the KRaft-native
+`StandardAuthorizer`. The inter-broker user is appended to `super.users`
+automatically. Rules are declarative; they are added but **not** removed —
+removing an ACL from `kafka_acls` does not delete it from the cluster.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `kafka_acl_enabled` | `false` | Enable `StandardAuthorizer` |
+| `kafka_acl_super_users` | `[]` | Additional principals (`User:name`); inter-broker user is added automatically |
+| `kafka_acl_allow_everyone_if_no_acl` | `false` | Production default — deny unmatched |
+| `kafka_acls` | `[]` | List of declarative rules (see below) |
+
+```yaml
+kafka_acl_enabled: true
+kafka_acls:
+  - principal: "User:app1"
+    operation: Read
+    resource_type: Topic
+    resource_name: events
+  - principal: "User:app1"
+    operation: Describe
+    resource_type: Group
+    resource_name: app1-consumers
+    pattern_type: PREFIXED
+```
+
+Each entry maps to a `kafka-acls.sh --add` invocation. `permission` defaults
+to `Allow`; set `Deny` to deny. `host` defaults to `*`. `pattern_type`
+defaults to `LITERAL`; use `PREFIXED` for prefix matches.
+
 ### AxonOps Agent Integration
 
 | Variable | Default | Description |
@@ -159,6 +306,10 @@ When enabled, the role invokes `axonops.axonops.agent` with the Kafka-specific p
 |-----|-------------|
 | `install` | Download, extract, user/group, symlink, service unit |
 | `firewall` | Open broker/controller ports in firewalld or ufw |
+| `security` | Master tag for TLS, SASL and ACL configuration |
+| `tls` | Subset of `security` covering certificate handling |
+| `sasl` | Subset of `security` covering SASL pre-flight and SCRAM user management |
+| `acl` | Apply declarative `kafka_acls` rules via `kafka-acls.sh` |
 | `config` | `server.properties` and `/etc/sysconfig/kafka` |
 | `cluster` | UUID management and storage formatting |
 | `topics` | Topic creation |
@@ -288,7 +439,7 @@ kafka_topics:
 - **Storage format** — `kafka-storage.sh format` is skipped if `meta.properties` already exists in any data directory. Re-runs are safe.
 - **Java 17** — Kafka 4.x requires Java 17. The role installs `openjdk-17-jre-headless` (Debian) or `java-17-openjdk-headless` (RHEL). Set `kafka_java_install: false` to skip this step if Java is managed by another role.
 - **Topics require a running broker** — `kafka_topics` is processed only when `kafka_start_on_install: true` and the broker port is reachable. Topics are not created on configuration-only runs.
-- **TLS/SASL** — not supported in this release. Planned for a future version.
+- **Security** — TLS, SASL (SCRAM-SHA-512 / PLAIN) and ACL are opt-in via `kafka_security_enabled`. With the master switch off the role's behaviour is unchanged from previous versions. See the Security sections above for details.
 - **AxonOps agent** — the role adds the `axonops` user to the `kafka` group and the `kafka` user to the `axonops` group so that `axon-agent` can access Kafka files without requiring root.
 
 ## License

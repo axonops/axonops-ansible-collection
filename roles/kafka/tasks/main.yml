@@ -160,6 +160,11 @@
   run_once: true
   tags: cluster
 
+- name: Configure security
+  ansible.builtin.import_tasks: security.yml
+  when: kafka_security_enabled | bool
+  tags: security
+
 - name: Configure Kafka
   ansible.builtin.import_tasks: config.yml
   tags: config
@@ -197,6 +202,25 @@
     - kafka_start_on_install | bool
     - "'broker' in kafka_node_roles"
   tags: service
+
+- name: Manage SCRAM users
+  ansible.builtin.import_tasks: sasl_users.yml
+  when:
+    - kafka_start_on_install | bool
+    - kafka_security_enabled | bool
+    - kafka_sasl_enabled | bool
+    - kafka_sasl_mechanism is match('^SCRAM')
+    - kafka_sasl_users | length > 0
+  tags: sasl
+
+- name: Apply ACLs
+  ansible.builtin.import_tasks: acls.yml
+  when:
+    - kafka_start_on_install | bool
+    - kafka_security_enabled | bool
+    - kafka_acl_enabled | bool
+    - kafka_acls | length > 0
+  tags: acl
 
 - name: Create Kafka topics
   ansible.builtin.import_tasks: topics.yml

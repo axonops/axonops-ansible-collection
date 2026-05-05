@@ -1,0 +1,46 @@
+---
+# ============================================================================
+# Kafka Role - Security orchestrator
+# ============================================================================
+# Runs only when kafka_security_enabled is true. Each sub-feature is opt-in.
+
+- name: Assert TLS mode is valid
+  ansible.builtin.assert:
+    that:
+      - kafka_tls_mode in ['custom', 'pki_agent', 'generate']
+    fail_msg: "kafka_tls_mode must be one of: custom, pki_agent, generate"
+  when: kafka_tls_enabled | bool
+  tags: tls
+
+- name: Assert custom-mode TLS paths are provided
+  ansible.builtin.assert:
+    that:
+      - kafka_tls_cert | length > 0
+      - kafka_tls_key | length > 0
+      - kafka_tls_ca | length > 0
+    fail_msg: >-
+      kafka_tls_mode is 'custom' but kafka_tls_cert / kafka_tls_key /
+      kafka_tls_ca are not all set.
+  when:
+    - kafka_tls_enabled | bool
+    - kafka_tls_mode == 'custom'
+  tags: tls
+
+- name: Configure TLS
+  ansible.builtin.import_tasks: tls.yml
+  when: kafka_tls_enabled | bool
+  tags: tls
+
+- name: Configure SASL pre-flight
+  ansible.builtin.import_tasks: sasl.yml
+  when: kafka_sasl_enabled | bool
+  tags: sasl
+
+- name: Render admin client properties
+  ansible.builtin.template:
+    src: admin.properties.j2
+    dest: "{{ kafka__admin_props_file }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0600"
+  tags: tls,sasl

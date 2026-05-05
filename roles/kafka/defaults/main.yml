@@ -62,7 +62,9 @@ kafka_node_roles:
 #   controller-only → [CONTROLLER://:9093]
 kafka_listeners: []
 
-kafka_inter_broker_listener_name: PLAINTEXT
+# Override the inter-broker listener name. Leave empty to auto-derive from
+# the security state (PLAINTEXT or SSL).
+kafka_inter_broker_listener_name: ""
 
 # --- Performance ------------------------------------------------------------
 
@@ -71,6 +73,110 @@ kafka_num_io_threads: 8
 kafka_socket_send_buffer_bytes: 102400
 kafka_socket_receive_buffer_bytes: 102400
 kafka_socket_request_max_bytes: 104857600
+
+# --- Security (master switch) ----------------------------------------------
+
+# When false (default), nothing in security.yml runs and listeners stay PLAINTEXT.
+# This preserves backward compatibility with existing deployments.
+kafka_security_enabled: false
+
+# --- TLS --------------------------------------------------------------------
+
+# Enable TLS on broker and controller listeners. Requires kafka_security_enabled: true.
+kafka_tls_enabled: false
+
+# Provisioning mode: how PEM material reaches the broker hosts.
+#   custom    — user supplies PEM files on the control node, role copies them
+#   pki_agent — read PEM files written locally by axonops.axonops.pki_agent
+#   generate  — role creates a self-signed CA and per-host certs (DEV ONLY)
+kafka_tls_mode: custom
+
+# Client authentication on TLS listeners.
+#   required  — mTLS, client must present a trusted cert (default)
+#   requested — client may present a cert, validated if so
+#   none      — server-auth only
+kafka_tls_client_auth: required
+
+# custom mode — paths on the CONTROL NODE; copied to brokers
+kafka_tls_cert: ""
+kafka_tls_key: ""
+kafka_tls_ca: ""
+kafka_tls_key_password: ""
+
+# pki_agent mode — paths on the BROKER HOST where pki_agent writes the PEM files
+kafka_tls_pki_cert_path: /opt/tls/kafka/cert.pem
+kafka_tls_pki_key_path: /opt/tls/kafka/key.pem
+kafka_tls_pki_ca_path: /opt/tls/kafka/ca.pem
+
+# generate mode — dev/test convenience only; do not use in production
+kafka_tls_generate_ca_cn: "Kafka Dev CA"
+kafka_tls_generate_validity_days: 3650
+# Control-node directory used to stage the generated CA between hosts
+kafka_tls_generate_local_dir: "/tmp/kafka-tls-{{ kafka_axonops_cluster_name | default('dev') }}"
+
+# Remote directory the broker reads PEM files from. The role places
+# kafka.crt, kafka.key and ca.crt here for custom and generate modes;
+# pki_agent mode reads directly from the kafka_tls_pki_* paths above.
+kafka_tls_remote_dir: /etc/kafka/tls
+
+# --- SASL -------------------------------------------------------------------
+
+# Requires kafka_security_enabled: true.
+kafka_sasl_enabled: false
+
+# Mechanism for client and inter-broker auth.
+#   SCRAM-SHA-512 — recommended; bootstrapped at format time, KRaft-native
+#   PLAIN         — credentials in JAAS, simpler, no salting (use only with TLS)
+kafka_sasl_mechanism: SCRAM-SHA-512
+
+# Inter-broker / controller credentials. The same identity is used for
+# broker↔broker and broker↔controller traffic and is added to super.users.
+kafka_sasl_inter_broker_user: kafka-admin
+kafka_sasl_inter_broker_password: ""
+
+# Additional SCRAM users created on first start via kafka-configs.sh.
+# Ignored when kafka_sasl_mechanism is PLAIN.
+# - { name: app1, password: secret }
+kafka_sasl_users: []
+
+# Static credentials for PLAIN mechanism. Ignored when SCRAM is used.
+# Each entry must include the inter-broker user as well.
+# - { name: kafka-admin, password: secret }
+kafka_sasl_plain_users: []
+
+# --- ACLs -------------------------------------------------------------------
+
+# Enable StandardAuthorizer (KRaft-native, no ZooKeeper). Requires
+# kafka_security_enabled: true. Inter-broker user is always added to
+# super.users so brokers can manage cluster metadata.
+kafka_acl_enabled: false
+
+# Additional principals granted super-user privileges. The inter-broker
+# user is appended automatically; do not list it again.
+kafka_acl_super_users: []
+
+# When false (production default), denied-by-default for unmatched topics.
+kafka_acl_allow_everyone_if_no_acl: false
+
+# Declarative ACL rules applied via kafka-acls.sh after the broker starts.
+# Each entry:
+#   principal     (str, required) — e.g. "User:app1"
+#   operation     (str, required) — Read | Write | Create | Delete | Alter |
+#                                   Describe | ClusterAction | AlterConfigs |
+#                                   DescribeConfigs | IdempotentWrite | All
+#   resource_type (str, required) — Topic | Group | Cluster | TransactionalId |
+#                                   DelegationToken
+#   resource_name (str, required) — name or "*"
+#   permission    (str, default Allow) — Allow | Deny
+#   host          (str, default "*")
+#   pattern_type  (str, default LITERAL) — LITERAL | PREFIXED
+kafka_acls: []
+# - principal: "User:app1"
+#   operation: Read
+#   resource_type: Topic
+#   resource_name: events
+#   permission: Allow
+#   host: "*"
 
 # --- Topic Defaults ---------------------------------------------------------
 
@@ -142,3 +248,25 @@ kafka_axonops_java_agent: "axon-kafka4-agent"
 # Required when kafka_axonops_agent_enabled is true.
 # Cluster name shown in AxonOps; the Kafka Java agent fails without it.
 # kafka_axonops_cluster_name: ""
+
+# When kafka_security_enabled is true, the role renders a client.properties
+# file matching the cluster's auth mode and passes it to the agent role via
+# axon_agent_kafka_client_properties. The agent uses these credentials for
+# its Kafka admin client (consumer-group lag, topic metadata, etc.).
+# Defaults reuse the inter-broker identity when SASL is enabled; override
+# to use a dedicated, lower-privileged user.
+kafka_axonops_sasl_user: "{{ kafka_sasl_inter_broker_user }}"
+kafka_axonops_sasl_password: "{{ kafka_sasl_inter_broker_password }}"
+kafka_axonops_client_properties_path: /etc/axonops/kafka_client.properties
+
+# Optionally install the Kconduit kafka cli client
+kafka_kconduit_enabled: false
+kafka_kconduit_version: "0.0.4"
+# Architecture mapping (uname values → release asset names)
+kafka_kconduit_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+
+# Package extension mapping
+kafka_kconduit_pkg_ext: "{{ 'rpm' if ansible_os_family == 'RedHat' else 'deb' }}"
+
+# Final URL
+kafka_kconduit_download_url: "https://github.com/digitalis-io/kconduit/releases/download/v{{ kafka_kconduit_version }}/kconduit_{{ kafka_kconduit_version }}_linux_{{ kafka_kconduit_arch }}.{{ kafka_kconduit_pkg_ext }}"

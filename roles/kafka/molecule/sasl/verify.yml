@@ -1,0 +1,70 @@
+---
+- name: Verify SASL_SSL configuration
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Read server.properties
+      ansible.builtin.slurp:
+        src: /opt/kafka/config/server.properties
+      register: kafka_props_content
+
+    - name: Decode server.properties
+      ansible.builtin.set_fact:
+        kafka_props: "{{ kafka_props_content.content | b64decode }}"
+
+    - name: Assert SASL_SSL listener configured
+      ansible.builtin.assert:
+        that:
+          - "'listeners=SASL_SSL://:9092,CONTROLLER://:9093' in kafka_props"
+          - "'inter.broker.listener.name=SASL_SSL' in kafka_props"
+          - "'sasl.enabled.mechanisms=SCRAM-SHA-512' in kafka_props"
+          - "'sasl.mechanism.inter.broker.protocol=SCRAM-SHA-512' in kafka_props"
+          - "'sasl.mechanism.controller.protocol=SCRAM-SHA-512' in kafka_props"
+        fail_msg: "SASL_SSL/SCRAM block missing or incorrect"
+
+    - name: Assert inter-broker JAAS rendered
+      ansible.builtin.assert:
+        that:
+          - "'listener.name.sasl_ssl.scram-sha-512.sasl.jaas.config=' in kafka_props"
+          - "'username=\"kafka-admin\"' in kafka_props"
+
+    - name: Stat admin.properties
+      ansible.builtin.stat:
+        path: /opt/kafka/config/admin.properties
+      register: kafka_admin_stat
+
+    - name: Assert admin.properties is locked down
+      ansible.builtin.assert:
+        that:
+          - kafka_admin_stat.stat.exists
+          - kafka_admin_stat.stat.mode == '0600'
+          - kafka_admin_stat.stat.pw_name == 'kafka'
+        fail_msg: "/opt/kafka/config/admin.properties missing or wrong perms"
+
+    - name: Read admin.properties
+      ansible.builtin.slurp:
+        src: /opt/kafka/config/admin.properties
+      register: kafka_admin_content
+
+    - name: Assert admin.properties has SASL_SSL settings
+      ansible.builtin.assert:
+        that:
+          - "'security.protocol=SASL_SSL' in (kafka_admin_content.content | b64decode)"
+          - "'sasl.mechanism=SCRAM-SHA-512' in (kafka_admin_content.content | b64decode)"
+
+    - name: Note skipped post-start tasks
+      ansible.builtin.debug:
+        msg: >-
+          sasl_users.yml and acls.yml are skipped here because
+          kafka_start_on_install=false. Those code paths require a live broker
+          and are exercised manually against real VMs (see issue #90).
+
+    - name: Assert StandardAuthorizer + super.users configured
+      ansible.builtin.assert:
+        that:
+          - "'authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer' in kafka_props"
+          - "'super.users=User:kafka-admin' in kafka_props"
+          - "'allow.everyone.if.no.acl.found=false' in kafka_props"
+        fail_msg: "ACL block missing or incorrect"
+
+# code: language=ansible

@@ -7,10 +7,27 @@
   delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
   run_once: true
 
+- name: Ensure kafka user tmp dir exists
+  become: true
+  ansible.builtin.file:
+    path: /tmp/.ansible_kafka
+    state: directory
+    owner: "{{ kafka_user }}"
+    mode: "0700"
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true
+
 - name: List existing topics
+  become: true
   become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.command:
-    cmd: "{{ kafka__home }}/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"
+    cmd: >-
+      {{ kafka__home }}/bin/kafka-topics.sh
+      --bootstrap-server localhost:9092
+      --list
+      {% if kafka_security_enabled | bool %}--command-config {{ kafka__admin_props_file }}{% endif %}
   register: kafka__reg_existing_topics
   changed_when: false
   check_mode: false
@@ -18,12 +35,16 @@
   run_once: true
 
 - name: Create topics
+  become: true
   become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.command:
     cmd: >-
       {{ kafka__home }}/bin/kafka-topics.sh
       --create
       --bootstrap-server localhost:9092
+      {% if kafka_security_enabled | bool %}--command-config {{ kafka__admin_props_file }}{% endif %}
       --topic {{ item.name }}
       --partitions {{ item.partitions | default(kafka_num_partitions) }}
       --replication-factor {{ item.replication_factor | default(kafka_replication_factor) }}

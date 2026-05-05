@@ -110,6 +110,9 @@ NTP:
     logFormat: "%4$s %1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS,%1$tL %5$s%6$s%n"
 {% elif "axon-kafka" in axon_java_agent %}
 kafka:
+{% if axon_agent_kafka_client_properties | default('') | length > 0 %}
+    client_properties_file: {{ axon_agent_kafka_client_properties }}
+{% endif %}
     tier0: # metrics collected every 5 seconds
         metrics:
             jvm_:

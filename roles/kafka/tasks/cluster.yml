@@ -60,15 +60,32 @@
   ansible.builtin.set_fact:
     kafka_cluster_id: "{{ kafka__reg_cluster_uuid.content | b64decode | trim }}"
 
+- name: Build kafka-storage.sh format argv
+  ansible.builtin.set_fact:
+    kafka__format_argv: >-
+      {{
+        [
+          kafka__home ~ '/bin/kafka-storage.sh',
+          'format',
+          '--config', kafka__config_path,
+          '--cluster-id', kafka_cluster_id,
+        ] +
+        (
+          ['--add-scram',
+           kafka_sasl_mechanism ~ '=[name=' ~ kafka_sasl_inter_broker_user ~
+           ',password=' ~ kafka_sasl_inter_broker_password ~ ']']
+          if (kafka__sasl_on | bool and kafka_sasl_mechanism.startswith('SCRAM'))
+          else []
+        )
+      }}
+
 - name: Format Kafka storage
   become: true
   become_user: "{{ kafka_user }}"
   vars:
     ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.command:
-    cmd: >-
-      {{ kafka__home }}/bin/kafka-storage.sh format
-      --config {{ kafka__config_path }}
-      --cluster-id {{ kafka_cluster_id }}
+    argv: "{{ kafka__format_argv }}"
   changed_when: kafka__reg_formatted.results | map(attribute='stat') | selectattr('exists') | list | length == 0
   when: kafka__reg_formatted.results | map(attribute='stat') | selectattr('exists') | list | length == 0
+  no_log: "{{ kafka__sasl_on | bool }}"

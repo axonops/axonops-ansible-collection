@@ -1,0 +1,130 @@
+---
+# ============================================================================
+# Kafka Role - TLS material distribution
+# ============================================================================
+# Resolves PEM source per kafka_tls_mode and assembles the combined keystore
+# Kafka expects (cert chain + private key in one file) plus a separate CA file.
+
+- name: Ensure TLS directory exists
+  ansible.builtin.file:
+    path: "{{ kafka_tls_remote_dir }}"
+    state: directory
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0750"
+
+- name: Generate self-signed TLS material (dev only)
+  ansible.builtin.import_tasks: tls_generate.yml
+  when: kafka_tls_mode == 'generate'
+
+- name: Copy TLS certificate (custom mode)
+  ansible.builtin.copy:
+    src: "{{ kafka_tls_cert }}"
+    dest: "{{ kafka__tls_src_cert }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0640"
+  when:
+    - kafka_tls_mode == 'custom'
+  notify: Restart Kafka
+
+- name: Copy TLS private key (custom mode)
+  ansible.builtin.copy:
+    src: "{{ kafka_tls_key }}"
+    dest: "{{ kafka__tls_src_key }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0600"
+  no_log: true
+  when:
+    - kafka_tls_mode == 'custom'
+  notify: Restart Kafka
+
+- name: Copy TLS CA bundle (custom mode)
+  ansible.builtin.copy:
+    src: "{{ kafka_tls_ca }}"
+    dest: "{{ kafka__tls_src_ca }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0644"
+  when:
+    - kafka_tls_mode == 'custom'
+  notify: Restart Kafka
+
+- name: Verify pki_agent source files exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ kafka_tls_pki_cert_path }}"
+    - "{{ kafka_tls_pki_key_path }}"
+    - "{{ kafka_tls_pki_ca_path }}"
+  register: kafka__reg_pki_stat
+  when: kafka_tls_mode == 'pki_agent'
+
+- name: Assert pki_agent source files exist
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: >-
+      pki_agent mode: expected file {{ item.item }} not found.
+      Configure axonops.axonops.pki_agent to write it before running this role.
+  loop: "{{ kafka__reg_pki_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: kafka_tls_mode == 'pki_agent'
+
+- name: Normalise private key to PKCS#8 (Kafka PEM loader requires it)
+  community.crypto.openssl_privatekey_convert:
+    src_path: "{{ kafka__tls_src_key }}"
+    src_passphrase: "{{ kafka_tls_key_password if kafka_tls_key_password | length > 0 else omit }}"
+    dest_path: "{{ kafka__tls_normalised_key }}"
+    format: pkcs8
+    mode: "0600"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+  no_log: true
+  notify: Restart Kafka
+
+- name: Read source certificate
+  ansible.builtin.slurp:
+    src: "{{ kafka__tls_src_cert }}"
+  register: kafka__reg_tls_cert
+
+- name: Read normalised key
+  ansible.builtin.slurp:
+    src: "{{ kafka__tls_normalised_key }}"
+  register: kafka__reg_tls_key
+  no_log: true
+
+- name: Read source CA bundle
+  ansible.builtin.slurp:
+    src: "{{ kafka__tls_src_ca }}"
+  register: kafka__reg_tls_ca
+
+- name: Assemble combined PEM keystore (cert chain + PKCS#8 key)
+  ansible.builtin.copy:
+    content: "{{ (kafka__reg_tls_cert.content | b64decode).rstrip() }}\n{{ kafka__reg_tls_key.content | b64decode }}"
+    dest: "{{ kafka__tls_keystore_file }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0600"
+  no_log: true
+  notify: Restart Kafka
+
+- name: Install CA truststore PEM
+  ansible.builtin.copy:
+    content: "{{ kafka__reg_tls_ca.content | b64decode }}"
+    dest: "{{ kafka__tls_truststore_file }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0644"
+  notify: Restart Kafka
+
+- name: Install pki_agent reload helper script
+  ansible.builtin.template:
+    src: kafka-reload-tls.sh.j2
+    dest: "{{ kafka__tls_reload_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: kafka_tls_mode == 'pki_agent'

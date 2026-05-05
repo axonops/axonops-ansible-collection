@@ -1,0 +1,32 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# pki_agent reload helper. Reassembles the Kafka PEM keystore from the
+# rotated cert + key written by the agent, then restarts the broker.
+set -eu
+
+CERT_SRC="{{ kafka_tls_pki_cert_path }}"
+KEY_SRC="{{ kafka_tls_pki_key_path }}"
+CA_SRC="{{ kafka_tls_pki_ca_path }}"
+KEYSTORE="{{ kafka__tls_keystore_file }}"
+TRUSTSTORE="{{ kafka__tls_truststore_file }}"
+NORMALISED_KEY="{{ kafka__tls_normalised_key }}"
+
+umask 077
+TMPDIR="$(dirname "$KEYSTORE")"
+
+# Kafka PEM keystore loader rejects PKCS#1; convert to PKCS#8 unconditionally.
+TMP_KEY="$(mktemp -p "$TMPDIR" key.XXXXXX)"
+openssl pkcs8 -topk8 -nocrypt -in "$KEY_SRC" -out "$TMP_KEY"
+chown {{ kafka_user }}:{{ kafka_group }} "$TMP_KEY"
+chmod 0600 "$TMP_KEY"
+mv -f "$TMP_KEY" "$NORMALISED_KEY"
+
+TMP_KEYSTORE="$(mktemp -p "$TMPDIR" keystore.XXXXXX)"
+cat "$CERT_SRC" "$NORMALISED_KEY" >"$TMP_KEYSTORE"
+chown {{ kafka_user }}:{{ kafka_group }} "$TMP_KEYSTORE"
+chmod 0600 "$TMP_KEYSTORE"
+mv -f "$TMP_KEYSTORE" "$KEYSTORE"
+
+install -o {{ kafka_user }} -g {{ kafka_group }} -m 0644 "$CA_SRC" "$TRUSTSTORE"
+
+systemctl restart kafka

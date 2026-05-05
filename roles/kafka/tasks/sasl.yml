@@ -1,0 +1,29 @@
+---
+# ============================================================================
+# Kafka Role - SASL pre-flight assertions
+# ============================================================================
+# Inter-broker credentials must be set or the cluster cannot bootstrap.
+
+- name: Assert SASL mechanism is supported
+  ansible.builtin.assert:
+    that:
+      - kafka_sasl_mechanism in ['SCRAM-SHA-512', 'SCRAM-SHA-256', 'PLAIN']
+    fail_msg: "kafka_sasl_mechanism must be one of: SCRAM-SHA-512, SCRAM-SHA-256, PLAIN"
+
+- name: Assert inter-broker credentials are set
+  ansible.builtin.assert:
+    that:
+      - kafka_sasl_inter_broker_user | length > 0
+      - kafka_sasl_inter_broker_password | length > 0
+    fail_msg: >-
+      kafka_sasl_inter_broker_user and kafka_sasl_inter_broker_password are
+      required when kafka_sasl_enabled is true.
+
+- name: Assert PLAIN users include the inter-broker identity
+  ansible.builtin.assert:
+    that:
+      - kafka_sasl_plain_users | selectattr('name', 'equalto', kafka_sasl_inter_broker_user) | list | length > 0
+    fail_msg: >-
+      With kafka_sasl_mechanism=PLAIN, kafka_sasl_plain_users must include an
+      entry with name={{ kafka_sasl_inter_broker_user }}.
+  when: kafka_sasl_mechanism == 'PLAIN'
