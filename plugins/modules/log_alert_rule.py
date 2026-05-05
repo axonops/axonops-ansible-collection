@@ -75,6 +75,11 @@ options:
     content:
         description:
             - Content to search in the log.
+            - Uses simple_query_string syntax.
+            - "Supported operators: single word (timeout), phrase (\"GC pause\"),"
+            - "AND (+timeout +error), OR (timeout error), NOT (timeout -warning),"
+            - "wildcard (time*), fuzzy (timout~)."
+            - "Regex patterns (e.g. .*, [a-z]+) are NOT supported."
         required: false
         type: str
     description:
@@ -156,6 +161,18 @@ EXAMPLES = r'''
       duration: 30s
       content: 'DOWN'
       level: error, debug
+# alert if logs contain both "WorkerSinkTask" AND "FAILED" in the last minute
+  - name: set a alert rule
+    axonops.axonops.log_alert_rule:
+      auth_token: "{{ secret }}"
+      org: my_company
+      cluster: single_instance
+      name: 'Connect Sink Task FAILED'
+      warning_value: 1
+      critical_value: 1
+      duration: 1m
+      content: '+WorkerSinkTask +FAILED'
+      source: '/var/log/kafka/connect.log'
 '''
 
 import re
