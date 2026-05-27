@@ -37,6 +37,12 @@
         recurse: true
         mode: "0755"
 
+    - name: Refresh apt cache (Debian family)
+      when: ansible_os_family == "Debian"
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
   roles:
     - role: axonops.axonops.cassandra
 
