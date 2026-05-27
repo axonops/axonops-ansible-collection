@@ -1,0 +1,28 @@
+---
+- name: Converge — cassandra role with JKS TLS and password files (default)
+  hosts: all
+  vars:
+    cassandra_version: "5.0.5"
+    cassandra_start_on_install: false
+    cassandra_install_format: pkg
+    cassandra_cluster_name: jks-password-files-test
+    cassandra_seeds: "127.0.0.1"
+
+    # JKS server encryption (default factory; no PEM)
+    cassandra_ssl_internode_encryption: all
+    cassandra_ssl_internode_keystore_file: /etc/cassandra/keystore.jks
+    cassandra_ssl_keystore_pass: "serverKeystorePass!"
+    cassandra_ssl_truststore_file: /etc/cassandra/truststore.jks
+    cassandra_ssl_truststore_pass: "serverTruststorePass!"
+
+    # JKS client encryption
+    cassandra_ssl_client_encryption_enabled: true
+    cassandra_ssl_client_keystore_file: /etc/cassandra/keystore.jks
+    cassandra_ssl_client_keystore_pass: "clientKeystorePass!"
+    cassandra_ssl_client_truststore_file: /etc/cassandra/truststore.jks
+    cassandra_ssl_client_truststore_pass: "clientTruststorePass!"
+
+    # cassandra_use_password_files defaults to true — not overridden here
+
+  roles:
+    - role: axonops.axonops.cassandra

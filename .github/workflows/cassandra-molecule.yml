@@ -35,6 +35,8 @@ jobs:
           - default
           - shenandoah
           - g1
+          - jks-password-files
+          - jks-inline-password
 
     steps:
       - name: Check out the codebase.

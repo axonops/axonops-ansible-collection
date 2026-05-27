@@ -1,0 +1,68 @@
+---
+- name: Verify JKS TLS uses inline passwords when opted out (BDD)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    # ---------- GIVEN: role completed with cassandra_use_password_files: false ----------
+
+    - name: GIVEN — read rendered cassandra.yaml
+      ansible.builtin.slurp:
+        src: /etc/cassandra/cassandra.yaml
+      register: cassandra_yaml_raw
+
+    - name: GIVEN — decode cassandra.yaml
+      ansible.builtin.set_fact:
+        cassandra_yaml: "{{ cassandra_yaml_raw.content | b64decode }}"
+
+    # ---------- THEN: inline password keys present ----------
+
+    - name: THEN — cassandra.yaml contains inline keystore_password
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is search('(?m)^\s+keystore_password:\s+serverKeystorePass!')
+        fail_msg: "inline keystore_password not rendered with opt-out"
+
+    - name: THEN — cassandra.yaml contains inline truststore_password
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is search('(?m)^\s+truststore_password:\s+serverTruststorePass!')
+        fail_msg: "inline truststore_password not rendered with opt-out"
+
+    # ---------- THEN: *_password_file keys must NOT be present ----------
+
+    - name: THEN — cassandra.yaml has no keystore_password_file key
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is not search('(?m)^\s+keystore_password_file:\s')
+        fail_msg: "keystore_password_file rendered despite opt-out"
+
+    - name: THEN — cassandra.yaml has no truststore_password_file key
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is not search('(?m)^\s+truststore_password_file:\s')
+        fail_msg: "truststore_password_file rendered despite opt-out"
+
+    # ---------- THEN: password files must NOT exist on disk ----------
+
+    - name: THEN — keystore password file is absent
+      ansible.builtin.stat:
+        path: /etc/cassandra/keystore_passwordfile.txt
+      register: keystore_pf
+
+    - name: THEN — assert keystore password file absent
+      ansible.builtin.assert:
+        that:
+          - not keystore_pf.stat.exists
+        fail_msg: "keystore_passwordfile.txt should not exist with opt-out"
+
+    - name: THEN — truststore password file is absent
+      ansible.builtin.stat:
+        path: /etc/cassandra/truststore_passwordfile.txt
+      register: truststore_pf
+
+    - name: THEN — assert truststore password file absent
+      ansible.builtin.assert:
+        that:
+          - not truststore_pf.stat.exists
+        fail_msg: "truststore_passwordfile.txt should not exist with opt-out"
