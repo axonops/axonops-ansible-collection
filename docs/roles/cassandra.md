@@ -85,6 +85,12 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
 | `cassandra_compaction_throughput` | `64MiB/s` | Compaction throughput limit |
 | `cassandra_stream_throughput_outbound` | `24MiB/s` | Stream throughput limit |
 
+### CQL Behavior
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_use_statements_enabled` | `true` | Allow CQL `USE <keyspace>` statements (Cassandra's default; set `false` to require fully-qualified `keyspace.table` names) |
+
 ### SSL/TLS Configuration
 
 #### JKS (default)

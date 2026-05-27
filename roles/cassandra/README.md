@@ -79,3 +79,16 @@ See `defaults/main.yml` for the full list of PEM variables (`cassandra_ssl_inter
         cassandra_cluster_name: my-cluster
         cassandra_dc: dc1
 ```
+
+## Upgrade Notes
+
+### 0.6.0 — `cassandra_use_statements_enabled` default changed
+
+`cassandra_use_statements_enabled` now defaults to `true` (previously `false`),
+matching Cassandra's own default. This re-enables CQL `USE <keyspace>;`, which
+cqlsh and most drivers rely on. Clusters that intentionally disabled `USE`
+(for example behind a keyspace-multiplexing proxy) should set it explicitly:
+
+```yaml
+cassandra_use_statements_enabled: false
+```
