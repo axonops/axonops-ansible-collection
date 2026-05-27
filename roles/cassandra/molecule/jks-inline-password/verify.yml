@@ -42,11 +42,12 @@
 
     - name: GIVEN — extract server_encryption_options block
       ansible.builtin.set_fact:
-        server_enc_block: "{{ cassandra_yaml | regex_search('(?s)^server_encryption_options:.*?(?=^\\S)', multiline=True) | default('', true) }}"
+        server_enc_block: "{{ cassandra_yaml | regex_search('(?s)^server_encryption_options:.*?(?=^client_encryption_options:)', multiline=True) | default('', true) }}"
+      no_log: true
 
     - name: GIVEN — extract client_encryption_options block
       ansible.builtin.set_fact:
-        client_enc_block: "{{ cassandra_yaml | regex_search('(?s)^client_encryption_options:.*?(?=^\\S)', multiline=True) | default('', true) }}"
+        client_enc_block: "{{ cassandra_yaml | regex_search('(?s)^client_encryption_options:.*?(?=^[a-zA-Z][a-zA-Z_0-9]*:)', multiline=True) | default('', true) }}"
       no_log: true
 
     # ---------- THEN: inline password keys present in each block ----------
@@ -58,15 +59,12 @@
         fail_msg: "inline keystore_password not rendered in server_encryption_options"
       no_log: true
 
-    - name: DEBUG — dump server_enc_block content
-      ansible.builtin.debug:
-        var: server_enc_block
-
     - name: THEN — server_encryption_options contains inline truststore_password
       ansible.builtin.assert:
         that:
           - server_enc_block is search('(?m)^\s+truststore_password:\s+serverTruststorePass!')
         fail_msg: "inline truststore_password not rendered in server_encryption_options"
+      no_log: true
 
     - name: THEN — client_encryption_options contains inline keystore_password
       ansible.builtin.assert:
