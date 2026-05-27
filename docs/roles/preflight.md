@@ -16,7 +16,7 @@ All preflight checks are enabled by default and can be individually disabled by 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `preflight_check_memory` | `true` | Check if system has sufficient memory |
-| `preflight_check_ntp` | `true` | Check if NTP/time synchronization is configured |
+| `preflight_check_ntp` | `true` | Verify active time synchronization (ntpd, chronyd, or systemd-timesyncd) |
 | `preflight_check_os` | `true` | Check if operating system is supported |
 | `preflight_check_cassandra_data_directory` | `true` | Check if Cassandra data directories have sufficient space |
 | `preflight_check_swap` | `true` | Check swap configuration (swap should be disabled for Cassandra) |
