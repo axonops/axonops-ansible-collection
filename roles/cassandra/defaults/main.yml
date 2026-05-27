@@ -385,7 +385,7 @@ cassandra_auth_read_consistency_level: LOCAL_QUORUM
 cassandra_auth_write_consistency_level: LOCAL_QUORUM
 
 cassandra_auth_cache_warming_enabled: true
-cassandra_use_statements_enabled: false
+cassandra_use_statements_enabled: true
 cassandra_secondary_indexes_enabled: true
 cassandra_user_timestamps_enabled: true
 cassandra_simplestrategy_enabled: false
