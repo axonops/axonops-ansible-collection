@@ -98,6 +98,26 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
 | `cassandra_ssl_truststore_file` | `conf/.truststore` | Truststore file path |
 | `cassandra_ssl_truststore_pass` | `cassandra` | Truststore password |
 
+##### Password files (default)
+
+By default the role keeps JKS keystore/truststore passwords out of `cassandra.yaml`. Each password is written to a separate mode `0600` file owned by the cassandra user, and `cassandra.yaml` references it via `keystore_password_file:` / `truststore_password_file:` keys (a stock Cassandra feature, not a third-party extension). This applies to both `server_encryption_options` and `client_encryption_options`.
+
+Files are written only when (a) the relevant TLS path is enabled and (b) the configured password is non-empty.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_use_password_files` | `true` | Externalise keystore/truststore passwords to `*_password_file` references. Set to `false` to inline passwords in `cassandra.yaml` (legacy behaviour). |
+| `cassandra_ssl_keystore_password_file` | `{{ cassandra_conf_dir }}/server_keystore_passwordfile.txt` | Path to the server keystore password file. |
+| `cassandra_ssl_truststore_password_file` | `{{ cassandra_conf_dir }}/server_truststore_passwordfile.txt` | Path to the server truststore password file. |
+| `cassandra_ssl_client_keystore_password_file` | `{{ cassandra_conf_dir }}/client_keystore_passwordfile.txt` | Path to the client keystore password file. |
+| `cassandra_ssl_client_truststore_password_file` | `{{ cassandra_conf_dir }}/client_truststore_passwordfile.txt` | Path to the client truststore password file. |
+
+To opt out for a host or group:
+
+```yaml
+cassandra_use_password_files: false
+```
+
 #### PEM-based TLS (Cassandra 4.1+)
 
 Cassandra 4.1 introduced `PEMBasedSslContextFactory`, which accepts PEM-encoded certificates and keys directly — no Java keystore required. The role supports two modes:

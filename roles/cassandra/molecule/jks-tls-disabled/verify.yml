@@ -10,9 +10,18 @@
   gather_facts: false
   tasks:
 
+    - name: GIVEN — read cassandra_conf_dir recorded by converge
+      ansible.builtin.slurp:
+        src: /tmp/cassandra_conf_dir
+      register: conf_dir_raw
+
+    - name: GIVEN — set cassandra_conf_dir fact
+      ansible.builtin.set_fact:
+        cassandra_conf_dir: "{{ conf_dir_raw.content | b64decode | trim }}"
+
     - name: GIVEN — read rendered cassandra.yaml
       ansible.builtin.slurp:
-        src: /etc/cassandra/cassandra.yaml
+        src: "{{ cassandra_conf_dir }}/cassandra.yaml"
       register: cassandra_yaml_raw
 
     - name: GIVEN — decode cassandra.yaml
@@ -31,24 +40,21 @@
           - cassandra_yaml is not search('(?m)^\s+truststore_password_file:\s')
         fail_msg: "truststore_password_file rendered despite TLS disabled"
 
-    - name: THEN — keystore password file is absent
+    - name: THEN — stat all four password files
       ansible.builtin.stat:
-        path: /etc/cassandra/keystore_passwordfile.txt
-      register: keystore_pf
+        path: "{{ item }}"
+      loop:
+        - /etc/cassandra/server_keystore_passwordfile.txt
+        - /etc/cassandra/server_truststore_passwordfile.txt
+        - /etc/cassandra/client_keystore_passwordfile.txt
+        - /etc/cassandra/client_truststore_passwordfile.txt
+      register: pf_stats
 
-    - name: THEN — assert keystore password file absent
+    - name: THEN — assert each password file is absent
       ansible.builtin.assert:
         that:
-          - not keystore_pf.stat.exists
-        fail_msg: "keystore_passwordfile.txt should not exist when TLS disabled"
-
-    - name: THEN — truststore password file is absent
-      ansible.builtin.stat:
-        path: /etc/cassandra/truststore_passwordfile.txt
-      register: truststore_pf
-
-    - name: THEN — assert truststore password file absent
-      ansible.builtin.assert:
-        that:
-          - not truststore_pf.stat.exists
-        fail_msg: "truststore_passwordfile.txt should not exist when TLS disabled"
+          - not item.stat.exists
+        fail_msg: "{{ item.item }} should not exist when TLS disabled"
+      loop: "{{ pf_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"

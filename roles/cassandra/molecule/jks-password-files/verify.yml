@@ -3,8 +3,10 @@
 #
 # Behaviour under test: when JKS TLS is enabled and cassandra_use_password_files
 # is left at its default (true), Cassandra's keystore/truststore passwords are
-# externalised to mode 0600 files referenced by *_password_file: keys in
-# cassandra.yaml — for BOTH server_encryption_options and client_encryption_options.
+# externalised to mode 0600 files. Four separate files exist — one per
+# (server|client) x (keystore|truststore) — and cassandra.yaml references them
+# via *_password_file: keys in server_encryption_options and
+# client_encryption_options.
 #
 # Why placeholder JKS files: prepare.yml writes empty keystore.jks/truststore.jks
 # to satisfy the role's file-existence checks. Cassandra is never started
@@ -16,23 +18,32 @@
   hosts: all
   gather_facts: false
   vars:
-    keystore_passwordfile: /etc/cassandra/keystore_passwordfile.txt
-    truststore_passwordfile: /etc/cassandra/truststore_passwordfile.txt
+    server_keystore_pf: /etc/cassandra/server_keystore_passwordfile.txt
+    server_truststore_pf: /etc/cassandra/server_truststore_passwordfile.txt
+    client_keystore_pf: /etc/cassandra/client_keystore_passwordfile.txt
+    client_truststore_pf: /etc/cassandra/client_truststore_passwordfile.txt
   tasks:
 
     # ---------- GIVEN: role completed with default cassandra_use_password_files ----------
 
+    - name: GIVEN — read cassandra_conf_dir recorded by converge
+      ansible.builtin.slurp:
+        src: /tmp/cassandra_conf_dir
+      register: conf_dir_raw
+
+    - name: GIVEN — set cassandra_conf_dir fact
+      ansible.builtin.set_fact:
+        cassandra_conf_dir: "{{ conf_dir_raw.content | b64decode | trim }}"
+
     - name: GIVEN — read rendered cassandra.yaml
       ansible.builtin.slurp:
-        src: /etc/cassandra/cassandra.yaml
+        src: "{{ cassandra_conf_dir }}/cassandra.yaml"
       register: cassandra_yaml_raw
 
     - name: GIVEN — decode cassandra.yaml
       ansible.builtin.set_fact:
         cassandra_yaml: "{{ cassandra_yaml_raw.content | b64decode }}"
 
-    # Extract server_encryption_options and client_encryption_options blocks
-    # separately so assertions target the correct block (Rule 3 / Rule 1).
     - name: GIVEN — extract server_encryption_options block
       ansible.builtin.set_fact:
         server_enc_block: "{{ cassandra_yaml | regex_search('(?s)^server_encryption_options:.*?(?=^\\S)', multiline=True) | default('', true) }}"
@@ -48,62 +59,69 @@
           - client_enc_block | length > 0
         fail_msg: "could not isolate server/client encryption blocks from cassandra.yaml"
 
-    # ---------- THEN: password files exist with secure permissions ----------
+    # ---------- THEN: all four password files exist with secure permissions ----------
 
-    - name: THEN — keystore password file exists
+    - name: THEN — stat all four password files
       ansible.builtin.stat:
-        path: "{{ keystore_passwordfile }}"
-      register: keystore_pf
+        path: "{{ item }}"
+      loop:
+        - "{{ server_keystore_pf }}"
+        - "{{ server_truststore_pf }}"
+        - "{{ client_keystore_pf }}"
+        - "{{ client_truststore_pf }}"
+      register: pf_stats
 
-    - name: THEN — keystore password file is mode 0600, owned by cassandra
+    - name: THEN — each password file is mode 0600, owned by cassandra
       ansible.builtin.assert:
         that:
-          - keystore_pf.stat.exists
-          - keystore_pf.stat.mode == '0600'
-          - keystore_pf.stat.pw_name == 'cassandra'
-          - keystore_pf.stat.gr_name == 'cassandra'
-        fail_msg: "keystore password file missing or insecure: {{ keystore_pf.stat }}"
+          - item.stat.exists
+          - item.stat.mode == '0600'
+          - item.stat.pw_name == 'cassandra'
+          - item.stat.gr_name == 'cassandra'
+        fail_msg: "password file insecure or missing: {{ item.item }} stat={{ item.stat }}"
+      loop: "{{ pf_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"
 
-    - name: THEN — truststore password file exists
-      ansible.builtin.stat:
-        path: "{{ truststore_passwordfile }}"
-      register: truststore_pf
-
-    - name: THEN — truststore password file is mode 0600, owned by cassandra
-      ansible.builtin.assert:
-        that:
-          - truststore_pf.stat.exists
-          - truststore_pf.stat.mode == '0600'
-          - truststore_pf.stat.pw_name == 'cassandra'
-          - truststore_pf.stat.gr_name == 'cassandra'
-        fail_msg: "truststore password file missing or insecure: {{ truststore_pf.stat }}"
-
-    - name: THEN — keystore password file content matches configured password
+    - name: THEN — server keystore password file content equals configured password
       ansible.builtin.slurp:
-        src: "{{ keystore_passwordfile }}"
-      register: keystore_pf_content
+        src: "{{ server_keystore_pf }}"
+      register: server_ks_content
       no_log: true
 
-    - name: THEN — keystore password file content equals serverKeystorePass!
+    - name: THEN — assert server keystore content
       ansible.builtin.assert:
         that:
-          - (keystore_pf_content.content | b64decode | trim) == 'serverKeystorePass!'
-        fail_msg: "keystore password file content mismatch"
+          - (server_ks_content.content | b64decode | trim) == 'serverKeystorePass!'
+        fail_msg: "server keystore password file content mismatch"
       no_log: true
 
-    # ---------- THEN: server_encryption_options uses *_password_file ----------
+    - name: THEN — client keystore password file content equals configured password
+      ansible.builtin.slurp:
+        src: "{{ client_keystore_pf }}"
+      register: client_ks_content
+      no_log: true
 
-    - name: THEN — server_encryption_options contains keystore_password_file
+    - name: THEN — assert client keystore content
       ansible.builtin.assert:
         that:
-          - server_enc_block is search('(?m)^\s+keystore_password_file:\s+' ~ (keystore_passwordfile | regex_escape))
-        fail_msg: "keystore_password_file not rendered in server_encryption_options"
+          - (client_ks_content.content | b64decode | trim) == 'clientKeystorePass!'
+        fail_msg: "client keystore password file content mismatch"
+      no_log: true
 
-    - name: THEN — server_encryption_options contains truststore_password_file
+    # ---------- THEN: server_encryption_options references server password files ----------
+
+    - name: THEN — server_encryption_options contains keystore_password_file pointing at server file
       ansible.builtin.assert:
         that:
-          - server_enc_block is search('(?m)^\s+truststore_password_file:\s+' ~ (truststore_passwordfile | regex_escape))
-        fail_msg: "truststore_password_file not rendered in server_encryption_options"
+          - server_enc_block is search('(?m)^\s+keystore_password_file:\s+' ~ (server_keystore_pf | regex_escape))
+        fail_msg: "server keystore_password_file not rendered in server_encryption_options"
+
+    - name: THEN — server_encryption_options contains truststore_password_file pointing at server file
+      ansible.builtin.assert:
+        that:
+          - server_enc_block is search('(?m)^\s+truststore_password_file:\s+' ~ (server_truststore_pf | regex_escape))
+        fail_msg: "server truststore_password_file not rendered in server_encryption_options"
 
     - name: THEN — server_encryption_options has no inline keystore_password
       ansible.builtin.assert:
@@ -117,19 +135,19 @@
           - server_enc_block is not search('(?m)^\s+truststore_password:\s')
         fail_msg: "inline truststore_password: found in server_encryption_options"
 
-    # ---------- THEN: client_encryption_options uses *_password_file ----------
+    # ---------- THEN: client_encryption_options references client password files ----------
 
-    - name: THEN — client_encryption_options contains keystore_password_file
+    - name: THEN — client_encryption_options contains keystore_password_file pointing at client file
       ansible.builtin.assert:
         that:
-          - client_enc_block is search('(?m)^\s+keystore_password_file:\s+' ~ (keystore_passwordfile | regex_escape))
-        fail_msg: "keystore_password_file not rendered in client_encryption_options"
+          - client_enc_block is search('(?m)^\s+keystore_password_file:\s+' ~ (client_keystore_pf | regex_escape))
+        fail_msg: "client keystore_password_file not rendered in client_encryption_options"
 
-    - name: THEN — client_encryption_options contains truststore_password_file
+    - name: THEN — client_encryption_options contains truststore_password_file pointing at client file
       ansible.builtin.assert:
         that:
-          - client_enc_block is search('(?m)^\s+truststore_password_file:\s+' ~ (truststore_passwordfile | regex_escape))
-        fail_msg: "truststore_password_file not rendered in client_encryption_options"
+          - client_enc_block is search('(?m)^\s+truststore_password_file:\s+' ~ (client_truststore_pf | regex_escape))
+        fail_msg: "client truststore_password_file not rendered in client_encryption_options"
 
     - name: THEN — client_encryption_options has no inline keystore_password
       ansible.builtin.assert:

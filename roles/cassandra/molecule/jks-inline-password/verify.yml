@@ -20,9 +20,18 @@
 
     # ---------- GIVEN: role completed with cassandra_use_password_files: false ----------
 
+    - name: GIVEN — read cassandra_conf_dir recorded by converge
+      ansible.builtin.slurp:
+        src: /tmp/cassandra_conf_dir
+      register: conf_dir_raw
+
+    - name: GIVEN — set cassandra_conf_dir fact
+      ansible.builtin.set_fact:
+        cassandra_conf_dir: "{{ conf_dir_raw.content | b64decode | trim }}"
+
     - name: GIVEN — read rendered cassandra.yaml
       ansible.builtin.slurp:
-        src: /etc/cassandra/cassandra.yaml
+        src: "{{ cassandra_conf_dir }}/cassandra.yaml"
       register: cassandra_yaml_raw
       no_log: true
 
@@ -87,24 +96,21 @@
 
     # ---------- THEN: password files must NOT exist on disk ----------
 
-    - name: THEN — keystore password file is absent
+    - name: THEN — stat all four password files
       ansible.builtin.stat:
-        path: /etc/cassandra/keystore_passwordfile.txt
-      register: keystore_pf
+        path: "{{ item }}"
+      loop:
+        - /etc/cassandra/server_keystore_passwordfile.txt
+        - /etc/cassandra/server_truststore_passwordfile.txt
+        - /etc/cassandra/client_keystore_passwordfile.txt
+        - /etc/cassandra/client_truststore_passwordfile.txt
+      register: pf_stats
 
-    - name: THEN — assert keystore password file absent
+    - name: THEN — assert each password file is absent
       ansible.builtin.assert:
         that:
-          - not keystore_pf.stat.exists
-        fail_msg: "keystore_passwordfile.txt should not exist with opt-out"
-
-    - name: THEN — truststore password file is absent
-      ansible.builtin.stat:
-        path: /etc/cassandra/truststore_passwordfile.txt
-      register: truststore_pf
-
-    - name: THEN — assert truststore password file absent
-      ansible.builtin.assert:
-        that:
-          - not truststore_pf.stat.exists
-        fail_msg: "truststore_passwordfile.txt should not exist with opt-out"
+          - not item.stat.exists
+        fail_msg: "{{ item.item }} should not exist with opt-out"
+      loop: "{{ pf_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"
