@@ -214,7 +214,7 @@ cassandra_require_endpoint_verification: false
 cassandra_legacy_ssl_storage_port_enabled: false
 cassandra_ssl_internode_keystore_file: "conf/.keystore"
 # WARNING: Change these passwords before enabling SSL encryption
-cassandra_ssl_internode_keystore_pass: "cassandra"
+cassandra_ssl_keystore_pass: "cassandra"
 cassandra_ssl_truststore_file: "conf/.truststore"
 cassandra_ssl_truststore_pass: "cassandra"
 cassandra_server_encryption_options_require_client_auth: false

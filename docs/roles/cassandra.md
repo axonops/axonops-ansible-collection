@@ -94,11 +94,18 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
 | `cassandra_ssl_internode_encryption` | `none` | Internode encryption: `none`, `all`, `dc`, or `rack` |
 | `cassandra_ssl_client_encryption_enabled` | `false` | Enable client-to-node encryption |
 | `cassandra_ssl_internode_keystore_file` | `conf/.keystore` | Keystore file path |
-| `cassandra_ssl_internode_keystore_pass` | `cassandra` | Keystore password |
+| `cassandra_ssl_keystore_pass` | `cassandra` | Keystore password (read by the role to write the password file or render the inline value) |
 | `cassandra_ssl_truststore_file` | `conf/.truststore` | Truststore file path |
 | `cassandra_ssl_truststore_pass` | `cassandra` | Truststore password |
 
 ##### Password files (default)
+
+> **⚠ Behaviour change in this release.** Previously, JKS passwords were written
+> inline into `cassandra.yaml`. By default the role now externalises them to
+> `*_password_file:` references. Running the role on an existing node will
+> rewrite `cassandra.yaml` and notify the `Restart Cassandra` handler. No data
+> is lost. To keep the legacy inline behaviour, set
+> `cassandra_use_password_files: false`.
 
 By default the role keeps JKS keystore/truststore passwords out of `cassandra.yaml`. Each password is written to a separate mode `0600` file owned by the cassandra user, and `cassandra.yaml` references it via `keystore_password_file:` / `truststore_password_file:` keys (a stock Cassandra feature, not a third-party extension). This applies to both `server_encryption_options` and `client_encryption_options`.
 
@@ -226,7 +233,7 @@ Store the resulting PEM content in Ansible Vault.
     cassandra_ssl_internode_encryption: all
     cassandra_ssl_client_encryption_enabled: true
     cassandra_ssl_internode_keystore_file: /etc/cassandra/conf/.keystore
-    cassandra_ssl_internode_keystore_pass: "{{ vault_keystore_password }}"
+    cassandra_ssl_keystore_pass: "{{ vault_keystore_password }}"
     cassandra_ssl_truststore_file: /etc/cassandra/conf/.truststore
     cassandra_ssl_truststore_pass: "{{ vault_truststore_password }}"
 
