@@ -1,22 +1,33 @@
 ---
-- name: Check NTP or Chrony
+- name: Check time synchronization (NTP, Chrony, or systemd-timesyncd)
   when: preflight_check_ntp is defined and preflight_check_ntp | bool
   block:
     - name: Check for NTP installation
       ansible.builtin.command: ntpd -v
       register: ntp_check
-      ignore_errors: true
+      changed_when: false
+      failed_when: false
 
     - name: Check for Chrony installation
       ansible.builtin.command: chronyd -v
       register: chrony_check
-      ignore_errors: true
+      changed_when: false
+      failed_when: false
 
-    - name: Assert Chrony is installed
+    - name: Check for systemd-timesyncd (active NTP synchronization)
+      ansible.builtin.command: timedatectl show --property=NTP --value
+      register: timesyncd_check
+      changed_when: false
+      failed_when: false
+
+    - name: Assert a time synchronization service is available
       ansible.builtin.assert:
         that:
-          - chrony_check.rc == 0 or ntp_check.rc == 0
-        fail_msg: "Neither NTP nor Chrony is installed."
+          - >-
+            chrony_check.rc == 0 or ntp_check.rc == 0
+            or (timesyncd_check.rc == 0 and (timesyncd_check.stdout | trim) == 'yes')
+        fail_msg: "No active time synchronization (ntpd, chronyd, or systemd-timesyncd)."
+        success_msg: "Time synchronization is active."
 
 - name: Assert OS is supported
   when: preflight_check_os is defined and preflight_check_os | bool
