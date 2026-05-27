@@ -25,7 +25,7 @@ cassandra_max_heap_size: 1G
 cassandra_ssl_internode_encryption: all
 cassandra_ssl_client_encryption_enabled: true
 cassandra_ssl_internode_keystore_file: /etc/cassandra/conf/.keystore
-cassandra_ssl_keystore_pass: "{{ vault_keystore_password }}"
+cassandra_ssl_internode_keystore_pass: "{{ vault_keystore_password }}"
 cassandra_ssl_truststore_file: /etc/cassandra/conf/.truststore
 cassandra_ssl_truststore_pass: "{{ vault_truststore_password }}"
 ```

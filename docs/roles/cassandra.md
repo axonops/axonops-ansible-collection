@@ -94,7 +94,7 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
 | `cassandra_ssl_internode_encryption` | `none` | Internode encryption: `none`, `all`, `dc`, or `rack` |
 | `cassandra_ssl_client_encryption_enabled` | `false` | Enable client-to-node encryption |
 | `cassandra_ssl_internode_keystore_file` | `conf/.keystore` | Keystore file path |
-| `cassandra_ssl_keystore_pass` | `cassandra` | Keystore password (read by the role to write the password file or render the inline value) |
+| `cassandra_ssl_internode_keystore_pass` | `cassandra` | Keystore password. Read by the role to write the password file or render the inline value. Alias `cassandra_ssl_keystore_pass` is also accepted. |
 | `cassandra_ssl_truststore_file` | `conf/.truststore` | Truststore file path |
 | `cassandra_ssl_truststore_pass` | `cassandra` | Truststore password |
 
@@ -233,7 +233,7 @@ Store the resulting PEM content in Ansible Vault.
     cassandra_ssl_internode_encryption: all
     cassandra_ssl_client_encryption_enabled: true
     cassandra_ssl_internode_keystore_file: /etc/cassandra/conf/.keystore
-    cassandra_ssl_keystore_pass: "{{ vault_keystore_password }}"
+    cassandra_ssl_internode_keystore_pass: "{{ vault_keystore_password }}"
     cassandra_ssl_truststore_file: /etc/cassandra/conf/.truststore
     cassandra_ssl_truststore_pass: "{{ vault_truststore_password }}"
 

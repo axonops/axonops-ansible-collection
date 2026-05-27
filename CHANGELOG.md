@@ -19,10 +19,14 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
-- **cassandra**: Renamed defaults variable `cassandra_ssl_internode_keystore_pass`
-  to `cassandra_ssl_keystore_pass` so the documented default matches the
-  variable read by the `cassandra.yaml` template and the new password-file
-  task. ([#99](https://github.com/axonops/axonops-ansible-collection/issues/99))
+- **cassandra**: `cassandra.yaml` template and the new password-file task have
+  always read `cassandra_ssl_keystore_pass`, but the defaults file only
+  declared `cassandra_ssl_internode_keystore_pass` — so the documented default
+  had no effect on the rendered config. Both names are now declared:
+  `cassandra_ssl_internode_keystore_pass` (legacy) holds the value;
+  `cassandra_ssl_keystore_pass` defaults to it via Jinja indirection. Existing
+  playbooks setting either variable continue to work without changes.
+  ([#99](https://github.com/axonops/axonops-ansible-collection/issues/99))
 - **cassandra 4.1.x template**: `server_encryption_options` now emits a
   `keystore_password:` (or `keystore_password_file:`) entry. The previous
   4.1.x template left the key commented out, so JKS internode TLS could not
