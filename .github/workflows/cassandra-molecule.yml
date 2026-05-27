@@ -37,6 +37,8 @@ jobs:
           - g1
           - jks-password-files
           - jks-inline-password
+          - jks-tls-disabled
+          - jks-empty-passwords
 
     steps:
       - name: Check out the codebase.
@@ -62,6 +64,26 @@ jobs:
 
       - name: Run Molecule converge
         run: molecule -v converge -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule verify
+        if: contains(matrix.scenario, 'jks-')
+        run: molecule -v verify -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule idempotence
+        if: contains(matrix.scenario, 'jks-')
+        run: molecule -v idempotence -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'
           ANSIBLE_FORCE_COLOR: '1'

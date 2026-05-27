@@ -1,4 +1,18 @@
 ---
+# BDD verification — JKS TLS opt-out (inline passwords)
+#
+# Behaviour under test: when cassandra_use_password_files=false, the role
+# preserves legacy behavior — passwords embedded inline in cassandra.yaml under
+# both server_encryption_options and client_encryption_options, and no
+# password files are written to disk.
+#
+# Why placeholder JKS files: see prepare.yml. Cassandra is not started.
+#
+# no_log: passwords flow through the slurp+set_fact chain. set_fact is marked
+# no_log to prevent password leakage into Ansible output on assertion failure.
+#
+# Isolation: dedicated container per scenario — parallel-safe.
+
 - name: Verify JKS TLS uses inline passwords when opted out (BDD)
   hosts: all
   gather_facts: false
@@ -10,38 +24,66 @@
       ansible.builtin.slurp:
         src: /etc/cassandra/cassandra.yaml
       register: cassandra_yaml_raw
+      no_log: true
 
     - name: GIVEN — decode cassandra.yaml
       ansible.builtin.set_fact:
         cassandra_yaml: "{{ cassandra_yaml_raw.content | b64decode }}"
+      no_log: true
 
-    # ---------- THEN: inline password keys present ----------
+    - name: GIVEN — extract server_encryption_options block
+      ansible.builtin.set_fact:
+        server_enc_block: "{{ cassandra_yaml | regex_search('(?s)^server_encryption_options:.*?(?=^\\S)', multiline=True) | default('', true) }}"
+      no_log: true
 
-    - name: THEN — cassandra.yaml contains inline keystore_password
+    - name: GIVEN — extract client_encryption_options block
+      ansible.builtin.set_fact:
+        client_enc_block: "{{ cassandra_yaml | regex_search('(?s)^client_encryption_options:.*?(?=^\\S)', multiline=True) | default('', true) }}"
+      no_log: true
+
+    # ---------- THEN: inline password keys present in each block ----------
+
+    - name: THEN — server_encryption_options contains inline keystore_password
       ansible.builtin.assert:
         that:
-          - cassandra_yaml is search('(?m)^\s+keystore_password:\s+serverKeystorePass!')
-        fail_msg: "inline keystore_password not rendered with opt-out"
+          - server_enc_block is search('(?m)^\s+keystore_password:\s+serverKeystorePass!')
+        fail_msg: "inline keystore_password not rendered in server_encryption_options"
+      no_log: true
 
-    - name: THEN — cassandra.yaml contains inline truststore_password
+    - name: THEN — server_encryption_options contains inline truststore_password
       ansible.builtin.assert:
         that:
-          - cassandra_yaml is search('(?m)^\s+truststore_password:\s+serverTruststorePass!')
-        fail_msg: "inline truststore_password not rendered with opt-out"
+          - server_enc_block is search('(?m)^\s+truststore_password:\s+serverTruststorePass!')
+        fail_msg: "inline truststore_password not rendered in server_encryption_options"
+      no_log: true
 
-    # ---------- THEN: *_password_file keys must NOT be present ----------
-
-    - name: THEN — cassandra.yaml has no keystore_password_file key
+    - name: THEN — client_encryption_options contains inline keystore_password
       ansible.builtin.assert:
         that:
-          - cassandra_yaml is not search('(?m)^\s+keystore_password_file:\s')
-        fail_msg: "keystore_password_file rendered despite opt-out"
+          - client_enc_block is search('(?m)^\s+keystore_password:\s+clientKeystorePass!')
+        fail_msg: "inline keystore_password not rendered in client_encryption_options"
+      no_log: true
 
-    - name: THEN — cassandra.yaml has no truststore_password_file key
+    - name: THEN — client_encryption_options contains inline truststore_password
       ansible.builtin.assert:
         that:
-          - cassandra_yaml is not search('(?m)^\s+truststore_password_file:\s')
-        fail_msg: "truststore_password_file rendered despite opt-out"
+          - client_enc_block is search('(?m)^\s+truststore_password:\s+clientTruststorePass!')
+        fail_msg: "inline truststore_password not rendered in client_encryption_options"
+      no_log: true
+
+    # ---------- THEN: *_password_file keys absent in both blocks ----------
+
+    - name: THEN — server_encryption_options has no keystore_password_file
+      ansible.builtin.assert:
+        that:
+          - server_enc_block is not search('(?m)^\s+keystore_password_file:\s')
+        fail_msg: "keystore_password_file rendered despite opt-out (server)"
+
+    - name: THEN — client_encryption_options has no keystore_password_file
+      ansible.builtin.assert:
+        that:
+          - client_enc_block is not search('(?m)^\s+keystore_password_file:\s')
+        fail_msg: "keystore_password_file rendered despite opt-out (client)"
 
     # ---------- THEN: password files must NOT exist on disk ----------
 

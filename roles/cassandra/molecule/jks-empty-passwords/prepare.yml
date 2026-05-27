@@ -1,0 +1,24 @@
+---
+- name: Stage placeholder JKS keystore and truststore files
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ensure conf directory exists for placeholder JKS files
+      ansible.builtin.file:
+        path: /etc/cassandra
+        state: directory
+        mode: '0755'
+
+    - name: Create placeholder keystore
+      ansible.builtin.copy:
+        content: ""
+        dest: /etc/cassandra/keystore.jks
+        mode: '0644'
+        force: false
+
+    - name: Create placeholder truststore
+      ansible.builtin.copy:
+        content: ""
+        dest: /etc/cassandra/truststore.jks
+        mode: '0644'
+        force: false

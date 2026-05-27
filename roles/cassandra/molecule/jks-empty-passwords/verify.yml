@@ -1,0 +1,56 @@
+---
+# BDD verification — JKS TLS with empty passwords (edge case)
+#
+# Behaviour under test: when keystore/truststore passwords are empty strings,
+# the role MUST NOT write empty 0600 password files, and the rendered
+# cassandra.yaml MUST NOT emit a *_password_file: key pointing at an empty file
+# (which would be a config error masquerading as a feature).
+#
+# The role should either:
+#   (a) skip emitting any password key (preferred), or
+#   (b) fall back to inline empty keystore_password (current legacy behavior).
+# Either is acceptable — what is NOT acceptable is creating an empty 0600 file
+# and pointing cassandra.yaml at it.
+
+- name: Verify empty-password edge case (BDD)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: GIVEN — read rendered cassandra.yaml
+      ansible.builtin.slurp:
+        src: /etc/cassandra/cassandra.yaml
+      register: cassandra_yaml_raw
+
+    - name: GIVEN — decode cassandra.yaml
+      ansible.builtin.set_fact:
+        cassandra_yaml: "{{ cassandra_yaml_raw.content | b64decode }}"
+
+    - name: THEN — keystore password file does NOT exist
+      ansible.builtin.stat:
+        path: /etc/cassandra/keystore_passwordfile.txt
+      register: keystore_pf
+
+    - name: THEN — assert keystore password file absent
+      ansible.builtin.assert:
+        that:
+          - not keystore_pf.stat.exists
+        fail_msg: "keystore_passwordfile.txt was written despite empty password"
+
+    - name: THEN — truststore password file does NOT exist
+      ansible.builtin.stat:
+        path: /etc/cassandra/truststore_passwordfile.txt
+      register: truststore_pf
+
+    - name: THEN — assert truststore password file absent
+      ansible.builtin.assert:
+        that:
+          - not truststore_pf.stat.exists
+        fail_msg: "truststore_passwordfile.txt was written despite empty password"
+
+    - name: THEN — cassandra.yaml has no *_password_file keys pointing at empty files
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is not search('(?m)^\s+keystore_password_file:\s+/etc/cassandra/keystore_passwordfile\.txt')
+          - cassandra_yaml is not search('(?m)^\s+truststore_password_file:\s+/etc/cassandra/truststore_passwordfile\.txt')
+        fail_msg: "cassandra.yaml references a password file that was not written"

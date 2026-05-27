@@ -1,0 +1,54 @@
+---
+# BDD verification — TLS disabled
+#
+# Behaviour under test: when TLS is off, the role MUST NOT write password files
+# nor emit *_password_file: keys, regardless of cassandra_use_password_files.
+# This guards against the role creating unused secret files on disk.
+
+- name: Verify no password files written when TLS disabled (BDD)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: GIVEN — read rendered cassandra.yaml
+      ansible.builtin.slurp:
+        src: /etc/cassandra/cassandra.yaml
+      register: cassandra_yaml_raw
+
+    - name: GIVEN — decode cassandra.yaml
+      ansible.builtin.set_fact:
+        cassandra_yaml: "{{ cassandra_yaml_raw.content | b64decode }}"
+
+    - name: THEN — cassandra.yaml has no keystore_password_file anywhere
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is not search('(?m)^\s+keystore_password_file:\s')
+        fail_msg: "keystore_password_file rendered despite TLS disabled"
+
+    - name: THEN — cassandra.yaml has no truststore_password_file anywhere
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is not search('(?m)^\s+truststore_password_file:\s')
+        fail_msg: "truststore_password_file rendered despite TLS disabled"
+
+    - name: THEN — keystore password file is absent
+      ansible.builtin.stat:
+        path: /etc/cassandra/keystore_passwordfile.txt
+      register: keystore_pf
+
+    - name: THEN — assert keystore password file absent
+      ansible.builtin.assert:
+        that:
+          - not keystore_pf.stat.exists
+        fail_msg: "keystore_passwordfile.txt should not exist when TLS disabled"
+
+    - name: THEN — truststore password file is absent
+      ansible.builtin.stat:
+        path: /etc/cassandra/truststore_passwordfile.txt
+      register: truststore_pf
+
+    - name: THEN — assert truststore password file absent
+      ansible.builtin.assert:
+        that:
+          - not truststore_pf.stat.exists
+        fail_msg: "truststore_passwordfile.txt should not exist when TLS disabled"
