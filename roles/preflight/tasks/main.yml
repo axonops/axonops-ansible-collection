@@ -14,7 +14,9 @@
       changed_when: false
       failed_when: false
 
-    - name: Check for systemd-timesyncd (active NTP synchronization)
+    # timedatectl 'show' requires systemd >= 230; on older or non-systemd hosts
+    # this returns a non-zero rc and the check falls back to ntpd/chronyd above.
+    - name: Check for systemd-timesyncd
       ansible.builtin.command: timedatectl show --property=NTP --value
       register: timesyncd_check
       changed_when: false
