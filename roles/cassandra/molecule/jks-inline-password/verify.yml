@@ -76,7 +76,8 @@
     - name: THEN — client_encryption_options contains inline truststore_password
       ansible.builtin.assert:
         that:
-          - client_enc_block is search('(?m)^\s+truststore_password:\s+clientTruststorePass!')
+          # 5.0.x client truststore_password is wrapped in double quotes by the template
+          - client_enc_block is search('(?m)^\s+truststore_password:\s+"?clientTruststorePass!"?')
         fail_msg: "inline truststore_password not rendered in client_encryption_options"
       no_log: true
 
