@@ -60,7 +60,7 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `cassandra_data_directory` | `/var/lib/cassandra` | Base data directory |
+| `cassandra_data_directory` | `/var/lib/cassandra/data` | Data (SSTable) directory |
 | `cassandra_commitlog_directory` | `/var/lib/cassandra/commitlog` | Commit log directory |
 | `cassandra_saved_caches_directory` | `/var/lib/cassandra/saved_caches` | Saved caches directory |
 | `cassandra_hints_directory` | `/var/lib/cassandra/hints` | Hints directory |
