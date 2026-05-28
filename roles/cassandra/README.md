@@ -30,6 +30,25 @@ cassandra_ssl_truststore_file: /etc/cassandra/conf/.truststore
 cassandra_ssl_truststore_pass: "{{ vault_truststore_password }}"
 ```
 
+#### Password files (default behaviour — changed)
+
+> **⚠ Behaviour change.** Prior to this release, the role embedded JKS passwords inline in `cassandra.yaml`. By default the role now writes each password to a separate mode `0600` file owned by the cassandra user and emits `keystore_password_file:` / `truststore_password_file:` keys in `cassandra.yaml` instead. This affects both `server_encryption_options` and `client_encryption_options`. No data is lost; running the role updates `cassandra.yaml` and Cassandra is restarted via the existing handler.
+
+Password files are written only when (a) the relevant TLS path is enabled and (b) the configured password is non-empty. Four files are written by default under `cassandra_conf_dir`:
+
+- `server_keystore_passwordfile.txt`
+- `server_truststore_passwordfile.txt`
+- `client_keystore_passwordfile.txt`
+- `client_truststore_passwordfile.txt`
+
+To opt out (keep the legacy inline behaviour):
+
+```yaml
+cassandra_use_password_files: false
+```
+
+See [docs/roles/cassandra.md](../../docs/roles/cassandra.md#password-files-default) for the full variable reference.
+
 ### PEM-based TLS (Cassandra 4.1+)
 
 Set `cassandra_ssl_internode_ssl_context_factory: pem` (and/or `cassandra_ssl_client_ssl_context_factory: pem`) to use `PEMBasedSslContextFactory`.

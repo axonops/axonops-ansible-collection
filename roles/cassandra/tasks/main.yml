@@ -208,6 +208,12 @@
       ansible.builtin.set_fact:
         cassandra_libjemalloc_path: "{{ (_jemalloc_lib_find.files | sort(attribute='path') | first).path }}"
 
+- name: Write TLS keystore/truststore password files (cassandra_use_password_files)
+  ansible.builtin.import_tasks: password-files.yml
+  tags:
+    - config
+    - tls
+
 - name: Deploy configuration
   tags: config
   block:

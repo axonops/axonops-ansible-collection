@@ -1833,7 +1833,9 @@ server_encryption_options:
 {% else %}
   # Set to a valid keystore if internode_encryption is dc, rack or all
   keystore: {{ cassandra_ssl_internode_keystore_file | default('conf/.keystore ')}}
-{% if cassandra_ssl_keystore_pass is defined and cassandra_ssl_keystore_pass != '' %}
+{% if cassandra_use_password_files | default(true) | bool and cassandra_ssl_internode_encryption | default('none') != 'none' and cassandra_ssl_keystore_pass | default('') != '' %}
+  keystore_password_file: {{ cassandra_ssl_keystore_password_file }}
+{% elif cassandra_ssl_keystore_pass is defined and cassandra_ssl_keystore_pass != '' %}
   keystore_password: {{ cassandra_ssl_keystore_pass }}
 {% endif %}
   # During internode mTLS authentication, inbound connections (acting as servers) use keystore, keystore_password
@@ -1844,7 +1846,11 @@ server_encryption_options:
 #  outbound_keystore_password: cassandra
   # Set to a valid trustore if require_client_auth is true
   truststore: {{ cassandra_ssl_truststore_file | default("") }}
+{% if cassandra_use_password_files | default(true) | bool and cassandra_ssl_internode_encryption | default('none') != 'none' and cassandra_ssl_truststore_pass | default('') != '' %}
+  truststore_password_file: {{ cassandra_ssl_truststore_password_file }}
+{% else %}
   truststore_password: {{ cassandra_ssl_truststore_pass | default("") }}
+{% endif %}
 {% endif %}
   # Verify peer server certificates
   require_client_auth: {{ cassandra_ssl_client_require_client_auth }}
@@ -1895,11 +1901,19 @@ client_encryption_options:
 {% else %}
   # Set keystore and keystore_password to valid keystores if enabled is true
   keystore: {{ cassandra_ssl_client_keystore_file | default("conf/.keystore") }}
+{% if cassandra_use_password_files | default(true) | bool and cassandra_ssl_client_encryption_enabled | default(false) | bool and cassandra_ssl_client_keystore_pass | default('') != '' %}
+  keystore_password_file: {{ cassandra_ssl_client_keystore_password_file }}
+{% else %}
   keystore_password: {{ cassandra_ssl_client_keystore_pass | default("cassandra") }}
+{% endif %}
   # Set trustore and truststore_password if require_client_auth is true
 {% if cassandra_ssl_client_truststore_file is defined and cassandra_ssl_client_truststore_file != '' %}
   truststore: "{{ cassandra_ssl_client_truststore_file }}"
+{% if cassandra_use_password_files | default(true) | bool and cassandra_ssl_client_encryption_enabled | default(false) | bool and cassandra_ssl_client_truststore_pass | default('') != '' %}
+  truststore_password_file: {{ cassandra_ssl_client_truststore_password_file }}
+{% else %}
   truststore_password: "{{ cassandra_ssl_client_truststore_pass | default('cassandra') }}"
+{% endif %}
 {% endif %}
   # More advanced defaults:
   # protocol: TLS
