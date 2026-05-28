@@ -30,24 +30,11 @@ cassandra_ssl_truststore_file: /etc/cassandra/conf/.truststore
 cassandra_ssl_truststore_pass: "{{ vault_truststore_password }}"
 ```
 
-#### Password files (default behaviour — changed)
+#### Password files (`cassandra_use_password_files`) — not supported
 
-> **⚠ Behaviour change.** Prior to this release, the role embedded JKS passwords inline in `cassandra.yaml`. By default the role now writes each password to a separate mode `0600` file owned by the cassandra user and emits `keystore_password_file:` / `truststore_password_file:` keys in `cassandra.yaml` instead. This affects both `server_encryption_options` and `client_encryption_options`. No data is lost; running the role updates `cassandra.yaml` and Cassandra is restarted via the existing handler.
+> **⚠ Not supported on this role's Cassandra versions.** The `keystore_password_file:` / `truststore_password_file:` keys were added in **Apache Cassandra 6.0** ([CASSANDRA-13428](https://issues.apache.org/jira/browse/CASSANDRA-13428)) and do **not** exist in Cassandra 4.1.x or 5.0.x — the only versions this role supports. On those versions Cassandra rejects the keys at startup with `Invalid yaml. Please remove properties [truststore_password_file, keystore_password_file]` and refuses to boot.
 
-Password files are written only when (a) the relevant TLS path is enabled and (b) the configured password is non-empty. Four files are written by default under `cassandra_conf_dir`:
-
-- `server_keystore_passwordfile.txt`
-- `server_truststore_passwordfile.txt`
-- `client_keystore_passwordfile.txt`
-- `client_truststore_passwordfile.txt`
-
-To opt out (keep the legacy inline behaviour):
-
-```yaml
-cassandra_use_password_files: false
-```
-
-See [docs/roles/cassandra.md](../../docs/roles/cassandra.md#password-files-default) for the full variable reference.
+For this reason `cassandra_use_password_files` defaults to `false` and the role **force-disables it with a warning** if you set it `true`, falling back to inline `keystore_password:` / `truststore_password:`. The variable is retained only so the path can be re-enabled once Cassandra 6.0+ becomes a supported target. Keep JKS passwords out of source control with Ansible Vault instead.
 
 ### PEM-based TLS (Cassandra 4.1+)
 

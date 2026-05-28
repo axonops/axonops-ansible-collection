@@ -35,7 +35,7 @@ jobs:
           - default
           - shenandoah
           - g1
-          - jks-password-files
+          # - jks-password-files  # disabled: *_password_file keys require Cassandra 6.0+ (CASSANDRA-13428), unsupported by this role — see #102
           - jks-inline-password
           - jks-tls-disabled
           - jks-empty-passwords
