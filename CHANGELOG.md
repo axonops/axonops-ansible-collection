@@ -6,18 +6,16 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
-### Changed
-
-- **cassandra**: JKS keystore/truststore passwords are now externalised to
-  `keystore_password_file:` / `truststore_password_file:` references in
-  `cassandra.yaml` by default. Each password is written to a separate mode
-  `0600` file owned by the cassandra user under `cassandra_conf_dir`, covering
-  both `server_encryption_options` and `client_encryption_options`. Set
-  `cassandra_use_password_files: false` to restore the previous inline
-  behaviour. See [docs/roles/cassandra.md](docs/roles/cassandra.md#password-files-default).
-  ([#99](https://github.com/axonops/axonops-ansible-collection/issues/99))
-
 ### Fixed
+
+- **cassandra**: `cassandra_use_password_files` no longer breaks Cassandra
+  startup. The `keystore_password_file:` / `truststore_password_file:` keys it
+  emitted were added in Apache Cassandra 6.0 (CASSANDRA-13428) and do not exist
+  in 4.1.x / 5.0.x, the only versions this role supports — Cassandra rejected
+  them with `Invalid yaml. Please remove properties [...]` and refused to boot.
+  The feature now defaults to `false` and is force-disabled with a warning if
+  enabled, falling back to inline `keystore_password:` / `truststore_password:`.
+  ([#102](https://github.com/axonops/axonops-ansible-collection/issues/102))
 
 - **cassandra**: `cassandra.yaml` template and the new password-file task have
   always read `cassandra_ssl_keystore_pass`, but the defaults file only

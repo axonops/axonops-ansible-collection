@@ -237,12 +237,17 @@ cassandra_ssl_client_require_endpoint_verification: false
 cassandra_ssl_client_encryption_protocol: "TLS"
 
 # Externalised keystore/truststore passwords (cassandra.yaml *_password_file keys)
-# When true (default), the role writes the JKS passwords to mode 0600 files
-# under cassandra_conf_dir and emits keystore_password_file / truststore_password_file
-# in cassandra.yaml — keeping plaintext passwords out of the world-readable config.
-# Set to false to revert to inline keystore_password / truststore_password keys.
-# No files are written if TLS is disabled or the relevant password is empty.
-cassandra_use_password_files: true
+#
+# NOT SUPPORTED in this role. The keystore_password_file / truststore_password_file
+# keys were added in Apache Cassandra 6.0 (CASSANDRA-13428) and do not exist in
+# Cassandra 4.1.x or 5.0.x — the only versions this role supports. Enabling them on
+# those versions makes cassandra.yaml invalid and Cassandra refuses to start with:
+#   "Invalid yaml. Please remove properties [truststore_password_file, keystore_password_file]"
+#
+# This feature is therefore disabled by default and force-disabled by the role on any
+# supported version (the role warns if you set it true). It is kept only so the path
+# can be re-enabled once Cassandra 6.0+ becomes a supported target.
+cassandra_use_password_files: false
 cassandra_ssl_keystore_password_file: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/server_keystore_passwordfile.txt"
 cassandra_ssl_truststore_password_file: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/server_truststore_passwordfile.txt"
 cassandra_ssl_client_keystore_password_file: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/client_keystore_passwordfile.txt"
