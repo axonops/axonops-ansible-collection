@@ -1,0 +1,138 @@
+---
+# Integration test for the chart_query_index parameter on
+# axonops.axonops.alert_rule. Mirrors the env-var convention used by
+# tests/run_dashboard_tests.sh.
+#
+# Three behaviours exercised:
+#   1. Default (chart_query_index: 0 implicit) — matches long-standing behaviour.
+#   2. Explicit non-zero index — alert's stored expr is derived from queries[N],
+#      not queries[0]. Verified against a chart with multiple queries.
+#   3. Out-of-range index — task fails with a clear error message instead of
+#      silently picking the wrong query (or IndexError).
+#
+# Required env (same as run_dashboard_tests.sh):
+#   AXONOPS_TOKEN, AXONOPS_TEST_URL, AXONOPS_TEST_ORG, AXONOPS_TEST_CLUSTER
+- name: Test alert_rule chart_query_index parameter
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    base_url: "{{ base_url | default('http://localhost:3000') }}"
+    org: "{{ org | default('testorg') }}"
+    cluster: "{{ cluster | default('test-cluster') }}"
+    # The "UP vs Down endpoints" chart on the Overview dashboard ships with
+    # two queries — use it as our two-query fixture. If the test cluster's
+    # dashboard schema changes, point these at any chart known to have at
+    # least two queries.
+    multi_query_chart_dashboard: Overview
+    multi_query_chart_title: UP vs Down endpoints
+    test_alert_prefix: ansible-test-alert_rule-chart_query_index
+
+  tasks:
+    # --- 1. Default index (queries[0]) — behaviour preserved ------------------
+    - name: Create alert with default chart_query_index (== 0)
+      axonops.axonops.alert_rule:
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        base_url: "{{ base_url }}"
+        name: "{{ test_alert_prefix }} default-idx"
+        dashboard: "{{ multi_query_chart_dashboard }}"
+        chart: "{{ multi_query_chart_title }}"
+        operator: ">="
+        warning_value: 1
+        critical_value: 2
+        duration: 5m
+        present: true
+      register: r_default
+
+    - name: Default-index alert should have been created (or no-op if already current)
+      ansible.builtin.assert:
+        that:
+          - r_default.failed is not defined or not r_default.failed
+
+    # --- 2. Explicit non-zero index (queries[1]) — new behaviour --------------
+    - name: Create alert with chart_query_index=1 (the second query)
+      axonops.axonops.alert_rule:
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        base_url: "{{ base_url }}"
+        name: "{{ test_alert_prefix }} explicit-idx-1"
+        dashboard: "{{ multi_query_chart_dashboard }}"
+        chart: "{{ multi_query_chart_title }}"
+        chart_query_index: 1
+        operator: ">="
+        warning_value: 1
+        critical_value: 2
+        duration: 5m
+        present: true
+      register: r_explicit_one
+
+    - name: Fetch the stored alerts to verify the two exprs differ
+      ansible.builtin.uri:
+        url: "{{ base_url }}/api/v1/alert-rules/{{ org }}/cassandra/{{ cluster }}"
+        method: GET
+        headers: "{{ {'Authorization': 'Bearer ' + lookup('env', 'AXONOPS_TOKEN')} if lookup('env', 'AXONOPS_TOKEN') else {} }}"
+        return_content: true
+        status_code: 200
+      register: stored_alerts
+
+    - name: Extract the two test alerts by name
+      ansible.builtin.set_fact:
+        alert_default: "{{ stored_alerts.json.metricrules | selectattr('alert', 'equalto', test_alert_prefix + ' default-idx') | first }}"
+        alert_idx_one: "{{ stored_alerts.json.metricrules | selectattr('alert', 'equalto', test_alert_prefix + ' explicit-idx-1') | first }}"
+
+    - name: Default-index and idx=1 alerts MUST have DIFFERENT exprs
+      ansible.builtin.assert:
+        that:
+          - alert_default.expr != alert_idx_one.expr
+        fail_msg: |
+          chart_query_index=1 produced the same expr as the default. Either the
+          chart has only one query (bad fixture) or the module didn't honor the
+          new param.
+          default: {{ alert_default.expr }}
+          idx=1:   {{ alert_idx_one.expr }}
+
+    # --- 3. Out-of-range index — task must fail clearly -----------------------
+    - name: Attempt alert with out-of-range chart_query_index
+      axonops.axonops.alert_rule:
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        base_url: "{{ base_url }}"
+        name: "{{ test_alert_prefix }} out-of-range-idx"
+        dashboard: "{{ multi_query_chart_dashboard }}"
+        chart: "{{ multi_query_chart_title }}"
+        chart_query_index: 99
+        operator: ">="
+        warning_value: 1
+        critical_value: 2
+        duration: 5m
+        present: true
+      register: r_oor
+      failed_when: false
+
+    - name: Out-of-range index should fail with the bounds-check error
+      ansible.builtin.assert:
+        that:
+          - r_oor.failed
+          - "'chart_query_index 99 out of range' in (r_oor.msg | default(''))"
+        fail_msg: |
+          Expected the task to fail with an out-of-range message; got
+          failed={{ r_oor.failed | default(false) }}, msg={{ r_oor.msg | default('<none>') }}
+
+    # --- Cleanup --------------------------------------------------------------
+    - name: Remove the two created test alerts
+      axonops.axonops.alert_rule:
+        org: "{{ org }}"
+        cluster: "{{ cluster }}"
+        base_url: "{{ base_url }}"
+        name: "{{ item }}"
+        dashboard: "{{ multi_query_chart_dashboard }}"
+        chart: "{{ multi_query_chart_title }}"
+        operator: ">="
+        warning_value: 1
+        critical_value: 2
+        duration: 5m
+        present: false
+      loop:
+        - "{{ test_alert_prefix }} default-idx"
+        - "{{ test_alert_prefix }} explicit-idx-1"
