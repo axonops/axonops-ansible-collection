@@ -92,6 +92,9 @@ _METRIC_SELECTOR_RE = re.compile(r"([a-zA-Z_:][a-zA-Z0-9_:]*)\s*\{([^{}]*)\}")
 # is single-quoted and may itself contain commas, so matching whole matchers
 # (rather than splitting the body on commas) keeps comma-bearing values intact.
 _LABEL_MATCHER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\s*(?:=~|!~|!=|=)\s*'[^']*'")
+# An exact-equality matcher against an empty value, e.g. `host_id=''` or
+# `host_id=~''`. Negated forms (`!=''`, `!~''`) mean "non-empty" and are kept.
+_EMPTY_EQ_MATCHER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\s*=~?\s*''$")
 
 
 def parse_set_label_arg(arg: str) -> tuple:
@@ -171,6 +174,30 @@ class ExprRewriter:
             if metric_glob is not None and not fnmatch.fnmatchcase(metric_name, metric_glob):
                 return m.group(0)
             return f"{metric_name}{{{label_re.sub(replacement, body)}}}"
+
+        return _METRIC_SELECTOR_RE.sub(_rewrite_selector, expr)
+
+    @staticmethod
+    def drop_empty_matchers(expr: str) -> str:
+        """Remove exact-equality matchers against an empty value (``label=''``
+        / ``label=~''``) from every metric selector.
+
+        AxonOps seeds some default rules with placeholder matchers like
+        ``events{host_id='',...}``. The alert engine treats an empty host_id as
+        "all hosts", but the raw query_range endpoint returns 500 for an
+        empty-string matcher. Stripping these from the *query* expression lets
+        the sample query succeed (aggregating across hosts); the stored rule
+        expr — written back and applied to the cluster — is left untouched.
+
+        Negated empty matchers (``label!=''``) mean "non-empty" and are kept.
+        """
+        def _rewrite_selector(m):
+            metric_name, body = m.group(1), m.group(2)
+            kept = [
+                matcher for matcher in _LABEL_MATCHER_RE.findall(body)
+                if not _EMPTY_EQ_MATCHER_RE.match(matcher.strip())
+            ]
+            return f"{metric_name}{{{','.join(kept)}}}"
 
         return _METRIC_SELECTOR_RE.sub(_rewrite_selector, expr)
 
@@ -510,6 +537,8 @@ class TuneAlertsOrchestrator:
         query_expr = bare
         for metric_glob, label, value in self.config.set_labels:
             query_expr = ExprRewriter.set_label(query_expr, label, value, metric_glob)
+        # Drop placeholder empty matchers so query_range stops 500'ing on them.
+        query_expr = ExprRewriter.drop_empty_matchers(query_expr)
 
         # Build the list of incident windows
         incident_windows = [_incident_day_range(d) for d in self.config.incidents]
