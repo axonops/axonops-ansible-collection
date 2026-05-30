@@ -82,6 +82,43 @@ def _percentile(samples: list, p: float) -> float:
 # ` <operator> <value>`.
 _TRAILING_THRESHOLD_RE = re.compile(r'^(.*)\s(<=|>=|<|>|==|!=)\s(\S+)$')
 
+# Matches a metric selector `name{<labels>}`. The label body cannot contain
+# braces (PromQL selectors don't nest), so `[^{}]*` is safe even when label
+# values carry commas. The metric name precedes the brace; function calls use
+# `(` and the `by (...)` grouping clause uses parens, so neither is matched.
+_METRIC_SELECTOR_RE = re.compile(r"([a-zA-Z_:][a-zA-Z0-9_:]*)\s*\{([^{}]*)\}")
+
+# A single label matcher inside a selector body: `label OP 'value'`. The value
+# is single-quoted and may itself contain commas, so matching whole matchers
+# (rather than splitting the body on commas) keeps comma-bearing values intact.
+_LABEL_MATCHER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\s*(?:=~|!~|!=|=)\s*'[^']*'")
+
+
+def parse_set_label_arg(arg: str) -> tuple:
+    """Parse a ``--set-label`` value of the form ``[METRIC_GLOB:]LABEL=VALUE``.
+
+    Returns ``(metric_glob_or_None, label, value)``. ``LABEL`` must be a valid
+    Prometheus label name (no colon), which lets us split the optional metric
+    glob on the last ``:`` unambiguously even when the glob itself contains a
+    colon (recording-rule style names). Raises ValueError on malformed input.
+    """
+    left, sep, value = arg.partition("=")
+    if not sep:
+        raise ValueError(f"--set-label must be LABEL=VALUE or METRIC_GLOB:LABEL=VALUE: {arg!r}")
+    left = left.strip()
+    value = value.strip()
+    if ":" in left:
+        metric_glob, _, label = left.rpartition(":")
+        metric_glob = metric_glob.strip() or None
+        label = label.strip()
+    else:
+        metric_glob, label = None, left
+    if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", label):
+        raise ValueError(f"invalid label name in --set-label: {label!r}")
+    if value == "" or "'" in value:
+        raise ValueError(f"invalid value in --set-label (empty or contains quote): {value!r}")
+    return (metric_glob, label, value)
+
 
 class ExprRewriter:
     """Strip or replace the trailing `<op> <value>` on an alert expression.
@@ -104,6 +141,38 @@ class ExprRewriter:
         """Return a new expr with the trailing value replaced by new_warning."""
         bare, op, _old = ExprRewriter.strip_threshold(expr)
         return f"{bare} {op} {_format_value(new_warning)}"
+
+    @staticmethod
+    def set_label(expr: str, label: str, value: str, metric_glob: str = None) -> str:
+        """Pin a label selector to a single exact-match value.
+
+        For every metric selector ``name{...}`` in ``expr`` whose name matches
+        ``metric_glob`` (fnmatch glob; ``None`` matches all) and that already
+        contains a matcher for ``label``, replace that matcher with
+        ``label='value'`` (exact equality, regardless of the original
+        ``=``/``=~``/``!=``/``!~`` operator and value). Selectors lacking the
+        label are left untouched — this pins existing labels, it never injects
+        a new one.
+
+        Used to retarget broken multi-value selectors (e.g. the comma-joined
+        ``keyspace=~'a,b,c'`` lists that match no series) onto a single active
+        keyspace/table so the tuner queries representative workload data. The
+        ``metric_glob`` lets callers confine an overloaded label like ``scope``
+        (a table name on ``cas_Table_*`` metrics, a request type or thread pool
+        elsewhere) to just the metrics where it means a table.
+        """
+        label_re = re.compile(
+            r"(?<![A-Za-z0-9_])" + re.escape(label) + r"\s*(?:=~|!~|=|!=)\s*'[^']*'"
+        )
+        replacement = f"{label}='{value}'"
+
+        def _rewrite_selector(m):
+            metric_name, body = m.group(1), m.group(2)
+            if metric_glob is not None and not fnmatch.fnmatchcase(metric_name, metric_glob):
+                return m.group(0)
+            return f"{metric_name}{{{label_re.sub(replacement, body)}}}"
+
+        return _METRIC_SELECTOR_RE.sub(_rewrite_selector, expr)
 
 
 def _format_value(v) -> str:
@@ -261,12 +330,15 @@ class TuneAlertsConfig:
     rules: list
     incidents: list = None          # list[str] of YYYY-MM-DD
     pinned_rules: list = None       # list[dict{pattern, warning, critical}]
+    set_labels: list = None         # list[tuple(metric_glob_or_None, label, value)]
 
     def __post_init__(self):
         if self.incidents is None:
             self.incidents = []
         if self.pinned_rules is None:
             self.pinned_rules = []
+        if self.set_labels is None:
+            self.set_labels = []
 
 
 @dataclass
@@ -433,6 +505,13 @@ class TuneAlertsOrchestrator:
                 old_warning=old_warning, old_critical=old_critical,
             )
 
+        # Apply caller-supplied label pins to the QUERY expression only — the
+        # stored rule expr is left as-is. Lets the tuner sample real workload
+        # data when the shipped selector targets a broken multi-value list.
+        query_expr = bare
+        for metric_glob, label, value in self.config.set_labels:
+            query_expr = ExprRewriter.set_label(query_expr, label, value, metric_glob)
+
         # Build the list of incident windows
         incident_windows = [_incident_day_range(d) for d in self.config.incidents]
 
@@ -443,10 +522,10 @@ class TuneAlertsOrchestrator:
         try:
             if incident_windows:
                 baseline_samples = self._baseline_samples_excluding(
-                    querier, bare, start_ts, end_ts, incident_windows,
+                    querier, query_expr, start_ts, end_ts, incident_windows,
                 )
             else:
-                baseline_samples = querier.query(bare, start=start_ts, end=end_ts, step="1m")
+                baseline_samples = querier.query(query_expr, start=start_ts, end=end_ts, step="1m")
         except HTTPCodeError as e:
             return RuleOutcome(
                 rule_name=name, status="skipped", reason=f"query failed: {e}",
@@ -500,7 +579,7 @@ class TuneAlertsOrchestrator:
             pre_warning = new_warning
             pre_critical = new_critical
             try:
-                incident_samples = querier.query(bare, start=inc_start, end=inc_end, step="1m")
+                incident_samples = querier.query(query_expr, start=inc_start, end=inc_end, step="1m")
             except HTTPCodeError as e:
                 incident_coverage.append({
                     "date": datetime.fromtimestamp(inc_start, tz=timezone.utc).strftime("%Y-%m-%d"),
@@ -756,6 +835,14 @@ class TuneAlertsOrchestrator:
             f"(p{result.percentile}, warning +{int(result.warning_headroom * 100)}%, "
             f"critical +{int(result.critical_headroom * 100)}%)",
             f"**Window:** {window_start} → {window_end} (7 days)",
+        ]
+        if self.config.set_labels:
+            overrides = ", ".join(
+                f"{(g + ':') if g else ''}{label}='{value}'"
+                for g, label, value in self.config.set_labels
+            )
+            lines.append(f"**Query label overrides:** {overrides}")
+        lines += [
             "",
             "## Summary",
             "",

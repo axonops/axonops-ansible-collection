@@ -298,6 +298,15 @@ class Application:
                                         help='Path to a JSON policy file with pinned thresholds that override '
                                              'workload-derived tuning for matching rule-name globs. Format: '
                                              '{"pinned_thresholds": [{"pattern": "Disk *", "warning": 70, "critical": 80}]}')
+        tune_alerts_parser.add_argument('--set-label', action='append', default=[], dest='set_label',
+                                        metavar='[METRIC_GLOB:]LABEL=VALUE',
+                                        help='Pin a label selector to a single value in the metric query used to '
+                                             'compute thresholds (the stored expr is unchanged). Repeatable. Only '
+                                             'rewrites selectors that already reference LABEL; never injects. Prefix '
+                                             'with a metric-name glob to confine an overloaded label, e.g. '
+                                             "--set-label 'cas_Table_*:scope=mytable'. Use to retarget broken "
+                                             "comma-list selectors onto one active keyspace/table, e.g. "
+                                             '--set-label keyspace=myks --set-label table=mytable')
 
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
@@ -576,7 +585,7 @@ class Application:
 
     @staticmethod
     def _build_tune_alerts_config(args):
-        from .components.tune_alerts import TuneAlertsConfig
+        from .components.tune_alerts import TuneAlertsConfig, parse_set_label_arg
 
         # Profile presets
         presets = {
@@ -590,6 +599,8 @@ class Application:
         if getattr(args, 'policy', None):
             pinned_rules = Application._load_policy_file(args.policy)
 
+        set_labels = [parse_set_label_arg(a) for a in (getattr(args, 'set_label', None) or [])]
+
         return TuneAlertsConfig(
             profile=args.profile,
             percentile=args.percentile if args.percentile is not None else p_percentile,
@@ -602,6 +613,7 @@ class Application:
             rules=list(args.rule or []),
             incidents=list(args.incident or []),
             pinned_rules=pinned_rules,
+            set_labels=set_labels,
         )
 
     @staticmethod

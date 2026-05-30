@@ -199,6 +199,98 @@ class TestExprRewriter(unittest.TestCase):
             ExprRewriter.rewrite("no_operator_or_value_here", new_warning=42)
 
 
+from axonopscli.components.tune_alerts import parse_set_label_arg
+
+
+class TestExprRewriterSetLabel(unittest.TestCase):
+
+    def test_rewrites_regex_comma_list_to_single_exact_value(self):
+        # The broken comma-list `=~` selector → single exact-match value.
+        expr = ("cas_Keyspace_ReadLatency{function='95thPercentile',"
+                "keyspace=~'system,system_auth,myks'}")
+        out = ExprRewriter.set_label(expr, "keyspace", "myks")
+        self.assertEqual(
+            out,
+            "cas_Keyspace_ReadLatency{function='95thPercentile',keyspace='myks'}",
+        )
+
+    def test_rewrites_exact_comma_list_to_single_value(self):
+        # `=` exact-match comma blob is also collapsed to one value.
+        expr = "cas_Table_AllMemtablesHeapSize{rack='',keyspace='system,myks'}"
+        out = ExprRewriter.set_label(expr, "keyspace", "myks")
+        self.assertEqual(
+            out, "cas_Table_AllMemtablesHeapSize{rack='',keyspace='myks'}"
+        )
+
+    def test_metric_glob_confines_overloaded_label(self):
+        # scope means a table on cas_Table_*, but a request type elsewhere.
+        # Only the cas_Table_* selector should be rewritten.
+        expr = ("sum(cas_Table_CoordinatorWriteLatency{scope=~'events,mytable'}) "
+                "+ cas_ClientRequest_Latency{scope='Read.*'}")
+        out = ExprRewriter.set_label(expr, "scope", "mytable", metric_glob="cas_Table_*")
+        self.assertEqual(
+            out,
+            "sum(cas_Table_CoordinatorWriteLatency{scope='mytable'}) "
+            "+ cas_ClientRequest_Latency{scope='Read.*'}",
+        )
+
+    def test_absent_label_is_left_untouched(self):
+        # No keyspace label present → expr unchanged (never injects).
+        expr = "host_CPU{axonfunction='rate',mode='iowait'}"
+        self.assertEqual(ExprRewriter.set_label(expr, "keyspace", "myks"), expr)
+
+    def test_does_not_touch_by_grouping_clause(self):
+        # `by (keyspace, table)` grouping must not be rewritten — only the
+        # selector body inside the braces.
+        expr = ("sum by (remoteIP, keyspace, table) "
+                "(client_throughput_write{keyspace=~'a,myks',table=~'x,mytable'})")
+        out = ExprRewriter.set_label(expr, "keyspace", "myks")
+        out = ExprRewriter.set_label(out, "table", "mytable")
+        self.assertEqual(
+            out,
+            "sum by (remoteIP, keyspace, table) "
+            "(client_throughput_write{keyspace='myks',table='mytable'})",
+        )
+
+    def test_rewrites_inside_delta_window_selector(self):
+        expr = "delta(cas_ThreadPools_internal{scope=~'MutationStage',dc=~'BC1'}[1m])"
+        out = ExprRewriter.set_label(expr, "dc", "BC2")
+        self.assertEqual(
+            out, "delta(cas_ThreadPools_internal{scope=~'MutationStage',dc='BC2'}[1m])"
+        )
+
+
+class TestParseSetLabelArg(unittest.TestCase):
+
+    def test_plain_label_value(self):
+        self.assertEqual(parse_set_label_arg("keyspace=myks"),
+                         (None, "keyspace", "myks"))
+
+    def test_metric_glob_prefix(self):
+        self.assertEqual(parse_set_label_arg("cas_Table_*:scope=mytable"),
+                         ("cas_Table_*", "scope", "mytable"))
+
+    def test_strips_whitespace(self):
+        self.assertEqual(parse_set_label_arg(" table = mytable "),
+                         (None, "table", "mytable"))
+
+    def test_missing_equals_raises(self):
+        with self.assertRaises(ValueError):
+            parse_set_label_arg("keyspace")
+
+    def test_invalid_label_name_raises(self):
+        with self.assertRaises(ValueError):
+            parse_set_label_arg("key-space=myks")
+
+    def test_value_with_quote_raises(self):
+        with self.assertRaises(ValueError):
+            parse_set_label_arg("keyspace=sub'ks")
+
+    def test_empty_value_raises(self):
+        with self.assertRaises(ValueError):
+            parse_set_label_arg("keyspace=")
+
+
 from unittest.mock import MagicMock
 from types import SimpleNamespace
 
@@ -378,7 +470,7 @@ from axonopscli.components.tune_alerts import (
 )
 
 
-def _sample_input(cluster_name="bc1"):
+def _sample_input(cluster_name="demo"):
     """Minimal input JSON mimicking the shape of the exported alert_rules.json."""
     return {
         "name": cluster_name,
@@ -441,7 +533,7 @@ class TestTuneAlertsOrchestrator(unittest.TestCase):
         axonops = MagicMock()
         axonops.get_cluster_type.return_value = "cassandra"
 
-        orch = TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="bc1"), config)
+        orch = TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="demo"), config)
         # Patch MetricQuerier.query to return canned samples keyed by bare_metric.
         def fake_query(self, promql, start, end, step="1m"):
             return samples_by_metric.get(promql, [])
@@ -549,7 +641,7 @@ class TestTuneAlertsOrchestrator(unittest.TestCase):
         config = _default_config()
         axonops = MagicMock()
         axonops.get_cluster_type.return_value = "cassandra"
-        orch = TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="bc1"), config)
+        orch = TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="demo"), config)
 
         with patch.object(MetricQuerier, 'query', new=failing_query):
             result = orch.tune_all(_sample_input())
@@ -565,7 +657,7 @@ class TestTuneAlertsOrchestrator(unittest.TestCase):
         clear 'cannot evaluate delta' skip reason, not silently tune."""
         # Construct an input with a malformed old threshold
         input_json = {
-            "name": "bc1",
+            "name": "demo",
             "metricrules": [
                 {
                     "id": "rule-x",
@@ -593,7 +685,7 @@ class TestTuneAlertsOrchestrator(unittest.TestCase):
         """Expressions ending in '* 100' with 0-100 bounded old thresholds
         are treated as percentages; tuned values cannot exceed 100."""
         input_json = {
-            "name": "bc1",
+            "name": "demo",
             "metricrules": [
                 {
                     "id": "rule-disk",
@@ -622,7 +714,7 @@ class TestTuneAlertsOrchestrator(unittest.TestCase):
         when both old thresholds are in 0-100. Catches expressions like
         `host_Disk_UsedPercent{...} >= 75` which carry no `* 100` suffix."""
         input_json = {
-            "name": "bc1",
+            "name": "demo",
             "metricrules": [
                 {
                     "id": "rule-disk",
@@ -652,7 +744,7 @@ class TestTuneAlertsOrchestrator(unittest.TestCase):
         """If old threshold is already > 100, the `* 100` is a unit
         conversion (e.g. ms→us), not a percentage — do not clamp."""
         input_json = {
-            "name": "bc1",
+            "name": "demo",
             "metricrules": [
                 {
                     "id": "rule-latency",
@@ -691,11 +783,11 @@ class TestTuneAlertsOrchestratorOutput(unittest.TestCase):
         config = _default_config()
         axonops = MagicMock()
         axonops.get_cluster_type.return_value = "cassandra"
-        orch = TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="bc1"), config)
+        orch = TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="demo"), config)
 
         input_path = os.path.join(tmp_path, "alert_rules.json")
         with open(input_path, "w") as f:
-            json.dump(_sample_input(cluster_name="bc1"), f)
+            json.dump(_sample_input(cluster_name="demo"), f)
 
         def fake_query(self, promql, start, end, step="1m"):
             return samples_all
@@ -712,11 +804,11 @@ class TestTuneAlertsOrchestratorOutput(unittest.TestCase):
             _, _, input_path, json_path, report_path = self._run_once(tmp)
             self.assertEqual(
                 os.path.basename(json_path),
-                "alert_rules.tuned.for.bc1.json",
+                "alert_rules.tuned.for.demo.json",
             )
             self.assertEqual(
                 os.path.basename(report_path),
-                "alert_rules.tuned.for.bc1.report.md",
+                "alert_rules.tuned.for.demo.report.md",
             )
 
     def test_output_file_mode_is_0600(self):
@@ -753,14 +845,14 @@ class TestTuneAlertsOrchestratorOutput(unittest.TestCase):
                 orch.print_summary(result, json_path)
             out = buf.getvalue()
             self.assertIn("Tuned 2", out)
-            self.assertIn("alert_rules.tuned.for.bc1.json", out)
+            self.assertIn("alert_rules.tuned.for.demo.json", out)
 
     def test_tuned_json_has_correct_cluster_name_and_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
             _, _, _, json_path, _ = self._run_once(tmp)
             with open(json_path) as f:
                 data = json.load(f)
-            self.assertEqual(data["name"], "bc1")
+            self.assertEqual(data["name"], "demo")
             self.assertEqual(len(data["metricrules"]), 2)
             # Must have preserved all fields, only changed warning/critical/expr
             rule = data["metricrules"][0]
@@ -779,7 +871,7 @@ class TestApplicationRunTuneAlerts(unittest.TestCase):
             # Write an input alert_rules.json
             input_path = os.path.join(tmp, "alert_rules.json")
             with open(input_path, "w") as f:
-                json.dump(_sample_input(cluster_name="bc1"), f)
+                json.dump(_sample_input(cluster_name="demo"), f)
 
             # Canned query_range response yielding p99 ≈ 990
             samples = list(range(1000))
@@ -795,13 +887,13 @@ class TestApplicationRunTuneAlerts(unittest.TestCase):
             }
             with patch.object(AxonOps, 'do_request', return_value=prom_response):
                 Application().run([
-                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "--org", "acme", "--cluster", "demo", "--token", "t",
                     "tune-alerts", "--input", input_path,
                 ])
 
             # Verify output files exist
-            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.tuned.for.bc1.json")))
-            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.tuned.for.bc1.report.md")))
+            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.tuned.for.demo.json")))
+            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.tuned.for.demo.report.md")))
 
     def test_application_run_tune_alerts_profile_quiet(self):
         from axonopscli.application import Application
@@ -810,7 +902,7 @@ class TestApplicationRunTuneAlerts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             input_path = os.path.join(tmp, "alert_rules.json")
             with open(input_path, "w") as f:
-                json.dump(_sample_input(cluster_name="bc1"), f)
+                json.dump(_sample_input(cluster_name="demo"), f)
 
             samples = list(range(1000))
             prom_response = {
@@ -825,11 +917,11 @@ class TestApplicationRunTuneAlerts(unittest.TestCase):
             }
             with patch.object(AxonOps, 'do_request', return_value=prom_response):
                 Application().run([
-                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "--org", "acme", "--cluster", "demo", "--token", "t",
                     "tune-alerts", "--input", input_path, "--profile", "quiet",
                 ])
 
-            out_path = os.path.join(tmp, "alert_rules.tuned.for.bc1.json")
+            out_path = os.path.join(tmp, "alert_rules.tuned.for.demo.json")
             with open(out_path) as f:
                 out = json.load(f)
             # Quiet profile: p99.9 + 50% critical headroom on 1000 samples → p99.9 ≈ 999, critical ≈ 1498.5
@@ -844,7 +936,7 @@ class TestTuneAlertsFromApi(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             # Canned: /api/v1/alert-rules returns _sample_input; /query_range returns samples
-            alert_rules_body = _sample_input(cluster_name="bc1")
+            alert_rules_body = _sample_input(cluster_name="demo")
             prom = {
                 "status": "success",
                 "data": {"resultType": "matrix", "result": [{"metric": {}, "values": [[i, str(float(v))] for i, v in enumerate(range(1000))]}]},
@@ -859,11 +951,11 @@ class TestTuneAlertsFromApi(unittest.TestCase):
 
             with patch.object(AxonOps, 'do_request', new=fake_do_request):
                 Application().run([
-                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "--org", "acme", "--cluster", "demo", "--token", "t",
                     "tune-alerts", "--from-api", "--output-dir", tmp,
                 ])
 
-            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.tuned.for.bc1.json")))
+            self.assertTrue(os.path.exists(os.path.join(tmp, "alert_rules.tuned.for.demo.json")))
 
     def test_from_api_and_input_are_mutually_exclusive(self):
         from axonopscli.application import Application
@@ -871,7 +963,7 @@ class TestTuneAlertsFromApi(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(SystemExit):
                 Application().run([
-                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "--org", "acme", "--cluster", "demo", "--token", "t",
                     "tune-alerts",
                     "--from-api", "--output-dir", tmp,
                     "--input", "/some/path.json",
@@ -882,7 +974,7 @@ class TestTuneAlertsFromApi(unittest.TestCase):
 
         with self.assertRaises(SystemExit):
             Application().run([
-                "--org", "acme", "--cluster", "bc1", "--token", "t",
+                "--org", "acme", "--cluster", "demo", "--token", "t",
                 "tune-alerts",
             ])
 
@@ -921,7 +1013,7 @@ class TestIncidentFlag(unittest.TestCase):
             return baseline_samples
 
         argv = [
-            "--org", "acme", "--cluster", "bc1", "--token", "t",
+            "--org", "acme", "--cluster", "demo", "--token", "t",
             "tune-alerts", "--input", input_path,
             "--incident", incident_date,
         ]
@@ -931,9 +1023,9 @@ class TestIncidentFlag(unittest.TestCase):
         with patch('axonopscli.components.tune_alerts.MetricQuerier.query', new=fake_query):
             Application().run(argv)
 
-        with open(os.path.join(tmp, "alert_rules.tuned.for.bc1.json")) as f:
+        with open(os.path.join(tmp, "alert_rules.tuned.for.demo.json")) as f:
             tuned = json.load(f)
-        with open(os.path.join(tmp, "alert_rules.tuned.for.bc1.report.md")) as f:
+        with open(os.path.join(tmp, "alert_rules.tuned.for.demo.report.md")) as f:
             report = f.read()
         return tuned, report
 
@@ -945,7 +1037,7 @@ class TestIncidentFlag(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tuned, report = self._run_with_incident(
                 tmp,
-                _sample_input(cluster_name="bc1"),
+                _sample_input(cluster_name="demo"),
                 baseline_samples=list(range(100)),   # p99 ≈ 98.01
                 incident_samples=[500, 600, 700],    # peak 700, way above 117.612
                 extra_args=["--max-delta", "100"],
@@ -963,7 +1055,7 @@ class TestIncidentFlag(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tuned, report = self._run_with_incident(
                 tmp,
-                _sample_input(cluster_name="bc1"),
+                _sample_input(cluster_name="demo"),
                 baseline_samples=list(range(1000)),  # p99 ≈ 989.01
                 incident_samples=[500, 700, 800],    # peak 800 < 989.01 (baseline p99)
             )
@@ -977,7 +1069,7 @@ class TestIncidentFlag(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tuned, report = self._run_with_incident(
                 tmp,
-                _sample_input(cluster_name="bc1"),
+                _sample_input(cluster_name="demo"),
                 baseline_samples=list(range(1, 101)),   # p99 ≈ 99.01
                 incident_samples=[50, 80, 100],          # peak 100 > 99.01 (impacted), but < 118.812 (would miss)
                 extra_args=["--max-delta", "100"],
@@ -994,19 +1086,19 @@ class TestIncidentFlag(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             input_path = os.path.join(tmp, "alert_rules.json")
             with open(input_path, "w") as f:
-                json.dump(_sample_input(cluster_name="bc1"), f)
+                json.dump(_sample_input(cluster_name="demo"), f)
 
             def fake_query(self, promql, start, end, step="1m"):
                 return list(range(1000))
 
             with patch('axonopscli.components.tune_alerts.MetricQuerier.query', new=fake_query):
                 Application().run([
-                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "--org", "acme", "--cluster", "demo", "--token", "t",
                     "tune-alerts", "--input", input_path,
                     "--incident", "2026-04-10", "--incident", "2026-04-11",
                 ])
 
-            with open(os.path.join(tmp, "alert_rules.tuned.for.bc1.report.md")) as f:
+            with open(os.path.join(tmp, "alert_rules.tuned.for.demo.report.md")) as f:
                 report = f.read()
             self.assertIn("Incident coverage (2026-04-10)", report)
             self.assertIn("Incident coverage (2026-04-11)", report)
@@ -1021,7 +1113,7 @@ class TestIncidentFlag(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             input_path = os.path.join(tmp, "alert_rules.json")
             with open(input_path, "w") as f:
-                json.dump(_sample_input(cluster_name="bc1"), f)
+                json.dump(_sample_input(cluster_name="demo"), f)
 
             incident_1_start, _ = _day_range("2026-04-10")
             incident_2_start, _ = _day_range("2026-04-11")
@@ -1035,13 +1127,13 @@ class TestIncidentFlag(unittest.TestCase):
 
             with patch('axonopscli.components.tune_alerts.MetricQuerier.query', new=fake_query):
                 Application().run([
-                    "--org", "acme", "--cluster", "bc1", "--token", "t",
+                    "--org", "acme", "--cluster", "demo", "--token", "t",
                     "tune-alerts", "--input", input_path,
                     "--incident", "2026-04-10", "--incident", "2026-04-11",
                     "--max-delta", "100",
                 ])
 
-            with open(os.path.join(tmp, "alert_rules.tuned.for.bc1.report.md")) as f:
+            with open(os.path.join(tmp, "alert_rules.tuned.for.demo.report.md")) as f:
                 report = f.read()
 
             inc2_idx = report.find("Incident coverage (2026-04-11)")
@@ -1065,7 +1157,7 @@ class TestPolicyPinning(unittest.TestCase):
         config.pinned_rules = pinned_rules
         axonops = MagicMock()
         axonops.get_cluster_type.return_value = "cassandra"
-        orch = TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="bc1"), config)
+        orch = TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="demo"), config)
         return orch
 
     def test_pinned_rule_gets_fixed_values_without_querying_api(self):
@@ -1074,7 +1166,7 @@ class TestPolicyPinning(unittest.TestCase):
             raise AssertionError("MetricQuerier.query must not be called for a pinned rule")
 
         input_json = {
-            "name": "bc1",
+            "name": "demo",
             "metricrules": [
                 {
                     "id": "rule-disk",
@@ -1100,7 +1192,7 @@ class TestPolicyPinning(unittest.TestCase):
 
     def test_pinned_rule_updates_expr_with_new_warning(self):
         input_json = {
-            "name": "bc1",
+            "name": "demo",
             "metricrules": [
                 {
                     "id": "rule-disk",
@@ -1123,7 +1215,7 @@ class TestPolicyPinning(unittest.TestCase):
         self.assertEqual(result.tuned_json["metricrules"][0]["criticalValue"], 80)
 
     def test_non_matching_rule_follows_normal_tuning_pipeline(self):
-        input_json = _sample_input(cluster_name="bc1")
+        input_json = _sample_input(cluster_name="demo")
         orch = self._make_orch_with_policy([
             {"pattern": "Disk *", "warning": 70, "critical": 80},
         ])
@@ -1143,7 +1235,7 @@ class TestPolicyPinning(unittest.TestCase):
         """Filter wins over pin: a rule excluded by --exclude is not considered
         for pinning (no work is done on it at all)."""
         input_json = {
-            "name": "bc1",
+            "name": "demo",
             "metricrules": [
                 {
                     "id": "rule-disk",
@@ -1171,7 +1263,7 @@ class TestPolicyPinning(unittest.TestCase):
         with a clear reason — we can't update the expr without knowing the
         operator."""
         input_json = {
-            "name": "bc1",
+            "name": "demo",
             "metricrules": [
                 {
                     "id": "rule-bad",
@@ -1195,7 +1287,7 @@ class TestPolicyPinning(unittest.TestCase):
         import tempfile
 
         input_json = {
-            "name": "bc1",
+            "name": "demo",
             "metricrules": [
                 {
                     "id": "rule-disk",
@@ -1283,6 +1375,60 @@ class TestPolicyFileLoader(unittest.TestCase):
             with self.assertRaises(ValueError) as ctx:
                 Application._load_policy_file(path)
             self.assertIn("not valid JSON", str(ctx.exception))
+
+
+class TestSetLabelOverrideEndToEnd(unittest.TestCase):
+    """End-to-end: --set-label retargets the query but never the stored expr."""
+
+    def _input(self):
+        return {
+            "name": "demo",
+            "metricrules": [{
+                "id": "r1",
+                "alert": "Keyspace Read Latency",
+                "expr": "cas_Keyspace_ReadLatency{keyspace=~'system,myks'} >= 250",
+                "operator": ">=",
+                "criticalValue": 300,
+                "warningValue": 250,
+                "filters": [],
+                "annotations": {},
+                "integrations": {},
+            }],
+        }
+
+    def test_query_uses_override_but_output_keeps_original_selector(self):
+        config = _default_config(
+            min_samples=5,
+            max_delta=100.0,
+            set_labels=[(None, "keyspace", "myks")],
+        )
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        orch = TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="demo"), config)
+
+        queried = []
+
+        def fake_query(self, promql, start, end, step="1m"):
+            queried.append(promql)
+            # Only the OVERRIDDEN selector returns data; the original comma
+            # list would return nothing (mirrors the real metrics API).
+            if promql == "cas_Keyspace_ReadLatency{keyspace='myks'}":
+                return list(range(1000))
+            return []
+
+        with patch.object(MetricQuerier, "query", new=fake_query):
+            result = orch.tune_all(self._input())
+
+        # It tuned — proving the query hit the overridden selector.
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "tuned")
+        self.assertEqual(queried, ["cas_Keyspace_ReadLatency{keyspace='myks'}"])
+
+        # The stored expr keeps the ORIGINAL comma-list selector; only the
+        # trailing threshold is rewritten.
+        out_expr = result.tuned_json["metricrules"][0]["expr"]
+        self.assertIn("keyspace=~'system,myks'", out_expr)
+        self.assertNotIn("keyspace='myks'", out_expr)
 
 
 if __name__ == "__main__":
