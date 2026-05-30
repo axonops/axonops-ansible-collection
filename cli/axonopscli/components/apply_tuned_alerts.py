@@ -15,11 +15,13 @@ click-through annotations) with the literal string `***REDACTED***`.
 """
 
 import json
+import time
 from dataclasses import dataclass, field
 from typing import List, Tuple
 
 from axonopscli.api import ALERT_RULES_URL
 from axonopscli.components.alerts import REDACTED
+from axonopscli.utils import HTTPCodeError
 
 
 class RedactedInputError(Exception):
@@ -34,6 +36,16 @@ class RedactedInputError(Exception):
 # server is the source of truth — we just guard against the obvious
 # "empty object" or "forgot a field" mistakes.
 _REQUIRED_FIELDS = ("id", "alert", "expr", "operator", "warningValue", "criticalValue")
+
+# Gateway statuses worth retrying: the backend either never received the
+# request or didn't answer in time, so re-POSTing is safe (and the alert-rules
+# endpoint upserts by rule id, so it's idempotent regardless). 4xx and any
+# non-HTTP error are NOT retried — they won't fix themselves.
+_TRANSIENT_STATUS = (502, 503, 504)
+# Total attempts per rule (1 initial try + retries).
+_MAX_POST_ATTEMPTS = 3
+# Linear backoff: sleep _RETRY_BACKOFF_SECONDS * attempt_number between tries.
+_RETRY_BACKOFF_SECONDS = 1.0
 
 
 def contains_redacted(obj) -> bool:
@@ -148,7 +160,7 @@ class AlertsApplier:
                 continue
 
             try:
-                self.axonops.do_request(url=url, method="POST", json_data=rule)
+                self._post_rule_with_retry(url, rule, name)
             except Exception as e:
                 if not continue_on_error:
                     # Re-raise so the caller sees the full error. We deliberately
@@ -165,6 +177,25 @@ class AlertsApplier:
                 print(f"  [applied]  {name} (id {rule_id})")
 
         return result
+
+    def _post_rule_with_retry(self, url: str, rule: dict, name: str):
+        """POST a single rule, retrying on transient gateway errors.
+
+        Retries only on _TRANSIENT_STATUS (502/503/504) — safe because the
+        endpoint upserts by rule id, so re-POSTing the same rule is idempotent.
+        Bounded by _MAX_POST_ATTEMPTS with linear backoff. Any other HTTP status
+        (e.g. 4xx) or non-HTTP error is raised immediately, unretried.
+        """
+        for attempt in range(1, _MAX_POST_ATTEMPTS + 1):
+            try:
+                return self.axonops.do_request(url=url, method="POST", json_data=rule)
+            except HTTPCodeError as e:
+                last_attempt = attempt == _MAX_POST_ATTEMPTS
+                if getattr(e, "status_code", None) not in _TRANSIENT_STATUS or last_attempt:
+                    raise
+                if getattr(self.args, "v", 0):
+                    print(f"  [retry {attempt}/{_MAX_POST_ATTEMPTS - 1}] {name}: {e}")
+                time.sleep(_RETRY_BACKOFF_SECONDS * attempt)
 
     def print_summary(self, result: ApplyResult) -> None:
         """Print the one-line summary. Verbose per-rule output is emitted
