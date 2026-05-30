@@ -282,6 +282,8 @@ class Application:
                                         help='Override profile warning headroom (e.g. 0.10 = +10%%)')
         tune_alerts_parser.add_argument('--critical-headroom', type=float, default=None,
                                         help='Override profile critical headroom (e.g. 0.20 = +20%%)')
+        tune_alerts_parser.add_argument('--days', type=int, default=7,
+                                        help='Lookback window in days for the baseline query (default 7)')
         tune_alerts_parser.add_argument('--min-samples', type=int, default=100,
                                         help='Skip rules with fewer samples than this (default 100)')
         tune_alerts_parser.add_argument('--max-delta', type=float, default=10.0,
@@ -614,6 +616,7 @@ class Application:
             incidents=list(args.incident or []),
             pinned_rules=pinned_rules,
             set_labels=set_labels,
+            days_back=args.days,
         )
 
     @staticmethod

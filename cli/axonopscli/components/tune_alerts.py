@@ -331,6 +331,7 @@ class TuneAlertsConfig:
     incidents: list = None          # list[str] of YYYY-MM-DD
     pinned_rules: list = None       # list[dict{pattern, warning, critical}]
     set_labels: list = None         # list[tuple(metric_glob_or_None, label, value)]
+    days_back: int = 7              # lookback window for the baseline query
 
     def __post_init__(self):
         if self.incidents is None:
@@ -394,8 +395,6 @@ class TuneAlertsOrchestrator:
     write_output() / write_audit_report() / print_summary().
     """
 
-    SEVEN_DAYS_SECS = 7 * 24 * 60 * 60
-
     def __init__(self, axonops, args, config: TuneAlertsConfig):
         self.axonops = axonops
         self.args = args
@@ -437,7 +436,7 @@ class TuneAlertsOrchestrator:
         tuned_json = deepcopy(input_json)
 
         end_ts = int(time.time())
-        start_ts = end_ts - self.SEVEN_DAYS_SECS
+        start_ts = end_ts - self.config.days_back * 86400
 
         outcomes = []
         for rule in tuned_json["metricrules"]:
@@ -834,7 +833,7 @@ class TuneAlertsOrchestrator:
             f"**Profile:** {result.profile} "
             f"(p{result.percentile}, warning +{int(result.warning_headroom * 100)}%, "
             f"critical +{int(result.critical_headroom * 100)}%)",
-            f"**Window:** {window_start} → {window_end} (7 days)",
+            f"**Window:** {window_start} → {window_end} ({self.config.days_back} days)",
         ]
         if self.config.set_labels:
             overrides = ", ".join(
