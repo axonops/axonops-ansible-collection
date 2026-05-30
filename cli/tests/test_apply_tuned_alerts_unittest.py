@@ -10,7 +10,7 @@ from unittest.mock import patch, MagicMock
 
 def _args(
     org="acme",
-    cluster="bc1",
+    cluster="demo",
     cluster_type="cassandra",
     input="/tmp/x.json",
     dry_run=False,
@@ -37,7 +37,7 @@ def _args(
     )
 
 
-def _sample_tuned_input(cluster_name="bc1"):
+def _sample_tuned_input(cluster_name="demo"):
     """Minimal tuned JSON with two rules — same shape as tune_alerts output."""
     return {
         "name": cluster_name,
@@ -106,7 +106,7 @@ class TestLoadInput(unittest.TestCase):
             with open(path, "w") as f:
                 json.dump(_sample_tuned_input(), f)
             data = applier.load_input(path)
-        self.assertEqual(data["name"], "bc1")
+        self.assertEqual(data["name"], "demo")
         self.assertEqual(len(data["metricrules"]), 2)
 
     def test_load_raises_for_missing_metricrules(self):
@@ -115,7 +115,7 @@ class TestLoadInput(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "t.json")
             with open(path, "w") as f:
-                json.dump({"name": "bc1"}, f)
+                json.dump({"name": "demo"}, f)
             with self.assertRaises(ValueError):
                 applier.load_input(path)
 
@@ -147,7 +147,7 @@ class TestApplyHappyPath(unittest.TestCase):
         axonops = MagicMock()
         axonops.get_cluster_type.return_value = "cassandra"
         axonops.do_request.return_value = {}
-        applier = AlertsApplier(axonops, _args(org="burodecredito", cluster="bc1"))
+        applier = AlertsApplier(axonops, _args(org="acme", cluster="demo"))
 
         result = applier.apply(
             _sample_tuned_input(), dry_run=False, continue_on_error=False,
@@ -169,7 +169,7 @@ class TestApplyHappyPath(unittest.TestCase):
             json_data = call.kwargs.get('json_data')
             self.assertEqual(
                 url,
-                "/api/v1/alert-rules/burodecredito/cassandra/bc1",
+                "/api/v1/alert-rules/acme/cassandra/demo",
             )
             self.assertEqual(method, "POST")
             self.assertEqual(json_data["id"], expected_rule["id"])
@@ -195,7 +195,7 @@ class TestApplyDryRun(unittest.TestCase):
         self.assertEqual(len(result.applied), 2)
         out = buf.getvalue()
         self.assertIn("[dry-run]", out)
-        self.assertIn("/api/v1/alert-rules/acme/cassandra/bc1", out)
+        self.assertIn("/api/v1/alert-rules/acme/cassandra/demo", out)
 
 
 class TestRedactedDetection(unittest.TestCase):
@@ -343,13 +343,13 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
         from axonopscli.axonops import AxonOps
 
         with tempfile.TemporaryDirectory() as tmp:
-            input_path = os.path.join(tmp, "alert_rules.tuned.for.bc1.json")
+            input_path = os.path.join(tmp, "alert_rules.tuned.for.demo.json")
             with open(input_path, "w") as f:
                 json.dump(_sample_tuned_input(), f)
 
             with patch.object(AxonOps, 'do_request', return_value={}) as do_req:
                 Application().run([
-                    "--org", "burodecredito", "--cluster", "bc1", "--token", "t",
+                    "--org", "acme", "--cluster", "demo", "--token", "t",
                     "apply-tuned-alerts", "--input", input_path, "--yes",
                 ])
 
@@ -360,7 +360,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
                 method = call.kwargs.get('method') or (call.args[1] if len(call.args) > 1 else None)
                 self.assertEqual(
                     url,
-                    "/api/v1/alert-rules/burodecredito/cassandra/bc1",
+                    "/api/v1/alert-rules/acme/cassandra/demo",
                 )
                 self.assertEqual(method, "POST")
 
@@ -369,7 +369,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
         from axonopscli.axonops import AxonOps
 
         with tempfile.TemporaryDirectory() as tmp:
-            input_path = os.path.join(tmp, "alert_rules.tuned.for.bc1.json")
+            input_path = os.path.join(tmp, "alert_rules.tuned.for.demo.json")
             with open(input_path, "w") as f:
                 json.dump(_sample_tuned_input(), f)
 
@@ -377,7 +377,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
             with patch.object(AxonOps, 'do_request', return_value={}) as do_req, \
                     contextlib.redirect_stdout(buf):
                 Application().run([
-                    "--org", "burodecredito", "--cluster", "bc1", "--token", "t",
+                    "--org", "acme", "--cluster", "demo", "--token", "t",
                     "apply-tuned-alerts", "--input", input_path, "--dry-run",
                 ])
             self.assertEqual(do_req.call_count, 0)
@@ -389,7 +389,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
         from axonopscli.axonops import AxonOps
 
         with tempfile.TemporaryDirectory() as tmp:
-            input_path = os.path.join(tmp, "alert_rules.tuned.for.bc1.json")
+            input_path = os.path.join(tmp, "alert_rules.tuned.for.demo.json")
             with open(input_path, "w") as f:
                 json.dump(_sample_tuned_input(), f)
 
@@ -399,7 +399,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
                 fake_stdin.isatty.return_value = True
                 with self.assertRaises(SystemExit) as ctx:
                     Application().run([
-                        "--org", "burodecredito", "--cluster", "bc1", "--token", "t",
+                        "--org", "acme", "--cluster", "demo", "--token", "t",
                         "apply-tuned-alerts", "--input", input_path,
                     ])
                 self.assertEqual(ctx.exception.code, 130)
@@ -410,7 +410,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
         from axonopscli.axonops import AxonOps
 
         with tempfile.TemporaryDirectory() as tmp:
-            input_path = os.path.join(tmp, "alert_rules.tuned.for.bc1.json")
+            input_path = os.path.join(tmp, "alert_rules.tuned.for.demo.json")
             with open(input_path, "w") as f:
                 json.dump(_sample_tuned_input(), f)
 
@@ -419,7 +419,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
                 fake_stdin.isatty.return_value = False
                 with self.assertRaises(SystemExit) as ctx:
                     Application().run([
-                        "--org", "burodecredito", "--cluster", "bc1", "--token", "t",
+                        "--org", "acme", "--cluster", "demo", "--token", "t",
                         "apply-tuned-alerts", "--input", input_path,
                     ])
                 # Non-zero exit; no POSTs.
@@ -432,7 +432,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
         from axonopscli.utils import HTTPCodeError
 
         with tempfile.TemporaryDirectory() as tmp:
-            input_path = os.path.join(tmp, "alert_rules.tuned.for.bc1.json")
+            input_path = os.path.join(tmp, "alert_rules.tuned.for.demo.json")
             with open(input_path, "w") as f:
                 json.dump(_sample_tuned_input(), f)
 
@@ -447,7 +447,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
             with patch.object(AxonOps, 'do_request', new=fake_do_request):
                 with self.assertRaises(SystemExit) as ctx:
                     Application().run([
-                        "--org", "burodecredito", "--cluster", "bc1", "--token", "t",
+                        "--org", "acme", "--cluster", "demo", "--token", "t",
                         "apply-tuned-alerts", "--input", input_path,
                         "--yes", "--continue-on-error",
                     ])
@@ -460,7 +460,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
         from axonopscli.axonops import AxonOps
 
         with tempfile.TemporaryDirectory() as tmp:
-            input_path = os.path.join(tmp, "alert_rules.tuned.for.bc1.json")
+            input_path = os.path.join(tmp, "alert_rules.tuned.for.demo.json")
             data = _sample_tuned_input()
             data["metricrules"][0]["integrations"] = {"webhook_url": "***REDACTED***"}
             with open(input_path, "w") as f:
@@ -469,7 +469,7 @@ class TestApplicationRunApplyTunedAlerts(unittest.TestCase):
             with patch.object(AxonOps, 'do_request', return_value={}) as do_req:
                 with self.assertRaises(SystemExit) as ctx:
                     Application().run([
-                        "--org", "burodecredito", "--cluster", "bc1", "--token", "t",
+                        "--org", "acme", "--cluster", "demo", "--token", "t",
                         "apply-tuned-alerts", "--input", input_path, "--yes",
                     ])
                 self.assertNotEqual(ctx.exception.code, 0)

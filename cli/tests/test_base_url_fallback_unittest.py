@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 from axonopscli.axonops import AxonOps, HTTPCodeError
 
-DASH = "https://dash.axonops.cloud/flare"
-SUBDOMAIN = "https://flare.axonops.cloud/dashboard"
+DASH = "https://dash.axonops.cloud/acme"
+SUBDOMAIN = "https://acme.axonops.cloud/dashboard"
 
 
 class DummyResponse:
@@ -36,12 +36,12 @@ class TestBaseUrlFallback(unittest.TestCase):
             return DummyResponse(200, {"ok": True})
 
         with patch("requests.request", side_effect=fake_request):
-            client = AxonOps(org_name="flare", api_token="t")
-            result = client.do_request("/api/v1/alert-rules/flare/cassandra/pyro")
+            client = AxonOps(org_name="acme", api_token="t")
+            result = client.do_request("/api/v1/alert-rules/acme/cassandra/demo")
 
         self.assertEqual(result, {"ok": True})
-        self.assertEqual(calls[0], DASH + "/api/v1/alert-rules/flare/cassandra/pyro")
-        self.assertEqual(calls[1], SUBDOMAIN + "/api/v1/alert-rules/flare/cassandra/pyro")
+        self.assertEqual(calls[0], DASH + "/api/v1/alert-rules/acme/cassandra/demo")
+        self.assertEqual(calls[1], SUBDOMAIN + "/api/v1/alert-rules/acme/cassandra/demo")
 
     def test_locks_onto_working_shape_after_first_request(self):
         calls = []
@@ -53,10 +53,10 @@ class TestBaseUrlFallback(unittest.TestCase):
             return DummyResponse(200, {"ok": True})
 
         with patch("requests.request", side_effect=fake_request):
-            client = AxonOps(org_name="flare", api_token="t")
-            client.do_request("/api/v1/alert-rules/flare/cassandra/pyro")
+            client = AxonOps(org_name="acme", api_token="t")
+            client.do_request("/api/v1/alert-rules/acme/cassandra/demo")
             calls.clear()
-            client.do_request("/api/v1/integrations/flare/cassandra/pyro")
+            client.do_request("/api/v1/integrations/acme/cassandra/demo")
 
         # The shared host is never re-probed once the subdomain has answered.
         self.assertEqual(len(calls), 1)
@@ -88,11 +88,11 @@ class TestBaseUrlFallback(unittest.TestCase):
             return DummyResponse(404)
 
         with patch("requests.request", side_effect=fake_request):
-            client = AxonOps(org_name="flare",
+            client = AxonOps(org_name="acme",
                              base_url="https://self-hosted.example.com",
                              api_token="t")
             with self.assertRaises(HTTPCodeError):
-                client.do_request("/api/v1/alert-rules/flare/cassandra/pyro")
+                client.do_request("/api/v1/alert-rules/acme/cassandra/demo")
 
         self.assertEqual(len(calls), 1)
         self.assertTrue(calls[0].startswith("https://self-hosted.example.com"))
@@ -105,9 +105,9 @@ class TestBaseUrlFallback(unittest.TestCase):
             return DummyResponse(401)  # bad token, not a wrong-host signal
 
         with patch("requests.request", side_effect=fake_request):
-            client = AxonOps(org_name="flare", api_token="t")
+            client = AxonOps(org_name="acme", api_token="t")
             with self.assertRaises(HTTPCodeError):
-                client.do_request("/api/v1/alert-rules/flare/cassandra/pyro")
+                client.do_request("/api/v1/alert-rules/acme/cassandra/demo")
 
         self.assertEqual(len(calls), 1)
         self.assertTrue(calls[0].startswith(DASH))
