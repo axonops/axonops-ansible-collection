@@ -96,6 +96,21 @@ _LABEL_MATCHER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\s*(?:=~|!~|!=|=)\s*'[^']
 # `host_id=~''`. Negated forms (`!=''`, `!~''`) mean "non-empty" and are kept.
 _EMPTY_EQ_MATCHER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\s*=~?\s*''$")
 
+# A rule whose leading metric selector is `events{...}`. AxonOps stores log
+# alerts under this metric (via log_alert_rule) without a PromQL trailing
+# threshold, and the event-type alerts (Failed Auth / DDL / DML / JMX) keep
+# 500ing on query_range. Either way the tuner can't usefully threshold-tune
+# them, so we skip them up front with one short reason.
+_EVENTS_METRIC_RE = re.compile(r"^\s*events\s*\{")
+
+
+def _is_event_metric_rule(expr) -> bool:
+    """True if the rule's expr is an `events{...}` selector (log alert or
+    event-type metric alert) — see _EVENTS_METRIC_RE."""
+    if not expr:
+        return False
+    return bool(_EVENTS_METRIC_RE.match(expr))
+
 
 def parse_set_label_arg(arg: str) -> tuple:
     """Parse a ``--set-label`` value of the form ``[METRIC_GLOB:]LABEL=VALUE``.
@@ -521,6 +536,17 @@ class TuneAlertsOrchestrator:
                 old_warning=old_warning, old_critical=old_critical,
                 new_warning=pinned_warning, new_critical=pinned_critical,
                 operator=operator, pinned_pattern=pinned_pattern,
+            )
+
+        # Pre-filter `events{...}` rules: log alerts have no PromQL threshold,
+        # and the event-type alerts return 500 on query_range. Threshold tuning
+        # doesn't apply to either — collapse them into one short skip reason
+        # instead of N different "cannot parse expr"/"query failed" lines.
+        if _is_event_metric_rule(expr):
+            return RuleOutcome(
+                rule_name=name, status="skipped",
+                reason="event/log-shape rule (events metric, not workload-tunable)",
+                old_warning=old_warning, old_critical=old_critical,
             )
 
         try:
