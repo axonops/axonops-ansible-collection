@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""Preflight: check which default alert rules reference charts that actually
+exist on a target cluster's AxonOps dashboards.
+
+The collection's default metric_alert_rules.yml match charts BY NAME
+(dashboard + chart title). Chart names vary between AxonOps versions, so before
+seeding (bin/default-apply) this reports which default rules would fail with
+"Could not find chart '...' in AxonOps" and lists the available chart titles on
+the relevant dashboard so you can correct the name.
+
+Read-only: only issues a GET against /api/v1/dashboardtemplate/.
+
+Usage:
+  bin/chart-check <org> <cluster>
+
+Env (same as the other wrappers):
+  AXONOPS_TOKEN   — API token for the target instance (required)
+  AXONOPS_URL     — base URL; for a dedicated subdomain:
+                    https://<org>.axonops.cloud/dashboard
+                    (leave unset for shared cloud dash.axonops.cloud/<org>)
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "cli"))
+
+import yaml  # noqa: E402  (PyYAML ships with Ansible)
+from axonopscli.axonops import AxonOps  # noqa: E402
+
+DEFAULTS = [
+    "examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml",
+    "examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/"
+    "REPLACE_WITH_CLUSTER_NAME/metric_alert_rules.yml",
+]
+
+
+def load_default_rules(repo_root, org):
+    """Default rules with the per-client override applied (replace by name,
+    append new) — mirrors what bin/default-apply seeds, so the preflight
+    reflects the rules that will actually be created."""
+    rules = []
+    for rel in DEFAULTS:
+        with open(os.path.join(repo_root, rel)) as f:
+            doc = yaml.safe_load(f) or {}
+        rules.extend(doc.get("axonops_alert_rules", []) or [])
+
+    ov_path = os.path.join(repo_root, "bin", "overrides", org, "metric_alert_rules.yml")
+    if os.path.exists(ov_path):
+        with open(ov_path) as f:
+            ov = yaml.safe_load(f) or {}
+        by_name = {r.get("name"): i for i, r in enumerate(rules)}
+        for orule in ov.get("axonops_alert_rules", []) or []:
+            n = orule.get("name")
+            if n in by_name:
+                rules[by_name[n]] = orule
+            else:
+                rules.append(orule); by_name[n] = len(rules) - 1
+
+    return [(r.get("name"), r.get("dashboard"), r.get("chart")) for r in rules]
+
+
+def main():
+    if len(sys.argv) < 3:
+        print("usage: bin/chart-check <org> <cluster>", file=sys.stderr)
+        return 2
+    org, cluster = sys.argv[1], sys.argv[2]
+    token = os.getenv("AXONOPS_TOKEN")
+    if not token:
+        print("AXONOPS_TOKEN must be set in env", file=sys.stderr)
+        return 2
+    cluster_type = os.getenv("AXONOPS_CLUSTER_TYPE", "cassandra")
+    repo_root = os.path.join(os.path.dirname(__file__), "..")
+
+    axonops = AxonOps(
+        org_name=org,
+        base_url=os.getenv("AXONOPS_URL", ""),
+        cluster_type=cluster_type,
+        api_token=token,
+    )
+    resp = axonops.do_request(
+        url=f"/api/v1/dashboardtemplate/{org}/{cluster_type}/{cluster}",
+        method="GET",
+    ) or {}
+
+    # Build {dashboard_name: set(chart_titles)}
+    charts = {}
+    for dash in resp.get("dashboards", []) or []:
+        titles = {p.get("title") for p in (dash.get("panels") or []) if p.get("title")}
+        charts[dash.get("name")] = titles
+
+    rules = load_default_rules(repo_root, org)
+    missing, ok = [], 0
+    for name, dashboard, chart in rules:
+        if dashboard in charts and chart in charts[dashboard]:
+            ok += 1
+        else:
+            missing.append((name, dashboard, chart))
+
+    print(f"Cluster {org}/{cluster}: {len(charts)} dashboards available")
+    print(f"Default rules: {len(rules)}  |  OK: {ok}  |  MISSING chart/dashboard: {len(missing)}\n")
+    if not missing:
+        print("All default rules map to existing charts. Safe to seed.")
+        return 0
+    for name, dashboard, chart in missing:
+        print(f"MISSING: rule {name!r}")
+        print(f"         dashboard={dashboard!r} chart={chart!r}")
+        if dashboard not in charts:
+            print(f"         (dashboard {dashboard!r} not found; available: {sorted(charts)})")
+        else:
+            print(f"         available charts on {dashboard!r}: {sorted(charts[dashboard])}")
+        print()
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

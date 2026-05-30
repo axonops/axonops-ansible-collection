@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# Seed the collection's default AxonOps Cassandra metric alert rules onto a
+# given org+cluster via the Ansible `configurations` role.
+#
+# Usage:
+#   bin/default-apply <org> <cluster> [extra ansible-playbook args]
+#   or with env vars: AXONOPS_ORG=... AXONOPS_CLUSTER=... bin/default-apply
+#
+# Required env:
+#   AXONOPS_TOKEN   — API token for the target instance
+#
+# Per-instance env (pass-through to the Ansible modules):
+#   AXONOPS_URL=...         — base URL, used as-is by the modules. This is the
+#                             SAME value the CLI export/tune/apply steps need, so
+#                             one export covers the whole flow. For a dedicated
+#                             subdomain org:
+#                               export AXONOPS_URL=https://<org>.axonops.cloud/dashboard
+#                             If unset (and AXONOPS_USE_SAML is not true), the host
+#                             is AUTO-DETECTED via bin/resolve-axonops-url: the
+#                             shared cloud host (dash.axonops.cloud/<org>) is tried
+#                             first, falling back to the dedicated subdomain
+#                             (<org>.axonops.cloud/dashboard) on a 404. So both
+#                             topologies "just work" without exporting AXONOPS_URL.
+#   AXONOPS_USE_SAML=true   — alternative to auto-detection for dedicated-subdomain
+#                             instances: skips the probe and lets the modules
+#                             derive https://<org>.axonops.cloud/dashboard
+#                             themselves. (The CLI does NOT honor this, so an
+#                             explicit AXONOPS_URL is preferred when you need to
+#                             pin a value for both CLI and Ansible.)
+#
+# Prereqs:
+#   - ansible-playbook on PATH
+#   - the axonops.axonops collection discoverable. For local dev, symlink this
+#     repo onto the default collections path:
+#       mkdir -p ~/.ansible/collections/ansible_collections/axonops
+#       ln -sfn "$PWD" ~/.ansible/collections/ansible_collections/axonops/axonops
+#
+# What it does:
+#   1. Stages a self-contained workspace at cli/exported/run/<org>-<cluster>/:
+#        seed-alerts.yml  (generated; runs axonops.axonops.configurations)
+#        inventory        (localhost-only; the role makes HTTP calls, no SSH)
+#        config/<org>/metric_alert_rules.yml              (org-wide defaults)
+#        config/<org>/<cluster>/metric_alert_rules.yml    (cluster defaults)
+#   2. Runs ansible-playbook from that dir (so the role's
+#      `with_fileglob: config/<org>/metric_alert_rules.yml` resolves) with
+#      `--tags metrics` — applying ONLY metric alerts, never touching existing
+#      integrations / log alerts / service checks on the cluster.
+#
+# Pass --check first for a read-only preview (Ansible check mode).
+#
+# After this:
+#   - The default metric alerts are created (or updated) at their default
+#     thresholds. Continue the tuning loop:
+#       bin/export         <customer>
+#       bin/tune-customer  <customer>
+#       bin/apply-customer <customer> --yes
+
+set -euo pipefail
+
+: "${AXONOPS_TOKEN:?AXONOPS_TOKEN must be set in env}"
+
+ORG="${1:-${AXONOPS_ORG:-}}"
+CLUSTER="${2:-${AXONOPS_CLUSTER:-}}"
+if [[ -z "$ORG" || -z "$CLUSTER" ]]; then
+    echo "usage: bin/default-apply <org> <cluster> [ansible-playbook args...]" >&2
+    echo "   or: AXONOPS_ORG=... AXONOPS_CLUSTER=... bin/default-apply [ansible-playbook args...]" >&2
+    exit 2
+fi
+
+# Shift off positional args so the rest pass through to ansible-playbook.
+[[ $# -ge 1 ]] && shift || true
+[[ $# -ge 1 ]] && shift || true
+
+cd "$(dirname "$0")/.."
+REPO_ROOT="$(pwd)"
+
+# Resolve the host the Ansible modules will hit. Unlike the CLI they have no
+# subdomain fallback, so when neither AXONOPS_URL nor AXONOPS_USE_SAML is set we
+# probe (shared cloud host → dedicated subdomain on 404) and export AXONOPS_URL
+# for the playbook run. An explicit AXONOPS_URL or AXONOPS_USE_SAML is left alone.
+if [[ -z "${AXONOPS_URL:-}" && "${AXONOPS_USE_SAML:-}" != "true" ]]; then
+    AXONOPS_URL="$(bin/resolve-axonops-url "$ORG" "$CLUSTER" "${AXONOPS_CLUSTER_TYPE:-cassandra}")"
+    export AXONOPS_URL
+    echo "Auto-detected AXONOPS_URL=${AXONOPS_URL}"
+fi
+
+STAGING="cli/exported/run/${ORG}-${CLUSTER}"
+CONFIG_ORG="${STAGING}/config/${ORG}"
+CONFIG_CLUSTER="${CONFIG_ORG}/${CLUSTER}"
+mkdir -p "${CONFIG_CLUSTER}"
+
+cp "examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml" \
+   "${CONFIG_ORG}/metric_alert_rules.yml"
+cp "examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/metric_alert_rules.yml" \
+   "${CONFIG_CLUSTER}/metric_alert_rules.yml"
+
+# Apply per-client overrides onto the staged config, merged by rule name:
+# matching name replaces, new name appends. Org-level overrides go against
+# the org-level YAML; cluster-level overrides go against the cluster-level
+# YAML — keeping each rule in the file it's shipped in is important because
+# both files are loaded and concatenated by the role, so an override at the
+# wrong level produces a duplicate-name entry that lets the cluster-level
+# shipped rule clobber the override on POST. No-op if either file is absent.
+_merge_override() {
+    local staged_path="$1" override_path="$2"
+    [[ -f "$override_path" ]] || return 0
+    python3 - "$staged_path" "$override_path" <<'PY'
+import sys, yaml
+staged_path, override_path = sys.argv[1], sys.argv[2]
+staged = yaml.safe_load(open(staged_path)) or {}
+override = yaml.safe_load(open(override_path)) or {}
+srules = staged.get("axonops_alert_rules") or []
+by_name = {r.get("name"): i for i, r in enumerate(srules)}
+replaced = added = 0
+for orule in (override.get("axonops_alert_rules") or []):
+    n = orule.get("name")
+    if n in by_name:
+        srules[by_name[n]] = orule; replaced += 1
+    else:
+        srules.append(orule); added += 1; by_name[n] = len(srules) - 1
+staged["axonops_alert_rules"] = srules
+with open(staged_path, "w") as f:
+    yaml.safe_dump(staged, f, sort_keys=False, default_flow_style=False)
+print(f"Applied {override_path}: {replaced} replaced, {added} added")
+PY
+}
+
+_merge_override "${CONFIG_ORG}/metric_alert_rules.yml" \
+                "bin/overrides/${ORG}/metric_alert_rules.yml"
+_merge_override "${CONFIG_CLUSTER}/metric_alert_rules.yml" \
+                "bin/overrides/${ORG}/${CLUSTER}/metric_alert_rules.yml"
+
+# Minimal inventory — the role only makes HTTP calls; no SSH needed.
+cat > "${STAGING}/inventory" <<'INV'
+[local]
+localhost ansible_connection=local
+INV
+
+# Clean seeding playbook — runs only the configurations role. org/cluster are
+# bound as play vars (from env) so the role's metric_alert_rules fileglob
+# resolves even under `--tags metrics`, which skips the role's own untagged
+# org/cluster set_fact tasks.
+cat > "${STAGING}/seed-alerts.yml" <<'YML'
+---
+- name: Seed default AxonOps metric alert rules
+  hosts: all
+  connection: local
+  gather_facts: false
+  vars:
+    org: "{{ lookup('env', 'AXONOPS_ORG') }}"
+    cluster: "{{ lookup('env', 'AXONOPS_CLUSTER') }}"
+    # cluster_type is referenced by always-tagged conditionals in the role
+    # (e.g. the commitlog-archive import's `when`), but the role's own
+    # cluster_type set_fact is not always-tagged and gets skipped under
+    # --tags metrics — so bind it here to keep those conditionals evaluable.
+    cluster_type: "{{ lookup('env', 'AXONOPS_CLUSTER_TYPE') | default('cassandra', true) }}"
+  roles:
+    - role: axonops.axonops.configurations
+YML
+
+echo "Seeding default metric alerts to org=${ORG} cluster=${CLUSTER}"
+echo "Staging dir:  ${REPO_ROOT}/${STAGING}"
+echo "Default org-level rules:     $(grep -c '^- name:' "${CONFIG_ORG}/metric_alert_rules.yml") entries"
+echo "Default cluster-level rules: $(grep -c '^- name:' "${CONFIG_CLUSTER}/metric_alert_rules.yml") entries"
+echo "AXONOPS_URL=${AXONOPS_URL:-<unset → shared cloud dash.axonops.cloud>}"
+echo "---"
+
+cd "${STAGING}"
+exec env \
+    AXONOPS_ORG="${ORG}" \
+    AXONOPS_CLUSTER="${CLUSTER}" \
+    AXONOPS_CLUSTER_TYPE="${AXONOPS_CLUSTER_TYPE:-cassandra}" \
+    ansible-playbook seed-alerts.yml -i inventory --tags metrics "$@"

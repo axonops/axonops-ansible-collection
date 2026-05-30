@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# Seed the collection's default AxonOps Cassandra LOG alert rules onto a given
+# org+cluster via the Ansible `configurations` role.
+#
+# This is the log-alert (logrules) parallel to bin/default-apply (metricrules).
+# It stages log_alert_rules.yml and runs the role with `--tags log_alerts`, so
+# it applies ONLY log alerts — never touching metric alerts, integrations, or
+# service checks. The two seeders are independent; run whichever you need.
+#
+# Usage:
+#   bin/default-apply-logs <org> <cluster> [extra ansible-playbook args]
+#   or with env vars: AXONOPS_ORG=... AXONOPS_CLUSTER=... bin/default-apply-logs
+#
+# Required env:
+#   AXONOPS_TOKEN   — API token for the target instance
+#
+# Per-instance env (same semantics as bin/default-apply):
+#   AXONOPS_URL=...         — base URL, used as-is by the modules. If unset (and
+#                             AXONOPS_USE_SAML is not true) the host is
+#                             auto-detected via bin/resolve-axonops-url.
+#   AXONOPS_USE_SAML=true   — skip the probe; the modules derive the subdomain.
+#
+# NOTE: the default log rules match against `source: /var/log/cassandra/system.log`.
+# If this cluster's Cassandra log path differs, the rules will match nothing —
+# add a bin/overrides/<org>/log_alert_rules.yml to correct the source (or any
+# rule), merged by name like the metric overrides. Run with --check first.
+#
+# Pass --check first for a read-only preview (Ansible check mode).
+set -euo pipefail
+
+: "${AXONOPS_TOKEN:?AXONOPS_TOKEN must be set in env}"
+
+ORG="${1:-${AXONOPS_ORG:-}}"
+CLUSTER="${2:-${AXONOPS_CLUSTER:-}}"
+if [[ -z "$ORG" || -z "$CLUSTER" ]]; then
+    echo "usage: bin/default-apply-logs <org> <cluster> [ansible-playbook args...]" >&2
+    echo "   or: AXONOPS_ORG=... AXONOPS_CLUSTER=... bin/default-apply-logs [ansible-playbook args...]" >&2
+    exit 2
+fi
+
+# Shift off positional args so the rest pass through to ansible-playbook.
+[[ $# -ge 1 ]] && shift || true
+[[ $# -ge 1 ]] && shift || true
+
+cd "$(dirname "$0")/.."
+REPO_ROOT="$(pwd)"
+
+# Resolve the host the Ansible modules will hit (see bin/default-apply for why).
+if [[ -z "${AXONOPS_URL:-}" && "${AXONOPS_USE_SAML:-}" != "true" ]]; then
+    AXONOPS_URL="$(bin/resolve-axonops-url "$ORG" "$CLUSTER" "${AXONOPS_CLUSTER_TYPE:-cassandra}")"
+    export AXONOPS_URL
+    echo "Auto-detected AXONOPS_URL=${AXONOPS_URL}"
+fi
+
+# Separate staging dir from the metric seeder so the two never clobber.
+STAGING="cli/exported/run/${ORG}-${CLUSTER}-logs"
+CONFIG_ORG="${STAGING}/config/${ORG}"
+CONFIG_CLUSTER="${CONFIG_ORG}/${CLUSTER}"
+mkdir -p "${CONFIG_CLUSTER}"
+
+cp "examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/log_alert_rules.yml" \
+   "${CONFIG_ORG}/log_alert_rules.yml"
+cp "examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/log_alert_rules.yml" \
+   "${CONFIG_CLUSTER}/log_alert_rules.yml"
+
+# Apply per-client overrides (bin/overrides/<org>/log_alert_rules.yml) onto the
+# staged org config, merged by rule name: matching name replaces, new name
+# appends. Lets a client fix the log source path or tweak rules without
+# restating the whole default set. No-op if absent.
+OVERRIDE="bin/overrides/${ORG}/log_alert_rules.yml"
+if [[ -f "$OVERRIDE" ]]; then
+    python3 - "${CONFIG_ORG}/log_alert_rules.yml" "$OVERRIDE" <<'PY'
+import sys, yaml
+staged_path, override_path = sys.argv[1], sys.argv[2]
+staged = yaml.safe_load(open(staged_path)) or {}
+override = yaml.safe_load(open(override_path)) or {}
+srules = staged.get("axonops_log_alert_rule") or []
+by_name = {r.get("name"): i for i, r in enumerate(srules)}
+replaced = added = 0
+for orule in (override.get("axonops_log_alert_rule") or []):
+    n = orule.get("name")
+    if n in by_name:
+        srules[by_name[n]] = orule; replaced += 1
+    else:
+        srules.append(orule); added += 1; by_name[n] = len(srules) - 1
+staged["axonops_log_alert_rule"] = srules
+with open(staged_path, "w") as f:
+    yaml.safe_dump(staged, f, sort_keys=False, default_flow_style=False)
+print(f"Applied {override_path}: {replaced} replaced, {added} added")
+PY
+fi
+
+# Minimal inventory — the role only makes HTTP calls; no SSH needed.
+cat > "${STAGING}/inventory" <<'INV'
+[local]
+localhost ansible_connection=local
+INV
+
+# Clean seeding playbook — runs only the configurations role. org/cluster are
+# bound as play vars (from env) so the role's log_alert_rules fileglob resolves
+# even under `--tags log_alerts`, which skips the role's own untagged
+# org/cluster set_fact tasks.
+cat > "${STAGING}/seed-log-alerts.yml" <<'YML'
+---
+- name: Seed default AxonOps log alert rules
+  hosts: all
+  connection: local
+  gather_facts: false
+  vars:
+    org: "{{ lookup('env', 'AXONOPS_ORG') }}"
+    cluster: "{{ lookup('env', 'AXONOPS_CLUSTER') }}"
+    cluster_type: "{{ lookup('env', 'AXONOPS_CLUSTER_TYPE') | default('cassandra', true) }}"
+  roles:
+    - role: axonops.axonops.configurations
+YML
+
+echo "Seeding default log alerts to org=${ORG} cluster=${CLUSTER}"
+echo "Staging dir:  ${REPO_ROOT}/${STAGING}"
+echo "Default org-level log rules:     $(grep -c '^- name:' "${CONFIG_ORG}/log_alert_rules.yml") entries"
+echo "Default cluster-level log rules: $(grep -c '^- name:' "${CONFIG_CLUSTER}/log_alert_rules.yml") entries"
+echo "AXONOPS_URL=${AXONOPS_URL:-<unset → shared cloud dash.axonops.cloud>}"
+echo "---"
+
+cd "${STAGING}"
+exec env \
+    AXONOPS_ORG="${ORG}" \
+    AXONOPS_CLUSTER="${CLUSTER}" \
+    AXONOPS_CLUSTER_TYPE="${AXONOPS_CLUSTER_TYPE:-cassandra}" \
+    ansible-playbook seed-log-alerts.yml -i inventory --tags log_alerts "$@"

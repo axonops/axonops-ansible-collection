@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Tune the exported alert rules for a given org+cluster against 7 days of
+# observed metrics, applying the shared policy file if present.
+#
+# Usage:
+#   bin/tune <org> <cluster> [tune-alerts args...]
+#
+# Default input (can be overridden with --input):
+#   ./cli/exported/<org>/<cluster>/alert_rules.json
+#
+# Default policy (can be overridden with --policy; only applied if the file
+# exists; pass --policy '' to skip explicitly... actually, the underlying CLI
+# doesn't support an empty --policy, so to suppress policy pass --policy to a
+# file that has {"pinned_thresholds":[]}):
+#   ./cli/exported/tune-alerts-policy.json
+#
+# Tuned output is written alongside the input (per the CLI's own semantics):
+#   ./cli/exported/<org>/<cluster>/alert_rules.tuned.for.<cluster>.json
+#   ./cli/exported/<org>/<cluster>/alert_rules.tuned.for.<cluster>.report.md
+#
+# Required env:
+#   AXONOPS_TOKEN   — SaaS API token (tune queries the metrics API)
+set -euo pipefail
+
+: "${AXONOPS_TOKEN:?AXONOPS_TOKEN must be set in env}"
+
+if [[ $# -lt 2 ]]; then
+    echo "usage: bin/tune <org> <cluster> [tune-alerts args...]" >&2
+    exit 2
+fi
+
+ORG="$1"
+CLUSTER="$2"
+shift 2
+
+cd "$(dirname "$0")/.."
+
+DEFAULT_INPUT="./cli/exported/${ORG}/${CLUSTER}/alert_rules.json"
+DEFAULT_POLICY="./cli/exported/tune-alerts-policy.json"
+
+HAS_INPUT=false
+HAS_POLICY=false
+for arg in "$@"; do
+    case "$arg" in
+        --input)  HAS_INPUT=true ;;
+        --policy) HAS_POLICY=true ;;
+    esac
+done
+
+ARGS=()
+if [[ "$HAS_INPUT" == false ]]; then
+    ARGS+=(--input "$DEFAULT_INPUT")
+fi
+if [[ "$HAS_POLICY" == false && -f "$DEFAULT_POLICY" ]]; then
+    ARGS+=(--policy "$DEFAULT_POLICY")
+fi
+ARGS+=("$@")
+
+echo "Tuning alerts for org=${ORG} cluster=${CLUSTER}"
+exec python3 cli/axonops.py \
+    --org "$ORG" \
+    --cluster "$CLUSTER" \
+    tune-alerts "${ARGS[@]}"

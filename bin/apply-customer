@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Push tuned alerts back to a named customer's cluster.
+#
+# Reads bin/customers/<name>.env for ORG and CLUSTER, then exec's
+# bin/tuned-apply. apply-tuned-alerts defaults --input to the conventional
+# tuned-path under cli/exported/<org>/<cluster>/; override with --input.
+#
+# Usage:
+#   bin/apply-customer <name> [--dry-run | --yes] [extra apply-tuned-alerts args...]
+#
+# Required env:
+#   AXONOPS_TOKEN   — SaaS API token (base URL is auto-detected by the CLI)
+set -euo pipefail
+
+NAME="${1:?usage: bin/apply-customer <name> [--dry-run | --yes] [extra args...]}"
+shift || true
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONF="${BIN_DIR}/customers/${NAME}.env"
+
+if [[ ! -f "$CONF" ]]; then
+    echo "no customer config at ${CONF}" >&2
+    echo "available customers:" >&2
+    ls "${BIN_DIR}/customers/" 2>/dev/null | sed 's|\.env$||;s|^|  |' >&2
+    exit 2
+fi
+# shellcheck source=/dev/null
+source "$CONF"
+
+: "${ORG:?customer config ${CONF} missing ORG}"
+: "${CLUSTER:?customer config ${CONF} missing CLUSTER}"
+
+exec "${BIN_DIR}/tuned-apply" "$ORG" "$CLUSTER" "$@"

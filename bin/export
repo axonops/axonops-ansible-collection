@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Export alert rules + integrations for a given org+cluster.
+#
+# Usage:
+#   bin/export <org> <cluster> [alerts subcommand args...]
+#
+# Each run writes an IMMUTABLE, timestamped snapshot — exports are never
+# overwritten:
+#   ./cli/exported/<org>/<cluster>/<UTC-timestamp>/alert_rules.json
+#   ./cli/exported/<org>/<cluster>/<UTC-timestamp>/integrations.json
+#
+# Stable pointers to the newest snapshot are kept as symlinks (pointers, not
+# exports — so nothing real is ever clobbered), which is what the rest of the
+# pipeline reads:
+#   ./cli/exported/<org>/<cluster>/latest            -> <newest timestamp>
+#   ./cli/exported/<org>/<cluster>/alert_rules.json  -> latest/alert_rules.json
+#   ./cli/exported/<org>/<cluster>/integrations.json -> latest/integrations.json
+# So `bin/tune <org> <cluster>` (reads alert_rules.json) works unchanged.
+#
+# --include-secrets is passed by default so widget_url and integration
+# credentials are preserved (required if you intend to re-apply via
+# apply-tuned-alerts). The CLI writes each snapshot dir 0700, JSON files 0600,
+# and maintains a per-snapshot .gitignore excluding the secret-bearing files.
+#
+# Required env:
+#   AXONOPS_TOKEN   — SaaS API token
+set -euo pipefail
+
+: "${AXONOPS_TOKEN:?AXONOPS_TOKEN must be set in env}"
+
+if [[ $# -lt 2 ]]; then
+    echo "usage: bin/export <org> <cluster> [alerts args...]" >&2
+    exit 2
+fi
+
+ORG="$1"
+CLUSTER="$2"
+shift 2
+
+cd "$(dirname "$0")/.."
+
+BASE_DIR="./cli/exported/${ORG}/${CLUSTER}"
+# UTC, colon-free so it's a safe path component and sorts lexicographically.
+# Seconds granularity so back-to-back runs never collide.
+STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+SNAPSHOT_DIR="${BASE_DIR}/${STAMP}"
+
+# Never overwrite an existing snapshot (belt-and-suspenders at second precision).
+if [[ -e "$SNAPSHOT_DIR" ]]; then
+    echo "refusing to overwrite existing snapshot ${SNAPSHOT_DIR}" >&2
+    exit 1
+fi
+mkdir -p "$SNAPSHOT_DIR"
+
+echo "Exporting alerts for org=${ORG} cluster=${CLUSTER} → ${SNAPSHOT_DIR}"
+python3 cli/axonops.py \
+    --org "$ORG" \
+    --cluster "$CLUSTER" \
+    alerts --exportpath "$SNAPSHOT_DIR" --include-secrets \
+    "$@"
+
+# Repoint the stable symlinks at this snapshot — only if it actually produced
+# files (an empty export writes nothing; in that case leave the prior 'latest'
+# intact and discard the empty snapshot dir).
+if [[ -e "${SNAPSHOT_DIR}/alert_rules.json" || -e "${SNAPSHOT_DIR}/integrations.json" ]]; then
+    ln -sfn "$STAMP" "${BASE_DIR}/latest"
+    for f in alert_rules.json integrations.json; do
+        if [[ -e "${SNAPSHOT_DIR}/${f}" ]]; then
+            ln -sfn "latest/${f}" "${BASE_DIR}/${f}"
+        elif [[ -L "${BASE_DIR}/${f}" ]]; then
+            # This run didn't produce it — drop the now-stale pointer.
+            rm -f "${BASE_DIR}/${f}"
+        fi
+    done
+    echo "Updated: ${BASE_DIR}/latest -> ${STAMP} (alert_rules.json / integrations.json follow it)"
+else
+    echo "Nothing was exported; removing empty snapshot, keeping previous 'latest'." >&2
+    rmdir "$SNAPSHOT_DIR" 2>/dev/null || true
+fi
