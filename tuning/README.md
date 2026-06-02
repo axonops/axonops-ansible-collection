@@ -1,9 +1,12 @@
 # `tuning/` — alert-tuning workflow
 
 Thin convenience wrappers around `cli/axonops.py` and the
-`axonops.axonops.configurations` Ansible role: seed the collection's default
-alert rules onto a cluster, observe real metrics, fit thresholds to the
-workload, push the tuned rules back.
+`axonops.axonops.configurations` Ansible role. The workflow:
+
+- **Seed** the collection's default alert rules onto a cluster.
+- **Observe** real metrics over a baseline window.
+- **Fit** thresholds to the observed workload distribution.
+- **Push** the tuned rules back to the cluster.
 
 This directory is **local-only** (gitignored). The scripts orchestrate
 production-affecting actions; keep them as project-team tooling, not part of
@@ -14,6 +17,37 @@ auto-detected by `tuning/resolve-axonops-url` (shared cloud
 `dash.axonops.cloud/<org>` first, falling back to dedicated-subdomain
 `<org>.axonops.cloud/dashboard` on 404) — no `AXONOPS_URL` is needed unless
 you want to pin it.
+
+---
+
+## The hot loop
+
+For an existing customer whose `.env` is already dialed in, this is the
+whole routine:
+
+```bash
+export AXONOPS_TOKEN=...
+
+tuning/cycle-customer <name>             # export + tune
+$EDITOR cli/exported/<org>/<cluster>/alert_rules.tuned.for.<cluster>.report.md
+tuning/apply-customer <name> --yes       # push
+```
+
+When a customer is brand new, or AxonOps ships an upgraded set of default
+rules, add a one-time **seed** step before the cycle:
+
+```bash
+$EDITOR tuning/customers/<name>.env      # copy from customers/example.env
+tuning/default-apply <org> <cluster>     # seed (and snapshot prior state)
+tuning/cycle-customer <name>             # tune
+tuning/apply-customer <name> --yes       # push
+```
+
+Both `default-apply` and `apply-customer` auto-snapshot the cluster's
+current state before they write, so any of those rows is reversible — see
+**Dated export snapshots** for the rollback command.
+
+Full step-by-step (when something doesn't fit the hot loop) is below.
 
 ---
 
