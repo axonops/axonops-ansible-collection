@@ -108,6 +108,11 @@ Ansible role and changes live alerting state. Always preview with `--check`
 first. On a clean check, expect `failed=0`; `changed` reflects rules whose
 content differs from current cluster state.
 
+Before the real run it auto-snapshots the cluster's current state as
+`alert_rules.pre-seed.json` / `integrations.pre-seed.json` (skipped under
+`--check`), so you can always diff against the pre-seed state and recover
+via `tuning/tuned-apply <org> <cluster> --input .../alert_rules.pre-seed.json --yes`.
+
 ### 6. Cycle and tune
 
 ```bash
@@ -133,6 +138,11 @@ for — and what to do about each — are in **Reading the tune report** below.
 tuning/apply-customer <name> --dry-run          # preview
 tuning/apply-customer <name> --yes              # apply
 ```
+
+Before the real POST it auto-snapshots the cluster's current state as
+`alert_rules.pre-tuned-alerts.json` / `integrations.pre-tuned-alerts.json`
+(skipped under `--dry-run`). Roll back with
+`tuning/tuned-apply <org> <cluster> --input .../alert_rules.pre-tuned-alerts.json --yes`.
 
 The apply step's POST retries transient 5xx automatically.
 
@@ -186,11 +196,11 @@ customer.
 
 | Script | Purpose |
 |--------|---------|
-| `tuning/default-apply` | Seeds **default metric alerts** (`--tags metrics`) onto the cluster via the Ansible role. Merges per-client overrides at both org and cluster levels. Auto-detects the base URL. **Destructive — preview with `--check`.** |
-| `tuning/default-apply-logs` | Same shape, seeds the **default log alerts** (`--tags log_alerts`). Independent of metric seeding. |
-| `tuning/export` | Pulls live alert rules + integrations into a dated, immutable snapshot under `cli/exported/<org>/<cluster>/<UTC-timestamp>/`. `latest`, `alert_rules.json`, `integrations.json` are symlinks tracking the newest snapshot. Always `--include-secrets`. |
+| `tuning/default-apply` | Seeds **default metric alerts** (`--tags metrics`) onto the cluster via the Ansible role. Merges per-client overrides at both org and cluster levels. Auto-detects the base URL. **Destructive — preview with `--check`.** Auto-snapshots current state as `alert_rules.pre-seed.json` before the real run. |
+| `tuning/default-apply-logs` | Same shape, seeds the **default log alerts** (`--tags log_alerts`). Independent of metric seeding. Auto-snapshots as `alert_rules.pre-seed-logs.json`. |
+| `tuning/export` | Pulls live alert rules + integrations into a dated, immutable snapshot under `cli/exported/<org>/<cluster>/<UTC-timestamp>/`. `latest`, `alert_rules.json`, `integrations.json` are symlinks tracking the newest snapshot. Always `--include-secrets`. With `--label NAME`, additionally creates labeled pointers (`alert_rules.<NAME>.json`, `integrations.<NAME>.json`) that move only on labeled runs — used by destructive scripts to preserve pre-op state. |
 | `tuning/tune` | Runs `tune-alerts` against the exported `alert_rules.json`. Auto-applies the team policy at `cli/exported/tune-alerts-policy.json`. Writes `alert_rules.tuned.for.<cluster>.json` + a `.report.md` audit. |
-| `tuning/tuned-apply` | POSTs a tuned JSON back via `apply-tuned-alerts`. The CLI retries transient 5xx automatically. |
+| `tuning/tuned-apply` | POSTs a tuned JSON back via `apply-tuned-alerts`. Auto-snapshots current state as `alert_rules.pre-tuned-alerts.json` before the POST (skipped under `--dry-run`). The CLI retries transient 5xx automatically. |
 | `tuning/chart-check` | Preflight: verifies every default rule's `chart` field exists on the cluster's dashboards. Catches chart-rename surprises before seeding fails. |
 | `tuning/resolve-axonops-url` | Helper used internally by `tuning/default-apply*` to auto-detect dedicated-subdomain orgs (probes shared host first, falls back on 404). |
 
@@ -366,18 +376,24 @@ actually means operationally.
 ## Dated export snapshots
 
 Each `tuning/export <org> <cluster>` writes an immutable snapshot dir and
-re-points three symlinks:
+re-points the stable symlinks. With `--label NAME`, it also creates labeled
+pointers that move ONLY on labeled runs — used by destructive scripts to
+preserve "the state right before X" across any number of intermediate exports:
 
 ```
 cli/exported/<org>/<cluster>/
-├── 2026-05-29T22-38-47Z/         ← this run (immutable)
+├── 2026-05-29T22-38-47Z/                 ← this run (immutable)
 │   ├── alert_rules.json
 │   ├── integrations.json
 │   └── .gitignore
-├── 2026-05-26T18-49-10Z/         ← previous run, preserved
-├── latest            → 2026-05-29T22-38-47Z
-├── alert_rules.json  → latest/alert_rules.json
-└── integrations.json → latest/integrations.json
+├── 2026-05-26T18:49:10Z/                 ← previous run, preserved
+├── latest                          → 2026-05-29T22-38-47Z
+├── alert_rules.json                → latest/alert_rules.json
+├── integrations.json               → latest/integrations.json
+├── alert_rules.pre-seed.json       → <ts>/alert_rules.json
+│                                     (set by tuning/default-apply)
+└── alert_rules.pre-tuned-alerts.json → <ts>/alert_rules.json
+                                       (set by tuning/tuned-apply)
 ```
 
 Downstream tools read the stable `alert_rules.json` and follow the symlink.

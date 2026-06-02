@@ -52,6 +52,20 @@ if [[ -z "${AXONOPS_URL:-}" && "${AXONOPS_USE_SAML:-}" != "true" ]]; then
     echo "Auto-detected AXONOPS_URL=${AXONOPS_URL}"
 fi
 
+# Safety net: snapshot the cluster's current state before this destructive
+# log-alert seed runs, labeled `pre-seed-logs`. Always recoverable as
+# cli/exported/<org>/<cluster>/alert_rules.pre-seed-logs.json. Skipped under
+# --check (read-only ansible mode — nothing to roll back).
+SKIP_PRE_SNAPSHOT=false
+for arg in "$@"; do
+    if [[ "$arg" == "--check" ]]; then SKIP_PRE_SNAPSHOT=true; break; fi
+done
+if [[ "$SKIP_PRE_SNAPSHOT" == false ]]; then
+    echo "==> Pre-seed snapshot of current state"
+    tuning/export "$ORG" "$CLUSTER" --label pre-seed-logs
+    echo ""
+fi
+
 # Separate staging dir from the metric seeder so the two never clobber.
 STAGING="cli/exported/run/${ORG}-${CLUSTER}-logs"
 CONFIG_ORG="${STAGING}/config/${ORG}"

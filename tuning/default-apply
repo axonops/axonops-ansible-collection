@@ -84,6 +84,20 @@ if [[ -z "${AXONOPS_URL:-}" && "${AXONOPS_USE_SAML:-}" != "true" ]]; then
     echo "Auto-detected AXONOPS_URL=${AXONOPS_URL}"
 fi
 
+# Safety net: snapshot the cluster's current alert/integration state before
+# this destructive seed runs, labeled `pre-seed`. Always recoverable as
+# cli/exported/<org>/<cluster>/alert_rules.pre-seed.json. Skipped under
+# --check (read-only ansible mode — nothing to roll back).
+SKIP_PRE_SNAPSHOT=false
+for arg in "$@"; do
+    if [[ "$arg" == "--check" ]]; then SKIP_PRE_SNAPSHOT=true; break; fi
+done
+if [[ "$SKIP_PRE_SNAPSHOT" == false ]]; then
+    echo "==> Pre-seed snapshot of current state"
+    tuning/export "$ORG" "$CLUSTER" --label pre-seed
+    echo ""
+fi
+
 STAGING="cli/exported/run/${ORG}-${CLUSTER}"
 CONFIG_ORG="${STAGING}/config/${ORG}"
 CONFIG_CLUSTER="${CONFIG_ORG}/${CLUSTER}"

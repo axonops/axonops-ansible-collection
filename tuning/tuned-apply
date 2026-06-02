@@ -42,6 +42,20 @@ if [[ "$HAS_INPUT" == false ]]; then
     set -- --input "$DEFAULT_INPUT" "$@"
 fi
 
+# Safety net: snapshot the cluster's current state before this destructive
+# POST runs, labeled `pre-tuned-alerts`. Always recoverable as
+# cli/exported/<org>/<cluster>/alert_rules.pre-tuned-alerts.json. Skipped
+# under --dry-run (no HTTP writes happen).
+SKIP_PRE_SNAPSHOT=false
+for arg in "$@"; do
+    if [[ "$arg" == "--dry-run" ]]; then SKIP_PRE_SNAPSHOT=true; break; fi
+done
+if [[ "$SKIP_PRE_SNAPSHOT" == false ]]; then
+    echo "==> Pre-tuned-alerts snapshot of current state"
+    tuning/export "$ORG" "$CLUSTER" --label pre-tuned-alerts
+    echo ""
+fi
+
 exec python3 cli/axonops.py \
     --org "$ORG" \
     --cluster "$CLUSTER" \

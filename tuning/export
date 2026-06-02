@@ -2,7 +2,7 @@
 # Export alert rules + integrations for a given org+cluster.
 #
 # Usage:
-#   tuning/export <org> <cluster> [alerts subcommand args...]
+#   tuning/export <org> <cluster> [--label NAME] [alerts subcommand args...]
 #
 # Each run writes an IMMUTABLE, timestamped snapshot — exports are never
 # overwritten:
@@ -17,6 +17,16 @@
 #   ./cli/exported/<org>/<cluster>/integrations.json -> latest/integrations.json
 # So `tuning/tune <org> <cluster>` (reads alert_rules.json) works unchanged.
 #
+# --label NAME creates additional stable pointers naming the run's PURPOSE:
+#   ./cli/exported/<org>/<cluster>/alert_rules.<NAME>.json
+#   ./cli/exported/<org>/<cluster>/integrations.<NAME>.json
+# Used by destructive scripts to snapshot "the state just before X" — e.g.
+# tuning/default-apply takes a `pre-seed` snapshot, tuning/tuned-apply takes
+# a `pre-tuned-alerts` snapshot. Labeled pointers update only when an
+# export is run with that label, so they always reflect the most recent
+# pre-<destructive-op> state regardless of how many unlabeled exports
+# happened in between.
+#
 # --include-secrets is passed by default so widget_url and integration
 # credentials are preserved (required if you intend to re-apply via
 # apply-tuned-alerts). The CLI writes each snapshot dir 0700, JSON files 0600,
@@ -29,13 +39,24 @@ set -euo pipefail
 : "${AXONOPS_TOKEN:?AXONOPS_TOKEN must be set in env}"
 
 if [[ $# -lt 2 ]]; then
-    echo "usage: tuning/export <org> <cluster> [alerts args...]" >&2
+    echo "usage: tuning/export <org> <cluster> [--label NAME] [alerts args...]" >&2
     exit 2
 fi
 
 ORG="$1"
 CLUSTER="$2"
 shift 2
+
+# Strip --label NAME out of the arg list before passing the rest to the CLI.
+LABEL=""
+PASS_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --label)   LABEL="${2:?--label requires a value}"; shift 2 ;;
+        --label=*) LABEL="${1#--label=}"; shift ;;
+        *)         PASS_ARGS+=("$1"); shift ;;
+    esac
+done
 
 cd "$(dirname "$0")/.."
 
@@ -52,12 +73,12 @@ if [[ -e "$SNAPSHOT_DIR" ]]; then
 fi
 mkdir -p "$SNAPSHOT_DIR"
 
-echo "Exporting alerts for org=${ORG} cluster=${CLUSTER} → ${SNAPSHOT_DIR}"
+echo "Exporting alerts for org=${ORG} cluster=${CLUSTER}${LABEL:+ (label=${LABEL})} → ${SNAPSHOT_DIR}"
 python3 cli/axonops.py \
     --org "$ORG" \
     --cluster "$CLUSTER" \
     alerts --exportpath "$SNAPSHOT_DIR" --include-secrets \
-    "$@"
+    "${PASS_ARGS[@]}"
 
 # Repoint the stable symlinks at this snapshot — only if it actually produced
 # files (an empty export writes nothing; in that case leave the prior 'latest'
@@ -72,6 +93,17 @@ if [[ -e "${SNAPSHOT_DIR}/alert_rules.json" || -e "${SNAPSHOT_DIR}/integrations.
             rm -f "${BASE_DIR}/${f}"
         fi
     done
+    # Labeled pointers (e.g. alert_rules.pre-seed.json) update only on labeled
+    # runs, so they preserve "state right before <destructive-op>" across any
+    # number of unlabeled exports.
+    if [[ -n "$LABEL" ]]; then
+        for f in alert_rules integrations; do
+            if [[ -e "${SNAPSHOT_DIR}/${f}.json" ]]; then
+                ln -sfn "${STAMP}/${f}.json" "${BASE_DIR}/${f}.${LABEL}.json"
+                echo "Updated: ${BASE_DIR}/${f}.${LABEL}.json -> ${STAMP}/${f}.json"
+            fi
+        done
+    fi
     echo "Updated: ${BASE_DIR}/latest -> ${STAMP} (alert_rules.json / integrations.json follow it)"
 else
     echo "Nothing was exported; removing empty snapshot, keeping previous 'latest'." >&2
