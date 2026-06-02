@@ -1,0 +1,61 @@
+---
+# DISABLED — removed from CI (.github/workflows/cassandra-molecule.yml).
+# The keystore_password_file / truststore_password_file keys this scenario
+# exercises were added in Apache Cassandra 6.0 (CASSANDRA-13428) and do not
+# exist in 4.1.x / 5.0.x, the only versions this role supports. The role now
+# force-disables cassandra_use_password_files, so this scenario's assertions no
+# longer hold. Retained for re-enablement once Cassandra 6.0+ is supported. See #102.
+- name: Converge — cassandra role with JKS TLS and password files (default)
+  hosts: all
+  vars:
+    cassandra_version: "5.0.7"
+    cassandra_start_on_install: false
+    cassandra_install_format: tar
+    cassandra_cluster_name: jks-password-files-test
+    cassandra_seeds: "127.0.0.1"
+    cassandra_dc: dc1
+    cassandra_rack: rack1
+    cassandra_max_heap_size: 512M
+
+    # Force deterministic password file paths (independent of install format)
+    cassandra_ssl_keystore_password_file: /etc/cassandra/server_keystore_passwordfile.txt
+    cassandra_ssl_truststore_password_file: /etc/cassandra/server_truststore_passwordfile.txt
+    cassandra_ssl_client_keystore_password_file: /etc/cassandra/client_keystore_passwordfile.txt
+    cassandra_ssl_client_truststore_password_file: /etc/cassandra/client_truststore_passwordfile.txt
+
+    # JKS server encryption (default factory; no PEM)
+    cassandra_ssl_internode_encryption: all
+    cassandra_ssl_internode_keystore_file: /etc/cassandra/keystore.jks
+    cassandra_ssl_keystore_pass: "serverKeystorePass!"
+    cassandra_ssl_truststore_file: /etc/cassandra/truststore.jks
+    cassandra_ssl_truststore_pass: "serverTruststorePass!"
+
+    # JKS client encryption
+    cassandra_ssl_client_encryption_enabled: true
+    cassandra_ssl_client_keystore_file: /etc/cassandra/keystore.jks
+    cassandra_ssl_client_keystore_pass: "clientKeystorePass!"
+    cassandra_ssl_client_truststore_file: /etc/cassandra/truststore.jks
+    cassandra_ssl_client_truststore_pass: "clientTruststorePass!"
+
+  pre_tasks:
+    - name: Workaround missing man1 dir in test containers
+      ansible.builtin.file:
+        path: /usr/share/man/man1
+        state: directory
+        mode: "0755"
+
+    - name: Refresh apt cache (Debian family)
+      when: ansible_os_family == "Debian"
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  roles:
+    - role: axonops.axonops.cassandra
+
+  post_tasks:
+    - name: Record cassandra_conf_dir for verify play
+      ansible.builtin.copy:
+        content: "{{ cassandra_conf_dir }}"
+        dest: /tmp/cassandra_conf_dir
+        mode: '0644'

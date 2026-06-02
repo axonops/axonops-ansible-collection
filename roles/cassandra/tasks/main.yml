@@ -27,6 +27,38 @@
       starting with '4.1' or '5.'. Please set cassandra_version to a supported value.
   tags: always
 
+- name: Assert Cassandra version supports PEMBasedSslContextFactory
+  ansible.builtin.assert:
+    that:
+      - cassandra_version is version('4.1', '>=')
+    fail_msg: "PEMBasedSslContextFactory requires Cassandra 4.1 or later."
+  when: >-
+    cassandra_ssl_internode_ssl_context_factory | default('') == 'pem' or
+    cassandra_ssl_client_ssl_context_factory | default('') == 'pem'
+  tags: always
+
+# keystore_password_file / truststore_password_file were added in Cassandra 6.0
+# (CASSANDRA-13428) and do not exist in 4.1.x / 5.0.x. Emitting them there makes
+# cassandra.yaml invalid and Cassandra refuses to start. This role only supports
+# 4.1.x / 5.0.x, so force the feature off and warn if it was enabled.
+- name: Warn and disable unsupported cassandra_use_password_files
+  when: cassandra_use_password_files | default(false) | bool
+  tags: always
+  block:
+    - name: Warn that cassandra_use_password_files is unsupported on this version
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: cassandra_use_password_files is enabled, but the
+          keystore_password_file / truststore_password_file keys it relies on were
+          introduced in Apache Cassandra 6.0 (CASSANDRA-13428) and do not exist in
+          {{ cassandra_version }}. They would make cassandra.yaml invalid and prevent
+          Cassandra from starting. Disabling the feature and falling back to inline
+          keystore_password / truststore_password keys.
+
+    - name: Force-disable cassandra_use_password_files on unsupported versions
+      ansible.builtin.set_fact:
+        cassandra_use_password_files: false
+
 - name: Import vars for 4.1
   ansible.builtin.include_vars: cassandra-4.1.yml
   when: cassandra_version.startswith('4.1')
@@ -197,6 +229,12 @@
         - _jemalloc_lib_find.files | length > 0
       ansible.builtin.set_fact:
         cassandra_libjemalloc_path: "{{ (_jemalloc_lib_find.files | sort(attribute='path') | first).path }}"
+
+- name: Write TLS keystore/truststore password files (cassandra_use_password_files)
+  ansible.builtin.import_tasks: password-files.yml
+  tags:
+    - config
+    - tls
 
 - name: Deploy configuration
   tags: config

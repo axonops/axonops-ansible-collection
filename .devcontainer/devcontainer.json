@@ -1,0 +1,27 @@
+{
+  "name": "axonops-ansible-collection",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=axonops-ansible-claude-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
+  ],
+  "containerEnv": {
+    "DISABLE_AUTOUPDATER": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "redhat.ansible",
+        "ms-python.python"
+      ]
+    }
+  },
+  "postStartCommand": "echo 'alias claude-dnd=\"claude --dangerously-skip-permissions\"' >> ~/.bashrc && echo 'alias claude-dnd=\"claude --dangerously-skip-permissions\"' >> ~/.zshrc 2>/dev/null || true"
+}

@@ -102,10 +102,10 @@ config:
           config:
             enable_ssl: false
             verify_hostnames: false
-            subject_key: {{ opensearch_oidc.subject_key}}
-            roles_key: {{ opensearch_oidc.roles_key}}
-            openid_connect_url: {{ opensearch_oidc.connect_url}}
-            kibana_url: {{ opensearch_oidc.dashboards_url}}
+            subject_key: "{{ opensearch_oidc.subject_key }}"
+            roles_key: "{{ opensearch_oidc.roles_key }}"
+            openid_connect_url: "{{ opensearch_oidc.connect_url }}"
+            kibana_url: "{{ opensearch_oidc.dashboards_url }}"
         authentication_backend:
           type: noop
     authz: {}

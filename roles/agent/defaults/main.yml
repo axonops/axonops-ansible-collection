@@ -6,7 +6,8 @@ axon_agent_server_port: "{% if axon_agent_server_host == 'agents.axonops.cloud' 
 
 # Possible Options: axon-cassandra3.11-agent, axon-dse6.0-agent, axon-dse6.7-agent, axon-dse5.1-agent or ""
 axon_java_agent: "axon-cassandra5.0-agent-jdk17"
-axon_agent_version: "2.0.2"
+# Leave empty to install the latest version from the repository.
+axon_agent_version: ""
 axon_java_agent_version: "1.0.10"
 
 # This is should be left undefined unless you are using a custom AxonOps server.
@@ -44,3 +45,17 @@ axon_agent_sudoers: |
 # axon_agent_cassandra_config: 'JVM_OPTS="$JVM_OPTS -javaagent:/usr/share/axonops/axon-cassandra4.0-agent.jar=/etc/axonops/axon-agent.yml"'
 # This config is more common for Apache Cassandra >= 5
 # axon_agent_cassandra_config: '. /usr/share/axonops/axonops-jvm.options'
+
+# Enable these options to let the Axon-Agent role modify the Kafka broker start script.
+# Set axon_java_agent to the correct Kafka agent package (e.g. axon-kafka3-agent).
+# Check https://axonops.com/docs/get_started/agent_setup/ to confirm the correct package name.
+# axon_agent_kafka_config_directory: /opt/kafka/bin
+# axon_agent_kafka_config: '. /usr/share/axonops/axonops-jvm.options'
+
+# Path to a Kafka client.properties file used by the AxonOps Kafka admin
+# client (TLS/SASL credentials matching the cluster's auth mode). Leave
+# empty for plaintext clusters. Rendered by the kafka role automatically.
+axon_agent_kafka_client_properties: ""
+
+# axon_agent_jvm_options: |
+#   EXTRA_ARGS="${EXTRA_ARGS} -javaagent:/usr/share/axonops/axon-kafka4-agent.jar=/etc/axonops/axon-agent.yml --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=jdk.unsupported/sun.misc=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED  --add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED  --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-opens=java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-exports=java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-opens=java.management/com.sun.jmx.interceptor=ALL-UNNAMED --add-exports=java.management/com.sun.jmx.interceptor=ALL-UNNAMED"

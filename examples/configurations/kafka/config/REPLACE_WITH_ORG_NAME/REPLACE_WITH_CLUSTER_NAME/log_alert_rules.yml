@@ -1,0 +1,7 @@
+######## Kafka Cluster-Specific Log Alert Overrides ########
+# Add cluster-specific log alert rules here.
+# These are APPENDED to the org-level rules in config/<org>/log_alert_rules.yml
+# Use this file to tune thresholds, add cluster-specific patterns, or target
+# non-standard log paths for this cluster only.
+
+axonops_log_alert_rule: []

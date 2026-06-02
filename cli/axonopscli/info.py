@@ -41,5 +41,3 @@ class Info:
         print("Info from server:")
         nodes = Nodes(self.axonops, self.args)
         print(nodes)
-
-

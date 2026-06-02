@@ -1,0 +1,71 @@
+---
+name: Apache Kafka Molecule
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'roles/kafka/**'
+      - '.github/workflows/kafka-molecule.yml'
+  pull_request:
+    paths:
+      - 'roles/kafka/**'
+      - '.github/workflows/kafka-molecule.yml'
+
+defaults:
+  run:
+    working-directory: roles/kafka
+
+jobs:
+  molecule:
+    name: Molecule Kafka (${{ matrix.scenario }} / ${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distro:
+          - rockylinux9
+          - rockylinux10
+          - ubuntu2204
+          - ubuntu2404
+          - ubuntu2604
+          - debian12
+          - debian13
+        scenario:
+          - default
+          - tls
+          - sasl
+
+    steps:
+      - name: Check out the codebase.
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install test dependencies.
+        run: pip3 install ansible molecule molecule-plugins[docker] docker cryptography
+
+      - name: Install Ansible collections (community.crypto)
+        run: ansible-galaxy collection install community.crypto
+
+      - name: Run Molecule destroy (ignore failures)
+        run: molecule -v destroy -s ${{ matrix.scenario }}
+        continue-on-error: true
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: kafka-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule converge
+        run: molecule -v converge -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: kafka-${{ matrix.scenario }}-${{ matrix.distro }}

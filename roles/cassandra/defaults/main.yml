@@ -214,7 +214,12 @@ cassandra_require_endpoint_verification: false
 cassandra_legacy_ssl_storage_port_enabled: false
 cassandra_ssl_internode_keystore_file: "conf/.keystore"
 # WARNING: Change these passwords before enabling SSL encryption
+# Legacy name kept for backwards compatibility. The canonical name read by the
+# cassandra.yaml template is cassandra_ssl_keystore_pass (declared below); it
+# falls back to cassandra_ssl_internode_keystore_pass so playbooks that set
+# either variable continue to work.
 cassandra_ssl_internode_keystore_pass: "cassandra"
+cassandra_ssl_keystore_pass: "{{ cassandra_ssl_internode_keystore_pass }}"
 cassandra_ssl_truststore_file: "conf/.truststore"
 cassandra_ssl_truststore_pass: "cassandra"
 cassandra_server_encryption_options_require_client_auth: false
@@ -230,6 +235,51 @@ cassandra_ssl_client_keystore_pass: "cassandra"
 cassandra_ssl_client_require_client_auth: false
 cassandra_ssl_client_require_endpoint_verification: false
 cassandra_ssl_client_encryption_protocol: "TLS"
+
+# Externalised keystore/truststore passwords (cassandra.yaml *_password_file keys)
+#
+# NOT SUPPORTED in this role. The keystore_password_file / truststore_password_file
+# keys were added in Apache Cassandra 6.0 (CASSANDRA-13428) and do not exist in
+# Cassandra 4.1.x or 5.0.x — the only versions this role supports. Enabling them on
+# those versions makes cassandra.yaml invalid and Cassandra refuses to start with:
+#   "Invalid yaml. Please remove properties [truststore_password_file, keystore_password_file]"
+#
+# This feature is therefore disabled by default and force-disabled by the role on any
+# supported version (the role warns if you set it true). It is kept only so the path
+# can be re-enabled once Cassandra 6.0+ becomes a supported target.
+cassandra_use_password_files: false
+cassandra_ssl_keystore_password_file: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/server_keystore_passwordfile.txt"
+cassandra_ssl_truststore_password_file: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/server_truststore_passwordfile.txt"
+cassandra_ssl_client_keystore_password_file: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/client_keystore_passwordfile.txt"
+cassandra_ssl_client_truststore_password_file: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/client_truststore_passwordfile.txt"
+
+# PEM-based TLS (Cassandra 4.1+)
+# Set to 'pem' to use PEMBasedSslContextFactory instead of the JKS keystore approach.
+# Any other value (including empty string) keeps the existing keystore path.
+# Requires cassandra_version >= 4.1.
+cassandra_ssl_internode_ssl_context_factory: ""
+
+# Inbound (server) identity for internode TLS — inline PEM strings.
+# private_key must contain the private key AND certificate chain concatenated
+# (PEMBasedSslContextFactory extracts both key and cert from this single value).
+# Store sensitive values in Ansible Vault.
+cassandra_ssl_internode_pem_private_key: ""
+cassandra_ssl_internode_pem_private_key_password: ""  # leave empty for unencrypted keys
+cassandra_ssl_internode_pem_trusted_certificates: ""
+
+# Outbound internode identity — used when mTLS requires a distinct client certificate.
+# If empty, Cassandra reuses the inbound private_key for outbound connections.
+cassandra_ssl_internode_pem_outbound_private_key: ""
+cassandra_ssl_internode_pem_outbound_private_key_password: ""
+cassandra_ssl_internode_pem_outbound_trusted_certificates: ""
+
+# PEM-based TLS for CQL client connections (client_encryption_options).
+# outbound_* parameters do not apply here — Cassandra never initiates connections to CQL clients.
+# private_key must contain the private key AND certificate chain concatenated.
+cassandra_ssl_client_ssl_context_factory: ""
+cassandra_ssl_client_pem_private_key: ""
+cassandra_ssl_client_pem_private_key_password: ""
+cassandra_ssl_client_pem_trusted_certificates: ""
 
 # Internode Compression
 cassandra_internode_compression: "dc"

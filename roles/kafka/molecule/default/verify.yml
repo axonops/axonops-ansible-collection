@@ -1,0 +1,80 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check Kafka home symlink exists
+      ansible.builtin.stat:
+        path: /opt/kafka
+      register: kafka_home_stat
+      failed_when: not kafka_home_stat.stat.exists or not kafka_home_stat.stat.islnk
+
+    - name: Check Kafka systemd unit exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/kafka.service
+      register: kafka_service_stat
+      failed_when: not kafka_service_stat.stat.exists
+
+    - name: Read server.properties
+      ansible.builtin.slurp:
+        src: /opt/kafka/config/server.properties
+      register: kafka_props_content
+
+    - name: Assert server.properties contains process.roles
+      ansible.builtin.assert:
+        that:
+          - "'process.roles=' in (kafka_props_content.content | b64decode)"
+        fail_msg: "server.properties does not contain process.roles"
+
+    - name: Assert server.properties contains node.id
+      ansible.builtin.assert:
+        that:
+          - "'node.id=1' in (kafka_props_content.content | b64decode)"
+        fail_msg: "server.properties does not contain the expected node.id=1"
+
+    - name: Check Kafka data directory exists
+      ansible.builtin.stat:
+        path: /var/lib/kafka
+      register: kafka_data_stat
+      failed_when: not kafka_data_stat.stat.exists or not kafka_data_stat.stat.isdir
+
+    - name: Check Kafka log directory exists
+      ansible.builtin.stat:
+        path: /var/log/kafka
+      register: kafka_log_stat
+      failed_when: not kafka_log_stat.stat.exists or not kafka_log_stat.stat.isdir
+
+    - name: Check Kafka user exists
+      ansible.builtin.getent:
+        database: passwd
+        key: kafka
+
+    - name: Read cluster UUID lock file
+      ansible.builtin.slurp:
+        src: /opt/kafka/CLUSTER_UUID.lock
+      register: kafka_uuid_content
+
+    - name: Assert cluster UUID lock file contains a UUID
+      ansible.builtin.assert:
+        that:
+          - (kafka_uuid_content.content | b64decode | trim) | length == 22
+        fail_msg: "CLUSTER_UUID.lock does not contain a valid Kafka UUID (expected 22 chars)"
+
+    - name: Read sysconfig/kafka
+      ansible.builtin.slurp:
+        src: /etc/sysconfig/kafka
+      register: kafka_sysconfig_content
+
+    - name: Assert KAFKA_HEAP_OPTS is set
+      ansible.builtin.assert:
+        that:
+          - "'KAFKA_HEAP_OPTS=' in (kafka_sysconfig_content.content | b64decode)"
+        fail_msg: "/etc/sysconfig/kafka does not contain KAFKA_HEAP_OPTS"
+
+    - name: Assert KAFKA_OPTS contains expected JVM flag
+      ansible.builtin.assert:
+        that:
+          - "'-XX:NewSize=64m' in (kafka_sysconfig_content.content | b64decode)"
+        fail_msg: "/etc/sysconfig/kafka does not contain the expected KAFKA_OPTS flags"
+
+# code: language=ansible

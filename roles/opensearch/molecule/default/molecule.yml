@@ -18,3 +18,4 @@ provisioner:
   name: ansible
   playbooks:
     converge: converge.yml
+    verify: verify.yml

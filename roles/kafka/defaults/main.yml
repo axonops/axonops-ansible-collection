@@ -1,0 +1,272 @@
+---
+# ============================================================================
+# Kafka Role - Default Variables
+# ============================================================================
+
+# --- Version & Download -----------------------------------------------------
+
+kafka_version: "4.0.0"
+kafka_scala_version: "2.13"
+# Java version passed to the axonops.axonops.java role as java_pkg. Kafka 4.x requires Java 17.
+kafka_java_version: 17
+kafka_java_install: true
+
+# --- Installation -----------------------------------------------------------
+
+kafka_install_root: /opt
+kafka_user: kafka
+kafka_group: kafka
+
+# --- Paths ------------------------------------------------------------------
+
+# JVM / service stdout logs (not Kafka topic partition data)
+kafka_log_dir: /var/log/kafka
+
+# Kafka topic/partition data directories
+kafka_data_dirs:
+  - /var/lib/kafka
+
+# --- JVM --------------------------------------------------------------------
+
+kafka_heap_size: 1G
+
+# Additional JVM flags — list or plain string
+# kafka_opts:
+#   - -XX:NewSize=256m
+kafka_opts: []
+
+# --- KRaft Cluster ----------------------------------------------------------
+
+# REQUIRED per host — role fails without it
+# kafka_node_id: 1
+
+# Node roles for this host. All three combinations are supported:
+#   [broker, controller]  — combined (default, recommended for small clusters)
+#   [broker]              — broker-only  (dedicated broker node)
+#   [controller]          — controller-only (dedicated controller quorum node)
+kafka_node_roles:
+  - broker
+  - controller
+
+# Optional: override the IP this node advertises. Defaults to ansible_default_ipv4.address
+# kafka_node_ip: 192.168.1.10
+
+# Optional: fix the cluster UUID. Auto-generated and persisted on first run if omitted.
+# kafka_cluster_id: ""
+
+# --- Listeners --------------------------------------------------------------
+
+# Override auto-derived listeners. Auto-derivation:
+#   combined node  → [PLAINTEXT://:9092, CONTROLLER://:9093]
+#   broker-only    → [PLAINTEXT://:9092]
+#   controller-only → [CONTROLLER://:9093]
+kafka_listeners: []
+
+# Override the inter-broker listener name. Leave empty to auto-derive from
+# the security state (PLAINTEXT or SSL).
+kafka_inter_broker_listener_name: ""
+
+# --- Performance ------------------------------------------------------------
+
+kafka_num_network_threads: 3
+kafka_num_io_threads: 8
+kafka_socket_send_buffer_bytes: 102400
+kafka_socket_receive_buffer_bytes: 102400
+kafka_socket_request_max_bytes: 104857600
+
+# --- Security (master switch) ----------------------------------------------
+
+# When false (default), nothing in security.yml runs and listeners stay PLAINTEXT.
+# This preserves backward compatibility with existing deployments.
+kafka_security_enabled: false
+
+# --- TLS --------------------------------------------------------------------
+
+# Enable TLS on broker and controller listeners. Requires kafka_security_enabled: true.
+kafka_tls_enabled: false
+
+# Provisioning mode: how PEM material reaches the broker hosts.
+#   custom    — user supplies PEM files on the control node, role copies them
+#   pki_agent — read PEM files written locally by axonops.axonops.pki_agent
+#   generate  — role creates a self-signed CA and per-host certs (DEV ONLY)
+kafka_tls_mode: custom
+
+# Client authentication on TLS listeners.
+#   required  — mTLS, client must present a trusted cert (default)
+#   requested — client may present a cert, validated if so
+#   none      — server-auth only
+kafka_tls_client_auth: required
+
+# custom mode — paths on the CONTROL NODE; copied to brokers
+kafka_tls_cert: ""
+kafka_tls_key: ""
+kafka_tls_ca: ""
+kafka_tls_key_password: ""
+
+# pki_agent mode — paths on the BROKER HOST where pki_agent writes the PEM files
+kafka_tls_pki_cert_path: /opt/tls/kafka/cert.pem
+kafka_tls_pki_key_path: /opt/tls/kafka/key.pem
+kafka_tls_pki_ca_path: /opt/tls/kafka/ca.pem
+
+# generate mode — dev/test convenience only; do not use in production
+kafka_tls_generate_ca_cn: "Kafka Dev CA"
+kafka_tls_generate_validity_days: 3650
+# Control-node directory used to stage the generated CA between hosts
+kafka_tls_generate_local_dir: "/tmp/kafka-tls-{{ kafka_axonops_cluster_name | default('dev') }}"
+
+# Remote directory the broker reads PEM files from. The role places
+# kafka.crt, kafka.key and ca.crt here for custom and generate modes;
+# pki_agent mode reads directly from the kafka_tls_pki_* paths above.
+kafka_tls_remote_dir: /etc/kafka/tls
+
+# --- SASL -------------------------------------------------------------------
+
+# Requires kafka_security_enabled: true.
+kafka_sasl_enabled: false
+
+# Mechanism for client and inter-broker auth.
+#   SCRAM-SHA-512 — recommended; bootstrapped at format time, KRaft-native
+#   PLAIN         — credentials in JAAS, simpler, no salting (use only with TLS)
+kafka_sasl_mechanism: SCRAM-SHA-512
+
+# Inter-broker / controller credentials. The same identity is used for
+# broker↔broker and broker↔controller traffic and is added to super.users.
+kafka_sasl_inter_broker_user: kafka-admin
+kafka_sasl_inter_broker_password: ""
+
+# Additional SCRAM users created on first start via kafka-configs.sh.
+# Ignored when kafka_sasl_mechanism is PLAIN.
+# - { name: app1, password: secret }
+kafka_sasl_users: []
+
+# Static credentials for PLAIN mechanism. Ignored when SCRAM is used.
+# Each entry must include the inter-broker user as well.
+# - { name: kafka-admin, password: secret }
+kafka_sasl_plain_users: []
+
+# --- ACLs -------------------------------------------------------------------
+
+# Enable StandardAuthorizer (KRaft-native, no ZooKeeper). Requires
+# kafka_security_enabled: true. Inter-broker user is always added to
+# super.users so brokers can manage cluster metadata.
+kafka_acl_enabled: false
+
+# Additional principals granted super-user privileges. The inter-broker
+# user is appended automatically; do not list it again.
+kafka_acl_super_users: []
+
+# When false (production default), denied-by-default for unmatched topics.
+kafka_acl_allow_everyone_if_no_acl: false
+
+# Declarative ACL rules applied via kafka-acls.sh after the broker starts.
+# Each entry:
+#   principal     (str, required) — e.g. "User:app1"
+#   operation     (str, required) — Read | Write | Create | Delete | Alter |
+#                                   Describe | ClusterAction | AlterConfigs |
+#                                   DescribeConfigs | IdempotentWrite | All
+#   resource_type (str, required) — Topic | Group | Cluster | TransactionalId |
+#                                   DelegationToken
+#   resource_name (str, required) — name or "*"
+#   permission    (str, default Allow) — Allow | Deny
+#   host          (str, default "*")
+#   pattern_type  (str, default LITERAL) — LITERAL | PREFIXED
+kafka_acls: []
+# - principal: "User:app1"
+#   operation: Read
+#   resource_type: Topic
+#   resource_name: events
+#   permission: Allow
+#   host: "*"
+
+# --- Topic Defaults ---------------------------------------------------------
+
+kafka_num_partitions: 1
+kafka_replication_factor: 1
+
+# --- Internal Topic Settings ------------------------------------------------
+
+kafka_offsets_topic_replication_factor: 1
+kafka_transaction_state_log_replication_factor: 1
+kafka_transaction_state_log_min_isr: 1
+
+# --- Log Retention ----------------------------------------------------------
+
+kafka_log_retention_hours: 168
+kafka_log_retention_bytes: -1
+kafka_log_segment_bytes: 1073741824
+kafka_log_retention_check_interval_ms: 300000
+
+# --- Service Control --------------------------------------------------------
+
+# It is recommended to leave these false and start Kafka manually after validating the cluster.
+kafka_start_on_install: false
+kafka_start_on_boot: false
+
+# Open Kafka ports in firewalld/ufw if either is active on the host.
+# Broker port 9092, controller port 9093 — only opened for the roles this node runs.
+kafka_configure_firewall: true
+
+# --- Topics -----------------------------------------------------------------
+
+# Idempotent topic management. Topics are created only if they do not already exist.
+# Requires kafka_start_on_install: true or a running broker.
+kafka_topics: []
+# - name: my-topic
+#   partitions: 3
+#   replication_factor: 1
+#   config:
+#     retention_ms: 86400000
+
+# --- Arbitrary Extra Config -------------------------------------------------
+
+# Key/value pairs appended verbatim to server.properties.
+kafka_additional_config: {}
+# message.max.bytes: 1000000
+
+# --- AxonOps Agent Integration ----------------------------------------------
+
+# Set to true to install and configure the AxonOps agent on Kafka nodes.
+kafka_axonops_agent_enabled: false
+
+# Required when kafka_axonops_agent_enabled is true.
+# kafka_axonops_org: ""
+
+# SaaS API key (required for axonops.cloud).
+# kafka_axonops_key: ""
+
+# AxonOps server host. Defaults to the SaaS endpoint.
+kafka_axonops_server_host: "agents.axonops.cloud"
+kafka_axonops_agent_server_port: "{% if kafka_axonops_server_host == 'agents.axonops.cloud' %}443{% else %}1888{% endif %}"
+
+# Kafka Java agent package name.
+kafka_axonops_java_agent: "axon-kafka4-agent"
+
+# Pin agent versions. Leave empty to install the latest available.
+# kafka_axonops_agent_version: ""
+# kafka_axonops_java_agent_version: ""
+
+# Required when kafka_axonops_agent_enabled is true.
+# Cluster name shown in AxonOps; the Kafka Java agent fails without it.
+# kafka_axonops_cluster_name: ""
+
+# When kafka_security_enabled is true, the role renders a client.properties
+# file matching the cluster's auth mode and passes it to the agent role via
+# axon_agent_kafka_client_properties. The agent uses these credentials for
+# its Kafka admin client (consumer-group lag, topic metadata, etc.).
+# Defaults reuse the inter-broker identity when SASL is enabled; override
+# to use a dedicated, lower-privileged user.
+kafka_axonops_sasl_user: "{{ kafka_sasl_inter_broker_user }}"
+kafka_axonops_sasl_password: "{{ kafka_sasl_inter_broker_password }}"
+kafka_axonops_client_properties_path: /etc/axonops/kafka_client.properties
+
+# Optionally install the Kconduit kafka cli client
+kafka_kconduit_enabled: false
+kafka_kconduit_version: "0.0.4"
+# Architecture mapping (uname values → release asset names)
+kafka_kconduit_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+
+# Package extension mapping
+kafka_kconduit_pkg_ext: "{{ 'rpm' if ansible_os_family == 'RedHat' else 'deb' }}"
+
+# Final URL
+kafka_kconduit_download_url: "https://github.com/digitalis-io/kconduit/releases/download/v{{ kafka_kconduit_version }}/kconduit_{{ kafka_kconduit_version }}_linux_{{ kafka_kconduit_arch }}.{{ kafka_kconduit_pkg_ext }}"

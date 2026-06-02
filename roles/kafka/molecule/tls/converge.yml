@@ -1,0 +1,31 @@
+---
+- name: Converge (TLS — generate mode)
+  hosts: all
+  become: true
+  vars:
+    kafka_version: "4.0.0"
+    kafka_node_id: 1
+    kafka_node_roles:
+      - broker
+      - controller
+    kafka_heap_size: "512m"
+    kafka_opts:
+      - "-XX:NewSize=64m"
+      - "-XX:MaxNewSize=64m"
+    kafka_data_dirs:
+      - /var/lib/kafka
+    # Skip systemd start in container — verify config + on-disk artefacts only
+    kafka_start_on_install: false
+    kafka_start_on_boot: false
+    # Security
+    kafka_security_enabled: true
+    kafka_tls_enabled: true
+    kafka_tls_mode: generate
+    kafka_tls_client_auth: required
+    kafka_tls_generate_local_dir: /tmp/molecule-kafka-tls
+    kafka_tls_generate_validity_days: 365
+
+  roles:
+    - role: kafka
+
+# code: language=ansible

@@ -1,0 +1,91 @@
+---
+- name: Ensure kafka user tmp dir exists
+  become: true
+  ansible.builtin.file:
+    path: /tmp/.ansible_kafka
+    state: directory
+    owner: "{{ kafka_user }}"
+    mode: "0700"
+
+- name: Check if data directories are already formatted
+  become: true
+  ansible.builtin.stat:
+    path: "{{ item }}/meta.properties"
+  register: kafka__reg_formatted
+  loop: "{{ kafka_data_dirs }}"
+
+- name: Check for existing cluster UUID lock file
+  become: true
+  ansible.builtin.stat:
+    path: "{{ kafka__uuid_file }}"
+  register: kafka__reg_uuid_exists
+  delegate_to: "{{ groups['kafka__group_controller_nodes'] | first }}"
+  run_once: true
+
+- name: Generate cluster UUID
+  become: true
+  become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
+  ansible.builtin.command:
+    cmd: "{{ kafka__home }}/bin/kafka-storage.sh random-uuid"
+  register: kafka__reg_new_uuid
+  changed_when: not kafka__reg_uuid_exists.stat.exists
+  delegate_to: "{{ groups['kafka__group_controller_nodes'] | first }}"
+  run_once: true
+  when: not kafka__reg_uuid_exists.stat.exists
+
+- name: Persist cluster UUID to lock file
+  become: true
+  become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
+  ansible.builtin.copy:
+    content: "{{ kafka__reg_new_uuid.stdout }}"
+    dest: "{{ kafka__uuid_file }}"
+    mode: "0444"
+  when:
+    - not kafka__reg_uuid_exists.stat.exists
+    - inventory_hostname in groups['kafka__group_controller_nodes']
+
+- name: Read cluster UUID from lock file
+  become: true
+  ansible.builtin.slurp:
+    src: "{{ kafka__uuid_file }}"
+  register: kafka__reg_cluster_uuid
+  delegate_to: "{{ groups['kafka__group_controller_nodes'] | first }}"
+  run_once: true
+
+- name: Set cluster UUID fact
+  ansible.builtin.set_fact:
+    kafka_cluster_id: "{{ kafka__reg_cluster_uuid.content | b64decode | trim }}"
+
+- name: Build kafka-storage.sh format argv
+  ansible.builtin.set_fact:
+    kafka__format_argv: >-
+      {{
+        [
+          kafka__home ~ '/bin/kafka-storage.sh',
+          'format',
+          '--config', kafka__config_path,
+          '--cluster-id', kafka_cluster_id,
+        ] +
+        (
+          ['--add-scram',
+           kafka_sasl_mechanism ~ '=[name=' ~ kafka_sasl_inter_broker_user ~
+           ',password=' ~ kafka_sasl_inter_broker_password ~ ']']
+          if (kafka__sasl_on | bool and kafka_sasl_mechanism.startswith('SCRAM'))
+          else []
+        )
+      }}
+
+- name: Format Kafka storage
+  become: true
+  become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
+  ansible.builtin.command:
+    argv: "{{ kafka__format_argv }}"
+  changed_when: kafka__reg_formatted.results | map(attribute='stat') | selectattr('exists') | list | length == 0
+  when: kafka__reg_formatted.results | map(attribute='stat') | selectattr('exists') | list | length == 0
+  no_log: "{{ kafka__sasl_on | bool }}"

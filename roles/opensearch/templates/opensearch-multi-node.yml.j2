@@ -14,10 +14,38 @@ plugins.security.disabled: true
 
 discovery.seed_hosts: [{% for host in opensearch_seed_hosts | default(ansible_play_hosts) %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 
-cluster.initial_master_nodes: [{% for host in opensearch_initial_master_nodes | default(ansible_play_hosts) %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
-
 cluster.initial_cluster_manager_nodes: [{% for host in opensearch_initial_cluster_manager_nodes | default(ansible_play_hosts) %}"{{ host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 
 {% if opensearch_node_roles is defined %}
 node.roles: [{{ opensearch_node_roles }}]
+{% endif %}
+
+{% if opensearch_security_enabled %}
+plugins.security.allow_default_init_securityindex: true
+plugins.security.audit.type: internal_opensearch
+plugins.security.enable_snapshot_restore_privilege: true
+plugins.security.check_snapshot_restore_write_privileges: true
+plugins.security.restapi.roles_enabled: ["all_access", "security_rest_api_access"]
+
+plugins.security.ssl.transport.pemcert_filepath: {{ inventory_hostname }}.pem
+plugins.security.ssl.transport.pemkey_filepath: {{ inventory_hostname }}.key
+plugins.security.ssl.transport.pemtrustedcas_filepath: root-ca.pem
+plugins.security.ssl.transport.enforce_hostname_verification: false
+plugins.security.ssl.http.enabled: true
+plugins.security.ssl.http.pemcert_filepath: {{ inventory_hostname }}_http.pem
+plugins.security.ssl.http.pemkey_filepath: {{ inventory_hostname }}_http.key
+plugins.security.ssl.http.pemtrustedcas_filepath: root-ca.pem
+{% if opensearch_tls_mode == 'generate' %}
+plugins.security.authcz.admin_dn:
+  - CN=admin.{{ opensearch_domain_name }},OU=Ops,O={{ opensearch_domain_name }}\, Inc.,DC={{ opensearch_domain_name }}
+plugins.security.nodes_dn:
+{% for host in ansible_play_hosts %}
+  - CN={{ host }}.{{ opensearch_domain_name }},OU=Ops,O={{ opensearch_domain_name }}\, Inc.,DC={{ opensearch_domain_name }}
+{% endfor %}
+{% elif opensearch_tls_mode == 'custom' %}
+plugins.security.authcz.admin_dn:
+  - "{{ opensearch_tls_admin_dn | default('CN=admin,OU=Ops,O=Example Inc.,DC=example.com') }}"
+plugins.security.nodes_dn:
+  - "{{ opensearch_tls_node_dn | default('CN=*,OU=Ops,O=Example Inc.,DC=example.com') }}"
+{% endif %}
 {% endif %}

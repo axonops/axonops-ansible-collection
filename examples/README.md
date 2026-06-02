@@ -16,7 +16,7 @@ Deploys AxonOps Agent alongside Apache Cassandra on target hosts.
 - Connects to AxonOps Server or SaaS
 
 **Key Variables:**
-- `axon_agent_version`: AxonOps Agent version (default: 2.0.2)
+- `axon_agent_version`: AxonOps Agent version (default: 2.0.21)
 - `axon_java_agent`: Java agent package (e.g., `axon-cassandra4.1-agent`)
 - `axon_agent_server_host`: AxonOps Server endpoint
 - `axon_agent_customer_name`: Organization identifier

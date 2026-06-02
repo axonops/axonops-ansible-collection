@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+# AxonOps Kafka admin client configuration. The agent uses these credentials
+# to read consumer group lag, topic metadata and other admin endpoints.
+security.protocol={{ kafka__broker_protocol }}
+
+{% if kafka__tls_on | bool %}
+ssl.keystore.type=PEM
+ssl.keystore.location={{ kafka__tls_keystore_file }}
+
+ssl.truststore.type=PEM
+ssl.truststore.location={{ kafka__tls_truststore_file }}
+
+ssl.endpoint.identification.algorithm=
+{% endif %}
+
+{% if kafka__sasl_on | bool %}
+sasl.mechanism={{ kafka_sasl_mechanism }}
+sasl.jaas.config={{ kafka__sasl_login_module }} required username="{{ kafka_axonops_sasl_user }}" password="{{ kafka_axonops_sasl_password }}";
+{% endif %}

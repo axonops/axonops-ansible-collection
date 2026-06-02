@@ -4,7 +4,7 @@
   vars:
     install_cassandra: true
     axon_java_agent: "axon-cassandra4.1-agent"
-    axon_agent_version: "2.0.2"
+    axon_agent_version: "2.0.21"
     axon_java_agent_version: "1.0.14"
     axon_agent_customer_name: "mycompany"
     # This is the AxonOps Server host, it can be localhost or the IP of the AxonOps Server

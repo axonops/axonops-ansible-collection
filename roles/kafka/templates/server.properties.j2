@@ -1,0 +1,102 @@
+# {{ ansible_managed }}
+
+############################# Server Basics #############################
+
+process.roles={{ kafka_node_roles | join(',') }}
+node.id={{ kafka_node_id }}
+
+# Controller quorum voters: id@host:port for every controller in the cluster
+controller.quorum.voters={% for host in groups['kafka__group_controller_nodes'] %}{{ hostvars[host]['kafka_node_id'] }}@{{ hostvars[host]['kafka_node_ip'] }}:9093{% if not loop.last %},{% endif %}{% endfor %}
+
+
+############################# Socket Server Settings #############################
+
+listeners={{ kafka__effective_listeners | join(',') }}
+
+inter.broker.listener.name={{ kafka_inter_broker_listener_name | default('', true) or kafka__broker_listener_name }}
+
+{% if kafka__has_broker | bool %}
+advertised.listeners={{ kafka__broker_listener_name }}://{{ kafka_node_ip }}:9092
+{% endif %}
+
+controller.listener.names={{ kafka__controller_listener_name }}
+
+listener.security.protocol.map={{ kafka__controller_listener_name }}:{{ kafka__controller_protocol }},PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
+
+{% if kafka__tls_on | bool %}
+############################# TLS #############################
+
+ssl.keystore.type=PEM
+ssl.keystore.location={{ kafka__tls_keystore_file }}
+{% if kafka_tls_key_password | length > 0 %}
+ssl.key.password={{ kafka_tls_key_password }}
+{% endif %}
+ssl.truststore.type=PEM
+ssl.truststore.location={{ kafka__tls_truststore_file }}
+ssl.client.auth={{ kafka_tls_client_auth }}
+ssl.endpoint.identification.algorithm=
+{% endif %}
+
+{% if kafka__sasl_on | bool %}
+############################# SASL #############################
+
+sasl.enabled.mechanisms={{ kafka_sasl_mechanism }}
+sasl.mechanism.inter.broker.protocol={{ kafka_sasl_mechanism }}
+# Required on broker-only nodes too — they connect to controllers as clients.
+sasl.mechanism.controller.protocol={{ kafka_sasl_mechanism }}
+
+# Per-listener mechanism + JAAS. Per-listener overrides shadow the global
+# sasl.enabled.mechanisms once any listener.name.* SASL key is set, so both
+# must be declared explicitly for each SASL listener.
+# Broker-only nodes still need the controller listener JAAS (used as the
+# client config when they fetch from the Raft quorum).
+{% if kafka__has_broker | bool %}
+listener.name.{{ kafka__broker_listener_name | lower }}.sasl.enabled.mechanisms={{ kafka_sasl_mechanism }}
+listener.name.{{ kafka__broker_listener_name | lower }}.{{ kafka__sasl_mech_lower }}.sasl.jaas.config={{ kafka__sasl_login_module }} required username="{{ kafka_sasl_inter_broker_user }}" password="{{ kafka_sasl_inter_broker_password }}"{% if kafka_sasl_mechanism == 'PLAIN' %}{% for u in kafka_sasl_plain_users %} user_{{ u.name }}="{{ u.password }}"{% endfor %}{% endif %};
+{% endif %}
+
+listener.name.{{ kafka__controller_listener_name | lower }}.sasl.enabled.mechanisms={{ kafka_sasl_mechanism }}
+listener.name.{{ kafka__controller_listener_name | lower }}.{{ kafka__sasl_mech_lower }}.sasl.jaas.config={{ kafka__sasl_login_module }} required username="{{ kafka_sasl_inter_broker_user }}" password="{{ kafka_sasl_inter_broker_password }}"{% if kafka_sasl_mechanism == 'PLAIN' %}{% for u in kafka_sasl_plain_users %} user_{{ u.name }}="{{ u.password }}"{% endfor %}{% endif %};
+{% endif %}
+
+{% if kafka__sec_on | bool and (kafka_acl_enabled | bool) %}
+############################# ACLs #############################
+
+authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer
+super.users={{ (['User:' ~ kafka_sasl_inter_broker_user] + kafka_acl_super_users) | unique | join(';') }}
+allow.everyone.if.no.acl.found={{ kafka_acl_allow_everyone_if_no_acl | bool | string | lower }}
+{% endif %}
+
+num.network.threads={{ kafka_num_network_threads }}
+num.io.threads={{ kafka_num_io_threads }}
+socket.send.buffer.bytes={{ kafka_socket_send_buffer_bytes }}
+socket.receive.buffer.bytes={{ kafka_socket_receive_buffer_bytes }}
+socket.request.max.bytes={{ kafka_socket_request_max_bytes }}
+
+############################# Log Basics #############################
+
+log.dirs={{ kafka_data_dirs | join(',') }}
+num.partitions={{ kafka_num_partitions }}
+num.recovery.threads.per.data.dir=1
+
+############################# Internal Topic Settings #############################
+
+offsets.topic.replication.factor={{ kafka_offsets_topic_replication_factor }}
+transaction.state.log.replication.factor={{ kafka_transaction_state_log_replication_factor }}
+transaction.state.log.min.isr={{ kafka_transaction_state_log_min_isr }}
+
+############################# Log Retention Policy #############################
+
+log.retention.hours={{ kafka_log_retention_hours }}
+{% if kafka_log_retention_bytes | int > 0 %}
+log.retention.bytes={{ kafka_log_retention_bytes }}
+{% endif %}
+log.segment.bytes={{ kafka_log_segment_bytes }}
+log.retention.check.interval.ms={{ kafka_log_retention_check_interval_ms }}
+
+{% if kafka_additional_config | length > 0 %}
+############################# Additional Config #############################
+{% for k, v in kafka_additional_config.items() %}
+{{ k }}={{ v }}
+{% endfor %}
+{% endif %}

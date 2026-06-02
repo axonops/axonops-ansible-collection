@@ -1,0 +1,43 @@
+---
+- name: Verify PEM-based TLS configuration
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Read rendered cassandra.yaml
+      ansible.builtin.slurp:
+        src: /etc/cassandra/cassandra.yaml
+      register: cassandra_yaml_raw
+
+    - name: Set cassandra_yaml fact
+      ansible.builtin.set_fact:
+        cassandra_yaml: "{{ cassandra_yaml_raw.content | b64decode }}"
+
+    - name: Verify server_encryption_options uses PEMBasedSslContextFactory
+      ansible.builtin.assert:
+        that:
+          - "'org.apache.cassandra.security.PEMBasedSslContextFactory' in cassandra_yaml"
+        fail_msg: "PEMBasedSslContextFactory not found in cassandra.yaml"
+
+    - name: Verify keystore key absent from server_encryption_options in PEM mode
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is not search('(?m)^  keystore:')
+        fail_msg: "keystore: key found in cassandra.yaml — should be absent in PEM mode"
+
+    - name: Verify private_key rendered with block scalar style
+      ansible.builtin.assert:
+        that:
+          - "'private_key: |' in cassandra_yaml"
+        fail_msg: "private_key: | (block scalar) not found — PEM content may not render correctly"
+
+    - name: "Verify store_type: JKS absent in PEM mode"
+      ansible.builtin.assert:
+        that:
+          - "'store_type: JKS' not in cassandra_yaml"
+        fail_msg: "store_type: JKS found in cassandra.yaml — should be absent in PEM mode"
+
+    - name: Verify keystore_password absent in PEM mode
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is not search('(?m)^  keystore_password:')
+        fail_msg: "keystore_password: found in cassandra.yaml — should be absent in PEM mode"

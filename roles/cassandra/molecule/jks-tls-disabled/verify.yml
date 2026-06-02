@@ -1,0 +1,60 @@
+---
+# BDD verification — TLS disabled
+#
+# Behaviour under test: when TLS is off, the role MUST NOT write password files
+# nor emit *_password_file: keys, regardless of cassandra_use_password_files.
+# This guards against the role creating unused secret files on disk.
+
+- name: Verify no password files written when TLS disabled (BDD)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: GIVEN — read cassandra_conf_dir recorded by converge
+      ansible.builtin.slurp:
+        src: /tmp/cassandra_conf_dir
+      register: conf_dir_raw
+
+    - name: GIVEN — set cassandra_conf_dir fact
+      ansible.builtin.set_fact:
+        cassandra_conf_dir: "{{ conf_dir_raw.content | b64decode | trim }}"
+
+    - name: GIVEN — read rendered cassandra.yaml
+      ansible.builtin.slurp:
+        src: "{{ cassandra_conf_dir }}/cassandra.yaml"
+      register: cassandra_yaml_raw
+
+    - name: GIVEN — decode cassandra.yaml
+      ansible.builtin.set_fact:
+        cassandra_yaml: "{{ cassandra_yaml_raw.content | b64decode }}"
+
+    - name: THEN — cassandra.yaml has no keystore_password_file anywhere
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is not search('(?m)^\s+keystore_password_file:\s')
+        fail_msg: "keystore_password_file rendered despite TLS disabled"
+
+    - name: THEN — cassandra.yaml has no truststore_password_file anywhere
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is not search('(?m)^\s+truststore_password_file:\s')
+        fail_msg: "truststore_password_file rendered despite TLS disabled"
+
+    - name: THEN — stat all four password files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/cassandra/server_keystore_passwordfile.txt
+        - /etc/cassandra/server_truststore_passwordfile.txt
+        - /etc/cassandra/client_keystore_passwordfile.txt
+        - /etc/cassandra/client_truststore_passwordfile.txt
+      register: pf_stats
+
+    - name: THEN — assert each password file is absent
+      ansible.builtin.assert:
+        that:
+          - not item.stat.exists
+        fail_msg: "{{ item.item }} should not exist when TLS disabled"
+      loop: "{{ pf_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"

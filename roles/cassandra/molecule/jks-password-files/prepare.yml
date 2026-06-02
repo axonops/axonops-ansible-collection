@@ -1,0 +1,27 @@
+---
+- name: Stage placeholder JKS keystore and truststore files
+  hosts: all
+  gather_facts: false
+  tasks:
+    # Cassandra is not started in molecule (start_on_install: false). The role only
+    # references the keystore/truststore paths in cassandra.yaml — content is never
+    # parsed in this test. Use empty placeholder files so paths exist on disk.
+    - name: Ensure conf directory exists for placeholder JKS files
+      ansible.builtin.file:
+        path: /etc/cassandra
+        state: directory
+        mode: '0755'
+
+    - name: Create placeholder keystore
+      ansible.builtin.copy:
+        content: ""
+        dest: /etc/cassandra/keystore.jks
+        mode: '0644'
+        force: false
+
+    - name: Create placeholder truststore
+      ansible.builtin.copy:
+        content: ""
+        dest: /etc/cassandra/truststore.jks
+        mode: '0644'
+        force: false

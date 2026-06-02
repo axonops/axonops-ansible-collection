@@ -1,0 +1,78 @@
+# Managed by Ansible — do not edit manually
+
+bao {
+  address = "{{ pki_agent_addr }}"
+{% if pki_agent_namespace | length > 0 %}
+  namespace = "{{ pki_agent_namespace }}"
+{% endif %}
+}
+
+auto_auth {
+{% if pki_agent_auto_auth_method == 'approle' %}
+  method "approle" {
+    mount_path = "auth/approle"
+    config = {
+      role_id_file_path   = "{{ pki_agent_config_dir }}/role_id"
+{% if pki_agent_approle_secret_id_file | length > 0 %}
+      secret_id_file_path = "{{ pki_agent_approle_secret_id_file }}"
+{% else %}
+      secret_id_file_path = "{{ pki_agent_config_dir }}/secret_id"
+{% endif %}
+    }
+  }
+{% elif pki_agent_auto_auth_method == 'token' %}
+  method "token_file" {
+    config = {
+      token_file_path = "{{ pki_agent_config_dir }}/token"
+    }
+  }
+{% endif %}
+
+  sink "file" {
+    config = {
+      path = "{{ pki_agent_data_dir }}/agent-token"
+    }
+  }
+}
+
+{% for cert in pki_agent_certificates %}
+# Certificate: {{ cert.name }}
+template {
+  contents = <<EOT
+{{ '{{' }} with pkiCert "{{ cert.pki_mount }}/issue/{{ cert.pki_role }}" "common_name={{ cert.common_name }}"{% if cert.alt_names | default('') | length > 0 %} "alt_names={{ cert.alt_names }}"{% endif %}{% if cert.ip_sans | default('') | length > 0 %} "ip_sans={{ cert.ip_sans }}"{% endif %} "ttl={{ cert.ttl | default('72h') }}" {{ '}}' }}
+{{ '{{ .Cert }}{{ .CA }}' }}
+{{ '{{ end }}' }}
+EOT
+  destination = "{{ cert.cert_path }}"
+  perms       = {{ cert.cert_mode | default('0640') }}
+{% if cert.reload_command | default('') | length > 0 %}
+  exec {
+    command = ["sh", "-c", "{{ cert.reload_command }}"]
+    timeout = "{{ cert.reload_timeout | default('5s') }}"
+  }
+{% endif %}
+}
+
+template {
+  contents = <<EOT
+{{ '{{' }} with pkiCert "{{ cert.pki_mount }}/issue/{{ cert.pki_role }}" "common_name={{ cert.common_name }}"{% if cert.alt_names | default('') | length > 0 %} "alt_names={{ cert.alt_names }}"{% endif %}{% if cert.ip_sans | default('') | length > 0 %} "ip_sans={{ cert.ip_sans }}"{% endif %} "ttl={{ cert.ttl | default('72h') }}" {{ '}}' }}
+{{ '{{ .Key }}' }}
+{{ '{{ end }}' }}
+EOT
+  destination = "{{ cert.key_path }}"
+  perms       = {{ cert.key_mode | default('0600') }}
+}
+
+{% if cert.ca_path | default('') | length > 0 %}
+template {
+  contents = <<EOT
+{{ '{{' }} with pkiCert "{{ cert.pki_mount }}/issue/{{ cert.pki_role }}" "common_name={{ cert.common_name }}" "ttl={{ cert.ttl | default('72h') }}" {{ '}}' }}
+{{ '{{ .CA }}' }}
+{{ '{{ end }}' }}
+EOT
+  destination = "{{ cert.ca_path }}"
+  perms       = {{ cert.cert_mode | default('0640') }}
+}
+
+{% endif %}
+{% endfor %}

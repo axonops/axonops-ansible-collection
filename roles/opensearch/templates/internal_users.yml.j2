@@ -1,21 +1,41 @@
 ---
-# This is the internal user database
-# The hash value is a bcrypt hash and can be generated with plugin/tools/hash.sh
-
 _meta:
   type: "internalusers"
   config_version: 2
 
-# Define your internal users here
-
 admin:
-  hash: "{{ opensearch_admin_password }}"
+  hash: "{{ _opensearch_admin_hash.stdout_lines | last }}"
   reserved: true
   backend_roles:
-  - "admin"
-  description: "admin user"
+    - "admin"
+  description: "OpenSearch admin user"
 
 kibanaserver:
-  hash: "{{ opensearch_dashboards_password | default(opensearch_admin_password) }}"
+  hash: "{{ _opensearch_dashboards_hash.stdout_lines | last }}"
   reserved: true
-  description: "kibanaserver user"
+  description: "OpenSearch Dashboards server user"
+{% for user in opensearch_users %}
+
+{{ user.name }}:
+  hash: "{{ _opensearch_user_hashes.results[loop.index0].stdout_lines | last }}"
+  reserved: {{ user.reserved | default(false) | lower }}
+{% if user.backend_roles is defined and user.backend_roles | length > 0 %}
+  backend_roles:
+{% for role in user.backend_roles %}
+    - "{{ role }}"
+{% endfor %}
+{% endif %}
+{% if user.opendistro_security_roles is defined and user.opendistro_security_roles | length > 0 %}
+  opendistro_security_roles:
+{% for role in user.opendistro_security_roles %}
+    - "{{ role }}"
+{% endfor %}
+{% endif %}
+{% if user.attributes is defined and user.attributes | length > 0 %}
+  attributes:
+{% for key, value in user.attributes.items() %}
+    {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+  description: "{{ user.description | default(user.name + ' user') }}"
+{% endfor %}

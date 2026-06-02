@@ -1,0 +1,125 @@
+---
+# ============================================================================
+# Kafka Role - TLS self-signed generation (DEV ONLY)
+# ============================================================================
+# Creates a CA on the control node (run_once), signs a per-host cert,
+# distributes cert + key + CA to the broker. Not for production.
+
+- name: Ensure local TLS staging directory exists
+  ansible.builtin.file:
+    path: "{{ kafka_tls_generate_local_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Check for existing CA private key on control node
+  ansible.builtin.stat:
+    path: "{{ kafka_tls_generate_local_dir }}/ca.key"
+  register: kafka__reg_local_ca
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Generate CA private key
+  community.crypto.openssl_privatekey:
+    path: "{{ kafka_tls_generate_local_dir }}/ca.key"
+    size: 2048
+    type: RSA
+    format: pkcs8
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: not kafka__reg_local_ca.stat.exists
+
+- name: Generate CA certificate signing request
+  community.crypto.openssl_csr:
+    path: "{{ kafka_tls_generate_local_dir }}/ca.csr"
+    privatekey_path: "{{ kafka_tls_generate_local_dir }}/ca.key"
+    common_name: "{{ kafka_tls_generate_ca_cn }}"
+    basic_constraints:
+      - "CA:TRUE"
+    basic_constraints_critical: true
+    key_usage:
+      - keyCertSign
+      - cRLSign
+    key_usage_critical: true
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: not kafka__reg_local_ca.stat.exists
+
+- name: Self-sign CA certificate
+  community.crypto.x509_certificate:
+    path: "{{ kafka_tls_generate_local_dir }}/ca.crt"
+    privatekey_path: "{{ kafka_tls_generate_local_dir }}/ca.key"
+    csr_path: "{{ kafka_tls_generate_local_dir }}/ca.csr"
+    provider: selfsigned
+    selfsigned_not_after: "+{{ kafka_tls_generate_validity_days }}d"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: not kafka__reg_local_ca.stat.exists
+
+- name: Generate per-host private key
+  community.crypto.openssl_privatekey:
+    path: "{{ kafka_tls_generate_local_dir }}/{{ inventory_hostname }}.key"
+    size: 2048
+    type: RSA
+    format: pkcs8
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+
+- name: Generate per-host CSR
+  community.crypto.openssl_csr:
+    path: "{{ kafka_tls_generate_local_dir }}/{{ inventory_hostname }}.csr"
+    privatekey_path: "{{ kafka_tls_generate_local_dir }}/{{ inventory_hostname }}.key"
+    common_name: "{{ inventory_hostname }}"
+    subject_alt_name: "{{ ['DNS:' ~ inventory_hostname, 'DNS:localhost', 'IP:127.0.0.1'] + (['IP:' ~ kafka_node_ip] if kafka_node_ip is defined else []) }}"
+    extended_key_usage:
+      - serverAuth
+      - clientAuth
+  delegate_to: localhost
+  become: false
+
+- name: Sign per-host certificate with CA
+  community.crypto.x509_certificate:
+    path: "{{ kafka_tls_generate_local_dir }}/{{ inventory_hostname }}.crt"
+    csr_path: "{{ kafka_tls_generate_local_dir }}/{{ inventory_hostname }}.csr"
+    ownca_path: "{{ kafka_tls_generate_local_dir }}/ca.crt"
+    ownca_privatekey_path: "{{ kafka_tls_generate_local_dir }}/ca.key"
+    provider: ownca
+    ownca_not_after: "+{{ kafka_tls_generate_validity_days }}d"
+  delegate_to: localhost
+  become: false
+
+- name: Push generated certificate to broker
+  ansible.builtin.copy:
+    src: "{{ kafka_tls_generate_local_dir }}/{{ inventory_hostname }}.crt"
+    dest: "{{ kafka__tls_src_cert }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0640"
+  notify: Restart Kafka
+
+- name: Push generated private key to broker
+  ansible.builtin.copy:
+    src: "{{ kafka_tls_generate_local_dir }}/{{ inventory_hostname }}.key"
+    dest: "{{ kafka__tls_src_key }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0600"
+  no_log: true
+  notify: Restart Kafka
+
+- name: Push generated CA bundle to broker
+  ansible.builtin.copy:
+    src: "{{ kafka_tls_generate_local_dir }}/ca.crt"
+    dest: "{{ kafka__tls_src_ca }}"
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0644"
+  notify: Restart Kafka

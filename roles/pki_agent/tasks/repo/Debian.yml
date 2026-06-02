@@ -1,0 +1,31 @@
+---
+- name: Add OpenBao apt repo prerequisites
+  ansible.builtin.apt:
+    name:
+      - gnupg
+      - apt-transport-https
+      - debian-archive-keyring
+    state: present
+    update_cache: true
+
+- name: Ensure keyrings directory exists
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Download OpenBao apt key
+  ansible.builtin.get_url:
+    url: https://packages.openbao.io/openbao-archive-keyring.gpg
+    dest: /usr/share/keyrings/openbao-archive-keyring.gpg
+    mode: "0644"
+
+- name: Add OpenBao apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/openbao-archive-keyring.gpg]
+      https://packages.openbao.io/openbao/stable/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} main
+    state: present
+    update_cache: true
+
+# code: language=ansible

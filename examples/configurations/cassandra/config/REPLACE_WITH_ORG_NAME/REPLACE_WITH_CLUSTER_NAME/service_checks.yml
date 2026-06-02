@@ -14,7 +14,7 @@ axonops_shell_check:
     timeout: 1m
     script: |-
       set -euo pipefail
-      
+
       if [ -f /var/run/reboot-required ]
       then
           echo `hostname` Reboot required
@@ -37,7 +37,7 @@ axonops_shell_check:
       import urllib.request
       import json
       import sys
-      
+
       url = "http://169.254.169.254/latest/meta-data/events/maintenance/scheduled"
       try:
         response = urllib.request.urlopen(url, timeout=2).read()
@@ -48,9 +48,9 @@ axonops_shell_check:
         if e.code == 404:
           print("No scheduled maintenance events found or not an AWS instance")
           sys.exit(0)
-      
+
       data = json.loads(response.decode('utf-8'))
-      
+
       if not data:
           print("No events for this node")
           sys.exit(0)
@@ -74,11 +74,11 @@ axonops_shell_check:
     timeout: 1m
     script: |-
       #!/bin/bash
-      
+
       EXIT_OK=0
       EXIT_WARNING=1
       EXIT_CRITICAL=2
-      
+
       # Locate nodetool
       if command -v nodetool >/dev/null 2>&1; then
           NODETOOL=nodetool
@@ -90,10 +90,10 @@ axonops_shell_check:
           echo "nodetool not found"
           exit $EXIT_CRITICAL
       fi
-      
+
       # Jitter to avoid herd effect
       sleep $(( RANDOM % 60 ))
-      
+
       check_schema() {
           $NODETOOL describecluster 2>/dev/null \
             | awk '/Schema versions:/,/^$/' \
@@ -103,32 +103,32 @@ axonops_shell_check:
             | grep -v ":" \
             | wc -l
       }
-      
+
       # First attempt
       schema_versions=$(check_schema)
       rc=$?
-      
+
       # Retry once if nodetool struggled
       if [ $rc -ne 0 ] || [ -z "$schema_versions" ]; then
           sleep 10
           schema_versions=$(check_schema)
           rc=$?
       fi
-      
+
       # nodetool/JMX problem → WARNING
       if [ $rc -ne 0 ] || [ -z "$schema_versions" ]; then
           echo "Unable to reliably query schema versions (node under load?)"
           exit $EXIT_WARNING
       fi
-      
+
       # Actual schema disagreement
       if [ "$schema_versions" -gt 1 ]; then
           echo "Schema disagreement detected ($schema_versions versions)"
           exit $EXIT_CRITICAL
       fi
-      
+
       echo "No schema disagreement detected"
-      
+
       exit $EXIT_OK
 
     # This check verifies that all files and directories under the Cassandra data directory
@@ -152,12 +152,12 @@ axonops_shell_check:
       import sys
       import pwd
       import grp
-      
+
       DATA_DIR = "/opt/cassandra/data"
       EXPECTED_USER = "cassandra"
       EXPECTED_GROUP = "cassandra"
       EXCLUDE_DIR = "snapshots"
-      
+
       def main():
           try:
               expected_uid = pwd.getpwnam(EXPECTED_USER).pw_uid
@@ -165,14 +165,14 @@ axonops_shell_check:
           except KeyError as e:
               print(f"WARNING: User or group not found: {e}")
               sys.exit(1)
-      
+
           ownership_issues = []
           permission_issues = []
-      
+
           for root, dirs, files in os.walk(DATA_DIR, topdown=True):
               # Exclude snapshots directories
               dirs[:] = [d for d in dirs if d != EXCLUDE_DIR]
-      
+
               # Check directory itself
               try:
                   st = os.stat(root)
@@ -181,7 +181,7 @@ axonops_shell_check:
               except PermissionError as e:
                   permission_issues.append(f"{root}: {e}")
                   continue
-      
+
               # Check files
               for name in files:
                   path = os.path.join(root, name)
@@ -191,20 +191,20 @@ axonops_shell_check:
                           ownership_issues.append(path)
                   except PermissionError as e:
                       permission_issues.append(f"{path}: {e}")
-      
+
           if permission_issues:
               print("WARNING: Unable to fully scan the data directory due to permission issues")
               for msg in permission_issues:
                   print(msg)
               sys.exit(1)
-      
+
           if ownership_issues:
               print(f"CRITICAL: Found files or directories not owned by "
                     f"{EXPECTED_USER}:{EXPECTED_GROUP}")
               for path in ownership_issues:
                   print(path)
               sys.exit(2)
-      
+
           print(f"OK: All accessible files under {DATA_DIR} are owned by "
                 f"{EXPECTED_USER}:{EXPECTED_GROUP}")
           sys.exit(0)

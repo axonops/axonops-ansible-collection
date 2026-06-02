@@ -1,0 +1,78 @@
+---
+- name: Verify TLS configuration
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Read server.properties
+      ansible.builtin.slurp:
+        src: /opt/kafka/config/server.properties
+      register: kafka_props_content
+
+    - name: Decode server.properties
+      ansible.builtin.set_fact:
+        kafka_props: "{{ kafka_props_content.content | b64decode }}"
+
+    - name: Assert SSL listener configured
+      ansible.builtin.assert:
+        that:
+          - "'listeners=SSL://:9092,CONTROLLER://:9093' in kafka_props"
+        fail_msg: "server.properties does not contain SSL listener"
+
+    - name: Assert advertised SSL listener
+      ansible.builtin.assert:
+        that:
+          - "'advertised.listeners=SSL://' in kafka_props"
+        fail_msg: "server.properties does not advertise SSL listener"
+
+    - name: Assert inter-broker listener is SSL
+      ansible.builtin.assert:
+        that:
+          - "'inter.broker.listener.name=SSL' in kafka_props"
+        fail_msg: "inter.broker.listener.name not set to SSL"
+
+    - name: Assert PEM keystore configured
+      ansible.builtin.assert:
+        that:
+          - "'ssl.keystore.type=PEM' in kafka_props"
+          - "'ssl.keystore.location=/etc/kafka/tls/keystore.pem' in kafka_props"
+          - "'ssl.truststore.location=/etc/kafka/tls/ca.pem' in kafka_props"
+          - "'ssl.client.auth=required' in kafka_props"
+        fail_msg: "TLS PEM block missing or incorrect"
+
+    - name: Stat keystore file
+      ansible.builtin.stat:
+        path: /etc/kafka/tls/keystore.pem
+      register: kafka_keystore_stat
+
+    - name: Assert keystore file present and owned by kafka
+      ansible.builtin.assert:
+        that:
+          - kafka_keystore_stat.stat.exists
+          - kafka_keystore_stat.stat.pw_name == 'kafka'
+          - kafka_keystore_stat.stat.mode == '0600'
+        fail_msg: "/etc/kafka/tls/keystore.pem missing or wrong perms"
+
+    - name: Stat truststore file
+      ansible.builtin.stat:
+        path: /etc/kafka/tls/ca.pem
+      register: kafka_ca_stat
+
+    - name: Assert truststore present
+      ansible.builtin.assert:
+        that:
+          - kafka_ca_stat.stat.exists
+        fail_msg: "/etc/kafka/tls/ca.pem missing"
+
+    - name: Read keystore content
+      ansible.builtin.slurp:
+        src: /etc/kafka/tls/keystore.pem
+      register: kafka_keystore_content
+
+    - name: Assert keystore contains both certificate and private key
+      ansible.builtin.assert:
+        that:
+          - "'BEGIN CERTIFICATE' in (kafka_keystore_content.content | b64decode)"
+          - "'PRIVATE KEY' in (kafka_keystore_content.content | b64decode)"
+        fail_msg: "keystore.pem missing cert or key block"
+
+# code: language=ansible

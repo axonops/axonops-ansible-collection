@@ -1,0 +1,281 @@
+######## Kafka Log Alert Rules ########
+# Comprehensive log-based alert rules for Apache Kafka clusters monitored by AxonOps.
+# Covers: Kafka Broker, KRaft Controller, and Kafka Connect log streams.
+# These rules are applied to ALL clusters in the organisation.
+# Override or extend per-cluster in config/<org>/<cluster>/log_alert_rules.yml
+#
+# The content field uses simple_query_string syntax:
+#   Single word: timeout        Phrase: \"GC pause\"
+#   AND: +timeout +error        OR: timeout error
+#   NOT: timeout -warning       Wildcard: time*
+# Regex (e.g. .*, [a-z]+) is NOT supported.
+
+axonops_log_alert_rule:
+
+######## KAFKA BROKER — STARTUP & AVAILABILITY ########
+
+- name: Broker Startup Failure
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +Fatal +error +KafkaServer +startup
+  source: "/var/log/kafka/server.log"
+  description: Broker failed to start. Check port conflicts, config errors, or permissions. Verify server.properties and listener ports.
+
+- name: Broker JVM OOM
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +OutOfMemoryError
+  source: "/var/log/kafka/server.log"
+  description: JVM heap exhausted. Increase -Xmx, review message sizes, check for memory leaks in custom interceptors or serialisers.
+
+- name: Broker FATAL Error
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: FATAL
+  source: "/var/log/kafka/server.log"
+  description: Fatal condition causing broker abort. Investigate immediately; check full stack trace.
+
+- name: Kafka Storage Exception
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +KafkaStorageException
+  source: "/var/log/kafka/server.log"
+  description: Disk-level failure. Check disk health, SMART status, and filesystem mount state.
+
+- name: Data Directory Failure
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +Failed +create +validate +data +directory
+  source: "/var/log/kafka/server.log"
+  description: Kafka cannot access a log directory. Verify directory exists, permissions are correct, and the filesystem is mounted and writable.
+
+- name: Log Flush IO Error
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +Error +flushing +log
+  source: "/var/log/kafka/server.log"
+  description: Typically java.io.IOException — No space left on device. Expand storage, reduce retention, or delete unused topics.
+
+- name: Disk Lock Error
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +Disk +error +locking +directory
+  source: "/var/log/kafka/server.log"
+  description: Another process is holding the data directory lock or the filesystem is read-only. Ensure no duplicate Kafka processes are running.
+
+
+######## KAFKA BROKER — REPLICATION & PARTITION HEALTH ########
+
+- name: Broker Under Replicated Partitions
+  warning_value: 1
+  critical_value: 5
+  duration: 5m
+  content: +under +replicated
+  source: "/var/log/kafka/server.log"
+  description: Partitions have fewer in-sync replicas than the replication factor. Risk of data loss if another broker fails.
+
+- name: ISR Shrunk
+  warning_value: 3
+  critical_value: 20
+  duration: 5m
+  content: +ISR +shrunk
+  source: "/var/log/kafka/server.log"
+  description: A replica fell behind and was removed from the ISR. Check the lagging broker's disk I/O, network latency, and resource utilisation.
+
+- name: ISR Shrunk (state-change log)
+  warning_value: 3
+  critical_value: 20
+  duration: 5m
+  content: +Shrinking +ISR
+  source: "/var/log/kafka/state-change.log"
+  description: ISR shrink logged in state-change log. Indicates replication performance issues.
+
+- name: Offline Partition
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +OfflinePartition
+  source: "/var/log/kafka/state-change.log"
+  description: A partition has no active leader. Restore the failed broker or trigger partition reassignment.
+
+
+######## KAFKA BROKER — SECURITY & AUTHENTICATION ########
+
+- name: Authorization Failure
+  warning_value: 1
+  critical_value: 10
+  duration: 5m
+  content: +Authorization +failed
+  source: "/var/log/kafka/kafka-authorizer.log"
+  description: A client request was denied by the ACL authoriser. If unexpected, investigate potential misconfiguration or security breach.
+
+- name: Authentication Failure
+  warning_value: 1
+  critical_value: 20
+  duration: 5m
+  content: +Failed +authentication
+  source: "/var/log/kafka/server.log"
+  description: Client failed SASL/mTLS authentication. Check client credentials, SASL configuration, and SCRAM user store.
+
+
+######## KAFKA BROKER — JVM GC ########
+
+- name: Broker Full GC Event
+  warning_value: 1
+  critical_value: 3
+  duration: 15m
+  content: +Full +GC
+  source: "/var/log/kafka/kafkaServer-gc.log"
+  description: Stop-the-world full GC occurred. If frequent, increase heap size. Kafka recommends G1GC with -XX:MaxGCPauseMillis=20.
+
+- name: Broker Long GC Pause
+  warning_value: 1
+  critical_value: 3
+  duration: 15m
+  content: +GC +pause
+  source: "/var/log/kafka/kafkaServer-gc.log"
+  description: GC pause detected. Long pauses (over 1s) can cause consumer lag spikes and request timeouts. Tune JVM heap (4-8 GB recommended). This rule matches all GC pauses; use warning/critical thresholds to control alert sensitivity.
+
+- name: Broker G1GC Mark Abort
+  warning_value: 1
+  critical_value: 1
+  duration: 5m
+  content: +concurrent-mark-abort
+  source: "/var/log/kafka/kafkaServer-gc.log"
+  description: G1GC marking cycle aborted due to heap pressure, often preceding an OOM. Review heap sizing immediately.
+
+- name: Broker GC OOM
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +OutOfMemoryError
+  source: "/var/log/kafka/kafkaServer-gc.log"
+  description: JVM heap exhausted as detected in GC log. Increase -Xmx immediately.
+
+
+######## KRAFT CONTROLLER — QUORUM & LEADER ELECTION ########
+
+- name: Controller No Quorum Leader
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +leader +none
+  source: "/var/log/kafka/controller.log"
+  description: The KRaft quorum has no elected leader. The cluster cannot process metadata changes. Check connectivity between all controller nodes.
+
+- name: Controller FATAL Error
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: FATAL
+  source: "/var/log/kafka/controller.log"
+  description: Fatal condition in the controller process. Investigate the full stack trace immediately.
+
+- name: Controller ERROR
+  warning_value: 3
+  critical_value: 20
+  duration: 5m
+  content: ERROR
+  source: "/var/log/kafka/controller.log"
+  description: Error in the controller log. Any error indicates a significant operational event.
+
+- name: Controller OOM
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +OutOfMemoryError
+  source: "/var/log/kafka/controller.log"
+  description: Controller JVM heap exhausted. Increase controller heap — larger clusters require more memory for in-memory metadata.
+
+- name: Controller Quorum Instability
+  warning_value: 3
+  critical_value: 20
+  duration: 15m
+  content: +Completed +transition +Unattached
+  source: "/var/log/kafka/controller.log"
+  description: Controller is frequently losing its quorum attachment. May indicate network instability between controller nodes. A few occurrences per week can be normal but sustained frequency is not.
+
+- name: Controller Metadata Load Error
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +MetadataLoadError
+  source: "/var/log/kafka/controller.log"
+  description: The BrokerMetadataListener encountered errors loading the metadata log. Data integrity risk; investigate immediately.
+
+
+######## KAFKA CONNECT — WORKER HEALTH ########
+
+- name: Connect Worker FATAL Error
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: FATAL
+  source: "/var/log/kafka/connect.log"
+  description: The Connect worker process has encountered a fatal error. Restart the worker and investigate the root cause.
+
+- name: Connect Worker Startup Failure
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +Failed +start +worker
+  source: "/var/log/kafka/connect.log"
+  description: Worker failed to start, typically due to configuration errors. Validate connect-distributed.properties.
+
+
+######## KAFKA CONNECT — CONNECTOR & TASK STATE ########
+
+- name: Connect Sink Task FAILED
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +WorkerSinkTask +FAILED
+  source: "/var/log/kafka/connect.log"
+  description: A sink connector task has transitioned to FAILED state. Connect does NOT automatically restart failed tasks. Restart via REST API POST /connectors/{name}/tasks/{id}/restart.
+
+- name: Connect Source Task FAILED
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +WorkerSourceTask +FAILED
+  source: "/var/log/kafka/connect.log"
+  description: A source connector task has transitioned to FAILED state. Connect does NOT automatically restart failed tasks. Restart via REST API POST /connectors/{name}/tasks/{id}/restart.
+
+- name: Connect Offset Commit Failure
+  warning_value: 1
+  critical_value: 5
+  duration: 5m
+  content: +Failed +commit +offsets
+  source: "/var/log/kafka/connect.log"
+  description: Offset commit failed, typically due to consumer group rebalance timeout. Increase session.timeout.ms or reduce max.poll.records.
+
+- name: Connect Deserialization Error
+  warning_value: 1
+  critical_value: 10
+  duration: 5m
+  content: +DeserializationException
+  source: "/var/log/kafka/connect.log"
+  description: Schema or serialisation mismatch. Check schema registry configuration and producer schema compatibility settings.
+
+- name: Connect Worker REST API Unreachable
+  warning_value: 1
+  critical_value: 1
+  duration: 1m
+  content: +\"Connection refused\" +8083
+  source: "/var/log/kafka/connect.log"
+  description: The Connect worker REST API is unreachable — indicates a worker crash or network issue.
+
+- name: Connect Broker Connection Loss
+  warning_value: 1
+  critical_value: 5
+  duration: 5m
+  content: +Disconnected +node
+  source: "/var/log/kafka/connect.log"
+  description: Connect worker lost connectivity to a Kafka broker. Check broker health and network path between Connect and Kafka.

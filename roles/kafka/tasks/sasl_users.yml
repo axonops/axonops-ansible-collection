@@ -1,0 +1,65 @@
+---
+# ============================================================================
+# Kafka Role - SASL/SCRAM user management (post-start)
+# ============================================================================
+# Idempotent: lists existing SCRAM credentials, only creates missing users.
+# Runs only after the broker is up; PLAIN credentials live in JAAS instead.
+
+- name: Ensure kafka user tmp dir exists
+  become: true
+  ansible.builtin.file:
+    path: /tmp/.ansible_kafka
+    state: directory
+    owner: "{{ kafka_user }}"
+    mode: "0700"
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true
+
+- name: List existing SCRAM users
+  become: true
+  become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
+  ansible.builtin.command:
+    argv:
+      - "{{ kafka__home }}/bin/kafka-configs.sh"
+      - --bootstrap-server
+      - localhost:9092
+      - --command-config
+      - "{{ kafka__admin_props_file }}"
+      - --describe
+      - --entity-type
+      - users
+  register: kafka__reg_scram_users
+  changed_when: false
+  check_mode: false
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true
+
+- name: Create missing SCRAM users
+  become: true
+  become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
+  ansible.builtin.command:
+    argv:
+      - "{{ kafka__home }}/bin/kafka-configs.sh"
+      - --bootstrap-server
+      - localhost:9092
+      - --command-config
+      - "{{ kafka__admin_props_file }}"
+      - --alter
+      - --add-config
+      - "{{ kafka_sasl_mechanism }}=[password={{ item.password }}]"
+      - --entity-type
+      - users
+      - --entity-name
+      - "{{ item.name }}"
+  loop: "{{ kafka_sasl_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: ('SCRAM credentials for user-principal ' ~ "'" ~ item.name ~ "'") not in kafka__reg_scram_users.stdout
+  changed_when: true
+  no_log: true
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true

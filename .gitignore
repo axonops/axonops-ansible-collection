@@ -9,3 +9,6 @@ venv/
 
 # Local-only helper scripts (per-client wrappers, not part of the shipped CLI)
 tuning/
+.claude/settings.local.json
+.ansible
+documents/

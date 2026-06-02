@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ansible-lint:*)",
+      "Bash(yamllint:*)",
+      "Bash(pre-commit run:*)",
+      "Bash(pre-commit install:*)",
+      "Bash(ansible --version)",
+      "Bash(ansible-lint --version)",
+      "Bash(molecule --version)",
+      "Bash(molecule test:*)",
+      "Bash(molecule converge:*)",
+      "Bash(molecule verify:*)",
+      "Bash(molecule destroy:*)",
+      "Bash(molecule create:*)",
+      "Bash(molecule lint:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); cmd=$(echo \"$input\" | python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('command',''))\" 2>/dev/null || echo \"\"); if echo \"$cmd\" | grep -qE '^git commit'; then cd \"$(git rev-parse --show-toplevel)\" && pre-commit run --files $(git diff --cached --name-only | tr '\\n' ' ') 2>&1 || true; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

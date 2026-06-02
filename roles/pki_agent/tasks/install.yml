@@ -1,0 +1,127 @@
+---
+- name: Set agent package name
+  ansible.builtin.set_fact:
+    _pki_agent_pkg: "openbao{{ '=' + pki_agent_version if pki_agent_version | length > 0 else '' }}"
+
+- name: Create agent system group
+  ansible.builtin.group:
+    name: "{{ pki_agent_group }}"
+    system: true
+    state: present
+
+- name: Create agent system user
+  ansible.builtin.user:
+    name: "{{ pki_agent_user }}"
+    group: "{{ pki_agent_group }}"
+    system: true
+    shell: /sbin/nologin
+    home: "{{ pki_agent_data_dir }}"
+    create_home: false
+    state: present
+
+- name: Create agent directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ pki_agent_user }}"
+    group: "{{ pki_agent_group }}"
+    mode: "0750"
+  loop:
+    - "{{ pki_agent_config_dir }}"
+    - "{{ pki_agent_data_dir }}"
+    - "{{ pki_agent_log_dir }}"
+
+- name: Install via package manager
+  when: pki_agent_install_method == 'pkg'
+  block:
+    - name: Add Debian repo
+      ansible.builtin.import_tasks: repo/Debian.yml
+      when: ansible_os_family == 'Debian'
+
+    - name: Add RedHat repo
+      ansible.builtin.import_tasks: repo/RedHat.yml
+      when: ansible_os_family == 'RedHat'
+
+    - name: Install package (Debian)
+      ansible.builtin.apt:
+        name: "{{ _pki_agent_pkg }}"
+        state: present
+        update_cache: true
+      when: ansible_os_family == 'Debian'
+      notify: Restart pki-agent
+
+    - name: Install package (RedHat)
+      ansible.builtin.package:
+        name: "{{ _pki_agent_pkg }}"
+        state: present
+      when: ansible_os_family == 'RedHat'
+      notify: Restart pki-agent
+
+- name: Install via binary download
+  when: pki_agent_install_method == 'binary'
+  block:
+    - name: Check installed version
+      ansible.builtin.command:
+        cmd: bao version
+      register: _pki_agent_installed_version
+      changed_when: false
+      failed_when: false
+
+    - name: Set version facts
+      ansible.builtin.set_fact:
+        _pki_agent_installed: >-
+          {{ _pki_agent_installed_version.rc == 0 and
+             (pki_agent_version | length == 0 or
+              pki_agent_version in _pki_agent_installed_version.stdout) }}
+
+    - name: Download and install binary
+      when: not _pki_agent_installed
+      block:
+        - name: Resolve latest version
+          when: pki_agent_version | length == 0
+          block:
+            - name: Get latest release tag
+              ansible.builtin.uri:
+                url: https://api.github.com/repos/openbao/openbao/releases/latest
+                return_content: true
+              register: _openbao_latest
+
+            - name: Set resolved version
+              ansible.builtin.set_fact:
+                _pki_agent_resolved_version: "{{ _openbao_latest.json.tag_name | regex_replace('^v', '') }}"
+
+        - name: Use pinned version
+          ansible.builtin.set_fact:
+            _pki_agent_resolved_version: "{{ pki_agent_version }}"
+          when: pki_agent_version | length > 0
+
+        - name: Set download URL
+          ansible.builtin.set_fact:
+            _pki_agent_download_url: >-
+              https://github.com/openbao/openbao/releases/download/v{{ _pki_agent_resolved_version }}/bao_{{ _pki_agent_resolved_version }}_linux_amd64.zip
+
+        - name: Download binary archive
+          ansible.builtin.get_url:
+            url: "{{ _pki_agent_download_url }}"
+            dest: "/tmp/pki_agent_{{ _pki_agent_resolved_version }}.zip"
+            mode: "0644"
+
+        - name: Install unzip
+          ansible.builtin.package:
+            name: unzip
+            state: present
+
+        - name: Unzip binary
+          ansible.builtin.unarchive:
+            src: "/tmp/pki_agent_{{ _pki_agent_resolved_version }}.zip"
+            dest: /usr/local/bin/
+            remote_src: true
+            mode: "0755"
+          notify: Restart pki-agent
+
+        - name: Clean up archive
+          ansible.builtin.file:
+            path: "/tmp/pki_agent_{{ _pki_agent_resolved_version }}.zip"
+            state: absent
+
+# code: language=ansible

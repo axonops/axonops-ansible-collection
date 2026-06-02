@@ -1,0 +1,366 @@
+---
+- name: Verify — OpenSearch security configuration
+  hosts: all
+  gather_facts: false
+  vars:
+    opensearch_install_root: /usr/share/opensearch
+    opensearch_conf_dir: /usr/share/opensearch/config
+    opensearch_security_dir: /usr/share/opensearch/config/opensearch-security
+    opensearch_admin_password: "Admin,Pass/With&Special$Chars"
+    opensearch_dashboards_password: "Dashboards_12345!"
+  tasks:
+    # =========================================================================
+    # 1. Verify opensearch.yml has TLS config inlined (not via blockinfile)
+    # =========================================================================
+
+    - name: Read opensearch.yml
+      ansible.builtin.slurp:
+        src: "{{ opensearch_conf_dir }}/opensearch.yml"
+      register: _os_config
+
+    - name: Decode opensearch.yml
+      ansible.builtin.set_fact:
+        _os_config_text: "{{ _os_config.content | b64decode }}"
+
+    - name: Verify TLS transport config is inlined
+      ansible.builtin.assert:
+        that:
+          - "'plugins.security.ssl.transport.pemcert_filepath' in _os_config_text"
+          - "'plugins.security.ssl.transport.pemkey_filepath' in _os_config_text"
+          - "'plugins.security.ssl.transport.pemtrustedcas_filepath' in _os_config_text"
+        fail_msg: "opensearch.yml is missing inlined TLS transport configuration"
+
+    - name: Verify TLS HTTP config is inlined
+      ansible.builtin.assert:
+        that:
+          - "'plugins.security.ssl.http.enabled: true' in _os_config_text"
+          - "'plugins.security.ssl.http.pemcert_filepath' in _os_config_text"
+        fail_msg: "opensearch.yml is missing inlined TLS HTTP configuration"
+
+    - name: Verify security plugin settings are inlined
+      ansible.builtin.assert:
+        that:
+          - "'plugins.security.allow_default_init_securityindex: true' in _os_config_text"
+          - "'plugins.security.audit.type: internal_opensearch' in _os_config_text"
+          - "'plugins.security.restapi.roles_enabled' in _os_config_text"
+        fail_msg: "opensearch.yml is missing inlined security plugin settings"
+
+    - name: Verify admin DN is present
+      ansible.builtin.assert:
+        that:
+          - "'plugins.security.authcz.admin_dn' in _os_config_text"
+          - "'CN=admin.molecule.test' in _os_config_text"
+        fail_msg: "opensearch.yml is missing admin DN for generate mode"
+
+    - name: Verify nodes DN is present
+      ansible.builtin.assert:
+        that:
+          - "'plugins.security.nodes_dn' in _os_config_text"
+        fail_msg: "opensearch.yml is missing nodes DN"
+
+    - name: Verify no blockinfile markers remain
+      ansible.builtin.assert:
+        that:
+          - "'## BEGIN' not in _os_config_text"
+          - "'## END' not in _os_config_text"
+        fail_msg: "opensearch.yml still contains blockinfile markers"
+
+    # =========================================================================
+    # 2. Verify TLS certificates exist
+    # =========================================================================
+
+    - name: Get hostname for cert verification
+      ansible.builtin.command: hostname
+      register: _hostname
+      changed_when: false
+
+    - name: Check TLS certificate files exist
+      ansible.builtin.stat:
+        path: "{{ opensearch_conf_dir }}/{{ item }}"
+      register: _cert_stat
+      failed_when: not _cert_stat.stat.exists
+      loop:
+        - root-ca.pem
+        - root-ca.key
+        - admin.pem
+        - admin.key
+        - "{{ _hostname.stdout }}.pem"
+        - "{{ _hostname.stdout }}.key"
+        - "{{ _hostname.stdout }}_http.pem"
+        - "{{ _hostname.stdout }}_http.key"
+
+    # =========================================================================
+    # 3. Verify internal_users.yml — no plaintext passwords, correct users
+    # =========================================================================
+
+    - name: Read internal_users.yml
+      ansible.builtin.slurp:
+        src: "{{ opensearch_security_dir }}/internal_users.yml"
+      register: _internal_users
+
+    - name: Decode internal_users.yml
+      ansible.builtin.set_fact:
+        _internal_users_text: "{{ _internal_users.content | b64decode }}"
+
+    - name: Verify admin user is present
+      ansible.builtin.assert:
+        that:
+          - "'admin:' in _internal_users_text"
+        fail_msg: "internal_users.yml is missing admin user"
+
+    - name: Verify kibanaserver user is present
+      ansible.builtin.assert:
+        that:
+          - "'kibanaserver:' in _internal_users_text"
+        fail_msg: "internal_users.yml is missing kibanaserver user"
+
+    - name: Verify custom users are present
+      ansible.builtin.assert:
+        that:
+          - "'logstash:' in _internal_users_text"
+          - "'readonlyuser:' in _internal_users_text"
+          - "'appuser:' in _internal_users_text"
+        fail_msg: "internal_users.yml is missing custom users"
+
+    - name: Verify passwords are hashed (bcrypt format)
+      ansible.builtin.assert:
+        that:
+          - "'$2' in _internal_users_text"
+        fail_msg: "internal_users.yml does not contain bcrypt hashes"
+
+    - name: Verify no plaintext passwords in internal_users.yml
+      ansible.builtin.assert:
+        that:
+          - "'Admin,Pass/With&Special$Chars' not in _internal_users_text"
+          - "'Dashboards_12345!' not in _internal_users_text"
+          - "'Logstash,Pass&123' not in _internal_users_text"
+          - "'ReadOnly/Pass' not in _internal_users_text"
+          - "'App$User' not in _internal_users_text"
+        fail_msg: "internal_users.yml contains plaintext passwords — hashing failed"
+
+    - name: Verify custom user backend roles
+      ansible.builtin.assert:
+        that:
+          - "'logstash' in _internal_users_text"
+          - "'readall' in _internal_users_text"
+          - "'app_backend_role' in _internal_users_text"
+        fail_msg: "internal_users.yml is missing expected backend roles"
+
+    - name: Verify custom user attributes
+      ansible.builtin.assert:
+        that:
+          - "'department' in _internal_users_text"
+          - "'engineering' in _internal_users_text"
+        fail_msg: "internal_users.yml is missing appuser attributes"
+
+    # =========================================================================
+    # 4. Verify roles.yml — custom roles deployed
+    # =========================================================================
+
+    - name: Check roles.yml exists
+      ansible.builtin.stat:
+        path: "{{ opensearch_security_dir }}/roles.yml"
+      register: _roles_file
+      failed_when: not _roles_file.stat.exists
+
+    - name: Read roles.yml
+      ansible.builtin.slurp:
+        src: "{{ opensearch_security_dir }}/roles.yml"
+      register: _roles
+
+    - name: Decode roles.yml
+      ansible.builtin.set_fact:
+        _roles_text: "{{ _roles.content | b64decode }}"
+
+    - name: Verify custom roles are present
+      ansible.builtin.assert:
+        that:
+          - "'app_role:' in _roles_text"
+          - "'readonly_custom:' in _roles_text"
+        fail_msg: "roles.yml is missing custom roles"
+
+    - name: Verify role permissions content
+      ansible.builtin.assert:
+        that:
+          - "'cluster_composite_ops_ro' in _roles_text"
+          - "'cluster_monitor' in _roles_text"
+          - "'app_*' in _roles_text"
+          - "'logs_*' in _roles_text"
+        fail_msg: "roles.yml is missing expected permissions content"
+
+    # =========================================================================
+    # 5. Verify roles_mapping.yml — standard + custom mappings
+    # =========================================================================
+
+    - name: Check roles_mapping.yml exists
+      ansible.builtin.stat:
+        path: "{{ opensearch_security_dir }}/roles_mapping.yml"
+      register: _mappings_file
+      failed_when: not _mappings_file.stat.exists
+
+    - name: Read roles_mapping.yml
+      ansible.builtin.slurp:
+        src: "{{ opensearch_security_dir }}/roles_mapping.yml"
+      register: _mappings
+
+    - name: Decode roles_mapping.yml
+      ansible.builtin.set_fact:
+        _mappings_text: "{{ _mappings.content | b64decode }}"
+
+    - name: Verify standard role mappings are present
+      ansible.builtin.assert:
+        that:
+          - "'all_access:' in _mappings_text"
+          - "'kibana_server:' in _mappings_text"
+          - "'kibana_user:' in _mappings_text"
+          - "'readall:' in _mappings_text"
+        fail_msg: "roles_mapping.yml is missing standard role mappings"
+
+    - name: Verify custom role mappings are present
+      ansible.builtin.assert:
+        that:
+          - "'app_role:' in _mappings_text"
+          - "'readonly_custom:' in _mappings_text"
+        fail_msg: "roles_mapping.yml is missing custom role mappings"
+
+    - name: Verify custom mapping content
+      ansible.builtin.assert:
+        that:
+          - "'app_backend_role' in _mappings_text"
+          - "'readonlyuser' in _mappings_text"
+        fail_msg: "roles_mapping.yml is missing expected mapping content"
+
+    # =========================================================================
+    # 6. Verify security config.yml exists
+    # =========================================================================
+
+    - name: Check security config.yml exists
+      ansible.builtin.stat:
+        path: "{{ opensearch_security_dir }}/config.yml"
+      register: _security_config
+      failed_when: not _security_config.stat.exists
+
+    # =========================================================================
+    # 7. Verify file permissions on security configs
+    # =========================================================================
+
+    - name: Check security directory permissions
+      ansible.builtin.stat:
+        path: "{{ opensearch_security_dir }}"
+      register: _sec_dir
+
+    - name: Verify security directory ownership
+      ansible.builtin.assert:
+        that:
+          - _sec_dir.stat.pw_name == 'opensearch'
+          - _sec_dir.stat.gr_name == 'opensearch'
+          - _sec_dir.stat.mode == '0700'
+        fail_msg: "Security config directory has wrong ownership or permissions"
+
+    - name: Check internal_users.yml permissions
+      ansible.builtin.stat:
+        path: "{{ opensearch_security_dir }}/internal_users.yml"
+      register: _iu_stat
+
+    - name: Verify internal_users.yml permissions
+      ansible.builtin.assert:
+        that:
+          - _iu_stat.stat.pw_name == 'opensearch'
+          - _iu_stat.stat.mode == '0640'
+        fail_msg: "internal_users.yml has wrong permissions"
+
+    # =========================================================================
+    # 8. Verify OpenSearch is running and accessible with admin credentials
+    # =========================================================================
+
+    - name: Check OpenSearch is listening
+      ansible.builtin.wait_for:
+        host: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+        port: 9200
+        timeout: 10
+
+    - name: Authenticate as admin via REST API
+      ansible.builtin.uri:
+        url: "https://{{ ansible_default_ipv4.address | default('127.0.0.1') }}:9200/_cluster/health"
+        user: admin
+        password: "{{ opensearch_admin_password }}"
+        validate_certs: false
+        status_code: 200
+      register: _admin_health
+
+    - name: Verify cluster health response
+      ansible.builtin.assert:
+        that:
+          - _admin_health.json.cluster_name == 'security-test'
+          - _admin_health.json.status in ['green', 'yellow']
+        fail_msg: "Cluster health check failed: {{ _admin_health.json }}"
+
+    # =========================================================================
+    # 9. Verify custom users can authenticate
+    # =========================================================================
+
+    - name: Authenticate as logstash user
+      ansible.builtin.uri:
+        url: "https://{{ ansible_default_ipv4.address | default('127.0.0.1') }}:9200/_cluster/health"
+        user: logstash
+        password: "Logstash,Pass&123"
+        validate_certs: false
+        status_code: 200
+      register: _logstash_auth
+
+    - name: Verify logstash user authenticated
+      ansible.builtin.assert:
+        that:
+          - _logstash_auth.status == 200
+        fail_msg: "logstash user failed to authenticate"
+
+    - name: Authenticate as readonlyuser
+      ansible.builtin.uri:
+        url: "https://{{ ansible_default_ipv4.address | default('127.0.0.1') }}:9200/_cluster/health"
+        user: readonlyuser
+        password: "ReadOnly/Pass\\456"
+        validate_certs: false
+        status_code: 200
+      register: _readonly_auth
+
+    - name: Verify readonlyuser authenticated
+      ansible.builtin.assert:
+        that:
+          - _readonly_auth.status == 200
+        fail_msg: "readonlyuser failed to authenticate"
+
+    - name: Authenticate as appuser
+      ansible.builtin.uri:
+        url: "https://{{ ansible_default_ipv4.address | default('127.0.0.1') }}:9200/_cluster/health"
+        user: appuser
+        password: "App$User'Pass"
+        validate_certs: false
+        status_code: 200
+      register: _app_auth
+
+    - name: Verify appuser authenticated
+      ansible.builtin.assert:
+        that:
+          - _app_auth.status == 200
+        fail_msg: "appuser failed to authenticate"
+
+    # =========================================================================
+    # 10. Verify wrong password is rejected
+    # =========================================================================
+
+    - name: Verify wrong password is rejected
+      ansible.builtin.uri:
+        url: "https://{{ ansible_default_ipv4.address | default('127.0.0.1') }}:9200/_cluster/health"
+        user: admin
+        password: "wrong_password"
+        validate_certs: false
+        status_code: 401
+      register: _bad_auth
+
+    - name: Confirm authentication was rejected
+      ansible.builtin.assert:
+        that:
+          - _bad_auth.status == 401
+        fail_msg: "Wrong password was not rejected"
+
+# code: language=ansible

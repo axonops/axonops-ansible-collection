@@ -87,14 +87,90 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
 
 ### SSL/TLS Configuration
 
+#### JKS (default)
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `cassandra_ssl_internode_encryption` | `none` | Internode encryption: `none`, `all`, `dc`, or `rack` |
 | `cassandra_ssl_client_encryption_enabled` | `false` | Enable client-to-node encryption |
 | `cassandra_ssl_internode_keystore_file` | `conf/.keystore` | Keystore file path |
-| `cassandra_ssl_internode_keystore_pass` | `cassandra` | Keystore password |
+| `cassandra_ssl_internode_keystore_pass` | `cassandra` | Keystore password. Read by the role to write the password file or render the inline value. Alias `cassandra_ssl_keystore_pass` is also accepted. |
 | `cassandra_ssl_truststore_file` | `conf/.truststore` | Truststore file path |
 | `cassandra_ssl_truststore_pass` | `cassandra` | Truststore password |
+
+##### Password files (default)
+
+> **⚠ Behaviour change in this release.** Previously, JKS passwords were written
+> inline into `cassandra.yaml`. By default the role now externalises them to
+> `*_password_file:` references. Running the role on an existing node will
+> rewrite `cassandra.yaml` and notify the `Restart Cassandra` handler. No data
+> is lost. To keep the legacy inline behaviour, set
+> `cassandra_use_password_files: false`.
+
+By default the role keeps JKS keystore/truststore passwords out of `cassandra.yaml`. Each password is written to a separate mode `0600` file owned by the cassandra user, and `cassandra.yaml` references it via `keystore_password_file:` / `truststore_password_file:` keys (a stock Cassandra feature, not a third-party extension). This applies to both `server_encryption_options` and `client_encryption_options`.
+
+Files are written only when (a) the relevant TLS path is enabled and (b) the configured password is non-empty.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_use_password_files` | `true` | Externalise keystore/truststore passwords to `*_password_file` references. Set to `false` to inline passwords in `cassandra.yaml` (legacy behaviour). |
+| `cassandra_ssl_keystore_password_file` | `{{ cassandra_conf_dir }}/server_keystore_passwordfile.txt` | Path to the server keystore password file. |
+| `cassandra_ssl_truststore_password_file` | `{{ cassandra_conf_dir }}/server_truststore_passwordfile.txt` | Path to the server truststore password file. |
+| `cassandra_ssl_client_keystore_password_file` | `{{ cassandra_conf_dir }}/client_keystore_passwordfile.txt` | Path to the client keystore password file. |
+| `cassandra_ssl_client_truststore_password_file` | `{{ cassandra_conf_dir }}/client_truststore_passwordfile.txt` | Path to the client truststore password file. |
+
+To opt out for a host or group:
+
+```yaml
+cassandra_use_password_files: false
+```
+
+#### PEM-based TLS (Cassandra 4.1+)
+
+Cassandra 4.1 introduced `PEMBasedSslContextFactory`, which accepts PEM-encoded certificates and keys directly — no Java keystore required. The role supports two modes:
+
+- **Inline mode**: PEM content is passed as variable values (stored in Ansible Vault). The role renders a `parameters:` block in `cassandra.yaml`.
+- **File mode**: Leave `pem_private_key` empty and point the existing `keystore_file` / `truststore_file` variables at PEM files on the target node. No `parameters:` block is rendered.
+
+**Key format requirement.** Cassandra's `PEMBasedSslContextFactory` requires **PKCS#8** private keys (`-----BEGIN PRIVATE KEY-----`). PKCS#1 keys (`-----BEGIN RSA PRIVATE KEY-----`) cause a `GeneralSecurityException: Invalid certificate format` at startup. Convert with:
+
+```bash
+openssl pkcs8 -topk8 -nocrypt -in server.key -out server-pkcs8.key
+```
+
+**`private_key` concatenation.** The `private_key` parameter must contain the private key **and** the certificate chain concatenated in a single value. Cassandra calls both `extractPrivateKey()` and `extractCertificates()` on the same field.
+
+```bash
+# Generate a PKCS#8 key and self-signed certificate
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out node.key
+openssl req -new -x509 -key node.key -out node.crt -days 365 -subj "/CN=$(hostname -f)"
+
+# Concatenate into a single value for private_key
+cat node.key node.crt > node-combined.pem
+```
+
+Store the resulting PEM content in Ansible Vault.
+
+**Internode (server_encryption_options) PEM variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_ssl_internode_ssl_context_factory` | `""` | Set to `pem` to enable `PEMBasedSslContextFactory` for internode TLS |
+| `cassandra_ssl_internode_pem_private_key` | `""` | Inline PEM: private key + certificate chain concatenated. Leave empty for file mode |
+| `cassandra_ssl_internode_pem_private_key_password` | `""` | Password for an encrypted private key. Leave empty for unencrypted keys |
+| `cassandra_ssl_internode_pem_trusted_certificates` | `""` | Inline PEM: CA certificate(s) used as the trust store |
+| `cassandra_ssl_internode_pem_outbound_private_key` | `""` | Optional separate identity for outbound internode connections (mTLS) |
+| `cassandra_ssl_internode_pem_outbound_private_key_password` | `""` | Password for the outbound private key |
+| `cassandra_ssl_internode_pem_outbound_trusted_certificates` | `""` | CA certificate(s) for validating outbound connections |
+
+**Client (client_encryption_options) PEM variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_ssl_client_ssl_context_factory` | `""` | Set to `pem` to enable `PEMBasedSslContextFactory` for client TLS |
+| `cassandra_ssl_client_pem_private_key` | `""` | Inline PEM: private key + certificate chain concatenated. Leave empty for file mode |
+| `cassandra_ssl_client_pem_private_key_password` | `""` | Password for an encrypted private key |
+| `cassandra_ssl_client_pem_trusted_certificates` | `""` | Inline PEM: CA certificate(s) used as the trust store |
 
 ## Dependencies
 
@@ -162,6 +238,64 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
     cassandra_ssl_truststore_pass: "{{ vault_truststore_password }}"
 
   roles:
+    - role: axonops.axonops.cassandra
+```
+
+### Cassandra with PEM-based TLS — inline mode (Cassandra 4.1+)
+
+```yaml
+- name: Deploy Cassandra with PEM-based TLS (inline)
+  hosts: cassandra
+  become: true
+  vars:
+    cassandra_version: "4.1.7"
+    cassandra_ssl_internode_encryption: all
+    cassandra_ssl_internode_ssl_context_factory: pem
+    # private_key must contain the private key AND certificate chain concatenated.
+    # Generate with:
+    #   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out node.key
+    #   openssl req -new -x509 -key node.key -out node.crt -days 365 -subj "/CN={{ inventory_hostname }}"
+    #   cat node.key node.crt > node-combined.pem
+    # Store in Ansible Vault.
+    cassandra_ssl_internode_pem_private_key: "{{ vault_cassandra_internode_pem_key }}"
+    cassandra_ssl_internode_pem_trusted_certificates: "{{ vault_cassandra_internode_pem_ca }}"
+    cassandra_ssl_client_encryption_enabled: true
+    cassandra_ssl_client_ssl_context_factory: pem
+    cassandra_ssl_client_pem_private_key: "{{ vault_cassandra_client_pem_key }}"
+    cassandra_ssl_client_pem_trusted_certificates: "{{ vault_cassandra_client_pem_ca }}"
+
+  roles:
+    - role: axonops.axonops.java
+      vars:
+        java_pkg: java-11-openjdk-headless
+
+    - role: axonops.axonops.cassandra
+```
+
+### Cassandra with PEM-based TLS — file mode (Cassandra 4.1+)
+
+```yaml
+- name: Deploy Cassandra with PEM-based TLS (file paths)
+  hosts: cassandra
+  become: true
+  vars:
+    cassandra_version: "4.1.7"
+    cassandra_ssl_internode_encryption: all
+    cassandra_ssl_internode_ssl_context_factory: pem
+    # In file mode, leave pem_private_key empty and point keystore/truststore at PEM files.
+    # The keystore PEM file must contain the private key + certificate chain concatenated.
+    cassandra_ssl_internode_keystore_file: /etc/cassandra/tls/node-combined.pem
+    cassandra_ssl_truststore_file: /etc/cassandra/tls/ca.pem
+    cassandra_ssl_client_encryption_enabled: true
+    cassandra_ssl_client_ssl_context_factory: pem
+    cassandra_ssl_client_keystore_file: /etc/cassandra/tls/node-combined.pem
+    cassandra_ssl_client_truststore_file: /etc/cassandra/tls/ca.pem
+
+  roles:
+    - role: axonops.axonops.java
+      vars:
+        java_pkg: java-11-openjdk-headless
+
     - role: axonops.axonops.cassandra
 ```
 

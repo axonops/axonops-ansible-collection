@@ -1,5 +1,15 @@
 # AxonOps Ansible Collection
 
+<p align="center">
+  <a href="https://axonops.com">
+    <img src="https://digitalis-marketplace-assets.s3.us-east-1.amazonaws.com/AxonopsDigitalMaster_AxonopsFullLogoBlue.jpg" alt="AxonOps" width="300">
+  </a>
+</p>
+
+<p align="center">
+  <em>Built and maintained by <a href="https://axonops.com">AxonOps</a></em>
+</p>
+
 [AxonOps](https://axonops.com/) can be used either via our SaaS service or you can install it locally in your environment.
 
 This collection provides Ansible roles and playbooks to deploy [AxonOps](https://axonops.com/) components. The examples below
@@ -48,11 +58,17 @@ This collection provides the following Ansible roles. Click on each role for det
 
 ### Infrastructure Components
 - **[cassandra](docs/roles/cassandra.md)** - Install and configure Apache Cassandra (3.11, 4.x, 5.x)
+- **[kafka](docs/roles/kafka.md)** - Install and configure Apache Kafka in KRaft mode (no ZooKeeper)
 - **[opensearch](docs/roles/opensearch.md)** - Install and configure OpenSearch for AxonOps (preferred for on-premises)
 - **[elastic](docs/roles/elastic.md)** - Install and configure Elasticsearch for AxonOps
 - **[java](docs/roles/java.md)** - Install Java (OpenJDK or Azul Zulu)
 
+### Security
+
+- **[pki_agent](docs/roles/pki_agent.md)** - Automated PKI certificate management using OpenBao Agent
+
 ### Utilities
+
 - **[preflight](docs/roles/preflight.md)** - Run pre-installation system checks
 
 For a complete guide including deployment patterns and quick references, see the [Role Documentation Index](docs/roles/README.md).
@@ -230,3 +246,7 @@ OpenSearch and Elasticsearch endpoints.
 ***
 
 *This project may contain trademarks or logos for projects, products, or services. Any use of third-party trademarks or logos are subject to those third-party's policies. AxonOps is a registered trademark of AxonOps Limited. Apache, Apache Cassandra, Cassandra, Apache Spark, Spark, Apache TinkerPop, TinkerPop, Apache Kafka and Kafka are either registered trademarks or trademarks of the Apache Software Foundation or its subsidiaries in Canada, the United States and/or other countries. Elasticsearch is a trademark of Elasticsearch B.V., registered in the U.S. and in other countries. Docker is a trademark or registered trademark of Docker, Inc. in the United States and/or other countries.*
+
+***
+
+Created for [AxonOps](https://axonops.com) by [Digitalis](https://digitalis.io)

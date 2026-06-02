@@ -507,8 +507,10 @@ axonops_alert_rules:
     description: Kafka partitions offline
 ```
 
-A full set of example Kafka alert rules is available at
-[examples/configurations/kafka/alert_rules.yml](../../examples/configurations/kafka/alert_rules.yml).
+A comprehensive set of Kafka alert rules covering metric and log-based alerts is available in
+[examples/configurations/kafka/config/REPLACE_WITH_ORG_NAME/](../../examples/configurations/kafka/config/REPLACE_WITH_ORG_NAME/).
+See the [Kafka Alert Pack section in the configurations role README](../../roles/configurations/README.md#kafka-alert-pack)
+for the full list of rules and quick-start instructions.
 
 ### Metric Alerts
 
@@ -583,12 +585,14 @@ axonops_alert_rules:
     description: Detected High disk utilization
 ```
 
-**Note:** More examples of metric checks can be found in the org level
+**Note:** More examples of metric checks can be found in the org-level
 [metric_alert_rules.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml) or
-the cluster level
+the cluster-level
 [metric_alert_rules.yml](../../examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/metric_alert_rules.yml)
-example files. For Kafka-specific alert rules, see
-[kafka/alert_rules.yml](../../examples/configurations/kafka/alert_rules.yml).
+example files. For Kafka-specific metric and log alert rules, see
+[kafka/config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml](../../examples/configurations/kafka/config/REPLACE_WITH_ORG_NAME/metric_alert_rules.yml)
+and
+[kafka/config/REPLACE_WITH_ORG_NAME/log_alert_rules.yml](../../examples/configurations/kafka/config/REPLACE_WITH_ORG_NAME/log_alert_rules.yml).
 
 ### Service Checks
 

@@ -1,0 +1,200 @@
+---
+- name: Update apt cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when:
+    - ansible_os_family == "Debian"
+    - kafka_security_enabled | bool
+    - kafka_tls_enabled | bool
+  tags: tls,security,acl
+
+- name: Ensure python3-cryptography is installed for SSL management
+  ansible.builtin.package:
+    name: python3-cryptography
+    state: present
+  when:
+    - kafka_security_enabled | bool
+    - kafka_tls_enabled | bool
+  tags: tls,security,acl
+
+- name: Ensure Kafka group exists
+  ansible.builtin.group:
+    name: "{{ kafka_group }}"
+    state: present
+    system: true
+
+- name: Ensure Kafka user exists
+  ansible.builtin.user:
+    name: "{{ kafka_user }}"
+    state: present
+    system: true
+    group: "{{ kafka_group }}"
+    home: "{{ kafka__home }}"
+    create_home: false
+    shell: /bin/bash
+
+- name: Install Java
+  ansible.builtin.include_role:
+    name: axonops.axonops.java
+  vars:
+    java_pkg: "{{ kafka__java_pkg }}"
+    java_zulu_version: "{{ kafka_java_version }}"
+  when: kafka_java_install | default(true)
+
+- name: Get Kafka checksum from Apache
+  ansible.builtin.uri:
+    url: "https://downloads.apache.org/kafka/{{ kafka_version }}/kafka_{{ kafka_scala_version }}-{{ kafka_version }}.tgz.sha512"
+    return_content: true
+  retries: 3
+  delay: 3
+  register: kafka__reg_checksum
+  run_once: true
+  when: kafka_checksum is not defined
+
+- name: Set checksum fact
+  ansible.builtin.set_fact:
+    kafka_checksum: >-
+      {{
+        kafka__reg_checksum.content
+        | replace('\n', '')
+        | regex_replace('\s{2,}', ' ')
+        | replace('kafka_' ~ kafka_scala_version ~ '-' ~ kafka_version ~ '.tgz: ', 'sha512:')
+      }}
+  when: kafka_checksum is not defined
+
+- name: Check if Kafka is already installed
+  ansible.builtin.stat:
+    path: "{{ kafka__install_path }}"
+  register: kafka__reg_install_check
+
+- name: Download and install Kafka
+  when: not kafka__reg_install_check.stat.exists
+  block:
+    - name: Download Kafka
+      ansible.builtin.get_url:
+        url: "{{ kafka__download_url }}"
+        checksum: "{{ kafka_checksum }}"
+        dest: "{{ kafka__download_destination }}"
+        mode: "0644"
+        timeout: 60
+      retries: 3
+      delay: 5
+
+    - name: Extract Kafka
+      ansible.builtin.unarchive:
+        src: "{{ kafka__download_destination }}"
+        dest: "{{ kafka_install_root }}"
+        remote_src: true
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_group }}"
+        creates: "{{ kafka__install_path }}"
+
+    - name: Remove downloaded tarball
+      ansible.builtin.file:
+        path: "{{ kafka__download_destination }}"
+        state: absent
+
+- name: Create Kafka home symlink
+  ansible.builtin.file:
+    path: "{{ kafka__home }}"
+    src: "{{ kafka__install_path }}"
+    state: link
+    force: true
+    follow: false
+
+- name: Create Kafka data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0750"
+  loop: "{{ kafka_data_dirs }}"
+
+- name: Create Kafka log directory
+  ansible.builtin.file:
+    path: "{{ kafka_log_dir }}"
+    state: directory
+    owner: "{{ kafka_user }}"
+    group: "{{ kafka_group }}"
+    mode: "0750"
+
+- name: Redirect Kafka service logs to /var/log
+  ansible.builtin.file:
+    path: "{{ kafka__home }}/logs"
+    src: "{{ kafka_log_dir }}"
+    state: link
+    force: true
+    follow: false
+
+- name: Ensure /etc/sysconfig exists
+  ansible.builtin.file:
+    path: /etc/sysconfig
+    state: directory
+    mode: "0755"
+
+- name: Deploy Kafka systemd unit
+  ansible.builtin.template:
+    src: kafka.service.j2
+    dest: /etc/systemd/system/kafka.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Ensure /etc/axonops directory exists
+  ansible.builtin.file:
+    path: /etc/axonops
+    state: directory
+    mode: "0755"
+  when: kafka_axonops_agent_enabled | bool
+  tags: axonops_agent
+
+- name: Render AxonOps agent Kafka client properties
+  ansible.builtin.template:
+    src: agent_client.properties.j2
+    dest: "{{ kafka_axonops_client_properties_path }}"
+    owner: root
+    group: axonops
+    mode: "0640"
+  no_log: "{{ kafka_sasl_enabled | bool }}"
+  when:
+    - kafka_axonops_agent_enabled | bool
+    - kafka_security_enabled | bool
+  tags: axonops_agent
+
+- name: Install and configure AxonOps agent
+  ansible.builtin.include_role:
+    name: axonops.axonops.agent
+  vars:
+    axon_java_agent: "{{ kafka_axonops_java_agent }}"
+    axon_agent_customer_name: "{{ kafka_axonops_org }}"
+    axon_agent_server_host: "{{ kafka_axonops_server_host }}"
+    axon_agent_key: "{{ kafka_axonops_key | default(omit) }}"
+    axon_agent_server_port: "{{ kafka_axonops_agent_server_port }}"
+    axon_agent_cluster_name: "{{ kafka_axonops_cluster_name | default(omit) }}"
+    # axon_agent_version: "{{ kafka_axonops_agent_version | default(omit) }}"
+    # axon_java_agent_version: "{{ kafka_axonops_java_agent_version | default(omit) }}"
+    axon_agent_kafka_config_directory: "{{ kafka__home }}/bin"
+    axon_agent_kafka_config: ". /usr/share/axonops/axonops-jvm.options"
+    axon_agent_kafka_client_properties: >-
+      {{ kafka_axonops_client_properties_path if (kafka_security_enabled | bool) else '' }}
+    axon_agent_include_service_config: true
+  when: kafka_axonops_agent_enabled | bool
+  tags: axonops_agent
+
+- name: Install KConduit Kafka CLI client
+  when: kafka_kconduit_enabled | bool
+  block:
+    - name: Download KConduit Kafka CLI client
+      ansible.builtin.get_url:
+        url: "{{ kafka_kconduit_download_url}}"
+        dest: "/tmp/kconduit_{{ kafka_kconduit_version }}_linux_{{ kafka_kconduit_arch }}.{{ kafka_kconduit_pkg_ext }}"
+        mode: "0644"
+
+    - name: Ensure KConduit is installed
+      ansible.builtin.package:
+        name: "/tmp/kconduit_{{ kafka_kconduit_version }}_linux_{{ kafka_kconduit_arch }}.{{ kafka_kconduit_pkg_ext }}"
+        state: present
+        disable_gpg_check: true

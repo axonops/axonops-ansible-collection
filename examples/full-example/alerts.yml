@@ -19,7 +19,13 @@
       when: cluster is not defined
 
 
-    - debug:
+    - name: Get the cluster type
+      tags: always
+      ansible.builtin.set_fact:
+        cluster_type: "{{ cluster_type | default(lookup('env', 'AXONOPS_CLUSTER_TYPE')) }}"
+      when: cluster_type is not defined
+
+    - ansible.builtin.debug:
         msg: "Org: {{ org }}, Cluster: {{ cluster }}"
     - name: Fail if no org
       ansible.builtin.assert:
@@ -41,7 +47,7 @@
         - "alerts-config/{{ org }}/{{ cluster }}/*.yml"
 
   roles:
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
       vars:
         present: true
 

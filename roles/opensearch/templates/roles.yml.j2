@@ -1,0 +1,53 @@
+---
+_meta:
+  type: "roles"
+  config_version: 2
+{% for role_name, role_config in opensearch_roles.items() %}
+
+{{ role_name }}:
+{% if role_config.cluster_permissions is defined and role_config.cluster_permissions | length > 0 %}
+  cluster_permissions:
+{% for perm in role_config.cluster_permissions %}
+    - "{{ perm }}"
+{% endfor %}
+{% endif %}
+{% if role_config.index_permissions is defined and role_config.index_permissions | length > 0 %}
+  index_permissions:
+{% for ip in role_config.index_permissions %}
+    - index_patterns:
+{% for pattern in ip.index_patterns %}
+        - "{{ pattern }}"
+{% endfor %}
+{% if ip.dls is defined %}
+      dls: "{{ ip.dls }}"
+{% endif %}
+{% if ip.fls is defined %}
+      fls:
+{% for field in ip.fls %}
+        - "{{ field }}"
+{% endfor %}
+{% endif %}
+{% if ip.allowed_actions is defined %}
+      allowed_actions:
+{% for action in ip.allowed_actions %}
+        - "{{ action }}"
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if role_config.tenant_permissions is defined and role_config.tenant_permissions | length > 0 %}
+  tenant_permissions:
+{% for tp in role_config.tenant_permissions %}
+    - tenant_patterns:
+{% for pattern in tp.tenant_patterns %}
+        - "{{ pattern }}"
+{% endfor %}
+{% if tp.allowed_actions is defined %}
+      allowed_actions:
+{% for action in tp.allowed_actions %}
+        - "{{ action }}"
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endfor %}
