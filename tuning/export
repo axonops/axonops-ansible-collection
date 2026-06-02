@@ -2,7 +2,7 @@
 # Export alert rules + integrations for a given org+cluster.
 #
 # Usage:
-#   bin/export <org> <cluster> [alerts subcommand args...]
+#   tuning/export <org> <cluster> [alerts subcommand args...]
 #
 # Each run writes an IMMUTABLE, timestamped snapshot — exports are never
 # overwritten:
@@ -15,7 +15,7 @@
 #   ./cli/exported/<org>/<cluster>/latest            -> <newest timestamp>
 #   ./cli/exported/<org>/<cluster>/alert_rules.json  -> latest/alert_rules.json
 #   ./cli/exported/<org>/<cluster>/integrations.json -> latest/integrations.json
-# So `bin/tune <org> <cluster>` (reads alert_rules.json) works unchanged.
+# So `tuning/tune <org> <cluster>` (reads alert_rules.json) works unchanged.
 #
 # --include-secrets is passed by default so widget_url and integration
 # credentials are preserved (required if you intend to re-apply via
@@ -29,7 +29,7 @@ set -euo pipefail
 : "${AXONOPS_TOKEN:?AXONOPS_TOKEN must be set in env}"
 
 if [[ $# -lt 2 ]]; then
-    echo "usage: bin/export <org> <cluster> [alerts args...]" >&2
+    echo "usage: tuning/export <org> <cluster> [alerts args...]" >&2
     exit 2
 fi
 

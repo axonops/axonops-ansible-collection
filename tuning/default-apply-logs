@@ -2,27 +2,27 @@
 # Seed the collection's default AxonOps Cassandra LOG alert rules onto a given
 # org+cluster via the Ansible `configurations` role.
 #
-# This is the log-alert (logrules) parallel to bin/default-apply (metricrules).
+# This is the log-alert (logrules) parallel to tuning/default-apply (metricrules).
 # It stages log_alert_rules.yml and runs the role with `--tags log_alerts`, so
 # it applies ONLY log alerts — never touching metric alerts, integrations, or
 # service checks. The two seeders are independent; run whichever you need.
 #
 # Usage:
-#   bin/default-apply-logs <org> <cluster> [extra ansible-playbook args]
-#   or with env vars: AXONOPS_ORG=... AXONOPS_CLUSTER=... bin/default-apply-logs
+#   tuning/default-apply-logs <org> <cluster> [extra ansible-playbook args]
+#   or with env vars: AXONOPS_ORG=... AXONOPS_CLUSTER=... tuning/default-apply-logs
 #
 # Required env:
 #   AXONOPS_TOKEN   — API token for the target instance
 #
-# Per-instance env (same semantics as bin/default-apply):
+# Per-instance env (same semantics as tuning/default-apply):
 #   AXONOPS_URL=...         — base URL, used as-is by the modules. If unset (and
 #                             AXONOPS_USE_SAML is not true) the host is
-#                             auto-detected via bin/resolve-axonops-url.
+#                             auto-detected via tuning/resolve-axonops-url.
 #   AXONOPS_USE_SAML=true   — skip the probe; the modules derive the subdomain.
 #
 # NOTE: the default log rules match against `source: /var/log/cassandra/system.log`.
 # If this cluster's Cassandra log path differs, the rules will match nothing —
-# add a bin/overrides/<org>/log_alert_rules.yml to correct the source (or any
+# add a tuning/overrides/<org>/log_alert_rules.yml to correct the source (or any
 # rule), merged by name like the metric overrides. Run with --check first.
 #
 # Pass --check first for a read-only preview (Ansible check mode).
@@ -33,8 +33,8 @@ set -euo pipefail
 ORG="${1:-${AXONOPS_ORG:-}}"
 CLUSTER="${2:-${AXONOPS_CLUSTER:-}}"
 if [[ -z "$ORG" || -z "$CLUSTER" ]]; then
-    echo "usage: bin/default-apply-logs <org> <cluster> [ansible-playbook args...]" >&2
-    echo "   or: AXONOPS_ORG=... AXONOPS_CLUSTER=... bin/default-apply-logs [ansible-playbook args...]" >&2
+    echo "usage: tuning/default-apply-logs <org> <cluster> [ansible-playbook args...]" >&2
+    echo "   or: AXONOPS_ORG=... AXONOPS_CLUSTER=... tuning/default-apply-logs [ansible-playbook args...]" >&2
     exit 2
 fi
 
@@ -45,9 +45,9 @@ fi
 cd "$(dirname "$0")/.."
 REPO_ROOT="$(pwd)"
 
-# Resolve the host the Ansible modules will hit (see bin/default-apply for why).
+# Resolve the host the Ansible modules will hit (see tuning/default-apply for why).
 if [[ -z "${AXONOPS_URL:-}" && "${AXONOPS_USE_SAML:-}" != "true" ]]; then
-    AXONOPS_URL="$(bin/resolve-axonops-url "$ORG" "$CLUSTER" "${AXONOPS_CLUSTER_TYPE:-cassandra}")"
+    AXONOPS_URL="$(tuning/resolve-axonops-url "$ORG" "$CLUSTER" "${AXONOPS_CLUSTER_TYPE:-cassandra}")"
     export AXONOPS_URL
     echo "Auto-detected AXONOPS_URL=${AXONOPS_URL}"
 fi
@@ -63,11 +63,11 @@ cp "examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/log_alert_rul
 cp "examples/configurations/cassandra/config/REPLACE_WITH_ORG_NAME/REPLACE_WITH_CLUSTER_NAME/log_alert_rules.yml" \
    "${CONFIG_CLUSTER}/log_alert_rules.yml"
 
-# Apply per-client overrides (bin/overrides/<org>/log_alert_rules.yml) onto the
+# Apply per-client overrides (tuning/overrides/<org>/log_alert_rules.yml) onto the
 # staged org config, merged by rule name: matching name replaces, new name
 # appends. Lets a client fix the log source path or tweak rules without
 # restating the whole default set. No-op if absent.
-OVERRIDE="bin/overrides/${ORG}/log_alert_rules.yml"
+OVERRIDE="tuning/overrides/${ORG}/log_alert_rules.yml"
 if [[ -f "$OVERRIDE" ]]; then
     python3 - "${CONFIG_ORG}/log_alert_rules.yml" "$OVERRIDE" <<'PY'
 import sys, yaml

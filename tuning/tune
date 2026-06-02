@@ -3,7 +3,7 @@
 # observed metrics, applying the shared policy file if present.
 #
 # Usage:
-#   bin/tune <org> <cluster> [tune-alerts args...]
+#   tuning/tune <org> <cluster> [tune-alerts args...]
 #
 # Default input (can be overridden with --input):
 #   ./cli/exported/<org>/<cluster>/alert_rules.json
@@ -25,7 +25,7 @@ set -euo pipefail
 : "${AXONOPS_TOKEN:?AXONOPS_TOKEN must be set in env}"
 
 if [[ $# -lt 2 ]]; then
-    echo "usage: bin/tune <org> <cluster> [tune-alerts args...]" >&2
+    echo "usage: tuning/tune <org> <cluster> [tune-alerts args...]" >&2
     exit 2
 fi
 

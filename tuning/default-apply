@@ -3,8 +3,8 @@
 # given org+cluster via the Ansible `configurations` role.
 #
 # Usage:
-#   bin/default-apply <org> <cluster> [extra ansible-playbook args]
-#   or with env vars: AXONOPS_ORG=... AXONOPS_CLUSTER=... bin/default-apply
+#   tuning/default-apply <org> <cluster> [extra ansible-playbook args]
+#   or with env vars: AXONOPS_ORG=... AXONOPS_CLUSTER=... tuning/default-apply
 #
 # Required env:
 #   AXONOPS_TOKEN   — API token for the target instance
@@ -16,7 +16,7 @@
 #                             subdomain org:
 #                               export AXONOPS_URL=https://<org>.axonops.cloud/dashboard
 #                             If unset (and AXONOPS_USE_SAML is not true), the host
-#                             is AUTO-DETECTED via bin/resolve-axonops-url: the
+#                             is AUTO-DETECTED via tuning/resolve-axonops-url: the
 #                             shared cloud host (dash.axonops.cloud/<org>) is tried
 #                             first, falling back to the dedicated subdomain
 #                             (<org>.axonops.cloud/dashboard) on a 404. So both
@@ -51,9 +51,9 @@
 # After this:
 #   - The default metric alerts are created (or updated) at their default
 #     thresholds. Continue the tuning loop:
-#       bin/export         <customer>
-#       bin/tune-customer  <customer>
-#       bin/apply-customer <customer> --yes
+#       tuning/export         <customer>
+#       tuning/tune-customer  <customer>
+#       tuning/apply-customer <customer> --yes
 
 set -euo pipefail
 
@@ -62,8 +62,8 @@ set -euo pipefail
 ORG="${1:-${AXONOPS_ORG:-}}"
 CLUSTER="${2:-${AXONOPS_CLUSTER:-}}"
 if [[ -z "$ORG" || -z "$CLUSTER" ]]; then
-    echo "usage: bin/default-apply <org> <cluster> [ansible-playbook args...]" >&2
-    echo "   or: AXONOPS_ORG=... AXONOPS_CLUSTER=... bin/default-apply [ansible-playbook args...]" >&2
+    echo "usage: tuning/default-apply <org> <cluster> [ansible-playbook args...]" >&2
+    echo "   or: AXONOPS_ORG=... AXONOPS_CLUSTER=... tuning/default-apply [ansible-playbook args...]" >&2
     exit 2
 fi
 
@@ -79,7 +79,7 @@ REPO_ROOT="$(pwd)"
 # probe (shared cloud host → dedicated subdomain on 404) and export AXONOPS_URL
 # for the playbook run. An explicit AXONOPS_URL or AXONOPS_USE_SAML is left alone.
 if [[ -z "${AXONOPS_URL:-}" && "${AXONOPS_USE_SAML:-}" != "true" ]]; then
-    AXONOPS_URL="$(bin/resolve-axonops-url "$ORG" "$CLUSTER" "${AXONOPS_CLUSTER_TYPE:-cassandra}")"
+    AXONOPS_URL="$(tuning/resolve-axonops-url "$ORG" "$CLUSTER" "${AXONOPS_CLUSTER_TYPE:-cassandra}")"
     export AXONOPS_URL
     echo "Auto-detected AXONOPS_URL=${AXONOPS_URL}"
 fi
@@ -126,9 +126,9 @@ PY
 }
 
 _merge_override "${CONFIG_ORG}/metric_alert_rules.yml" \
-                "bin/overrides/${ORG}/metric_alert_rules.yml"
+                "tuning/overrides/${ORG}/metric_alert_rules.yml"
 _merge_override "${CONFIG_CLUSTER}/metric_alert_rules.yml" \
-                "bin/overrides/${ORG}/${CLUSTER}/metric_alert_rules.yml"
+                "tuning/overrides/${ORG}/${CLUSTER}/metric_alert_rules.yml"
 
 # Minimal inventory — the role only makes HTTP calls; no SSH needed.
 cat > "${STAGING}/inventory" <<'INV'

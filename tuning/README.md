@@ -1,4 +1,4 @@
-# `bin/` — alert-tuning workflow
+# `tuning/` — alert-tuning workflow
 
 Thin convenience wrappers around `cli/axonops.py` and the
 `axonops.axonops.configurations` Ansible role: seed the collection's default
@@ -10,7 +10,7 @@ production-affecting actions; keep them as project-team tooling, not part of
 the shipped collection.
 
 All scripts require `AXONOPS_TOKEN` in the environment. The base URL is
-auto-detected by `bin/resolve-axonops-url` (shared cloud
+auto-detected by `tuning/resolve-axonops-url` (shared cloud
 `dash.axonops.cloud/<org>` first, falling back to dedicated-subdomain
 `<org>.axonops.cloud/dashboard` on 404) — no `AXONOPS_URL` is needed unless
 you want to pin it.
@@ -31,11 +31,11 @@ export AXONOPS_TOKEN=...
 
 ```bash
 # Confirm the URL resolves and the token works
-bin/resolve-axonops-url <org> <cluster> cassandra
+tuning/resolve-axonops-url <org> <cluster> cassandra
 
 # Verify every shipped default rule references a chart that exists on the
-# cluster. Surfaces chart-name mismatches before bin/default-apply hits them.
-bin/chart-check <org> <cluster>
+# cluster. Surfaces chart-name mismatches before tuning/default-apply hits them.
+tuning/chart-check <org> <cluster>
 ```
 
 Then **probe the cluster's metric label schema** before assuming the shipped
@@ -63,8 +63,8 @@ curl -sS -H "Authorization: Bearer $AXONOPS_TOKEN" \
 Copy the template and fill it in:
 
 ```bash
-cp bin/customers/example.env bin/customers/<name>.env
-$EDITOR bin/customers/<name>.env
+cp tuning/customers/example.env tuning/customers/<name>.env
+$EDITOR tuning/customers/<name>.env
 ```
 
 Required keys: `ORG`, `CLUSTER`, `HOT_KEYSPACE`, `HOT_TABLE`. The hot table is
@@ -77,9 +77,9 @@ Optional knobs (set only when needed): `DAYS`, `MIN_SAMPLES`, `MAX_DELTA`,
 
 ### 3. (If needed) Add chart-name overrides
 
-If `bin/chart-check` flagged missing charts, add corrections in
-`bin/overrides/<org>/metric_alert_rules.yml` and/or
-`bin/overrides/<org>/<cluster>/metric_alert_rules.yml` — see
+If `tuning/chart-check` flagged missing charts, add corrections in
+`tuning/overrides/<org>/metric_alert_rules.yml` and/or
+`tuning/overrides/<org>/<cluster>/metric_alert_rules.yml` — see
 **Per-client overrides**.
 
 ### 4. (If needed) Build a schema-fix patcher
@@ -87,23 +87,23 @@ If `bin/chart-check` flagged missing charts, add corrections in
 If the schema probe in step 1 showed mismatched labels, you'll have rules
 whose stored exprs filter on labels that don't exist. The pattern:
 
-1. Write `bin/patch-<name>-broken-exprs` — reads the latest export, rewrites
+1. Write `tuning/patch-<name>-broken-exprs` — reads the latest export, rewrites
    the affected rules' `expr` fields to use the cluster's actual label
    schema, writes `alert_rules.schemafix.json`.
 2. **Probe each corrected selector against `query_range` before baking it
    in.** Don't ship fixes you haven't confirmed return data.
 3. Set `EXPR_PATCHER=patch-<name>-broken-exprs` in the customer's `.env` —
-   `bin/cycle-customer` then runs the script, applies its output, and
+   `tuning/cycle-customer` then runs the script, applies its output, and
    re-exports before tuning, automatically.
 
 ### 5. Seed the defaults
 
 ```bash
-bin/default-apply <org> <cluster> --check    # preview; verify 0 failures
-bin/default-apply <org> <cluster>            # apply
+tuning/default-apply <org> <cluster> --check    # preview; verify 0 failures
+tuning/default-apply <org> <cluster>            # apply
 ```
 
-`bin/default-apply` is destructive — it pushes ~50 rules through the
+`tuning/default-apply` is destructive — it pushes ~50 rules through the
 Ansible role and changes live alerting state. Always preview with `--check`
 first. On a clean check, expect `failed=0`; `changed` reflects rules whose
 content differs from current cluster state.
@@ -111,7 +111,7 @@ content differs from current cluster state.
 ### 6. Cycle and tune
 
 ```bash
-bin/cycle-customer <name>
+tuning/cycle-customer <name>
 ```
 
 This is idempotent — safe to re-run. It exports, runs any `EXPR_PATCHER` /
@@ -130,8 +130,8 @@ for — and what to do about each — are in **Reading the tune report** below.
 ### 7. Push the tuned thresholds back
 
 ```bash
-bin/apply-customer <name> --dry-run          # preview
-bin/apply-customer <name> --yes              # apply
+tuning/apply-customer <name> --dry-run          # preview
+tuning/apply-customer <name> --yes              # apply
 ```
 
 The apply step's POST retries transient 5xx automatically.
@@ -142,17 +142,17 @@ For ongoing tuning runs (e.g. after a workload shift, or after AxonOps
 ships a release with new default rules):
 
 ```bash
-bin/default-apply <org> <cluster>            # only if defaults changed or rules drifted
-bin/cycle-customer <name>                    # always
-bin/apply-customer <name> --yes              # when you trust the report
+tuning/default-apply <org> <cluster>            # only if defaults changed or rules drifted
+tuning/cycle-customer <name>                    # always
+tuning/apply-customer <name> --yes              # when you trust the report
 ```
 
-`bin/default-apply` clobbers any custom-expr patches the previous cycle
-installed — that's why `bin/cycle-customer` always runs after.
+`tuning/default-apply` clobbers any custom-expr patches the previous cycle
+installed — that's why `tuning/cycle-customer` always runs after.
 
 ---
 
-## Customer config — `bin/customers/<name>.env`
+## Customer config — `tuning/customers/<name>.env`
 
 Bash KEY=VALUE file the three customer-driven scripts source. One file per
 customer.
@@ -165,45 +165,45 @@ customer.
 | `MIN_SAMPLES` | Minimum samples per rule (CLI default 100) | no |
 | `MAX_DELTA` | Maximum delta multiplier vs seeded default (CLI default 10) | no |
 | `EXTRA_SET_LABELS` | Bash array of extra `--set-label` values, e.g. `("table=${HOT_TABLE}")` when the cluster's rules carry a separate `table` label on top of `keyspace=` and `cas_Table_*:scope=` | no |
-| `EXPR_PATCHER` | Path (relative to `bin/`) of a schema-fix patcher — only set if the cluster has a label-schema mismatch | no |
-| `PRE_HOOKS` | Bash array of paths (relative to `bin/`) of idempotent setup scripts run at the very start of `bin/cycle-customer` (e.g. dashboard chart corrections) | no |
+| `EXPR_PATCHER` | Path (relative to `tuning/`) of a schema-fix patcher — only set if the cluster has a label-schema mismatch | no |
+| `PRE_HOOKS` | Bash array of paths (relative to `tuning/`) of idempotent setup scripts run at the very start of `tuning/cycle-customer` (e.g. dashboard chart corrections) | no |
 
-`bin/customers/example.env` is the template — copy and edit.
+`tuning/customers/example.env` is the template — copy and edit.
 
 ---
 
 ## Scripts
 
-### Customer-driven (source `bin/customers/<name>.env`)
+### Customer-driven (source `tuning/customers/<name>.env`)
 
 | Script | Purpose |
 |--------|---------|
-| `bin/tune-customer <name>` | Runs `bin/tune` with the customer's `ORG`, `CLUSTER`, `--set-label keyspace=…`, `--set-label cas_Table_*:scope=…`, and any tune knobs from `.env`. |
-| `bin/cycle-customer <name>` | Full reconciliation: pre-hooks → export → (optional patcher + apply + re-export) → tune. Idempotent. |
-| `bin/apply-customer <name>` | Pushes the tuned JSON back via `bin/tuned-apply`. Takes `--dry-run` / `--yes` / etc. |
+| `tuning/tune-customer <name>` | Runs `tuning/tune` with the customer's `ORG`, `CLUSTER`, `--set-label keyspace=…`, `--set-label cas_Table_*:scope=…`, and any tune knobs from `.env`. |
+| `tuning/cycle-customer <name>` | Full reconciliation: pre-hooks → export → (optional patcher + apply + re-export) → tune. Idempotent. |
+| `tuning/apply-customer <name>` | Pushes the tuned JSON back via `tuning/tuned-apply`. Takes `--dry-run` / `--yes` / etc. |
 
 ### Generic pipeline (take `<org> <cluster>`)
 
 | Script | Purpose |
 |--------|---------|
-| `bin/default-apply` | Seeds **default metric alerts** (`--tags metrics`) onto the cluster via the Ansible role. Merges per-client overrides at both org and cluster levels. Auto-detects the base URL. **Destructive — preview with `--check`.** |
-| `bin/default-apply-logs` | Same shape, seeds the **default log alerts** (`--tags log_alerts`). Independent of metric seeding. |
-| `bin/export` | Pulls live alert rules + integrations into a dated, immutable snapshot under `cli/exported/<org>/<cluster>/<UTC-timestamp>/`. `latest`, `alert_rules.json`, `integrations.json` are symlinks tracking the newest snapshot. Always `--include-secrets`. |
-| `bin/tune` | Runs `tune-alerts` against the exported `alert_rules.json`. Auto-applies the team policy at `cli/exported/tune-alerts-policy.json`. Writes `alert_rules.tuned.for.<cluster>.json` + a `.report.md` audit. |
-| `bin/tuned-apply` | POSTs a tuned JSON back via `apply-tuned-alerts`. The CLI retries transient 5xx automatically. |
-| `bin/chart-check` | Preflight: verifies every default rule's `chart` field exists on the cluster's dashboards. Catches chart-rename surprises before seeding fails. |
-| `bin/resolve-axonops-url` | Helper used internally by `bin/default-apply*` to auto-detect dedicated-subdomain orgs (probes shared host first, falls back on 404). |
+| `tuning/default-apply` | Seeds **default metric alerts** (`--tags metrics`) onto the cluster via the Ansible role. Merges per-client overrides at both org and cluster levels. Auto-detects the base URL. **Destructive — preview with `--check`.** |
+| `tuning/default-apply-logs` | Same shape, seeds the **default log alerts** (`--tags log_alerts`). Independent of metric seeding. |
+| `tuning/export` | Pulls live alert rules + integrations into a dated, immutable snapshot under `cli/exported/<org>/<cluster>/<UTC-timestamp>/`. `latest`, `alert_rules.json`, `integrations.json` are symlinks tracking the newest snapshot. Always `--include-secrets`. |
+| `tuning/tune` | Runs `tune-alerts` against the exported `alert_rules.json`. Auto-applies the team policy at `cli/exported/tune-alerts-policy.json`. Writes `alert_rules.tuned.for.<cluster>.json` + a `.report.md` audit. |
+| `tuning/tuned-apply` | POSTs a tuned JSON back via `apply-tuned-alerts`. The CLI retries transient 5xx automatically. |
+| `tuning/chart-check` | Preflight: verifies every default rule's `chart` field exists on the cluster's dashboards. Catches chart-rename surprises before seeding fails. |
+| `tuning/resolve-axonops-url` | Helper used internally by `tuning/default-apply*` to auto-detect dedicated-subdomain orgs (probes shared host first, falls back on 404). |
 
 ---
 
-## Per-client overrides — `bin/overrides/`
+## Per-client overrides — `tuning/overrides/`
 
-`bin/default-apply` merges YAML overrides at **two levels** into the staged
+`tuning/default-apply` merges YAML overrides at **two levels** into the staged
 Ansible config:
 
 ```
-bin/overrides/<org>/metric_alert_rules.yml             → merged into org-level YAML
-bin/overrides/<org>/<cluster>/metric_alert_rules.yml   → merged into cluster-level YAML
+tuning/overrides/<org>/metric_alert_rules.yml             → merged into org-level YAML
+tuning/overrides/<org>/<cluster>/metric_alert_rules.yml   → merged into cluster-level YAML
 ```
 
 Both merge by rule name: matching name **replaces** the shipped default; new
@@ -222,13 +222,13 @@ dashboard chart's query template. It honors YAML `operator:` /
 `warning_value:` / `critical_value:` / `duration:` / chart-name overrides,
 but the `metric:` field is **ignored for the stored expr**. To set a custom
 expr you have to bypass the Ansible flow and POST via `apply-tuned-alerts`
-(which `bin/cycle-customer` does when an `EXPR_PATCHER` is configured).
+(which `tuning/cycle-customer` does when an `EXPR_PATCHER` is configured).
 
 ---
 
 ## Tuning policy — `cli/exported/tune-alerts-policy.json`
 
-Team-wide pinned thresholds applied automatically by `bin/tune`. fnmatch
+Team-wide pinned thresholds applied automatically by `tuning/tune`. fnmatch
 globs against rule names. Each entry should carry a `_why` annotation.
 
 Use the policy file for rules that **aren't workload-tunable**:
@@ -273,12 +273,12 @@ fire; the tuner sees 0 samples.
 The Ansible `alert_rule` module can't fix this from YAML (chart-template-
 derived exprs aren't overridable via the `metric:` field). The workaround:
 
-1. Write a customer-specific `bin/patch-<name>-broken-exprs` that rewrites
+1. Write a customer-specific `tuning/patch-<name>-broken-exprs` that rewrites
    the affected rules' `expr` fields to use the cluster's actual label
    schema. Each fix is `(corrected_selector, comparison_op)`; the
    threshold comes from the rule's existing `warningValue`.
 2. Set `EXPR_PATCHER=patch-<name>-broken-exprs` in the customer's `.env`.
-3. `bin/cycle-customer` runs it as part of every cycle — POST goes through
+3. `tuning/cycle-customer` runs it as part of every cycle — POST goes through
    `apply-tuned-alerts`, which writes the rule's `expr` field verbatim
    (bypassing the chart-template derivation).
 
@@ -302,7 +302,7 @@ has two versions accessed via the same URL with different query strings:
 
 These are independent storages with potentially different content. If you
 fix a chart by writing to v2 (`?dashver=2.0`) only and then run
-`bin/default-apply`, the `alert_rule` module reads v1 → sees the old
+`tuning/default-apply`, the `alert_rule` module reads v1 → sees the old
 chart → derives the old expr → reports `changed=0` even though the chart
 "looks" fixed in the UI (which reads v2). **Always update both** when
 fixing dashboard chart queries.
@@ -318,7 +318,7 @@ each skip reason has a remedy:
 | Reason | Cause | Remedy |
 |---|---|---|
 | `insufficient data (0 samples)` on `cas_ClientRequest_Latency` or `cas_Table_*Histogram` rules | Label schema mismatch (`percentile=` / `consistency=` filters match nothing) | Add an `EXPR_PATCHER` |
-| `insufficient data (0 samples)` on rules pinned to a placeholder table | Default rule selectors target the wrong table | `--set-label cas_Table_*:scope=<HOT_TABLE>` (already issued by `bin/tune-customer`) |
+| `insufficient data (0 samples)` on rules pinned to a placeholder table | Default rule selectors target the wrong table | `--set-label cas_Table_*:scope=<HOT_TABLE>` (already issued by `tuning/tune-customer`) |
 | `insufficient data (N samples)` where N is small but non-zero | Sparse-but-real metric | Increase `DAYS` and/or lower `MIN_SAMPLES` in the customer's `.env` |
 | `insufficient data` on CAS failures, dropped mutations, timeouts, queue depths | Exception/failure metrics — near-zero on healthy clusters by design | Pin in `cli/exported/tune-alerts-policy.json` — these aren't workload-tunable |
 | `unreasonable delta (max_delta=N)` | Workload-derived threshold > N× the seeded default | Decide whether the seeded threshold is a real operational issue (NTP, partition size — keep seeded) or whether the workload genuinely differs (raise `MAX_DELTA`) |
@@ -365,7 +365,7 @@ actually means operationally.
 
 ## Dated export snapshots
 
-Each `bin/export <org> <cluster>` writes an immutable snapshot dir and
+Each `tuning/export <org> <cluster>` writes an immutable snapshot dir and
 re-points three symlinks:
 
 ```
@@ -388,13 +388,13 @@ precision and the script refuses to overwrite an existing snapshot dir.
 
 ## Notes and gotchas
 
-- **`bin/default-apply` is destructive — preview with `--check`.** Cycle,
+- **`tuning/default-apply` is destructive — preview with `--check`.** Cycle,
   export, and tune are reconciliation steps; safe to re-run.
 - The apply path is **idempotent** — each rule POSTs with its `id` and the
   endpoint upserts. A re-run after a transient failure is safe.
 - **Manual UI edits** add a `(updated X to Y)` suffix to the rule name.
   Policy pin patterns are exact matches by default — re-apply via
-  `bin/default-apply` to restore the canonical name + re-pin.
+  `tuning/default-apply` to restore the canonical name + re-pin.
 - The Ansible `alert_rule` module's error path **prints the full
   `Authorization` header** (including the token) on failure. Rotate any
   token that appears in an error log.
@@ -403,7 +403,7 @@ precision and the script refuses to overwrite an existing snapshot dir.
   "Skipped" section before assuming a rule was tuned.
 - Percent-shaped metrics are clamped at 100.
 - Output dirs are created `0700`; JSON files `0600`.
-- `bin/cycle-customer` exports **before** anything else so manual UI
+- `tuning/cycle-customer` exports **before** anything else so manual UI
   changes (rule deletions, edits) are honored; without that first export,
   the apply step would reassert the previous export's state and undo
   whatever you just did in the UI.

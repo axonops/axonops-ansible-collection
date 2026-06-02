@@ -4,14 +4,14 @@ exist on a target cluster's AxonOps dashboards.
 
 The collection's default metric_alert_rules.yml match charts BY NAME
 (dashboard + chart title). Chart names vary between AxonOps versions, so before
-seeding (bin/default-apply) this reports which default rules would fail with
+seeding (tuning/default-apply) this reports which default rules would fail with
 "Could not find chart '...' in AxonOps" and lists the available chart titles on
 the relevant dashboard so you can correct the name.
 
 Read-only: only issues a GET against /api/v1/dashboardtemplate/.
 
 Usage:
-  bin/chart-check <org> <cluster>
+  tuning/chart-check <org> <cluster>
 
 Env (same as the other wrappers):
   AXONOPS_TOKEN   — API token for the target instance (required)
@@ -36,7 +36,7 @@ DEFAULTS = [
 
 def load_default_rules(repo_root, org):
     """Default rules with the per-client override applied (replace by name,
-    append new) — mirrors what bin/default-apply seeds, so the preflight
+    append new) — mirrors what tuning/default-apply seeds, so the preflight
     reflects the rules that will actually be created."""
     rules = []
     for rel in DEFAULTS:
@@ -61,7 +61,7 @@ def load_default_rules(repo_root, org):
 
 def main():
     if len(sys.argv) < 3:
-        print("usage: bin/chart-check <org> <cluster>", file=sys.stderr)
+        print("usage: tuning/chart-check <org> <cluster>", file=sys.stderr)
         return 2
     org, cluster = sys.argv[1], sys.argv[2]
     token = os.getenv("AXONOPS_TOKEN")

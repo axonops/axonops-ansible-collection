@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
-# Run bin/tune for a named customer using their bin/customers/<name>.env config.
+# Run tuning/tune for a named customer using their tuning/customers/<name>.env config.
 #
 # Sources the env file for ORG, CLUSTER, HOT_KEYSPACE, HOT_TABLE, and optional
 # tune knobs (DAYS, MIN_SAMPLES, MAX_DELTA, EXTRA_SET_LABELS), then exec's
-# bin/tune with the right --set-label / --days / etc. args.
+# tuning/tune with the right --set-label / --days / etc. args.
 #
-# This replaces bin/tune-<customer> one-off scripts; the customer-specific
+# This replaces tuning/tune-<customer> one-off scripts; the customer-specific
 # wrappers are kept as thin delegators for muscle memory.
 #
 # Usage:
-#   bin/tune-customer <name> [extra tune-alerts args...]
+#   tuning/tune-customer <name> [extra tune-alerts args...]
 #
 # Required env:
 #   AXONOPS_TOKEN   — SaaS API token
 set -euo pipefail
 
-NAME="${1:?usage: bin/tune-customer <name> [extra tune-alerts args...]}"
+NAME="${1:?usage: tuning/tune-customer <name> [extra tune-alerts args...]}"
 shift || true
 
-BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONF="${BIN_DIR}/customers/${NAME}.env"
+TUNING_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONF="${TUNING_DIR}/customers/${NAME}.env"
 
 if [[ ! -f "$CONF" ]]; then
     echo "no customer config at ${CONF}" >&2
     echo "available customers:" >&2
-    ls "${BIN_DIR}/customers/" 2>/dev/null | sed 's|\.env$||;s|^|  |' >&2
+    ls "${TUNING_DIR}/customers/" 2>/dev/null | sed 's|\.env$||;s|^|  |' >&2
     exit 2
 fi
 
@@ -49,4 +49,4 @@ for lbl in "${EXTRA_SET_LABELS[@]}"; do
     [[ -n "$lbl" ]] && ARGS+=(--set-label "$lbl")
 done
 
-exec "${BIN_DIR}/tune" "${ARGS[@]}" "$@"
+exec "${TUNING_DIR}/tune" "${ARGS[@]}" "$@"

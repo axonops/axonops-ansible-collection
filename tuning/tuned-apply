@@ -2,7 +2,7 @@
 # Apply a pre-tuned alert_rules JSON to a given org+cluster.
 #
 # Usage:
-#   bin/tuned-apply <org> <cluster> [--input PATH] [apply-tuned-alerts args...]
+#   tuning/tuned-apply <org> <cluster> [--input PATH] [apply-tuned-alerts args...]
 #
 # Default --input, if not supplied, is:
 #   ./cli/exported/<org>/<cluster>/alert_rules.tuned.for.<cluster>.json
@@ -17,7 +17,7 @@ set -euo pipefail
 : "${AXONOPS_TOKEN:?AXONOPS_TOKEN must be set in env}"
 
 if [[ $# -lt 2 ]]; then
-    echo "usage: bin/tuned-apply <org> <cluster> [--input PATH] [apply-tuned-alerts args...]" >&2
+    echo "usage: tuning/tuned-apply <org> <cluster> [--input PATH] [apply-tuned-alerts args...]" >&2
     exit 2
 fi
 

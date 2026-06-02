@@ -6,15 +6,15 @@
 # CLI's logic in cli/axonopscli/axonops.py (do_request): try the shared host
 # first, fall back to the subdomain on a 404, and echo whichever answers. The
 # CLI auto-detects internally, but the Ansible modules don't — so this lets the
-# Ansible-driven wrappers (bin/default-apply) resolve the host the same way.
+# Ansible-driven wrappers (tuning/default-apply) resolve the host the same way.
 #
 # Source of truth for the URL shapes is the CLI; keep the two in sync.
 #
 # Usage:
-#   bin/resolve-axonops-url <org> [cluster] [cluster_type]
+#   tuning/resolve-axonops-url <org> [cluster] [cluster_type]
 #
 # Echoes the resolved base URL on stdout. The probe trace goes to stderr, so
-# callers can safely do:  AXONOPS_URL="$(bin/resolve-axonops-url acme prod)"
+# callers can safely do:  AXONOPS_URL="$(tuning/resolve-axonops-url acme prod)"
 #
 # Env:
 #   AXONOPS_URL    — if set, echoed as-is (trailing slash trimmed); no probing.
@@ -26,7 +26,7 @@ CLUSTER="${2:-${AXONOPS_CLUSTER:-}}"
 CLUSTER_TYPE="${3:-${AXONOPS_CLUSTER_TYPE:-cassandra}}"
 
 if [[ -z "$ORG" ]]; then
-    echo "usage: bin/resolve-axonops-url <org> [cluster] [cluster_type]" >&2
+    echo "usage: tuning/resolve-axonops-url <org> [cluster] [cluster_type]" >&2
     exit 2
 fi
 
