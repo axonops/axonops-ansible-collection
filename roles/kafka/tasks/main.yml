@@ -57,15 +57,6 @@
     kafka_node_ip: "{{ kafka_node_ip | default(ansible_default_ipv4.address) }}"
   tags: always
 
-- name: Install Kafka
-  ansible.builtin.import_tasks: install.yml
-  tags: install
-
-- name: Configure firewall
-  ansible.builtin.import_tasks: firewall.yml
-  when: kafka_configure_firewall | bool
-  tags: firewall
-
 - name: Create AxonOps user
   tags: axonops_user
   when: kafka_axonops_agent_enabled | bool
@@ -127,6 +118,16 @@
       when:
         - ansible_facts.services['axon-agent.service'] is defined
         - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
+
+- name: Install Kafka
+  ansible.builtin.import_tasks: install.yml
+  tags: install
+
+- name: Configure firewall
+  ansible.builtin.import_tasks: firewall.yml
+  when: kafka_configure_firewall | bool
+  tags: firewall
+
 
 # Populate dynamic groups before config.yml renders the template that references them.
 - name: Add controller nodes to dynamic group
