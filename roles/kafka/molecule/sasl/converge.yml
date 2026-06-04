@@ -3,7 +3,7 @@
   hosts: all
   become: true
   vars:
-    kafka_version: "4.0.0"
+    kafka_version: "4.3.0"
     kafka_node_id: 1
     kafka_node_roles:
       - broker
