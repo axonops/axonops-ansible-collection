@@ -5,7 +5,7 @@
 
 # --- Version & Download -----------------------------------------------------
 
-kafka_version: "4.0.0"
+kafka_version: "4.3.0"
 kafka_scala_version: "2.13"
 # Java version passed to the axonops.axonops.java role as java_pkg. Kafka 4.x requires Java 17.
 kafka_java_version: 17
