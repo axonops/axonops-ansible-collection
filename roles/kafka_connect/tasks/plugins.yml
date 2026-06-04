@@ -1,0 +1,27 @@
+---
+# Sync user-supplied plugin JARs / connector dirs into kafka_connect_plugin_path.
+# Default source: files/connect-libs/ in the playbook directory. Set
+# kafka_connect_local_plugins_dir to "" to skip this entirely.
+
+- name: Check whether the local plugin source dir exists
+  ansible.builtin.stat:
+    path: "{{ kafka_connect_local_plugins_dir }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: kafka_connect__reg_local_plugins
+  when: kafka_connect_local_plugins_dir | length > 0
+
+- name: Copy Connect plugins from {{ kafka_connect_local_plugins_dir }}
+  ansible.builtin.copy:
+    src: "{{ kafka_connect_local_plugins_dir }}/"
+    dest: "{{ kafka_connect_plugin_path }}/"
+    owner: "{{ kafka_connect_user }}"
+    group: "{{ kafka_connect_group }}"
+    mode: "0644"
+    directory_mode: "0755"
+  when:
+    - kafka_connect_local_plugins_dir | length > 0
+    - kafka_connect__reg_local_plugins.stat.exists | default(false)
+    - kafka_connect__reg_local_plugins.stat.isdir | default(false)
+  notify: Restart Kafka Connect

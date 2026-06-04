@@ -1,0 +1,30 @@
+---
+# Internal computed variables. Do not override.
+
+kafka_connect__download_url: "{{ kafka_connect_download_url_override if kafka_connect_download_url_override | length > 0 else 'https://dlcdn.apache.org/kafka/' ~ kafka_connect_version ~ '/kafka_' ~ kafka_connect_scala_version ~ '-' ~ kafka_connect_version ~ '.tgz' }}"
+kafka_connect__download_destination: "{{ kafka_connect_install_root }}/kafka-connect_{{ kafka_connect_scala_version }}-{{ kafka_connect_version }}.tgz"
+kafka_connect__install_path: "{{ kafka_connect_install_root }}/kafka_{{ kafka_connect_scala_version }}-{{ kafka_connect_version }}"
+kafka_connect__home: "{{ kafka_connect_install_root }}/kafka-connect"
+kafka_connect__config_file: "{{ kafka_connect_config_dir }}/connect-distributed.properties"
+kafka_connect__opts: "{{ (kafka_connect_opts | type_debug == 'list') | ternary(kafka_connect_opts | join(' '), kafka_connect_opts) }}"
+
+kafka_connect__java_pkg: >-
+  {%- if ansible_os_family == 'Debian' -%}zulu{{ kafka_connect_java_version }}-jdk
+  {%- elif ansible_os_family == 'RedHat' -%}zulu{{ kafka_connect_java_version }}-ca-jdk
+  {%- else -%}java-{{ kafka_connect_java_version }}-openjdk
+  {%- endif %}
+
+kafka_connect__sec_on: "{{ kafka_connect_security_enabled | bool }}"
+kafka_connect__tls_on: "{{ kafka_connect__sec_on and (kafka_connect_tls_enabled | bool) }}"
+kafka_connect__sasl_on: "{{ kafka_connect__sec_on and (kafka_connect_sasl_enabled | bool) }}"
+
+kafka_connect__security_protocol: >-
+  {{ 'SASL_SSL' if (kafka_connect__tls_on and kafka_connect__sasl_on)
+     else ('SASL_PLAINTEXT' if kafka_connect__sasl_on
+     else ('SSL' if kafka_connect__tls_on else 'PLAINTEXT')) }}
+
+kafka_connect__sasl_mech_lower: "{{ kafka_connect_sasl_mechanism | lower }}"
+kafka_connect__sasl_login_module: >-
+  {%- if kafka_connect_sasl_mechanism == 'PLAIN' -%}org.apache.kafka.common.security.plain.PlainLoginModule
+  {%- else -%}org.apache.kafka.common.security.scram.ScramLoginModule
+  {%- endif %}

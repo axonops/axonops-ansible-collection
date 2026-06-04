@@ -1,0 +1,10 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart Kafka Connect
+  ansible.builtin.systemd:
+    daemon_reload: true
+    state: restarted
+    name: kafka-connect

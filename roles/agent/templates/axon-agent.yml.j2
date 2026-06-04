@@ -110,35 +110,106 @@ NTP:
     logFormat: "%4$s %1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS,%1$tL %5$s%6$s%n"
 {% elif "axon-kafka" in axon_java_agent %}
 kafka:
-{% if axon_agent_kafka_client_properties | default('') | length > 0 %}
-    client_properties_file: {{ axon_agent_kafka_client_properties }}
+{% if inventory_hostname in groups['kafka_controllers'] %}
+  node_type: "kraft-controller"
+{% elif inventory_hostname in groups['kafka_brokers'] %}
+  node_type: "kraft-broker"
+{% elif inventory_hostname in groups['kafka_connect'] %}
+  node_type: "connect"
 {% endif %}
-    tier0: # metrics collected every 5 seconds
-        metrics:
-            jvm_:
-              - "java.lang:*"
-            kafka_:
-              - "kafka.server:*"
-              - "kafka.controller:*"
-              - "kafka.network:*"
-              - "kafka.log:*"
-              - "kafka.cluster:*"
+{# axon_agent_rack overrides; otherwise fall back to kafka_rack from the kafka role. #}
+{% set _rack = axon_agent_rack | default('') or kafka_rack | default('') %}
+{% if _rack | length > 0 %}
+  rack: "{{ _rack }}"
+{% endif %}
+{# Render kafka_client only on hosts that run a broker. The agent talks to
+   its co-located broker, not the cluster bootstrap list. Override the
+   broker URL by setting axon_agent_kafka_brokers explicitly. #}
+{% set _brokers = axon_agent_kafka_brokers | default([]) %}
+{% if (_brokers | length == 0) and (inventory_hostname in groups['kafka_brokers'] | default([])) %}
+{%   set _brokers = [(kafka_node_ip | default(ansible_default_ipv4.address)) ~ ':9092'] %}
+{% endif %}
+{% if _brokers | length > 0 %}
+  kafka_client:
+    brokers:
+{% for _broker in _brokers %}
+      - "{{ _broker }}"
+{% endfor %}
+{% if axon_agent_kafka_sasl_enabled | default(false) | bool %}
+    sasl:
+      mechanism: "{{ axon_agent_kafka_sasl_mechanism | default('PLAIN') }}"
+      username: "{{ axon_agent_kafka_sasl_username }}"
+      password: "{{ axon_agent_kafka_sasl_password }}"
+{% endif %}
+{% if axon_agent_kafka_tls_enabled | default(false) | bool %}
+    tls:
+      enabled: true
+{% if axon_agent_kafka_tls_ca_filepath | default('') | length > 0 %}
+      caFilepath: "{{ axon_agent_kafka_tls_ca_filepath }}"
+{% endif %}
+      insecureSkipTlsVerify: {{ axon_agent_kafka_tls_skip_verify | default(false) | bool | string | lower }}
+{% endif %}
+{% endif %}
+{# connect_client — rendered on Connect hosts. Either provide a full
+   axon_agent_connect_clusters list, or rely on the shortcut vars to
+   build a single-cluster entry. #}
+{% if axon_agent_connect_enabled | default(false) | bool %}
+{%   set _connect_clusters = axon_agent_connect_clusters | default([]) %}
+{%   if _connect_clusters | length == 0 %}
+{%     set _connect_clusters = [{
+         'name': axon_agent_connect_cluster_name,
+         'url': axon_agent_connect_url,
+         'username': axon_agent_connect_username | default(''),
+         'password': axon_agent_connect_password | default(''),
+         'token': axon_agent_connect_token | default(''),
+         'tls': {
+           'enabled': axon_agent_connect_tls_enabled | default(false),
+           'caFilepath': axon_agent_connect_tls_ca_filepath | default(''),
+           'certFilepath': axon_agent_connect_tls_cert_filepath | default(''),
+           'keyFilepath': axon_agent_connect_tls_key_filepath | default(''),
+           'insecureSkipTlsVerify': axon_agent_connect_tls_skip_verify | default(false),
+         }
+       }] %}
+{%   endif %}
+  connect_client:
+    enabled: true
+    clusters:
+{% for _c in _connect_clusters %}
+      - name: "{{ _c.name }}"
+        url: "{{ _c.url }}"
+{% if _c.username | default('') | length > 0 %}
+        username: "{{ _c.username }}"
+        password: "{{ _c.password | default('') }}"
+{% endif %}
+{% if _c.token | default('') | length > 0 %}
+        token: "{{ _c.token }}"
+{% endif %}
+{% if (_c.tls | default({})).enabled | default(false) | bool %}
+        tls:
+          enabled: true
+{% if _c.tls.caFilepath | default('') | length > 0 %}
+          caFilepath: "{{ _c.tls.caFilepath }}"
+{% endif %}
+{% if _c.tls.certFilepath | default('') | length > 0 %}
+          certFilepath: "{{ _c.tls.certFilepath }}"
+{% endif %}
+{% if _c.tls.keyFilepath | default('') | length > 0 %}
+          keyFilepath: "{{ _c.tls.keyFilepath }}"
+{% endif %}
+          insecureSkipTlsVerify: {{ _c.tls.insecureSkipTlsVerify | default(false) | bool | string | lower }}
+{% endif %}
+{% endfor %}
+    connectTimeout: {{ axon_agent_connect_connect_timeout | default('10s') }}
+    readTimeout: {{ axon_agent_connect_read_timeout | default('30s') }}
+    requestTimeout: {{ axon_agent_connect_request_timeout | default('30s') }}
+    startup:
+      establishConnectionEagerly: {{ axon_agent_connect_startup_establish_eagerly | default(false) | bool | string | lower }}
+      maxRetries: {{ axon_agent_connect_startup_max_retries | default(5) }}
+      retryInterval: {{ axon_agent_connect_startup_retry_interval | default('1s') }}
+      maxRetryInterval: {{ axon_agent_connect_startup_max_retry_interval | default('30s') }}
+      backoffMultiplier: {{ axon_agent_connect_startup_backoff_multiplier | default(2.0) }}
+{% endif %}
 
-    tier1:
-        frequency: 300 # metrics collected every 300 seconds (5m)
-        metrics:
-            kafka_:
-              - "kafka.server:type=BrokerTopicMetrics,*"
-
-    blacklist:
-      - ".*999thPercentile|.*50thPercentile|.*FifteenMinuteRate|.*FiveMinuteRate|.*MeanRate|.*Mean|.*OneMinuteRate|.*StdDev"
-
-    JMXOperationsBlacklist:
-      - "getThreadInfo"
-
-    warningThresholdMillis: {{ axon_agent_warn_threshold_millis | default(1000) }}
-
-    logFormat: "%4$s %1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS,%1$tL %5$s%6$s%n"
 {% elif "axon-cassandra" in axon_java_agent %}
 cassandra:
     tier0: # metrics collected every 5 seconds

@@ -1,0 +1,73 @@
+# {{ ansible_managed }}
+# Kafka Connect — distributed worker configuration.
+
+bootstrap.servers={{ kafka_connect_bootstrap_servers | join(',') }}
+group.id={{ kafka_connect_group_id }}
+
+key.converter={{ kafka_connect_key_converter }}
+value.converter={{ kafka_connect_value_converter }}
+key.converter.schemas.enable={{ kafka_connect_key_converter_schemas_enable | bool | string | lower }}
+value.converter.schemas.enable={{ kafka_connect_value_converter_schemas_enable | bool | string | lower }}
+
+offset.storage.topic={{ kafka_connect_offset_storage_topic }}
+offset.storage.replication.factor={{ kafka_connect_replication_factor }}
+offset.storage.partitions={{ kafka_connect_offset_storage_partitions }}
+
+config.storage.topic={{ kafka_connect_config_storage_topic }}
+config.storage.replication.factor={{ kafka_connect_replication_factor }}
+
+status.storage.topic={{ kafka_connect_status_storage_topic }}
+status.storage.replication.factor={{ kafka_connect_replication_factor }}
+status.storage.partitions={{ kafka_connect_status_storage_partitions }}
+
+offset.flush.interval.ms=10000
+
+listeners={{ kafka_connect_rest_listener }}
+rest.advertised.host.name={{ kafka_connect_rest_advertised_host }}
+rest.advertised.port={{ kafka_connect_rest_advertised_port }}
+
+plugin.path={{ kafka_connect_plugin_path }}
+
+{% if kafka_connect__sec_on | bool %}
+############################# Security #############################
+security.protocol={{ kafka_connect__security_protocol }}
+producer.security.protocol={{ kafka_connect__security_protocol }}
+consumer.security.protocol={{ kafka_connect__security_protocol }}
+admin.security.protocol={{ kafka_connect__security_protocol }}
+
+{% if kafka_connect__sasl_on | bool %}
+sasl.mechanism={{ kafka_connect_sasl_mechanism }}
+sasl.jaas.config={{ kafka_connect__sasl_login_module }} required username="{{ kafka_connect_sasl_user }}" password="{{ kafka_connect_sasl_password }}";
+
+producer.sasl.mechanism={{ kafka_connect_sasl_mechanism }}
+producer.sasl.jaas.config={{ kafka_connect__sasl_login_module }} required username="{{ kafka_connect_sasl_user }}" password="{{ kafka_connect_sasl_password }}";
+
+consumer.sasl.mechanism={{ kafka_connect_sasl_mechanism }}
+consumer.sasl.jaas.config={{ kafka_connect__sasl_login_module }} required username="{{ kafka_connect_sasl_user }}" password="{{ kafka_connect_sasl_password }}";
+
+admin.sasl.mechanism={{ kafka_connect_sasl_mechanism }}
+admin.sasl.jaas.config={{ kafka_connect__sasl_login_module }} required username="{{ kafka_connect_sasl_user }}" password="{{ kafka_connect_sasl_password }}";
+{% endif %}
+
+{% if kafka_connect__tls_on | bool %}
+ssl.truststore.type=PEM
+ssl.truststore.location={{ kafka_connect_tls_ca_path }}
+producer.ssl.truststore.type=PEM
+producer.ssl.truststore.location={{ kafka_connect_tls_ca_path }}
+consumer.ssl.truststore.type=PEM
+consumer.ssl.truststore.location={{ kafka_connect_tls_ca_path }}
+admin.ssl.truststore.type=PEM
+admin.ssl.truststore.location={{ kafka_connect_tls_ca_path }}
+{% if kafka_connect_tls_keystore_path | length > 0 %}
+ssl.keystore.type=PEM
+ssl.keystore.location={{ kafka_connect_tls_keystore_path }}
+{% if kafka_connect_tls_keystore_password | length > 0 %}
+ssl.keystore.key.password={{ kafka_connect_tls_keystore_password }}
+{% endif %}
+{% endif %}
+{% endif %}
+{% endif %}
+
+{% for k, v in (kafka_connect_additional_config | default({})).items() %}
+{{ k }}={{ v }}
+{% endfor %}

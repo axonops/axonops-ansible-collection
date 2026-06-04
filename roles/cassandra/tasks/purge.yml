@@ -1,0 +1,55 @@
+---
+# Wipe Cassandra state on this node for a clean rebuild. Destructive — removes
+# every directory the role manages and forces Cassandra to bootstrap from
+# scratch on the next start.
+#
+# Invocation (from any playbook using this role):
+#   ansible-playbook playbook.yml --tags purge -e cassandra_purge_confirm=true
+#
+# Run cluster-wide. Wiping a single node while its peers still gossip about it
+# reproduces "A node with address X already exists, cancelling join" on the
+# next start — every node in the cluster must be purged in lockstep.
+
+- name: Refuse to purge without explicit confirmation
+  ansible.builtin.assert:
+    that:
+      - cassandra_purge_confirm | default(false) | bool
+    fail_msg: >-
+      Refusing to purge: cassandra_purge_confirm is not true. Re-run with
+      `-e cassandra_purge_confirm=true` to wipe data, commitlog, hints,
+      saved_caches, cdc_raw and logs on every targeted host.
+  run_once: true
+
+- name: Populate service facts
+  ansible.builtin.service_facts:
+
+- name: Stop cassandra
+  ansible.builtin.systemd:
+    name: cassandra
+    state: stopped
+  when: ansible_facts.services['cassandra.service'] is defined
+
+# axon-agent keeps file handles on /var/log/axonops/ and runs the embedded
+# Java agent inside the Cassandra JVM — stopping it here avoids races on the
+# next start and lets the Java agent rebind cleanly to a fresh Cassandra.
+- name: Stop axon-agent
+  ansible.builtin.systemd:
+    name: axon-agent
+    state: stopped
+  when: ansible_facts.services['axon-agent.service'] is defined
+
+# Remove the whole tree under each managed directory. The role's normal
+# "Create main directories" task recreates these with correct ownership on
+# the next run, so we don't need to put empty dirs back here.
+- name: Wipe Cassandra state directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ cassandra_data_directory }}"
+    - "{{ cassandra_hints_directory }}"
+    - "{{ cassandra_commitlog_directory }}"
+    - "{{ cassandra_saved_caches_directory }}"
+    - "{{ cassandra_cdc_raw_directory }}"
+    - "{{ cassandra_log_dir }}"
+    - "{{ cassandra_gc_log_dir }}"

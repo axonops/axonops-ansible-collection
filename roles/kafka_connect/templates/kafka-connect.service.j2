@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+
+[Unit]
+Description=Apache Kafka Connect (distributed mode)
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/kafka-connect
+User={{ kafka_connect_user }}
+Group={{ kafka_connect_group }}
+WorkingDirectory={{ kafka_connect__home }}
+ExecStart={{ kafka_connect__home }}/bin/connect-distributed.sh {{ kafka_connect__config_file }}
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=100000
+
+[Install]
+WantedBy=multi-user.target

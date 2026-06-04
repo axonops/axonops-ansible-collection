@@ -77,9 +77,9 @@
         checksum: "{{ kafka_checksum }}"
         dest: "{{ kafka__download_destination }}"
         mode: "0644"
-        timeout: 60
-      retries: 3
-      delay: 5
+        timeout: "{{ kafka_download_timeout }}"
+      retries: "{{ kafka_download_retries }}"
+      delay: "{{ kafka_download_retry_delay }}"
 
     - name: Extract Kafka
       ansible.builtin.unarchive:
@@ -180,6 +180,15 @@
     axon_agent_kafka_config: ". /usr/share/axonops/axonops-jvm.options"
     axon_agent_kafka_client_properties: >-
       {{ kafka_axonops_client_properties_path if (kafka_security_enabled | bool) else '' }}
+    # Pass SASL/TLS settings to the agent template. The brokers list is
+    # auto-derived in the template from kafka_node_ip on broker hosts; set
+    # axon_agent_kafka_brokers explicitly here to override.
+    axon_agent_kafka_sasl_enabled: "{{ kafka__sasl_on | bool }}"
+    axon_agent_kafka_sasl_mechanism: "{{ kafka_sasl_mechanism }}"
+    axon_agent_kafka_sasl_username: "{{ kafka_axonops_sasl_user }}"
+    axon_agent_kafka_sasl_password: "{{ kafka_axonops_sasl_password }}"
+    axon_agent_kafka_tls_enabled: "{{ kafka__tls_on | bool }}"
+    axon_agent_kafka_tls_ca_filepath: "{{ kafka__tls_truststore_file if kafka__tls_on else '' }}"
     axon_agent_include_service_config: true
   when: kafka_axonops_agent_enabled | bool
   tags: axonops_agent

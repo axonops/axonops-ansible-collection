@@ -1,0 +1,117 @@
+---
+- name: Ensure Kafka Connect group exists
+  ansible.builtin.group:
+    name: "{{ kafka_connect_group }}"
+    state: present
+    system: true
+
+- name: Ensure Kafka Connect user exists
+  ansible.builtin.user:
+    name: "{{ kafka_connect_user }}"
+    state: present
+    system: true
+    group: "{{ kafka_connect_group }}"
+    home: "{{ kafka_connect__home }}"
+    create_home: false
+    shell: /bin/bash
+
+- name: Install Java
+  ansible.builtin.include_role:
+    name: axonops.axonops.java
+  vars:
+    java_pkg: "{{ kafka_connect__java_pkg }}"
+    java_zulu_version: "{{ kafka_connect_java_version }}"
+  when: kafka_connect_java_install | default(true) | bool
+
+- name: Get Kafka checksum from Apache
+  ansible.builtin.uri:
+    url: "https://downloads.apache.org/kafka/{{ kafka_connect_version }}/kafka_{{ kafka_connect_scala_version }}-{{ kafka_connect_version }}.tgz.sha512"
+    return_content: true
+  retries: 3
+  delay: 3
+  register: kafka_connect__reg_checksum
+  run_once: true
+  when: kafka_connect_checksum is not defined
+
+- name: Set checksum fact
+  ansible.builtin.set_fact:
+    kafka_connect_checksum: >-
+      {{
+        kafka_connect__reg_checksum.content
+        | replace('\n', '')
+        | regex_replace('\s{2,}', ' ')
+        | replace('kafka_' ~ kafka_connect_scala_version ~ '-' ~ kafka_connect_version ~ '.tgz: ', 'sha512:')
+      }}
+  when: kafka_connect_checksum is not defined
+
+- name: Check if Kafka Connect distribution is already installed
+  ansible.builtin.stat:
+    path: "{{ kafka_connect__install_path }}"
+  register: kafka_connect__reg_install_check
+
+- name: Download and install Kafka Connect distribution
+  when: not kafka_connect__reg_install_check.stat.exists
+  block:
+    - name: Download Kafka tarball
+      ansible.builtin.get_url:
+        url: "{{ kafka_connect__download_url }}"
+        checksum: "{{ kafka_connect_checksum }}"
+        dest: "{{ kafka_connect__download_destination }}"
+        mode: "0644"
+        timeout: "{{ kafka_connect_download_timeout }}"
+      retries: "{{ kafka_connect_download_retries }}"
+      delay: "{{ kafka_connect_download_retry_delay }}"
+
+    - name: Extract Kafka tarball
+      ansible.builtin.unarchive:
+        src: "{{ kafka_connect__download_destination }}"
+        dest: "{{ kafka_connect_install_root }}"
+        remote_src: true
+        owner: "{{ kafka_connect_user }}"
+        group: "{{ kafka_connect_group }}"
+        creates: "{{ kafka_connect__install_path }}"
+
+    - name: Remove downloaded tarball
+      ansible.builtin.file:
+        path: "{{ kafka_connect__download_destination }}"
+        state: absent
+
+- name: Create Kafka Connect home symlink
+  ansible.builtin.file:
+    path: "{{ kafka_connect__home }}"
+    src: "{{ kafka_connect__install_path }}"
+    state: link
+    force: true
+    follow: false
+
+- name: Create Kafka Connect config dir
+  ansible.builtin.file:
+    path: "{{ kafka_connect_config_dir }}"
+    state: directory
+    owner: "{{ kafka_connect_user }}"
+    group: "{{ kafka_connect_group }}"
+    mode: "0750"
+
+- name: Create Kafka Connect log dir
+  ansible.builtin.file:
+    path: "{{ kafka_connect_log_dir }}"
+    state: directory
+    owner: "{{ kafka_connect_user }}"
+    group: "{{ kafka_connect_group }}"
+    mode: "0750"
+
+- name: Redirect Connect service logs to {{ kafka_connect_log_dir }}
+  ansible.builtin.file:
+    path: "{{ kafka_connect__home }}/logs"
+    src: "{{ kafka_connect_log_dir }}"
+    state: link
+    force: true
+    follow: false
+
+- name: Create Kafka Connect plugin path
+  ansible.builtin.file:
+    path: "{{ kafka_connect_plugin_path }}"
+    state: directory
+    owner: "{{ kafka_connect_user }}"
+    group: "{{ kafka_connect_group }}"
+    mode: "0755"

@@ -64,6 +64,14 @@
   when: cassandra_version.startswith('4.1')
   tags: always
 
+# Destructive — opt-in via `--tags purge`. The `never` tag means a plain run
+# without explicit `--tags purge` (or `--tags all,purge`) skips this entirely.
+# Wipes data/commitlog/hints/saved_caches/cdc_raw/logs on every targeted host
+# so the cluster bootstraps clean on the next start. See tasks/purge.yml.
+- name: Purge Cassandra state
+  ansible.builtin.import_tasks: purge.yml
+  tags: [never, purge]
+
 - name: Import vars for 5.0
   ansible.builtin.include_vars: cassandra-5.0.yml
   when: cassandra_version.startswith('5.')

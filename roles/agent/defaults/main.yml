@@ -52,10 +52,79 @@ axon_agent_sudoers: |
 # axon_agent_kafka_config_directory: /opt/kafka/bin
 # axon_agent_kafka_config: '. /usr/share/axonops/axonops-jvm.options'
 
+# Same pattern for Kafka Connect's start script (bin/connect-distributed.sh).
+# The kafka_connect role sets these automatically; override only if your
+# Connect install lives somewhere else.
+# axon_agent_kafka_connect_config_directory: /opt/kafka-connect/bin
+# axon_agent_kafka_connect_config: '. /usr/share/axonops/axonops-jvm.options'
+
 # Path to a Kafka client.properties file used by the AxonOps Kafka admin
 # client (TLS/SASL credentials matching the cluster's auth mode). Leave
 # empty for plaintext clusters. Rendered by the kafka role automatically.
 axon_agent_kafka_client_properties: ""
+
+# kafka.kafka_client block rendered into axon-agent.yml. Used by the agent's
+# Kafka admin client (consumer group lag, topic metadata, etc.). The kafka
+# role sets these automatically; override only when running the agent role
+# standalone against an external Kafka cluster.
+#
+# Optional rack identifier rendered under the kafka: section of axon-agent.yml.
+# Leave empty to omit; the agent then auto-detects from Kafka's broker.rack.
+axon_agent_rack: ""
+
+# Bootstrap brokers — list of host:port. Leave empty to omit the
+# kafka_client block entirely.
+axon_agent_kafka_brokers: []
+# axon_agent_kafka_brokers:
+#   - kafka-1.example.com:9092
+#   - kafka-2.example.com:9092
+
+# SASL — opt-in. Mechanism: PLAIN | SCRAM-SHA-256 | SCRAM-SHA-512 |
+# OAUTHBEARER | GSSAPI. Username and password are required when enabled.
+axon_agent_kafka_sasl_enabled: false
+axon_agent_kafka_sasl_mechanism: PLAIN
+axon_agent_kafka_sasl_username: ""
+axon_agent_kafka_sasl_password: ""
+
+# TLS — opt-in. Set caFilepath to the CA bundle the agent should trust;
+# skip_verify disables hostname/cert validation (dev only).
+axon_agent_kafka_tls_enabled: false
+axon_agent_kafka_tls_ca_filepath: ""
+axon_agent_kafka_tls_skip_verify: false
+
+# kafka.connect_client block — rendered on Kafka Connect hosts. The
+# kafka_connect role sets axon_agent_connect_enabled automatically.
+#
+# Shortcut vars build a single-cluster entry from the values below. To
+# describe multiple clusters or override the layout, set
+# axon_agent_connect_clusters explicitly (list of dicts mirroring the
+# ConnectCluster struct: name, url, username, password, token, tls).
+axon_agent_connect_enabled: false
+axon_agent_connect_clusters: []
+
+axon_agent_connect_cluster_name: "{{ axon_agent_cluster_name | default('connect-cluster') }}"
+axon_agent_connect_url: "http://localhost:8083"
+axon_agent_connect_username: ""
+axon_agent_connect_password: ""
+axon_agent_connect_token: ""
+
+axon_agent_connect_tls_enabled: false
+axon_agent_connect_tls_ca_filepath: ""
+axon_agent_connect_tls_cert_filepath: ""
+axon_agent_connect_tls_key_filepath: ""
+axon_agent_connect_tls_skip_verify: false
+
+# Timeouts (Go duration strings).
+axon_agent_connect_connect_timeout: "10s"
+axon_agent_connect_read_timeout: "30s"
+axon_agent_connect_request_timeout: "30s"
+
+# Startup behaviour for the connect_client. Defaults are conservative.
+axon_agent_connect_startup_establish_eagerly: false
+axon_agent_connect_startup_max_retries: 5
+axon_agent_connect_startup_retry_interval: "1s"
+axon_agent_connect_startup_max_retry_interval: "30s"
+axon_agent_connect_startup_backoff_multiplier: 2.0
 
 # axon_agent_jvm_options: |
 #   EXTRA_ARGS="${EXTRA_ARGS} -javaagent:/usr/share/axonops/axon-kafka4-agent.jar=/etc/axonops/axon-agent.yml --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=jdk.unsupported/sun.misc=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED  --add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED  --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-opens=java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-exports=java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-opens=java.management/com.sun.jmx.interceptor=ALL-UNNAMED --add-exports=java.management/com.sun.jmx.interceptor=ALL-UNNAMED"

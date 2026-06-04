@@ -11,6 +11,17 @@ kafka_scala_version: "2.13"
 kafka_java_version: 17
 kafka_java_install: true
 
+# Download tuning. Default URL is dlcdn.apache.org (current releases only);
+# point at archive.apache.org via kafka_download_url_override for versions
+# no longer on the CDN, or at an internal artifact cache.
+kafka_download_timeout: 600
+kafka_download_retries: 5
+kafka_download_retry_delay: 10
+# Examples:
+#   kafka_download_url_override: "https://archive.apache.org/dist/kafka/3.7.0/kafka_2.13-3.7.0.tgz"
+#   kafka_download_url_override: "https://artifacts.internal/kafka_2.13-4.0.0.tgz"
+kafka_download_url_override: ""
+
 # --- Installation -----------------------------------------------------------
 
 kafka_install_root: /opt
@@ -53,6 +64,11 @@ kafka_node_roles:
 
 # Optional: fix the cluster UUID. Auto-generated and persisted on first run if omitted.
 # kafka_cluster_id: ""
+
+# Optional: rack identifier emitted as broker.rack for rack-aware partition
+# assignment. Set per host (controllers ignore it; broker.rack is broker-only).
+# kafka_rack: rack-a
+kafka_rack: ""
 
 # --- Listeners --------------------------------------------------------------
 

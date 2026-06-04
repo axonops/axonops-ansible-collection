@@ -1,0 +1,116 @@
+---
+# ============================================================================
+# Kafka Connect Role - Orchestrator
+# ============================================================================
+
+- name: Validate bootstrap servers
+  ansible.builtin.assert:
+    that:
+      - kafka_connect_bootstrap_servers | length > 0
+    fail_msg: >-
+      kafka_connect_bootstrap_servers is empty. Either populate the
+      kafka_brokers inventory group with kafka_node_ip set on each host, or
+      set kafka_connect_bootstrap_servers explicitly.
+
+- name: Install Kafka Connect distribution and dependencies
+  ansible.builtin.import_tasks: install.yml
+
+- name: Sync local plugins into Connect plugin path
+  ansible.builtin.import_tasks: plugins.yml
+
+- name: Render configuration and systemd unit
+  ansible.builtin.import_tasks: configure.yml
+
+# Cross-link the kafka_connect process user and the axonops package user so
+# the Java agent (running as kafka_connect_user) can write to /var/log/axonops/
+# and the axonops agent can read kafka-connect-owned files.
+- name: Set up AxonOps / Connect user cross-membership
+  tags: axonops_user
+  when: kafka_connect_axonops_agent_enabled | bool
+  block:
+    - name: Gather group information
+      ansible.builtin.getent:
+        database: group
+
+    - name: Gather axonops user information
+      ansible.builtin.getent:
+        database: passwd
+        key: axonops
+      register: kafka_connect__reg_axonops_user
+      failed_when: false
+
+    - name: Populate service facts
+      ansible.builtin.service_facts:
+
+    - name: Stop axon-agent if axonops user is not in {{ kafka_connect_group }} group
+      ansible.builtin.systemd:
+        name: axon-agent
+        state: stopped
+      register: kafka_connect__reg_stop_agent
+      failed_when:
+        - kafka_connect__reg_stop_agent.failed
+        - '"Could not find the requested service" not in kafka_connect__reg_stop_agent.msg'
+      when:
+        - ansible_facts.services['axon-agent.service'] is defined
+        - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
+        - kafka_connect__reg_axonops_user.ansible_facts.getent_passwd.axonops is defined
+        - >-
+          kafka_connect_group not in (
+            ansible_facts.getent_group
+            | dict2items
+            | selectattr('value.2', 'search', kafka_connect__reg_axonops_user.ansible_facts.getent_passwd.axonops.1)
+            | map(attribute='key')
+            | list
+          )
+
+    - name: Add axonops user to {{ kafka_connect_group }} group
+      ansible.builtin.user:
+        name: axonops
+        groups: "{{ kafka_connect_group }}"
+        append: true
+        shell: /bin/bash
+        home: /home/axonops
+
+    - name: Add {{ kafka_connect_user }} to axonops group
+      ansible.builtin.user:
+        name: "{{ kafka_connect_user }}"
+        groups: axonops
+        append: true
+
+    - name: Start axon-agent
+      ansible.builtin.systemd:
+        name: axon-agent
+        state: started
+      when:
+        - ansible_facts.services['axon-agent.service'] is defined
+        - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
+
+- name: Install and configure AxonOps agent
+  ansible.builtin.include_role:
+    name: axonops.axonops.agent
+  vars:
+    axon_java_agent: "{{ kafka_connect_axonops_java_agent }}"
+    axon_agent_customer_name: "{{ kafka_connect_axonops_org }}"
+    axon_agent_server_host: "{{ kafka_connect_axonops_server_host }}"
+    axon_agent_key: "{{ kafka_connect_axonops_key | default(omit) }}"
+    axon_agent_server_port: "{{ kafka_connect_axonops_agent_server_port }}"
+    axon_agent_cluster_name: "{{ kafka_connect_axonops_cluster_name | default(omit) }}"
+    # No kafka_client block on Connect hosts — Connect monitoring goes
+    # through connect_client (REST) only, not a Kafka admin client.
+    # Source the kafka-java-agent JVM options from connect-distributed.sh so
+    # the Connect process loads the AxonOps Java agent.
+    axon_agent_kafka_connect_config_directory: "{{ kafka_connect__home }}/bin"
+    axon_agent_kafka_connect_config: ". /usr/share/axonops/axonops-jvm.options"
+    # connect_client — agent polls Connect's REST API. Always loopback since
+    # the agent is co-located with the worker.
+    axon_agent_connect_enabled: true
+    # Explicit override wins; otherwise reuse the AxonOps Kafka cluster
+    # name; otherwise fall back to the Connect worker group.id.
+    axon_agent_connect_cluster_name: >-
+      {{ kafka_connect_axonops_connect_cluster_name
+         if (kafka_connect_axonops_connect_cluster_name | default('') | length > 0)
+         else (kafka_connect_axonops_cluster_name | default(kafka_connect_group_id)) }}
+    axon_agent_connect_url: "http://localhost:{{ kafka_connect_rest_advertised_port }}"
+    axon_agent_include_service_config: true
+  when: kafka_connect_axonops_agent_enabled | bool
+  tags: axonops_agent

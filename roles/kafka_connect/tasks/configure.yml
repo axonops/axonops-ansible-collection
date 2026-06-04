@@ -1,0 +1,47 @@
+---
+- name: Ensure /etc/sysconfig exists
+  ansible.builtin.file:
+    path: /etc/sysconfig
+    state: directory
+    mode: "0755"
+
+- name: Render Kafka Connect environment file
+  ansible.builtin.template:
+    src: kafka-connect.env.j2
+    dest: /etc/sysconfig/kafka-connect
+    owner: root
+    group: "{{ kafka_connect_group }}"
+    mode: "0640"
+  notify: Restart Kafka Connect
+
+- name: Render connect-distributed.properties
+  ansible.builtin.template:
+    src: connect-distributed.properties.j2
+    dest: "{{ kafka_connect__config_file }}"
+    owner: "{{ kafka_connect_user }}"
+    group: "{{ kafka_connect_group }}"
+    mode: "0640"
+  no_log: "{{ kafka_connect__sasl_on | bool }}"
+  notify: Restart Kafka Connect
+
+- name: Deploy Kafka Connect systemd unit
+  ansible.builtin.template:
+    src: kafka-connect.service.j2
+    dest: /etc/systemd/system/kafka-connect.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable Kafka Connect at boot
+  ansible.builtin.systemd:
+    name: kafka-connect
+    enabled: "{{ kafka_connect_start_on_boot | bool }}"
+    daemon_reload: true
+
+- name: Start Kafka Connect
+  ansible.builtin.systemd:
+    name: kafka-connect
+    state: started
+    daemon_reload: true
+  when: kafka_connect_start_on_install | bool

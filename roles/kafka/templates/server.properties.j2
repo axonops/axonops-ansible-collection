@@ -17,6 +17,9 @@ inter.broker.listener.name={{ kafka_inter_broker_listener_name | default('', tru
 
 {% if kafka__has_broker | bool %}
 advertised.listeners={{ kafka__broker_listener_name }}://{{ kafka_node_ip }}:9092
+{% if kafka_rack | default('') | length > 0 %}
+broker.rack={{ kafka_rack }}
+{% endif %}
 {% endif %}
 
 controller.listener.names={{ kafka__controller_listener_name }}

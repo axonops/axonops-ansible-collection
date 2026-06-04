@@ -1,0 +1,134 @@
+---
+# ============================================================================
+# Kafka Connect Role - Default Variables
+# ============================================================================
+
+# --- Version & Download -----------------------------------------------------
+# Connect ships in the same tarball as Kafka. By default we reuse the kafka
+# role's version variables when they are set; override here for a standalone
+# install.
+
+kafka_connect_version: "{{ kafka_version | default('4.0.0') }}"
+kafka_connect_scala_version: "{{ kafka_scala_version | default('2.13') }}"
+kafka_connect_java_version: "{{ kafka_java_version | default(17) }}"
+kafka_connect_java_install: true
+
+# Download tuning. Default URL is dlcdn.apache.org (current releases only);
+# point at archive.apache.org via kafka_connect_download_url_override for
+# versions no longer on the CDN, or at an internal artifact cache.
+kafka_connect_download_timeout: 600
+kafka_connect_download_retries: 5
+kafka_connect_download_retry_delay: 10
+# Examples:
+#   kafka_connect_download_url_override: "https://archive.apache.org/dist/kafka/3.7.0/kafka_2.13-3.7.0.tgz"
+#   kafka_connect_download_url_override: "https://artifacts.internal/kafka_2.13-4.0.0.tgz"
+kafka_connect_download_url_override: ""
+
+# --- Installation -----------------------------------------------------------
+
+kafka_connect_install_root: /opt
+kafka_connect_user: kafka
+kafka_connect_group: kafka
+
+# --- Paths ------------------------------------------------------------------
+
+kafka_connect_log_dir: /var/log/kafka-connect
+kafka_connect_config_dir: /etc/kafka-connect
+kafka_connect_plugin_path: /opt/kafka-connect/plugins
+
+# Local directory on the control node holding plugin uber-JARs and connector
+# folders. Contents are copied verbatim into kafka_connect_plugin_path. The
+# default points at the playbook directory, so `files/connect-libs/` next to
+# your playbook is picked up automatically. Set to "" to skip the sync.
+kafka_connect_local_plugins_dir: "{{ playbook_dir }}/files/connect-libs"
+
+# --- JVM --------------------------------------------------------------------
+
+kafka_connect_heap_size: 1G
+kafka_connect_opts: []
+
+# --- Cluster ----------------------------------------------------------------
+
+# Bootstrap brokers Connect talks to. Auto-derived from the kafka_brokers
+# inventory group when present (using each broker's kafka_node_ip:9092).
+# Override with a plain list of host:port strings for an external cluster.
+kafka_connect_bootstrap_servers: >-
+  {{ groups['kafka_brokers'] | default([])
+     | map('extract', hostvars, ['kafka_node_ip'])
+     | map('regex_replace', '$', ':9092')
+     | list }}
+
+# Connect cluster identifier. All workers sharing this group.id form one
+# cluster and rebalance work between themselves.
+kafka_connect_group_id: connect-cluster
+
+# REST API listener. Defaults to all interfaces, port 8083.
+kafka_connect_rest_listener: "http://0.0.0.0:8083"
+# Advertised hostname for the REST API. Defaults to the host's kafka_node_ip
+# when set (matches the listener IPs used elsewhere), else ansible_host.
+kafka_connect_rest_advertised_host: >-
+  {{ kafka_node_ip | default(ansible_host | default(ansible_default_ipv4.address)) }}
+kafka_connect_rest_advertised_port: 8083
+
+# Internal topics. Replication factor defaults to the number of brokers in
+# the kafka_brokers group, capped at 3.
+kafka_connect_offset_storage_topic: connect-offsets
+kafka_connect_config_storage_topic: connect-configs
+kafka_connect_status_storage_topic: connect-status
+kafka_connect_replication_factor: >-
+  {{ [groups['kafka_brokers'] | default([]) | length, 3] | min }}
+kafka_connect_offset_storage_partitions: 25
+kafka_connect_status_storage_partitions: 5
+
+# Converters
+kafka_connect_key_converter: org.apache.kafka.connect.json.JsonConverter
+kafka_connect_value_converter: org.apache.kafka.connect.json.JsonConverter
+kafka_connect_key_converter_schemas_enable: false
+kafka_connect_value_converter_schemas_enable: false
+
+# --- Security ---------------------------------------------------------------
+
+# When false, Connect uses PLAINTEXT to talk to Kafka.
+kafka_connect_security_enabled: "{{ kafka_security_enabled | default(false) | bool }}"
+
+# SASL. The same identity is used by Connect's producer, consumer and admin
+# clients. With strict ACLs grant this user Create/Describe/Read/Write on the
+# internal topics, plus access to whatever source/sink topics it touches —
+# or make it a super.user.
+kafka_connect_sasl_enabled: "{{ kafka_sasl_enabled | default(false) | bool }}"
+kafka_connect_sasl_mechanism: "{{ kafka_sasl_mechanism | default('PLAIN') }}"
+kafka_connect_sasl_user: "{{ kafka_sasl_inter_broker_user | default('kafka-admin') }}"
+kafka_connect_sasl_password: "{{ kafka_sasl_inter_broker_password | default('') }}"
+
+# TLS. Path on the Connect host where the CA bundle (PEM) sits. Set only when
+# kafka_connect_tls_enabled is true.
+kafka_connect_tls_enabled: "{{ kafka_tls_enabled | default(false) | bool }}"
+kafka_connect_tls_ca_path: /etc/kafka-connect/tls/ca.pem
+kafka_connect_tls_keystore_path: ""
+kafka_connect_tls_keystore_password: ""
+
+# --- Service Control --------------------------------------------------------
+
+kafka_connect_start_on_install: false
+kafka_connect_start_on_boot: false
+
+# --- Arbitrary Extra Config -------------------------------------------------
+
+# Key/value pairs appended verbatim to connect-distributed.properties.
+kafka_connect_additional_config: {}
+
+# --- AxonOps Agent Integration ----------------------------------------------
+
+kafka_connect_axonops_agent_enabled: false
+# kafka_connect_axonops_org: ""
+# kafka_connect_axonops_key: ""
+# kafka_connect_axonops_cluster_name: ""
+
+# Name shown for this Connect cluster inside the agent's connect_client.clusters
+# block (and therefore in AxonOps). Defaults to kafka_connect_axonops_cluster_name
+# so the Connect view shares the parent Kafka cluster's label; set this to
+# decouple — e.g. one Kafka cluster monitored by multiple Connect clusters.
+kafka_connect_axonops_connect_cluster_name: ""
+kafka_connect_axonops_server_host: "agents.axonops.cloud"
+kafka_connect_axonops_agent_server_port: "{% if kafka_connect_axonops_server_host == 'agents.axonops.cloud' %}443{% else %}1888{% endif %}"
+kafka_connect_axonops_java_agent: "axon-kafka4-agent"

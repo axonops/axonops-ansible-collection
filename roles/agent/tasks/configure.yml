@@ -94,4 +94,25 @@
         insertbefore: "^exec "
         firstmatch: true
 
+- name: Add AxonOps agent config to connect-distributed.sh
+  when: axon_agent_kafka_connect_config_directory is defined and axon_agent_kafka_connect_config_directory != ""
+  block:
+    - name: Check connect-distributed.sh can be found
+      ansible.builtin.stat:
+        path: "{{ axon_agent_kafka_connect_config_directory }}/connect-distributed.sh"
+      register: _connect_start
+
+    - name: Fail if connect-distributed.sh not found
+      ansible.builtin.fail:
+        msg: "{{ axon_agent_kafka_connect_config_directory }}/connect-distributed.sh not found"
+      when: not _connect_start.stat.exists
+
+    - name: Add AxonOps agent config to connect-distributed.sh
+      ansible.builtin.lineinfile:
+        path: "{{ axon_agent_kafka_connect_config_directory }}/connect-distributed.sh"
+        line: "{{ axon_agent_kafka_connect_config }}"
+        regexp: '(axonops|axon-agent|axon-kafka)'
+        insertbefore: "^exec "
+        firstmatch: true
+
 # code: language=ansible
