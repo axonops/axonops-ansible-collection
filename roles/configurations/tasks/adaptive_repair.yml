@@ -6,7 +6,7 @@
     username: "{{ adaptive_repair.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
     password: "{{ adaptive_repair.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
     active: "{{ adaptive_repair.enabled | default(true) }}"
-    auth_token: "{{ adaptive_repair.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    auth_token: "{{ adaptive_repair.auth_token | default(auth_token | default(lookup('env', 'AXONOPS_TOKEN'))) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
     excludedtables: "{{ adaptive_repair.excludedtables | default([]) }}"
     filter_twcs: "{{ adaptive_repair.filter_twcs | default(True) }}"
     gc_grace: "{{ adaptive_repair.gc_grace | default(omit) }}"

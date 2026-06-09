@@ -23,11 +23,11 @@
   axonops.axonops.dashboard_template:
     org: "{{ org }}"
     cluster: "{{ cluster }}"
-    cluster_type: "{{ dashboard_item.cluster_type | default(omit) }}"
+    cluster_type: "{{ dashboard_item.cluster_type | default(cluster_type | default(omit)) }}"
     name: "{{ dashboard_item.name }}"
     filters: "{{ dashboard_item.filters | default(omit) }}"
     panels: "{{ dashboard_item.panels | default(omit) }}"
-    auth_token: "{{ dashboard_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    auth_token: "{{ dashboard_item.auth_token | default(auth_token | default(lookup('env', 'AXONOPS_TOKEN'))) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
     username: "{{ dashboard_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
     password: "{{ dashboard_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
   with_items:
