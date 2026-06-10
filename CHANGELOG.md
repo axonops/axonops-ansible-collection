@@ -19,6 +19,14 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
+- **cassandra 3.11 cassandra.yaml**: stop seeding
+  `cassandra_native_transport_port_ssl` with `9142` in the 3.11 vars
+  file. Cassandra 3.11 refuses to start when the key is set unless
+  `client_encryption_options.enabled: true` (`Encryption must be
+  enabled in client_encryption_options for native_transport_port_ssl`).
+  The variable is now undefined by default and must be opted into
+  alongside client encryption.
+
 - **cassandra 3.11 cassandra.yaml**: socket buffer + index summary keys no
   longer emit empty values that crash Cassandra at boot
   (`Can not set int field … to null value` /

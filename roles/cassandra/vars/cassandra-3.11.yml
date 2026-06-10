@@ -93,7 +93,11 @@ cassandra_memtable_cleanup_threshold: 0.11
 
 # Listen / broadcast / RPC (3.11 only)
 cassandra_listen_on_broadcast_address: false
-cassandra_native_transport_port_ssl: 9142
+# native_transport_port_ssl is intentionally undefined. Cassandra 3.11 refuses
+# to start with it set unless client_encryption is enabled
+# ("Encryption must be enabled in client_encryption_options for
+# native_transport_port_ssl"). Override in your playbook (typically 9142)
+# when enabling TLS.
 cassandra_native_transport_max_threads: 128
 cassandra_native_transport_max_concurrent_connections: -1
 cassandra_native_transport_max_concurrent_connections_per_ip: -1

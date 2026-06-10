@@ -733,7 +733,7 @@ native_transport_port: {{ cassandra_native_transport_port }}
 # from native_transport_port will use encryption for native_transport_port_ssl while
 # keeping native_transport_port unencrypted.
 # native_transport_port_ssl: 9142
-{% if cassandra_native_transport_port_ssl is defined %}
+{% if cassandra_native_transport_port_ssl is defined and cassandra_native_transport_port_ssl | string | length > 0 %}
 native_transport_port_ssl: {{ cassandra_native_transport_port_ssl }}
 {% endif %}
 
