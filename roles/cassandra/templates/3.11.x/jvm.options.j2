@@ -239,10 +239,18 @@
 # For systems with > 8 cores, the default ParallelGCThreads is 5/8 the number of logical cores.
 # Otherwise equal to the number of cores when 8 or less.
 # Machines with > 10 cores should try setting these to <= full cores.
+{% if cassandra_jvm_parallel_gc_threads | int > 0 %}
 -XX:ParallelGCThreads={{ cassandra_jvm_parallel_gc_threads }}
+{% else %}
+#-XX:ParallelGCThreads=16
+{% endif %}
 # By default, ConcGCThreads is 1/4 of ParallelGCThreads.
 # Setting both to the same value can reduce STW durations.
+{% if cassandra_jvm_conc_gc_threads | int > 0 %}
 -XX:ConcGCThreads={{ cassandra_jvm_conc_gc_threads }}
+{% else %}
+#-XX:ConcGCThreads=16
+{% endif %}
 
 # Do reference processing in parallel GC.
 -XX:+ParallelRefProcEnabled

@@ -19,6 +19,12 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
+- **cassandra 3.11 jvm.options**: render `-XX:ParallelGCThreads` and
+  `-XX:ConcGCThreads` only when set to a value `> 0`. Java 8's G1GC rejects
+  `0` for these (`The flag -XX:+UseG1GC can not be combined with
+  -XX:ParallelGCThreads=0`) and refuses to start. When unset (or `0`), the
+  lines are emitted as comments so the JVM auto-picks based on core count.
+
 - **cassandra**: `cassandra_use_password_files` no longer breaks Cassandra
   startup. The `keystore_password_file:` / `truststore_password_file:` keys it
   emitted were added in Apache Cassandra 6.0 (CASSANDRA-13428) and do not exist
