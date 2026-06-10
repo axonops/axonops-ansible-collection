@@ -327,7 +327,7 @@ key_cache_size_in_mb: {{ cassandra_key_cache_size_in_mb }}
 #
 # Default is 14400 or 4 hours.
 #key_cache_save_period: 14400
-key_cache_save_period: {{ cassandra_key_cache_save_period }}
+key_cache_save_period: {{ cassandra_key_cache_save_period_in_secs | int }}
 
 # Number of keys from the key cache to save
 # Disabled by default, meaning all keys are going to be saved
@@ -367,7 +367,7 @@ row_cache_size_in_mb: {{ cassandra_row_cache_size_in_mb }}
 #
 # Default is 0 to disable saving the row cache.
 #row_cache_save_period: 0
-row_cache_save_period: {{ cassandra_row_cache_save_period }}
+row_cache_save_period: {{ cassandra_row_cache_save_period_in_secs | int }}
 
 # Number of keys from the row cache to save.
 # Specify 0 (which is the default), meaning all keys are going to be saved
@@ -398,7 +398,7 @@ counter_cache_size_in_mb: {{ cassandra_counter_cache_size_in_mb }}
 #
 # Default is 7200 or 2 hours.
 #counter_cache_save_period: 7200
-counter_cache_save_period: {{ cassandra_counter_cache_save_period }}
+counter_cache_save_period: {{ cassandra_counter_cache_save_period_in_secs | int }}
 
 # Number of keys from the counter cache to save
 # Disabled by default, meaning all keys are going to be saved

@@ -63,6 +63,20 @@ cassandra_enable_user_defined_functions: false
 cassandra_enable_scripted_user_defined_functions: false
 cassandra_enable_materialized_views: "{{ cassandra_materialized_views_enabled | default(false) | bool }}"
 
+# Cache save periods — Cassandra 3.11 expects integer seconds, not the
+# duration strings (e.g. "4h", "2h", "0s") used by 4.1.x / 5.0.x. Strip
+# any unit suffix and multiply by its second-count so user overrides in
+# either form keep working on 3.11.
+cassandra_key_cache_save_period_in_secs: >-
+  {{ (cassandra_key_cache_save_period | string | regex_replace('[^0-9]', '') | int)
+     * ({'s': 1, 'm': 60, 'h': 3600, 'd': 86400, '': 1}[cassandra_key_cache_save_period | string | regex_replace('[0-9]', '') | lower]) }}
+cassandra_row_cache_save_period_in_secs: >-
+  {{ (cassandra_row_cache_save_period | string | regex_replace('[^0-9]', '') | int)
+     * ({'s': 1, 'm': 60, 'h': 3600, 'd': 86400, '': 1}[cassandra_row_cache_save_period | string | regex_replace('[0-9]', '') | lower]) }}
+cassandra_counter_cache_save_period_in_secs: >-
+  {{ (cassandra_counter_cache_save_period | string | regex_replace('[^0-9]', '') | int)
+     * ({'s': 1, 'm': 60, 'h': 3600, 'd': 86400, '': 1}[cassandra_counter_cache_save_period | string | regex_replace('[0-9]', '') | lower]) }}
+
 # Cache save behaviour (3.11 unconditional keys)
 cassandra_key_cache_keys_to_save: 100
 cassandra_row_cache_keys_to_save: 100

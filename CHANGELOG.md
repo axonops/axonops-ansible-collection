@@ -19,6 +19,15 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
+- **cassandra 3.11 cassandra.yaml**: `key_cache_save_period`,
+  `row_cache_save_period`, and `counter_cache_save_period` are now
+  rendered as integer seconds. The shared role defaults are duration
+  strings (`"4h"` / `"0s"` / `"2h"`) accepted by 4.1.x / 5.0.x but
+  rejected by 3.11 (`Cannot create property=key_cache_save_period …
+  For input string: "4h"`). The 3.11 vars file converts the friendly
+  defaults — and any user override in the same form — to seconds
+  before the template renders them.
+
 - **cassandra 3.11 jvm.options**: render `-XX:ParallelGCThreads` and
   `-XX:ConcGCThreads` only when set to a value `> 0`. Java 8's G1GC rejects
   `0` for these (`The flag -XX:+UseG1GC can not be combined with
