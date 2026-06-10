@@ -19,6 +19,20 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
+- **cassandra 3.11 cassandra.yaml**: unit-aware conversion of friendly
+  defaults to legacy `_in_ms` / `_in_kb` / `_in_mb` /
+  `_megabits_per_sec` keys. The shared role defaults carry units
+  (`"2s"`, `"30m"`, `"10MiB"`, `"24MiB/s"`); the previous 3.11 vars
+  file stripped non-digits with `regex_replace`, so `"2s"` rendered as
+  `write_request_timeout_in_ms: 2` (= 2 ms), `"30m"` as
+  `roles_validity_in_ms: 30`, etc. This silently broke timeouts and
+  triggered `Back-pressure window size must be >= 10` at boot because
+  the back-pressure window derives from `write_request_timeout_in_ms`.
+  The 3.11 vars file now multiplies each value by the unit's base
+  count (`s=1000`, `m=60000`, `MiB=1`, `MiB/s -> *8` for the
+  megabits-per-sec stream throughput vars) so user overrides in
+  either form land on the correct integer 3.11 expects.
+
 - **cassandra 3.11 cassandra.yaml**: stop seeding
   `cassandra_native_transport_port_ssl` with `9142` in the 3.11 vars
   file. Cassandra 3.11 refuses to start when the key is set unless
