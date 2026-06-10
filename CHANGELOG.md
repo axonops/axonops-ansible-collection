@@ -6,6 +6,17 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Added
+
+- **cassandra**: Apache Cassandra 3.11 support. The role now installs and
+  configures Cassandra 3.11.x via tar, using a dedicated `templates/3.11.x/`
+  set (legacy `cassandra.yaml` schema with `*_in_ms` / `*_in_mb` keys, single
+  `jvm.options` file, no `auto_optimise_*` / `commitlog_sync_group_window`
+  keys). The `java` role automatically picks Java 8 when `cassandra_version`
+  starts with `3.11`. New molecule scenario `cassandra-3.11` and example
+  playbook `examples/cassandra-3.11.yml`.
+  ([#108](https://github.com/axonops/axonops-ansible-collection/issues/108))
+
 ### Fixed
 
 - **cassandra**: `cassandra_use_password_files` no longer breaks Cassandra
