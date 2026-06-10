@@ -19,6 +19,21 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
+- **cassandra 3.11 cassandra.yaml**: socket buffer + index summary keys no
+  longer emit empty values that crash Cassandra at boot
+  (`Can not set int field … to null value` /
+  `internode_send_buff_size_in_bytes:`). The 3.11 vars file used to seed
+  `cassandra_{rpc,internode}_{send,recv}_buff_size_in_bytes` and
+  `cassandra_index_summary_capacity_in_mb` with `""`; the template's
+  `is defined` guard then evaluated true and rendered the key with no
+  value. The vars are now left undefined and the template guards also
+  reject empty strings, so Cassandra falls back to its JVM defaults
+  (or `net.ipv4.tcp_{r,w}mem` for the socket buffers). Also fixed two
+  mismatched-variable bugs carried over from the reference template:
+  `internode_recv_buff_size_in_bytes` was guarded by
+  `cassandra_rpc_recv_buff_size_in_bytes`, and `broadcast_address` was
+  guarded by `cassandra_memtable_broadcast_address`.
+
 - **cassandra 3.11 cassandra.yaml**: `key_cache_save_period`,
   `row_cache_save_period`, and `counter_cache_save_period` are now
   rendered as integer seconds. The shared role defaults are duration

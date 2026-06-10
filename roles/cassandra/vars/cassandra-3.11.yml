@@ -86,8 +86,10 @@ cassandra_counter_cache_keys_to_save: 100
 cassandra_buffer_pool_use_heap_if_exhausted: true
 cassandra_memtable_cleanup_threshold: 0.11
 
-# Index summary (3.11 only — unconditional in template)
-cassandra_index_summary_capacity_in_mb: ""
+# Index summary, RPC / internode buffer sizes: intentionally left undefined.
+# The 3.11 cassandra.yaml template guards each with `is defined and length > 0`
+# so the JVM picks its native defaults (or values from net.ipv4.tcp_{r,w}mem
+# for the socket buffers). Override in your playbook to force a value.
 
 # Listen / broadcast / RPC (3.11 only)
 cassandra_listen_on_broadcast_address: false
@@ -98,12 +100,8 @@ cassandra_native_transport_max_concurrent_connections_per_ip: -1
 cassandra_start_rpc: false
 cassandra_rpc_port: 9160
 cassandra_rpc_server_type: sync
-cassandra_rpc_send_buff_size_in_bytes: ""
-cassandra_rpc_recv_buff_size_in_bytes: ""
 cassandra_rpc_min_threads: 16
 cassandra_rpc_max_threads: 2048
-cassandra_internode_send_buff_size_in_bytes: ""
-cassandra_internode_recv_buff_size_in_bytes: ""
 
 # Misc 3.11-only unconditional keys
 cassandra_cross_node_timeout: false

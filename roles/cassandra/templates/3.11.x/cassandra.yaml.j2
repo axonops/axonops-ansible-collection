@@ -632,10 +632,10 @@ memtable_flush_writers: {{ cassandra_memtable_flush_writers }}
 # shrink their index summaries in order to meet this limit.  However, this
 # is a best-effort process. In extreme conditions Cassandra may need to use
 # more than this amount of memory.
-{% if cassandra_index_summary_capacity_in_mb is defined %}
+{% if cassandra_index_summary_capacity_in_mb is defined and cassandra_index_summary_capacity_in_mb | string | length > 0 %}
 index_summary_capacity_in_mb: {{ cassandra_index_summary_capacity_in_mb }}
 {% else %}
-index_summary_capacity_in_mb:
+#index_summary_capacity_in_mb:
 {% endif %}
 
 # How frequently index summaries should be resampled.  This is done
@@ -698,7 +698,7 @@ listen_address: localhost
 # Address to broadcast to other Cassandra nodes
 # Leaving this blank will set it to the same value as listen_address
 # broadcast_address: 1.2.3.4
-{% if cassandra_memtable_broadcast_address is defined %}
+{% if cassandra_broadcast_address is defined and cassandra_broadcast_address | string | length > 0 %}
 broadcast_address: {{ cassandra_broadcast_address }}
 {% endif %}
 
@@ -860,10 +860,10 @@ rpc_server_type: {{ cassandra_rpc_server_type }}
 # uncomment to set socket buffer sizes on rpc connections
 # rpc_send_buff_size_in_bytes:
 # rpc_recv_buff_size_in_bytes:
-{% if cassandra_rpc_send_buff_size_in_bytes is defined %}
+{% if cassandra_rpc_send_buff_size_in_bytes is defined and cassandra_rpc_send_buff_size_in_bytes | string | length > 0 %}
 rpc_send_buff_size_in_bytes: {{ cassandra_rpc_send_buff_size_in_bytes }}
 {% endif %}
-{% if cassandra_rpc_recv_buff_size_in_bytes is defined %}
+{% if cassandra_rpc_recv_buff_size_in_bytes is defined and cassandra_rpc_recv_buff_size_in_bytes | string | length > 0 %}
 rpc_recv_buff_size_in_bytes: {{ cassandra_rpc_recv_buff_size_in_bytes }}
 {% endif %}
 
@@ -882,10 +882,10 @@ rpc_recv_buff_size_in_bytes: {{ cassandra_rpc_recv_buff_size_in_bytes }}
 # Note that when setting this, the buffer size is limited by net.core.wmem_max
 # and when not setting it it is defined by net.ipv4.tcp_wmem
 # internode_recv_buff_size_in_bytes:
-{% if cassandra_internode_send_buff_size_in_bytes is defined %}
+{% if cassandra_internode_send_buff_size_in_bytes is defined and cassandra_internode_send_buff_size_in_bytes | string | length > 0 %}
 internode_send_buff_size_in_bytes: {{ cassandra_internode_send_buff_size_in_bytes }}
 {% endif %}
-{% if cassandra_rpc_recv_buff_size_in_bytes is defined %}
+{% if cassandra_internode_recv_buff_size_in_bytes is defined and cassandra_internode_recv_buff_size_in_bytes | string | length > 0 %}
 internode_recv_buff_size_in_bytes: {{ cassandra_internode_recv_buff_size_in_bytes }}
 {% endif %}
 
