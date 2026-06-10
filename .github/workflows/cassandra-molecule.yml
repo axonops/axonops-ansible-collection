@@ -22,6 +22,7 @@ jobs:
     name: Molecule Cassandra (${{ matrix.scenario }} / ${{ matrix.distro }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         distro:
           - rockylinux9
