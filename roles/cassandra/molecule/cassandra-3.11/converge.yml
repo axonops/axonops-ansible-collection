@@ -13,11 +13,10 @@
     # Cassandra 3.11 requires Java 8.
     cassandra_seeds: "127.0.0.1"
   pre_tasks:
-    - name: "Create /usr/share/man/man1/"
+    - name: Workaround missing man1 dir in test containers
       ansible.builtin.file:
-        path: /usr/share/man/man1/
+        path: /usr/share/man/man1
         state: directory
-        recurse: true
         mode: "0755"
   roles:
     - role: java
