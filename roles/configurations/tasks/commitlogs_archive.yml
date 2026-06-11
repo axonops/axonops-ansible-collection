@@ -28,7 +28,7 @@
   axonops.axonops.commitlog_archive:
     org: "{{ org }}"
     cluster: "{{ cluster }}"
-    cluster_type: "{{ commitlog_item.cluster_type|default(omit) }}"
+    cluster_type: "{{ commitlog_item.cluster_type | default(cluster_type | default(omit)) }}"
     present: "{{ commitlog_item.present|default(true) }}"
     remote_path: "{{ commitlog_item.remote_path }}"
     remote_retention: "{{ commitlog_item.remote_retention|default('60d') }}"
@@ -55,7 +55,7 @@
     ssh_user: "{{ commitlog_item.ssh_user |default(omit)}}"
     ssh_pass: "{{ commitlog_item.ssh_pass |default(omit)}}"
     key_file: "{{ commitlog_item.key_file |default(omit)}}"
-    auth_token: "{{ commitlog_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    auth_token: "{{ commitlog_item.auth_token | default(auth_token | default(lookup('env', 'AXONOPS_TOKEN'))) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
     username: "{{ commitlog_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
     password: "{{ commitlog_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
   with_items:
