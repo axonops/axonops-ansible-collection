@@ -25,6 +25,34 @@ dynamic_snitch_reset_interval: 600000ms
 
 Before running this playbook for Cassandra 5.0, review the variables in [roles/cassandra/defaults/main.yml](../../roles/cassandra/defaults/main.yml) and compare them against the appropriate template.
 
+## Cassandra 3.11 support
+
+Cassandra 3.11.x is supported via the dedicated `templates/3.11.x/` set and the
+`vars/cassandra-3.11.yml` variable file. The role uses the **legacy**
+`cassandra.yaml` schema (`_in_ms`, `_in_mb`, `_in_kb` suffixed keys) and a
+single `jvm.options` file (4.x/5.x split into `jvm-server.options` plus
+client/version files). The 4.x/5.x-only keys (`auto_optimise_*`,
+`commitlog_sync_group_window`, `repaired_data_tracking_*`,
+`corrupted_tombstone_strategy`, `full_query_logging_options`,
+`client_encryption_options.optional` is preserved but unused on 3.11) are
+**not emitted** for 3.11.
+
+Cassandra 3.11 requires Java 8. The `axonops.axonops.java` role detects
+`cassandra_version.startswith('3.11')` and selects the Java 8 package
+automatically. Set `java_use_zulu: true` on RHEL 10+ / Debian 13+ where the
+base repositories no longer ship OpenJDK 8.
+
+```yaml
+cassandra_version: 3.11.17
+cassandra_cluster_name: legacy-cluster
+cassandra_dc: dc1
+cassandra_rack: rack1
+cassandra_max_heap_size: 4G
+```
+
+See [examples/cassandra-3.11.yml](../../examples/cassandra-3.11.yml) for a
+complete playbook including AxonOps agent.
+
 ## Role Variables
 
 ### Basic Configuration
@@ -100,9 +128,36 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
 | `cassandra_ssl_internode_encryption` | `none` | Internode encryption: `none`, `all`, `dc`, or `rack` |
 | `cassandra_ssl_client_encryption_enabled` | `false` | Enable client-to-node encryption |
 | `cassandra_ssl_internode_keystore_file` | `conf/.keystore` | Keystore file path |
-| `cassandra_ssl_internode_keystore_pass` | `cassandra` | Keystore password |
+| `cassandra_ssl_internode_keystore_pass` | `cassandra` | Keystore password. Read by the role to write the password file or render the inline value. Alias `cassandra_ssl_keystore_pass` is also accepted. |
 | `cassandra_ssl_truststore_file` | `conf/.truststore` | Truststore file path |
 | `cassandra_ssl_truststore_pass` | `cassandra` | Truststore password |
+
+##### Password files (default)
+
+> **⚠ Behaviour change in this release.** Previously, JKS passwords were written
+> inline into `cassandra.yaml`. By default the role now externalises them to
+> `*_password_file:` references. Running the role on an existing node will
+> rewrite `cassandra.yaml` and notify the `Restart Cassandra` handler. No data
+> is lost. To keep the legacy inline behaviour, set
+> `cassandra_use_password_files: false`.
+
+By default the role keeps JKS keystore/truststore passwords out of `cassandra.yaml`. Each password is written to a separate mode `0600` file owned by the cassandra user, and `cassandra.yaml` references it via `keystore_password_file:` / `truststore_password_file:` keys (a stock Cassandra feature, not a third-party extension). This applies to both `server_encryption_options` and `client_encryption_options`.
+
+Files are written only when (a) the relevant TLS path is enabled and (b) the configured password is non-empty.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_use_password_files` | `true` | Externalise keystore/truststore passwords to `*_password_file` references. Set to `false` to inline passwords in `cassandra.yaml` (legacy behaviour). |
+| `cassandra_ssl_keystore_password_file` | `{{ cassandra_conf_dir }}/server_keystore_passwordfile.txt` | Path to the server keystore password file. |
+| `cassandra_ssl_truststore_password_file` | `{{ cassandra_conf_dir }}/server_truststore_passwordfile.txt` | Path to the server truststore password file. |
+| `cassandra_ssl_client_keystore_password_file` | `{{ cassandra_conf_dir }}/client_keystore_passwordfile.txt` | Path to the client keystore password file. |
+| `cassandra_ssl_client_truststore_password_file` | `{{ cassandra_conf_dir }}/client_truststore_passwordfile.txt` | Path to the client truststore password file. |
+
+To opt out for a host or group:
+
+```yaml
+cassandra_use_password_files: false
+```
 
 #### PEM-based TLS (Cassandra 4.1+)
 

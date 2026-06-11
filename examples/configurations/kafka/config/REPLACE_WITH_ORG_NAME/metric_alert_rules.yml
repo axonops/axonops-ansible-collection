@@ -13,8 +13,8 @@ axonops_alert_rules:
   dashboard: Kafka Overview
   chart: Active Controller
   operator: '>='
-  warning_value: 1
-  critical_value: 1
+  warning_value: 2
+  critical_value: 2
   duration: 1m
   description: More than one active controller — split-brain condition. Page immediately.
 
@@ -145,15 +145,6 @@ axonops_alert_rules:
   critical_value: 1
   duration: 5m
   description: One or more connector tasks have failed. Connect does NOT automatically restart failed tasks. Restart via REST API POST /connectors/{name}/tasks/{id}/restart.
-
-- name: Connect Task Running Ratio Low
-  dashboard: Connect Tasks
-  chart: Connector Task Running Ratio
-  operator: '<'
-  warning_value: 75
-  critical_value: 50
-  duration: 5m
-  description: A task is spending more than half its time not running (paused or backpressured). Investigate downstream system performance.
 
 - name: Connect Task Commit Success Rate Low
   dashboard: Connect Tasks

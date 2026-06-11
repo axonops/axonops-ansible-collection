@@ -23,7 +23,7 @@
   axonops.axonops.log_alert_rule:
     org: "{{ org }}"
     cluster: "{{ cluster }}"
-    cluster_type: "{{ logalert_item.cluster_type | default(omit) }}"
+    cluster_type: "{{ logalert_item.cluster_type | default(cluster_type | default(omit)) }}"
     name: "{{ logalert_item.name }}"
     content: "{{ logalert_item.content | default('') }}"
     operator: "{{ logalert_item.operator | default('>=') }}"
@@ -39,7 +39,7 @@
     dc: "{{ logalert_item.dc | default([]) }}"
     rack: "{{ logalert_item.rack | default([]) }}"
     host_id: "{{ logalert_item.host_id | default([]) }}"
-    auth_token: "{{ logalert_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    auth_token: "{{ logalert_item.auth_token | default(auth_token | default(lookup('env', 'AXONOPS_TOKEN'))) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
     username: "{{ logalert_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
     password: "{{ logalert_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
 

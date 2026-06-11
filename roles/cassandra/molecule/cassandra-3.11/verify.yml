@@ -1,0 +1,67 @@
+---
+- name: Verify — Cassandra 3.11 install + config
+  hosts: all
+  gather_facts: false
+  vars:
+    cassandra_version: 3.11.17
+    cassandra_install_root: /opt
+    cassandra_conf_dir: "/opt/apache-cassandra-{{ cassandra_version }}/conf"
+  tasks:
+    - name: Tar extracted to versioned dir
+      ansible.builtin.stat:
+        path: "{{ cassandra_install_root }}/apache-cassandra-{{ cassandra_version }}"
+      register: install_dir
+      failed_when: not install_dir.stat.exists or not install_dir.stat.isdir
+
+    - name: Check cassandra.yaml exists
+      ansible.builtin.stat:
+        path: "{{ cassandra_conf_dir }}/cassandra.yaml"
+      register: yaml_stat
+      failed_when: not yaml_stat.stat.exists
+
+    - name: Check jvm.options exists (3.11 single-file layout)
+      ansible.builtin.stat:
+        path: "{{ cassandra_conf_dir }}/jvm.options"
+      register: jvm_opts_stat
+      failed_when: not jvm_opts_stat.stat.exists
+
+    - name: Check jvm-server.options absent (4.x/5.x only)
+      ansible.builtin.stat:
+        path: "{{ cassandra_conf_dir }}/jvm-server.options"
+      register: jvm_server_stat
+      failed_when: jvm_server_stat.stat.exists
+
+    - name: Slurp cassandra.yaml
+      ansible.builtin.slurp:
+        src: "{{ cassandra_conf_dir }}/cassandra.yaml"
+      register: yaml_slurp
+
+    - name: Parse cassandra.yaml
+      ansible.builtin.set_fact:
+        yaml_content: "{{ yaml_slurp.content | b64decode }}"
+        yaml_doc: "{{ yaml_slurp.content | b64decode | from_yaml }}"
+
+    - name: Check cluster_name set in cassandra.yaml
+      ansible.builtin.assert:
+        that:
+          - yaml_doc.cluster_name is defined
+          - yaml_doc.cluster_name == 'cassandra-3-11'
+
+    - name: 4.x/5.x-only keys MUST NOT appear in 3.11 cassandra.yaml
+      ansible.builtin.assert:
+        that:
+          - "'auto_optimise_full_repair_streams' not in yaml_content"
+          - "'auto_optimise_inc_repair_streams' not in yaml_content"
+          - "'auto_optimise_preview_repair_streams' not in yaml_content"
+          - "'commitlog_sync_group_window' not in yaml_content"
+          - "'repaired_data_tracking_for_range_reads_enabled' not in yaml_content"
+          - "'repaired_data_tracking_for_partition_reads_enabled' not in yaml_content"
+          - "'corrupted_tombstone_strategy' not in yaml_content"
+          - "'full_query_logging_options' not in yaml_content"
+
+    - name: Legacy 3.11 keys present
+      ansible.builtin.assert:
+        that:
+          - "'commitlog_sync_period_in_ms' in yaml_content"
+          - "'max_hint_window_in_ms' in yaml_content"
+          - "'native_transport_max_frame_size_in_mb' in yaml_content"

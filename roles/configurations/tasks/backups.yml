@@ -28,7 +28,7 @@
   axonops.axonops.backup:
     org: "{{ org }}"
     cluster: "{{ cluster }}"
-    cluster_type: "{{ backups_item.cluster_type | default(omit) }}"
+    cluster_type: "{{ backups_item.cluster_type | default(cluster_type | default(omit)) }}"
     present: "{{ backups_item.present | default(true) }}"
     local_retention: "{{ backups_item.local_retention | default('10d') }}"
     remote_path: "{{ backups_item.remote_path | default(omit) }}"
@@ -66,7 +66,7 @@
     ssh_user: "{{ backups_item.ssh_user | default(omit) }}"
     ssh_pass: "{{ backups_item.ssh_pass | default(omit) }}"
     key_file: "{{ backups_item.key_file | default(omit) }}"
-    auth_token: "{{ backups_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    auth_token: "{{ backups_item.auth_token | default(auth_token | default(lookup('env', 'AXONOPS_TOKEN'))) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
     username: "{{ backups_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
     password: "{{ backups_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
   with_items:

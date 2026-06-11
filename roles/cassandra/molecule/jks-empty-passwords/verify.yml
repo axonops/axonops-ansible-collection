@@ -1,0 +1,55 @@
+---
+# BDD verification — JKS TLS with empty passwords (edge case)
+#
+# Behaviour under test: when keystore/truststore passwords are empty strings,
+# the role MUST NOT write empty 0600 password files, and cassandra.yaml MUST
+# NOT emit *_password_file: keys pointing at non-existent / empty files.
+
+- name: Verify empty-password edge case (BDD)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: GIVEN — read cassandra_conf_dir recorded by converge
+      ansible.builtin.slurp:
+        src: /tmp/cassandra_conf_dir
+      register: conf_dir_raw
+
+    - name: GIVEN — set cassandra_conf_dir fact
+      ansible.builtin.set_fact:
+        cassandra_conf_dir: "{{ conf_dir_raw.content | b64decode | trim }}"
+
+    - name: GIVEN — read rendered cassandra.yaml
+      ansible.builtin.slurp:
+        src: "{{ cassandra_conf_dir }}/cassandra.yaml"
+      register: cassandra_yaml_raw
+
+    - name: GIVEN — decode cassandra.yaml
+      ansible.builtin.set_fact:
+        cassandra_yaml: "{{ cassandra_yaml_raw.content | b64decode }}"
+
+    - name: THEN — stat all four password files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /etc/cassandra/server_keystore_passwordfile.txt
+        - /etc/cassandra/server_truststore_passwordfile.txt
+        - /etc/cassandra/client_keystore_passwordfile.txt
+        - /etc/cassandra/client_truststore_passwordfile.txt
+      register: pf_stats
+
+    - name: THEN — assert each password file is absent
+      ansible.builtin.assert:
+        that:
+          - not item.stat.exists
+        fail_msg: "{{ item.item }} was written despite empty password"
+      loop: "{{ pf_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: THEN — cassandra.yaml has no *_password_file keys
+      ansible.builtin.assert:
+        that:
+          - cassandra_yaml is not search('(?m)^\s+keystore_password_file:\s')
+          - cassandra_yaml is not search('(?m)^\s+truststore_password_file:\s')
+        fail_msg: "cassandra.yaml references a password file that was not written"

@@ -1,9 +1,11 @@
-_java_pkg: "{% if cassandra_version is defined and cassandra_version.startswith('5') %}openjdk-17-jre-headless{% else %}openjdk-11-jre-headless{% endif %}"
+_java_pkg: "{% if cassandra_version is defined and cassandra_version.startswith('5') %}openjdk-17-jre-headless{% elif cassandra_version is defined and cassandra_version.startswith('3.11') %}openjdk-8-jre-headless{% else %}openjdk-11-jre-headless{% endif %}"
 _zulu_major_version: >-
   {%- if java_zulu_version is defined and java_zulu_version != '' -%}
     {{ java_zulu_version }}
   {%- elif cassandra_version is defined and cassandra_version.startswith('5') -%}
     17
+  {%- elif cassandra_version is defined and cassandra_version.startswith('3.11') -%}
+    8
   {%- else -%}
     11
   {%- endif -%}
