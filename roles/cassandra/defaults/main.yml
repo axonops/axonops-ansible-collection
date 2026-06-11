@@ -355,7 +355,7 @@ cassandra_transparent_data_encryption_options:
           key_password: "cassandra"
 
 # jemalloc
-cassandra_jemalloc_enabled: "{{ ansible_facts['os_family'] == 'Debian' }}"
+cassandra_jemalloc_enabled: true
 # cassandra_libjemalloc_path: ""  # auto-detected when cassandra_jemalloc_enabled is true
 
 # JVM

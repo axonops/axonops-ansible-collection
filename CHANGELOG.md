@@ -23,6 +23,12 @@ All notable changes to this collection are documented here. The format is based 
   (`Ubuntu, Debian, CentOS, RedHat, Rocky, Amazon`). All other roles
   already branch on `ansible_os_family`, which Amazon Linux reports
   as `RedHat`, so no further changes were required.
+- **cassandra**: jemalloc install on Amazon Linux. The
+  `epel-release` package is not available in the Amazon Linux
+  repositories (`No package epel-release available.`); skip that
+  task on Amazon Linux and install `jemalloc` directly from the
+  distribution's own repos (where it is shipped by default on
+  Amazon Linux 2023 and via `amazon-linux-extras` on AL2).
 
 ### Fixed
 

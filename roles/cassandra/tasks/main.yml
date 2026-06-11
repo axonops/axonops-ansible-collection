@@ -211,6 +211,14 @@
         name: libjemalloc2
         state: present
 
+    - name: Install epel-release for jemalloc on RedHat
+      when:
+        - ansible_os_family == "RedHat"
+        - ansible_distribution != "Amazon"
+      ansible.builtin.yum:
+        name: epel-release
+        state: present
+
     - name: Install jemalloc package (RedHat)
       when: ansible_os_family == "RedHat"
       ansible.builtin.package:
