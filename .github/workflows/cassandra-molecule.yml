@@ -22,6 +22,7 @@ jobs:
     name: Molecule Cassandra (${{ matrix.scenario }} / ${{ matrix.distro }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         distro:
           - rockylinux9
@@ -39,6 +40,7 @@ jobs:
           - jks-inline-password
           - jks-tls-disabled
           - jks-empty-passwords
+          - cassandra-3.11
 
     steps:
       - name: Check out the codebase.
@@ -72,7 +74,7 @@ jobs:
           MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
 
       - name: Run Molecule verify
-        if: contains(matrix.scenario, 'jks-')
+        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11'
         run: molecule -v verify -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'
@@ -82,7 +84,7 @@ jobs:
           MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
 
       - name: Run Molecule idempotence
-        if: contains(matrix.scenario, 'jks-')
+        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11'
         run: molecule -v idempotence -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'

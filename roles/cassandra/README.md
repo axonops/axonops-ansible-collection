@@ -2,6 +2,22 @@
 
 Installs and configures Apache Cassandra from the Apache tar distribution.
 
+## Supported versions
+
+| Cassandra | Java | `cassandra.yaml` schema | JVM options file(s) |
+|-----------|------|--------------------------|---------------------|
+| 3.11.x    | 8    | Legacy (`*_in_ms`, `*_in_mb`) | `jvm.options` |
+| 4.1.x     | 11   | Modern (duration/size strings) | `jvm-server.options`, `jvm11-server.options`, `jvm-clients.options`, `jvm11-clients.options` |
+| 5.0.x     | 17   | Modern (duration/size strings) | `jvm-server.options`, `jvm11-server.options`, `jvm-clients.options`, `jvm11-clients.options`, `jvm17-server.options`, `jvm17-clients.options` |
+
+Set `cassandra_version` to a value starting with `3.11`, `4.1`, or `5.` — anything
+else makes the role fail fast at the version assertion.
+
+The `axonops.axonops.java` role auto-selects the Java major version from
+`cassandra_version` (Java 8 for 3.11, Java 11 for 4.1, Java 17 for 5.x); use
+`java_use_zulu: true` on RHEL 10+ / Debian 13+ where the base repos no longer
+ship the relevant OpenJDK package.
+
 ## Requirements
 
 - Java must be installed before running this role (use `axonops.axonops.java`).
@@ -85,3 +101,28 @@ See `defaults/main.yml` for the full list of PEM variables (`cassandra_ssl_inter
         cassandra_cluster_name: my-cluster
         cassandra_dc: dc1
 ```
+
+## Example: Cassandra 3.11
+
+Cassandra 3.11 requires Java 8 and uses the legacy `cassandra.yaml` schema.
+The role picks the right template directory (`templates/3.11.x/`), variable
+set (`vars/cassandra-3.11.yml`) and config file list (single `jvm.options`)
+automatically when `cassandra_version` starts with `3.11`.
+
+```yaml
+- hosts: cassandra
+  become: true
+  vars:
+    cassandra_version: 3.11.17
+    cassandra_cluster_name: legacy-cluster
+    cassandra_dc: dc1
+    cassandra_rack: rack1
+    cassandra_max_heap_size: 4G
+    cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | join(',') }}"
+  roles:
+    - role: axonops.axonops.java
+      # No need to set java_zulu_version — the java role detects 3.11 → Java 8.
+    - role: axonops.axonops.cassandra
+```
+
+A full working example lives at [`examples/cassandra-3.11.yml`](../../examples/cassandra-3.11.yml).

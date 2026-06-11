@@ -25,6 +25,34 @@ dynamic_snitch_reset_interval: 600000ms
 
 Before running this playbook for Cassandra 5.0, review the variables in [roles/cassandra/defaults/main.yml](../../roles/cassandra/defaults/main.yml) and compare them against the appropriate template.
 
+## Cassandra 3.11 support
+
+Cassandra 3.11.x is supported via the dedicated `templates/3.11.x/` set and the
+`vars/cassandra-3.11.yml` variable file. The role uses the **legacy**
+`cassandra.yaml` schema (`_in_ms`, `_in_mb`, `_in_kb` suffixed keys) and a
+single `jvm.options` file (4.x/5.x split into `jvm-server.options` plus
+client/version files). The 4.x/5.x-only keys (`auto_optimise_*`,
+`commitlog_sync_group_window`, `repaired_data_tracking_*`,
+`corrupted_tombstone_strategy`, `full_query_logging_options`,
+`client_encryption_options.optional` is preserved but unused on 3.11) are
+**not emitted** for 3.11.
+
+Cassandra 3.11 requires Java 8. The `axonops.axonops.java` role detects
+`cassandra_version.startswith('3.11')` and selects the Java 8 package
+automatically. Set `java_use_zulu: true` on RHEL 10+ / Debian 13+ where the
+base repositories no longer ship OpenJDK 8.
+
+```yaml
+cassandra_version: 3.11.17
+cassandra_cluster_name: legacy-cluster
+cassandra_dc: dc1
+cassandra_rack: rack1
+cassandra_max_heap_size: 4G
+```
+
+See [examples/cassandra-3.11.yml](../../examples/cassandra-3.11.yml) for a
+complete playbook including AxonOps agent.
+
 ## Role Variables
 
 ### Basic Configuration

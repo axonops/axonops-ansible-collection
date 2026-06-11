@@ -21,10 +21,10 @@
   ansible.builtin.assert:
     that:
       - cassandra_version is defined
-      - cassandra_version.startswith('4.1') or cassandra_version.startswith('5.')
+      - cassandra_version.startswith('3.11') or cassandra_version.startswith('4.1') or cassandra_version.startswith('5.')
     fail_msg: >-
       Unsupported cassandra_version '{{ cassandra_version }}'. This role supports versions
-      starting with '4.1' or '5.'. Please set cassandra_version to a supported value.
+      starting with '3.11', '4.1' or '5.'. Please set cassandra_version to a supported value.
   tags: always
 
 - name: Assert Cassandra version supports PEMBasedSslContextFactory
@@ -58,6 +58,11 @@
     - name: Force-disable cassandra_use_password_files on unsupported versions
       ansible.builtin.set_fact:
         cassandra_use_password_files: false
+
+- name: Import vars for 3.11
+  ansible.builtin.include_vars: cassandra-3.11.yml
+  when: cassandra_version.startswith('3.11')
+  tags: always
 
 - name: Import vars for 4.1
   ansible.builtin.include_vars: cassandra-4.1.yml
@@ -206,6 +211,14 @@
         name: libjemalloc2
         state: present
 
+    - name: Install epel-release for jemalloc on RedHat
+      when:
+        - ansible_os_family == "RedHat"
+        - ansible_distribution != "Amazon"
+      ansible.builtin.yum:
+        name: epel-release
+        state: present
+
     - name: Install jemalloc package (RedHat)
       when: ansible_os_family == "RedHat"
       ansible.builtin.package:
@@ -249,7 +262,29 @@
         tmpl_dir: 4.1.x
       when: cassandra_version.startswith('4.1')
 
-    - name: Ensure Cassandra node configured
+    - name: Template directory
+      ansible.builtin.set_fact:
+        tmpl_dir: 3.11.x
+      when: cassandra_version.startswith('3.11')
+
+    - name: Ensure Cassandra node configured (3.11 only — legacy schema, single jvm.options)
+      when: cassandra_version.startswith('3.11')
+      ansible.builtin.template:
+        src: "{{ tmpl_dir }}/{{ item }}.j2"
+        dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
+        mode: "0640"
+        owner: cassandra
+        group: cassandra
+      loop:
+        - cassandra-env.sh
+        - cassandra-rackdc.properties
+        - cassandra.yaml
+        - logback.xml
+        - jvm.options
+      notify: Restart Cassandra
+
+    - name: Ensure Cassandra node configured (4.1.x / 5.x)
+      when: not cassandra_version.startswith('3.11')
       ansible.builtin.template:
         src: "{{ tmpl_dir }}/{{ item }}.j2"
         dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
