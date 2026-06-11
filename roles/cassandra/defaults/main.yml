@@ -36,7 +36,7 @@ cassandra_dynamic_snitch_enabled: true
 cassandra_gc_log_dir: /var/log/cassandra
 cassandra_log_dir: /var/log/cassandra
 cassandra_saved_caches_directory: /var/lib/cassandra/saved_caches
-cassandra_data_directory: /var/lib/cassandra
+cassandra_data_directory: /var/lib/cassandra/data
 cassandra_hints_directory: /var/lib/cassandra/hints
 cassandra_commitlog_directory: "/var/lib/cassandra/commitlog"
 cassandra_auto_bootstrap: true

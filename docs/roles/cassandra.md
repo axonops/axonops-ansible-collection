@@ -88,7 +88,7 @@ complete playbook including AxonOps agent.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `cassandra_data_directory` | `/var/lib/cassandra` | Base data directory |
+| `cassandra_data_directory` | `/var/lib/cassandra/data` | Data (SSTable) directory |
 | `cassandra_commitlog_directory` | `/var/lib/cassandra/commitlog` | Commit log directory |
 | `cassandra_saved_caches_directory` | `/var/lib/cassandra/saved_caches` | Saved caches directory |
 | `cassandra_hints_directory` | `/var/lib/cassandra/hints` | Hints directory |

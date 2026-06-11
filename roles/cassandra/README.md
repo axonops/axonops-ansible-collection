@@ -102,6 +102,31 @@ See `defaults/main.yml` for the full list of PEM variables (`cassandra_ssl_inter
         cassandra_dc: dc1
 ```
 
+## Upgrade Notes
+
+### 0.6.0 — `cassandra_data_directory` default changed (breaking)
+
+`cassandra_data_directory` now defaults to `/var/lib/cassandra/data` (previously
+`/var/lib/cassandra`). New installs are unaffected.
+
+For an **existing** cluster that relied on the old default, the data path moves,
+so Cassandra would start against an empty directory. Migrate each node:
+
+1. Stop Cassandra on the node.
+2. Create `/var/lib/cassandra/data` and move the existing keyspace directories
+   into it. The keyspace directories are the top-level subdirectories of
+   `/var/lib/cassandra` (for example `system/`, `system_schema/`, `system_auth/`,
+   and your application keyspaces). Do **not** move `commitlog/`, `hints/`,
+   `saved_caches/`, `cdc_raw/`, or filesystem metadata such as `lost+found/`.
+3. Fix ownership: `chown -R cassandra:cassandra /var/lib/cassandra/data`.
+4. Start Cassandra and verify the node rejoins the ring (`nodetool status`) and
+   that existing tables are readable.
+
+To keep the previous behavior instead, pin the variable:
+
+```yaml
+cassandra_data_directory: /var/lib/cassandra
+```
 ## Example: Cassandra 3.11
 
 Cassandra 3.11 requires Java 8 and uses the legacy `cassandra.yaml` schema.
