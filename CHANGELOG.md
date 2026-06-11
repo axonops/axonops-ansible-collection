@@ -17,6 +17,13 @@ All notable changes to this collection are documented here. The format is based 
   playbook `examples/cassandra-3.11.yml`.
   ([#108](https://github.com/axonops/axonops-ansible-collection/issues/108))
 
+### Added
+
+- **preflight**: Amazon Linux added to the supported-OS allowlist
+  (`Ubuntu, Debian, CentOS, RedHat, Rocky, Amazon`). All other roles
+  already branch on `ansible_os_family`, which Amazon Linux reports
+  as `RedHat`, so no further changes were required.
+
 ### Fixed
 
 - **cassandra**: `cassandra_jemalloc_enabled` default used Jinja
