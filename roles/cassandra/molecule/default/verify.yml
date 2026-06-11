@@ -1,0 +1,65 @@
+---
+# BDD verification — data directory migration guard
+#
+# Behaviour under test: the role MUST refuse to run when the configured
+# cassandra_data_directory contains no 'system' keyspace directory while the
+# parent directory does (data laid out with the pre-0.6.0 default), MUST pass
+# on a fresh install, and MUST allow bypassing the guard with
+# cassandra_data_directory_check: false.
+
+- name: Verify data directory migration guard (BDD)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: GIVEN — a fresh install converged with the 0.6 default layout
+      ansible.builtin.stat:
+        path: /var/lib/cassandra/data
+      register: verify_data_dir
+
+    - name: THEN — the configured data directory exists
+      ansible.builtin.assert:
+        that:
+          - verify_data_dir.stat.exists
+          - verify_data_dir.stat.isdir
+
+    - name: WHEN — the guard runs against the fresh install layout
+      ansible.builtin.include_tasks: ../../tasks/check-data-dir.yml
+      vars:
+        cassandra_data_directory: /var/lib/cassandra/data
+        cassandra_data_directory_check: true
+
+    - name: GIVEN — an unmigrated pre-0.6 layout under a scratch directory
+      ansible.builtin.file:
+        path: /tmp/guard-test/system
+        state: directory
+        mode: "0750"
+
+    - name: WHEN — the guard runs against the unmigrated layout
+      block:
+        - name: Include the data directory guard against the unmigrated layout
+          ansible.builtin.include_tasks: ../../tasks/check-data-dir.yml
+          vars:
+            cassandra_data_directory: /tmp/guard-test/data
+            cassandra_data_directory_check: true
+      rescue:
+        - name: Record that the guard failed
+          ansible.builtin.set_fact:
+            guard_failed: true
+
+    - name: THEN — the guard fails the play on the unmigrated layout
+      ansible.builtin.assert:
+        that:
+          - guard_failed | default(false) | bool
+        fail_msg: data directory guard did not fail on an unmigrated layout
+
+    - name: WHEN — the guard is disabled on the unmigrated layout
+      ansible.builtin.include_tasks: ../../tasks/check-data-dir.yml
+      vars:
+        cassandra_data_directory: /tmp/guard-test/data
+        cassandra_data_directory_check: false
+
+    - name: Clean up scratch directory
+      ansible.builtin.file:
+        path: /tmp/guard-test
+        state: absent

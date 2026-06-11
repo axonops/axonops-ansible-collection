@@ -110,17 +110,39 @@ See `defaults/main.yml` for the full list of PEM variables (`cassandra_ssl_inter
 `/var/lib/cassandra`). New installs are unaffected.
 
 For an **existing** cluster that relied on the old default, the data path moves,
-so Cassandra would start against an empty directory. Migrate each node:
+so Cassandra would start against an empty directory. The role refuses to run in
+that situation: a preflight guard fails the play when `cassandra_data_directory`
+contains no `system` keyspace directory while its parent does (i.e. data is
+still laid out under the old default). The guard can be disabled with
+`cassandra_data_directory_check: false` once the data location is confirmed.
 
-1. Stop Cassandra on the node.
-2. Create `/var/lib/cassandra/data` and move the existing keyspace directories
+Migrate **one node at a time**, confirming the node is back to `UN` in
+`nodetool status` before moving to the next:
+
+1. Flush memtables and stop accepting writes: `nodetool drain`.
+2. Take a safety snapshot (cheap, hard links): `nodetool snapshot -t pre-datadir-move`.
+   The snapshot lives inside each keyspace directory and moves with it.
+3. Stop Cassandra on the node.
+4. Create `/var/lib/cassandra/data` and move the existing keyspace directories
    into it. The keyspace directories are the top-level subdirectories of
-   `/var/lib/cassandra` (for example `system/`, `system_schema/`, `system_auth/`,
-   and your application keyspaces). Do **not** move `commitlog/`, `hints/`,
-   `saved_caches/`, `cdc_raw/`, or filesystem metadata such as `lost+found/`.
-3. Fix ownership: `chown -R cassandra:cassandra /var/lib/cassandra/data`.
-4. Start Cassandra and verify the node rejoins the ring (`nodetool status`) and
-   that existing tables are readable.
+   `/var/lib/cassandra` (`system/`, `system_schema/`, `system_auth/`,
+   `system_distributed/`, `system_traces/`, and your application keyspaces).
+   For example:
+
+   ```bash
+   mkdir /var/lib/cassandra/data
+   cd /var/lib/cassandra
+   mv system system_schema system_auth system_distributed system_traces <your_keyspaces> data/
+   ```
+
+   Do **not** move `commitlog/`, `hints/`, `saved_caches/`, `cdc_raw/`, or
+   filesystem metadata such as `lost+found/`.
+5. Fix ownership: `chown -R cassandra:cassandra /var/lib/cassandra/data`.
+6. Start Cassandra and verify the node rejoins the ring (`nodetool status`
+   shows `UN`), schema agreement holds (`nodetool describecluster` shows a
+   single schema version), and existing tables are readable.
+7. Only then proceed to the next node. Once the whole cluster is migrated,
+   clear the snapshots: `nodetool clearsnapshot -t pre-datadir-move`.
 
 To keep the previous behavior instead, pin the variable:
 

@@ -6,8 +6,25 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Changed
+
+- **cassandra (BREAKING)**: `cassandra_data_directory` now defaults to
+  `/var/lib/cassandra/data` (previously `/var/lib/cassandra`), matching the
+  upstream Apache Cassandra layout. New installs are unaffected. Existing
+  clusters that relied on the old default must either migrate keyspace data
+  into the new path (see "Upgrade Notes" in `roles/cassandra/README.md`) or
+  pin `cassandra_data_directory: /var/lib/cassandra`.
+  ([#96](https://github.com/axonops/axonops-ansible-collection/pull/96))
+
 ### Added
 
+- **cassandra**: preflight data-directory migration guard. The role now fails
+  fast when `cassandra_data_directory` contains no `system` keyspace directory
+  while its parent does — the signature of data still laid out with the
+  pre-0.6.0 default — instead of rewriting `cassandra.yaml` and restarting
+  Cassandra against an empty directory (which would bring the node up empty
+  with a new host ID). Controlled by `cassandra_data_directory_check`
+  (default `true`).
 - **cassandra**: Apache Cassandra 3.11 support. The role now installs and
   configures Cassandra 3.11.x via tar, using a dedicated `templates/3.11.x/`
   set (legacy `cassandra.yaml` schema with `*_in_ms` / `*_in_mb` keys, single

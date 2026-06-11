@@ -89,6 +89,7 @@ complete playbook including AxonOps agent.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `cassandra_data_directory` | `/var/lib/cassandra/data` | Data (SSTable) directory |
+| `cassandra_data_directory_check` | `true` | Fail the play if `cassandra_data_directory` has no `system` keyspace but its parent does (unmigrated pre-0.6.0 layout) |
 | `cassandra_commitlog_directory` | `/var/lib/cassandra/commitlog` | Commit log directory |
 | `cassandra_saved_caches_directory` | `/var/lib/cassandra/saved_caches` | Saved caches directory |
 | `cassandra_hints_directory` | `/var/lib/cassandra/hints` | Hints directory |
