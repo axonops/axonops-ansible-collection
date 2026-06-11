@@ -10,9 +10,9 @@ cassandra_allocate_tokens_for_local_replication_factor: 3
 cassandra_binary_owner: root
 cassandra_binary_group: root
 
-cassandra_version: 5.0.7
+cassandra_version: 5.0.8
 
-cassandra_cqlai_version: 0.1.5
+cassandra_cqlai_version: 0.1.7
 cassandra_cqlai_binary: "{{ _cassandra_cqlai_binary }}"
 
 # It is recommended to leave this as false
@@ -355,7 +355,7 @@ cassandra_transparent_data_encryption_options:
           key_password: "cassandra"
 
 # jemalloc
-cassandra_jemalloc_enabled: true
+cassandra_jemalloc_enabled: "{{ ansible_facts['os_family'] == 'Debian' }}"
 # cassandra_libjemalloc_path: ""  # auto-detected when cassandra_jemalloc_enabled is true
 
 # JVM

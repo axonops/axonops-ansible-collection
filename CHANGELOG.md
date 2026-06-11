@@ -19,6 +19,12 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
+- **cassandra**: `cassandra_jemalloc_enabled` default used Jinja
+  statement syntax (`{% true if ... %}`) instead of an expression,
+  causing `Encountered unknown tag 'true'` whenever the variable was
+  evaluated (e.g. by the jemalloc install task's `when:`). Now an
+  expression: `{{ ansible_facts['os_family'] == 'Debian' }}`.
+
 - **cassandra 3.11 cassandra.yaml**: unit-aware conversion of friendly
   defaults to legacy `_in_ms` / `_in_kb` / `_in_mb` /
   `_megabits_per_sec` keys. The shared role defaults carry units
