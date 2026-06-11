@@ -29,6 +29,15 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
+- **cassandra**: the role no longer auto-starts the node on first install
+  when `cassandra_start_on_install: false`. The `Start cassandra` task's
+  `state` expression had an `{% else %}started` fall-through, so on a fresh
+  host — where `cassandra.service` is absent from `ansible_facts.services`
+  or `inactive` — it started the node regardless of the flag. The service
+  is now left untouched (`omit`) unless start is explicitly requested or the
+  node is already running.
+  ([#111](https://github.com/axonops/axonops-ansible-collection/issues/111))
+
 - **cassandra**: `cassandra_jemalloc_enabled` default used Jinja
   statement syntax (`{% true if ... %}`) instead of an expression,
   causing `Encountered unknown tag 'true'` whenever the variable was

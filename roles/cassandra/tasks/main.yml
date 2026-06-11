@@ -375,7 +375,9 @@
     daemon_reload: true
     name: "cassandra"
     enabled: "{{ cassandra_start_on_boot | default(true) | bool }}"
-    state: >-
-      {% if cassandra_start_on_install %}started{% elif ansible_facts.services['cassandra.service'].state == 'running' %}started{% elif ansible_facts.services['cassandra.service'].state == 'stopped' %}stopped{% else %}started{% endif %}
+    # Start only when explicitly requested, or when the node is already running
+    # (so a config change can restart it). Otherwise leave systemd state untouched
+    # — never auto-start on first install when cassandra_start_on_install is false.
+    state: "{{ 'started' if (cassandra_start_on_install | bool or (ansible_facts.services['cassandra.service'] | default({})).state | default('') == 'running') else omit }}"
 
 # code: language=ansible

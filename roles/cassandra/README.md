@@ -33,6 +33,13 @@ cassandra_rack: rack1
 cassandra_max_heap_size: 1G
 ```
 
+### Service control
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `cassandra_start_on_install` | `false` | When `false`, the role installs and (per `cassandra_start_on_boot`) enables the `cassandra` service but does **not** start it on first install — the node is left for an external operator to bootstrap. When `true`, the role starts the service. A node that is already running is always (re)started so a config change takes effect, regardless of this flag. |
+| `cassandra_start_on_boot` | `false` | Controls boot-time enablement only (`systemctl enable`). Independent of `cassandra_start_on_install` — enabling at boot does not start the node during the play. |
+
 ## TLS
 
 ### JKS (default)
