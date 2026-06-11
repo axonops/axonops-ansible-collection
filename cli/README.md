@@ -544,3 +544,128 @@ Create a new silence with a duration of 1 hour to a specific datacenter, rack an
 ```shell
 $ pipenv run python axonops.py silence --create --dcs '[{"Name": "dc2","Racks": [{"Name": "rack1","Nodes": ["a107315b-2cc1-4650-8363-386460421bcd"]}]}]'
 ```
+
+### `alerts` Subcommand
+
+Export configured alert rules and integrations from a single AxonOps cluster
+to JSON files. Mirrors the ergonomics of `dashboard --exportpath`.
+
+#### Options:
+
+* `--exportpath` (required) Directory to write the JSON files. Created if missing.
+* `--include-secrets` Include integration secrets (webhook URLs, API keys, etc.) in
+  the export instead of redacting them. When set, the exported filenames are
+  auto-appended to a `.gitignore` in the export directory as defense in depth
+  against accidental git commits.
+
+**Output:** writes `alert_rules.json` and `integrations.json` (each with file mode
+`0600`) into the export directory. Empty resources are skipped — if the cluster
+has no alert rules, no `alert_rules.json` is written.
+
+**Secret handling:** by default, secret-bearing fields in integration definitions
+(`webhook_url`, `api_key`, `service_key`, `integration_key`, `routing_key`,
+`auth_token`, `password`, `secret`) are replaced with `***REDACTED***`. To export
+raw values (e.g. for restore to another instance), pass `--include-secrets`.
+
+#### Examples:
+
+Export alert rules and integrations (secrets redacted):
+
+```shell
+$ pipenv run python axonops.py alerts --exportpath ./backup
+```
+
+Export with raw secret values (writes `.gitignore` automatically):
+
+```shell
+$ pipenv run python axonops.py alerts --exportpath ./backup --include-secrets
+```
+
+### `tune-alerts` Subcommand
+
+Read an existing `alert_rules.json` (produced by the `alerts` subcommand or
+hand-crafted in the same shape) and write a tuned sibling JSON whose
+`warningValue` and `criticalValue` are calibrated to the last 7 days of
+observed metric data. Companion markdown audit report lists every change
+with before/after/percentile/sample count, so you can review the tuning
+before re-applying.
+
+#### Options:
+
+* `--input` Path to the source `alert_rules.json`. Mutually exclusive
+  with `--from-api`. The tuned output is written alongside it as
+  `alert_rules.tuned.for.<cluster>.json` plus a `<...>.report.md`.
+* `--from-api` Fetch alert rules directly from the live API instead of
+  reading from `--input`. Requires `--output-dir`. Mutually exclusive
+  with `--input`.
+* `--output-dir PATH` Directory for the tuned JSON and audit report.
+  Only valid with `--from-api`; rejected when `--input` is used
+  (output is then written alongside the input file).
+* `--profile {noisy,default,quiet}` Preset combining percentile and
+  headroom. Defaults to `default`.
+    * `noisy`: p95 with +5% warning / +10% critical headroom.
+    * `default`: p99 with +10% warning / +20% critical headroom.
+    * `quiet`: p99.9 with +20% warning / +50% critical headroom.
+* `--percentile FLOAT` Override the profile's percentile (0 < P < 100).
+* `--warning-headroom FLOAT` Override the profile's warning headroom
+  (e.g. `0.10` for +10%).
+* `--critical-headroom FLOAT` Override the profile's critical headroom.
+* `--min-samples N` Skip rules whose metric returns fewer than N samples
+  over the 7-day window. Default 100.
+* `--max-delta N` Skip rules whose new threshold differs from the original
+  by more than N× (either direction). Default 10.
+* `--include GLOB` Tune only rules whose name matches this fnmatch glob.
+  Repeatable.
+* `--exclude GLOB` Skip rules whose name matches this glob. Repeatable.
+  Overrides `--include`.
+* `--rule NAME` Tune only this exact rule name. Repeatable.
+* `--incident YYYY-MM-DD` UTC day to exclude from the baseline and verify
+  coverage for. When set, the tuned threshold is verified against the
+  incident peak: if the metric reflected the incident but the baseline-
+  derived threshold wouldn't have fired, the threshold is automatically
+  adjusted so it would. The audit report gains a "Incident coverage"
+  section per incident. Repeatable.
+
+#### Behavior:
+
+The tool loads the input, strips each rule's trailing ` <operator> <value>`
+suffix to isolate the bare metric, queries `/api/v1/query_range` over the
+last 7 days (1-minute step), and computes a baseline percentile. For `>=`
+and `>` operators, the upper percentile is used with positive headroom.
+For `<=` and `<`, the lower percentile is used with negative headroom —
+the "alert if it gets X% worse than last week" semantic applies to both
+tails.
+
+Rules that fail one of these checks are left unchanged in the output and
+listed in the stdout summary and the audit report:
+
+- **insufficient data**: fewer than `--min-samples` non-null samples
+- **nonsensical**: new threshold would be ≤ 0
+- **unreasonable delta**: new threshold differs from original by more than
+  `--max-delta`× (guards against metric instability or algorithm error)
+- **query failed**: metric endpoint returned an error
+- **cannot parse expr**: the rule's expression didn't match the expected
+  trailing-operator shape
+
+#### Examples:
+
+Tune with the default profile:
+
+```shell
+$ pipenv run python axonops.py --org $AXONOPS_ORG --cluster $AXONOPS_CLUSTER --token $AXONOPS_TOKEN \
+    tune-alerts --input ./exported/alert_rules.json
+```
+
+Use the noisy preset to catch smaller deviations:
+
+```shell
+$ pipenv run python axonops.py --org $AXONOPS_ORG --cluster $AXONOPS_CLUSTER --token $AXONOPS_TOKEN \
+    tune-alerts --input ./exported/alert_rules.json --profile noisy
+```
+
+Tune a subset of rules:
+
+```shell
+$ pipenv run python axonops.py --org $AXONOPS_ORG --cluster $AXONOPS_CLUSTER --token $AXONOPS_TOKEN \
+    tune-alerts --input ./exported/alert_rules.json --include 'GC*' --exclude '*_paxos*'
+```
