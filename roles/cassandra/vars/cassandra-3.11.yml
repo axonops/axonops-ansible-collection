@@ -128,9 +128,9 @@ cassandra_enable_materialized_views: "{{ cassandra_materialized_views_enabled | 
 # Cache save periods — 3.11 expects integer seconds. Shared defaults are
 # duration strings ("4h" / "0s" / "2h"). Convert with the same _secs_units
 # table.
-cassandra_key_cache_save_period_in_secs: "{{ (cassandra_key_cache_save_period | string | regex_replace('[^0-9.]', '') | float * (_secs_units[cassandra_key_cache_save_period | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
-cassandra_row_cache_save_period_in_secs: "{{ (cassandra_row_cache_save_period | string | regex_replace('[^0-9.]', '') | float * (_secs_units[cassandra_row_cache_save_period | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
-cassandra_counter_cache_save_period_in_secs: "{{ (cassandra_counter_cache_save_period | string | regex_replace('[^0-9.]', '') | float * (_secs_units[cassandra_counter_cache_save_period | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_key_cache_save_period_in_secs: "{{ (cassandra_key_cache_save_period | default('4h') | string | regex_replace('[^0-9.]', '') | float * (_secs_units[cassandra_key_cache_save_period | default('4h') | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_row_cache_save_period_in_secs: "{{ (cassandra_row_cache_save_period | default('0s') | string | regex_replace('[^0-9.]', '') | float * (_secs_units[cassandra_row_cache_save_period | default('0s') | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_counter_cache_save_period_in_secs: "{{ (cassandra_counter_cache_save_period | default('2h') | string | regex_replace('[^0-9.]', '') | float * (_secs_units[cassandra_counter_cache_save_period | default('2h') | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
 
 # Cache save behaviour (3.11 unconditional keys)
 cassandra_key_cache_keys_to_save: 100

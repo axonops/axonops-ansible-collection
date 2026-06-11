@@ -16,9 +16,6 @@ All notable changes to this collection are documented here. The format is based 
   starts with `3.11`. New molecule scenario `cassandra-3.11` and example
   playbook `examples/cassandra-3.11.yml`.
   ([#108](https://github.com/axonops/axonops-ansible-collection/issues/108))
-
-### Added
-
 - **preflight**: Amazon Linux added to the supported-OS allowlist
   (`Ubuntu, Debian, CentOS, RedHat, Rocky, Amazon`). All other roles
   already branch on `ansible_os_family`, which Amazon Linux reports
@@ -92,10 +89,10 @@ All notable changes to this collection are documented here. The format is based 
 
 - **cassandra**: `cassandra_use_password_files` no longer breaks Cassandra
   startup. The `keystore_password_file:` / `truststore_password_file:` keys it
-  emitted were added in Apache Cassandra 6.0 (CASSANDRA-13428) and do not exist
-  in 4.1.x / 5.0.x, the only versions this role supports — Cassandra rejected
-  them with `Invalid yaml. Please remove properties [...]` and refused to boot.
-  The feature now defaults to `false` and is force-disabled with a warning if
+  emitted were introduced in Apache Cassandra 6.0 (CASSANDRA-13428) and are
+  not recognised by 3.11.x, 4.1.x, or 5.0.x — Cassandra rejected them with
+  `Invalid yaml. Please remove properties [...]` and refused to boot. The
+  feature now defaults to `false` and is force-disabled with a warning if
   enabled, falling back to inline `keystore_password:` / `truststore_password:`.
   ([#102](https://github.com/axonops/axonops-ansible-collection/issues/102))
 
