@@ -22,6 +22,7 @@ jobs:
     name: Molecule Cassandra (${{ matrix.scenario }} / ${{ matrix.distro }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         distro:
           - rockylinux9
@@ -35,6 +36,11 @@ jobs:
           - default
           - shenandoah
           - g1
+          # - jks-password-files  # disabled: *_password_file keys require Cassandra 6.0+ (CASSANDRA-13428), unsupported by this role — see #102
+          - jks-inline-password
+          - jks-tls-disabled
+          - jks-empty-passwords
+          - cassandra-3.11
 
     steps:
       - name: Check out the codebase.
@@ -60,6 +66,26 @@ jobs:
 
       - name: Run Molecule converge
         run: molecule -v converge -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule verify
+        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11'
+        run: molecule -v verify -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule idempotence
+        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11'
+        run: molecule -v idempotence -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'
           ANSIBLE_FORCE_COLOR: '1'

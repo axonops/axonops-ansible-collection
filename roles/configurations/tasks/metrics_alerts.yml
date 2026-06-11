@@ -23,7 +23,7 @@
   axonops.axonops.alert_rule:
     org: "{{ org }}"
     cluster: "{{ cluster }}"
-    cluster_type: "{{ metricsalerts_item.cluster_type | default(omit) }}"
+    cluster_type: "{{ metricsalerts_item.cluster_type | default(cluster_type | default(omit)) }}"
     dashboard: "{{ metricsalerts_item.dashboard }}"
     chart: "{{ metricsalerts_item.chart }}"
     operator: "{{ metricsalerts_item.operator }}"
@@ -43,7 +43,7 @@
     dc: "{{ metricsalerts_item.dc | default([]) }}"
     rack: "{{ metricsalerts_item.rack | default([]) }}"
     host_id: "{{ metricsalerts_item.host_id | default([]) }}"
-    auth_token: "{{ metricsalerts_item.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    auth_token: "{{ metricsalerts_item.auth_token | default(auth_token | default(lookup('env', 'AXONOPS_TOKEN'))) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
     username: "{{ metricsalerts_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
     password: "{{ metricsalerts_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
   loop: "{{ axonops_alert_rules }}"
