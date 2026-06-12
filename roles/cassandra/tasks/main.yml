@@ -84,6 +84,9 @@
   when: ansible_os_family == "RedHat"
   tags: always
 
+- name: Data directory migration safety check
+  ansible.builtin.import_tasks: check-data-dir.yml
+
 - name: Install from pkg
   when: cassandra_install_format == "pkg"
   ansible.builtin.import_tasks: install-pkg.yml

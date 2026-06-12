@@ -37,6 +37,11 @@ cassandra_gc_log_dir: /var/log/cassandra
 cassandra_log_dir: /var/log/cassandra
 cassandra_saved_caches_directory: /var/lib/cassandra/saved_caches
 cassandra_data_directory: /var/lib/cassandra/data
+# Refuse to run if cassandra_data_directory has no 'system' keyspace but its
+# parent directory does (data still laid out with the pre-0.6.0 default of
+# /var/lib/cassandra). See "Upgrade Notes" in the role README. Set to false
+# to bypass after migrating or for a deliberate fresh start.
+cassandra_data_directory_check: true
 cassandra_hints_directory: /var/lib/cassandra/hints
 cassandra_commitlog_directory: "/var/lib/cassandra/commitlog"
 cassandra_auto_bootstrap: true
