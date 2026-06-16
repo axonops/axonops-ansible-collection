@@ -16,7 +16,13 @@ All notable changes to this collection are documented here. The format is based 
   pin `cassandra_data_directory: /var/lib/cassandra`.
   ([#96](https://github.com/axonops/axonops-ansible-collection/pull/96))
 
+### Fixed
+
+- **alert_route module**: typo `type: srt` corrected to `type: str` in DOCUMENTATION block, fixing Galaxy importer parse failure.
+
 ### Added
+
+- **kafka role**: added `README.md` with full variable reference, quick start, and usage examples; fixes Galaxy publish failure caused by missing role readme.
 
 - **cassandra**: preflight data-directory migration guard. The role now fails
   fast when `cassandra_data_directory` contains no `system` keyspace directory
