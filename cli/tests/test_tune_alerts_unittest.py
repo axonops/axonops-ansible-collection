@@ -1283,6 +1283,41 @@ class TestPolicyPinning(unittest.TestCase):
         self.assertEqual(result.outcomes[0].status, "skipped")
         self.assertIn("cannot parse expr for pinning", result.outcomes[0].reason)
 
+    def test_pinned_event_rule_with_no_threshold_pins_via_json_fields(self):
+        """Log-pattern event rules (`events{message="..."}`) have no trailing
+        threshold in the expr — the operator/warning/critical live only in the
+        rule's JSON fields. A matching policy pin should update those fields
+        and leave expr alone, rather than rejecting the rule as unparseable."""
+        input_json = {
+            "name": "demo",
+            "metricrules": [
+                {
+                    "id": "rule-corrupt-sst",
+                    "alert": "Corrupt SSTable",
+                    "expr": 'events{message="+Corrupt +sstable",source="/x/y.log"}',
+                    "for": "10s", "operator": ">=",
+                    "warningValue": 1, "criticalValue": 1,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        orch = self._make_orch_with_policy([
+            {"pattern": "Corrupt SSTable", "warning": 2, "critical": 5},
+        ])
+        result = orch.tune_all(input_json)
+
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "pinned")
+        self.assertEqual(outcome.new_warning, 2)
+        self.assertEqual(outcome.new_critical, 5)
+        self.assertEqual(outcome.operator, ">=")
+        rule_out = result.tuned_json["metricrules"][0]
+        self.assertEqual(rule_out["warningValue"], 2)
+        self.assertEqual(rule_out["criticalValue"], 5)
+        # Expr must be left untouched — there's no trailing threshold to rewrite.
+        self.assertEqual(rule_out["expr"],
+                         'events{message="+Corrupt +sstable",source="/x/y.log"}')
+
     def test_audit_report_includes_pinned_section(self):
         import tempfile
 
@@ -1314,6 +1349,526 @@ class TestPolicyPinning(unittest.TestCase):
         self.assertIn("## Pinned rules (policy override)", report)
         self.assertIn("Disk % Usage Workarea", report)
         self.assertIn("Disk *", report)
+
+
+class TestEventsTuning(unittest.TestCase):
+    """`events{...}` rules are tuned via the /events search endpoint
+    (metrics query_range 500s on them). Falls back to the old short-skip
+    if the endpoint isn't usable or the expr filters can't be parsed."""
+
+    def _make_orch(self):
+        config = _default_config()
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        return axonops, TuneAlertsOrchestrator(
+            axonops, _args(org="acme", cluster="demo"), config,
+        )
+
+    def _events_rule(self, alert, expr, op=">=", warn=1, crit=5, for_str="5m"):
+        return {
+            "id": f"r-{alert}",
+            "alert": alert,
+            "expr": expr,
+            "for": for_str, "operator": op,
+            "warningValue": warn, "criticalValue": crit,
+            "filters": [], "annotations": {}, "integrations": {},
+        }
+
+    def test_zero_count_pins_at_shipped(self):
+        axonops, orch = self._make_orch()
+        axonops.do_request.return_value = {
+            "metadata": {"_count": "0"}, "data": [],
+        }
+        input_json = {"name": "demo", "metricrules": [
+            self._events_rule(
+                "Corrupt SSTable",
+                'events{message="+Corrupt +sstable",source="/x/system.log"}',
+                warn=1, crit=1, for_str="10s",
+            ),
+        ]}
+        result = orch.tune_all(input_json)
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "pinned")
+        self.assertEqual(outcome.new_warning, 1)
+        self.assertEqual(outcome.new_critical, 1)
+        self.assertEqual(outcome.sample_count, 0)
+        self.assertIn("0 occurrence", outcome.reason)
+
+    def test_high_count_raises_thresholds(self):
+        axonops, orch = self._make_orch()
+        # Mean per 5m-window ~ a lot.
+        axonops.do_request.return_value = {
+            "metadata": {"_count": "100000"}, "data": [],
+        }
+        input_json = {"name": "demo", "metricrules": [
+            self._events_rule(
+                "Failed Authentications",
+                "events{host_id='',level='error',type='authentication'} >= 1.0",
+                warn=1, crit=20, for_str="3m",
+            ),
+        ]}
+        result = orch.tune_all(input_json)
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "tuned")
+        self.assertEqual(outcome.sample_count, 100000)
+        self.assertGreater(outcome.new_warning, 1)
+        self.assertGreater(outcome.new_critical, outcome.new_warning)
+
+    def test_unparseable_expr_falls_back_to_legacy_skip(self):
+        # An `events{...}` selector whose body has no recognisable
+        # source/level/message/type/host_id matcher — parse_filters returns
+        # an empty dict but the expr isn't the special empty-filter form
+        # (`events{}`), so the events path bails and we fall back to the
+        # legacy "event/log-shape rule" skip.
+        axonops, orch = self._make_orch()
+        input_json = {"name": "demo", "metricrules": [
+            self._events_rule("Weird Rule", "events{ }", warn=1, crit=1),
+        ]}
+        result = orch.tune_all(input_json)
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "skipped")
+        self.assertIn("event/log-shape rule", outcome.reason)
+        # The events endpoint must not have been called.
+        axonops.do_request.assert_not_called()
+
+    def test_events_endpoint_failure_falls_back_to_legacy_skip(self):
+        axonops, orch = self._make_orch()
+        from axonopscli.utils import HTTPCodeError
+        axonops.do_request.side_effect = HTTPCodeError("500 boom")
+        input_json = {"name": "demo", "metricrules": [
+            self._events_rule(
+                "Some Log Rule",
+                'events{message="+something",source="/var/log/x"}',
+            ),
+        ]}
+        result = orch.tune_all(input_json)
+        self.assertEqual(result.outcomes[0].status, "skipped")
+        self.assertIn("event/log-shape rule", result.outcomes[0].reason)
+
+
+class TestSchemaDiagnostic(unittest.TestCase):
+    """When a tuning query returns 0 series, the orchestrator probes the
+    cluster's actual label values and reports the offending label instead
+    of the opaque 'insufficient data (0 samples)' message."""
+
+    def _make_orch_with_query(self, query_return_value, label_values_by_label):
+        from axonopscli.components.tune_alerts import (
+            TuneAlertsOrchestrator, SchemaDiagnostic,
+        )
+
+        config = _default_config()
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        orch = TuneAlertsOrchestrator(
+            axonops, _args(org="acme", cluster="demo"), config,
+        )
+
+        # Stub MetricQuerier.query to return zero samples for this test.
+        def zero_query(self, promql, start, end, step="1m"):
+            return list(query_return_value)
+        self._zero_query_patcher = patch.object(MetricQuerier, 'query', new=zero_query)
+        self._zero_query_patcher.start()
+
+        # Stub the schema diagnostic's HTTP call so we can control which
+        # labels appear empty without hitting the network.
+        def fake_request(url, method="GET", **_):
+            for label, values in label_values_by_label.items():
+                if f"regex={label}%3D" in url or f"regex={label}=" in url:
+                    return {"status": "success", "data": values}
+            return {"status": "success", "data": []}
+        axonops.do_request.side_effect = fake_request
+
+        return orch
+
+    def tearDown(self):
+        # Stop any patches the helper started.
+        if hasattr(self, "_zero_query_patcher"):
+            self._zero_query_patcher.stop()
+
+    def test_zero_series_with_broken_label_reports_broken_schema(self):
+        # `consistency=` doesn't exist on this cluster; `function=` does.
+        orch = self._make_orch_with_query(
+            query_return_value=[],
+            label_values_by_label={
+                "consistency": [],          # broken — no values for this label
+                "function": ["99thPercentile", "Count"],
+            },
+        )
+        input_json = {
+            "name": "demo",
+            "metricrules": [
+                {
+                    "id": "r1",
+                    "alert": "Read Latency LQ",
+                    "expr": "cas_ClientRequest_Latency{consistency='LOCAL_QUORUM',function='99thPercentile'} >= 1000000",
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 1000000, "criticalValue": 2000000,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        result = orch.tune_all(input_json)
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "skipped")
+        self.assertIn("broken_schema", outcome.reason)
+        self.assertIn("consistency", outcome.reason)
+
+    def test_zero_series_with_all_labels_present_falls_back_to_insufficient_data(self):
+        # Every positive-equality label has values — no schema break, just
+        # a genuinely quiet metric. Fall back to the existing message.
+        orch = self._make_orch_with_query(
+            query_return_value=[],
+            label_values_by_label={
+                "scope": ["Read", "Write"],
+                "function": ["99thPercentile", "Count"],
+            },
+        )
+        input_json = {
+            "name": "demo",
+            "metricrules": [
+                {
+                    "id": "r1",
+                    "alert": "Read Latency",
+                    "expr": "cas_ClientRequest_Latency{scope='Read',function='99thPercentile'} >= 1000000",
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 1000000, "criticalValue": 2000000,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        result = orch.tune_all(input_json)
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "skipped")
+        self.assertIn("insufficient data", outcome.reason)
+        self.assertNotIn("broken_schema", outcome.reason)
+
+    def test_diagnostic_results_are_cached_per_metric_label(self):
+        # Two rules query the same metric+label combo; the probe should
+        # fire once.
+        from axonopscli.components.tune_alerts import SchemaDiagnostic
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        axonops.do_request.return_value = {"status": "success", "data": []}
+        diag = SchemaDiagnostic(axonops, _args())
+        diag.diagnose("cas_X{consistency='ALL'}")
+        diag.diagnose("cas_X{consistency='LOCAL_QUORUM'}")
+        # Same metric+label, called twice on the diagnostic; backend hit
+        # exactly once.
+        self.assertEqual(axonops.do_request.call_count, 1)
+
+
+class TestExprRewrites(unittest.TestCase):
+    """The --rewrites flag rewrites rule exprs in-memory before tuning so
+    the tuner queries the corrected expr AND the output JSON carries it."""
+
+    def _make_orch_with_rewrites(self, expr_rewrites):
+        config = _default_config()
+        config.expr_rewrites = expr_rewrites
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        return TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="demo"), config)
+
+    def test_rewrite_replaces_expr_before_tuning(self):
+        # Tuner would have queried the OLD expr; assert it never gets a
+        # chance — only the rewritten expr should reach MetricQuerier.
+        seen = []
+
+        def capturing_query(self, promql, start, end, step="1m"):
+            seen.append(promql)
+            return list(range(1000))
+
+        input_json = {
+            "name": "demo",
+            "metricrules": [
+                {
+                    "id": "rule-x",
+                    "alert": "Coordinator Read Latency - LOCAL_QUORUM 99thPercentile",
+                    "expr": "cas_ClientRequest_Latency{consistency='LOCAL_QUORUM',percentile='99thPercentile'} >= 1000000.0",
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 1000000, "criticalValue": 2000000,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        new_expr = ("cas_ClientRequest_Latency{scope=~'Read_*LOCAL_QUORUM',"
+                    "function='99thPercentile',function!='Min|Max'} >= 1000000.0")
+        orch = self._make_orch_with_rewrites({
+            "Coordinator Read Latency - LOCAL_QUORUM 99thPercentile": new_expr,
+        })
+
+        with patch.object(MetricQuerier, 'query', new=capturing_query):
+            result = orch.tune_all(input_json)
+
+        self.assertEqual(result.tuned_json["metricrules"][0]["expr"], new_expr)
+        # The bare metric (without trailing threshold) is what the querier
+        # sees — assert no query used the old consistency=/percentile= form.
+        for q in seen:
+            self.assertNotIn("consistency=", q)
+            self.assertNotIn("percentile=", q)
+
+    def test_noop_rewrite_when_expr_already_current(self):
+        # Re-applying the same rewrite should not cause the rewrite stage
+        # to log "patched" — i.e. _apply_expr_rewrites must detect that the
+        # rule's expr already matches the target and leave it alone. The
+        # tuner will still adjust the trailing threshold from observed
+        # data; that's the normal tuning path, not the rewrite path.
+        current_expr = "host_Disk_UsedPercent{} >= 75"
+        input_json = {
+            "name": "demo",
+            "metricrules": [
+                {
+                    "id": "rule-disk",
+                    "alert": "Disk Rule",
+                    "expr": current_expr,
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 75, "criticalValue": 80,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        orch = self._make_orch_with_rewrites({"Disk Rule": current_expr})
+
+        def canned_query(self, promql, start, end, step="1m"):
+            return list(range(1000))
+
+        with patch.object(MetricQuerier, 'query', new=canned_query):
+            result = orch.tune_all(input_json)
+        # Bare metric (everything before the trailing operator) should be unchanged.
+        out_expr = result.tuned_json["metricrules"][0]["expr"]
+        self.assertTrue(
+            out_expr.startswith("host_Disk_UsedPercent{}"),
+            f"rewrite altered the bare metric: {out_expr!r}",
+        )
+
+    def test_unmatched_rewrite_warns_but_does_not_fail(self):
+        input_json = {
+            "name": "demo",
+            "metricrules": [
+                {
+                    "id": "rule-disk",
+                    "alert": "Disk Rule",
+                    "expr": "host_Disk_UsedPercent{} >= 75",
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 75, "criticalValue": 80,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        orch = self._make_orch_with_rewrites({
+            "Renamed Rule That No Longer Exists": "some_metric{} >= 1",
+        })
+        def canned_query(self, promql, start, end, step="1m"):
+            return list(range(1000))
+
+        with patch.object(MetricQuerier, 'query', new=canned_query):
+            # Must not raise; the warning goes to stderr.
+            result = orch.tune_all(input_json)
+        # The unmatched rewrite must not touch the rule's bare metric.
+        out_expr = result.tuned_json["metricrules"][0]["expr"]
+        self.assertTrue(
+            out_expr.startswith("host_Disk_UsedPercent{}"),
+            f"unmatched rewrite altered the bare metric: {out_expr!r}",
+        )
+
+
+class TestRewritesFileLoader(unittest.TestCase):
+    """The --rewrites flag loads and validates a JSON rewrites file."""
+
+    def _write(self, tmp, content):
+        path = os.path.join(tmp, "rewrites.json")
+        with open(path, "w") as f:
+            if isinstance(content, str):
+                f.write(content)
+            else:
+                json.dump(content, f)
+        return path
+
+    def test_loads_valid_rewrites(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {
+                "expr_rewrites": [
+                    {"alert": "Rule A", "expr": "metric_a{} >= 1"},
+                    {"alert": "Rule B", "expr": "metric_b{} >= 2", "_note": "schema fix"},
+                ],
+            })
+            out = Application._load_rewrites_file(path)
+        self.assertEqual(out, {"Rule A": "metric_a{} >= 1", "Rule B": "metric_b{} >= 2"})
+
+    def test_rejects_missing_required_keys(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {"expr_rewrites": [{"alert": "Rule A"}]})
+            with self.assertRaisesRegex(ValueError, "missing required key 'expr'"):
+                Application._load_rewrites_file(path)
+
+    def test_rejects_duplicate_alert(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {
+                "expr_rewrites": [
+                    {"alert": "Rule A", "expr": "x"},
+                    {"alert": "Rule A", "expr": "y"},
+                ],
+            })
+            with self.assertRaisesRegex(ValueError, "duplicate entry for alert 'Rule A'"):
+                Application._load_rewrites_file(path)
+
+
+class TestShippedLiteralPin(unittest.TestCase):
+    """A policy entry with warning/critical = 'shipped' resolves to the
+    rule's current value at apply time."""
+
+    def _make_orch(self, pinned_rules):
+        config = _default_config()
+        config.pinned_rules = pinned_rules
+        axonops = MagicMock()
+        axonops.get_cluster_type.return_value = "cassandra"
+        return TuneAlertsOrchestrator(axonops, _args(org="acme", cluster="demo"), config)
+
+    def test_shipped_resolves_to_current_values(self):
+        input_json = {
+            "name": "demo",
+            "metricrules": [
+                {
+                    "id": "rule-disk",
+                    "alert": "Disk % Usage Workarea",
+                    "expr": "host_Disk_UsedPercent{} >= 75",
+                    "for": "5m", "operator": ">=",
+                    "warningValue": 75, "criticalValue": 80,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        orch = self._make_orch([
+            {"pattern": "Disk *", "warning": "shipped", "critical": "shipped"},
+        ])
+        result = orch.tune_all(input_json)
+        outcome = result.outcomes[0]
+        self.assertEqual(outcome.status, "pinned")
+        self.assertEqual(outcome.new_warning, 75)
+        self.assertEqual(outcome.new_critical, 80)
+        # JSON updated to the resolved numeric values (NOT the literal 'shipped').
+        self.assertEqual(result.tuned_json["metricrules"][0]["warningValue"], 75)
+        self.assertEqual(result.tuned_json["metricrules"][0]["criticalValue"], 80)
+
+    def test_shipped_mixed_with_explicit(self):
+        # warning='shipped' (keep current 75), critical=90 (raise).
+        input_json = {
+            "name": "demo",
+            "metricrules": [
+                {
+                    "id": "r", "alert": "Mixed Rule",
+                    "expr": "host_x{} >= 75", "for": "5m", "operator": ">=",
+                    "warningValue": 75, "criticalValue": 80,
+                    "filters": [], "annotations": {}, "integrations": {},
+                },
+            ],
+        }
+        orch = self._make_orch([
+            {"pattern": "Mixed Rule", "warning": "shipped", "critical": 90},
+        ])
+        result = orch.tune_all(input_json)
+        self.assertEqual(result.outcomes[0].new_warning, 75)
+        self.assertEqual(result.outcomes[0].new_critical, 90)
+
+
+class TestPolicyExtends(unittest.TestCase):
+    """Top-level 'extends' chains policy files. Child overrides parent by
+    exact pattern match; new patterns appended in child order."""
+
+    def _write(self, tmp, name, content):
+        path = os.path.join(tmp, name)
+        with open(path, "w") as f:
+            json.dump(content, f)
+        return path
+
+    def test_child_overrides_parent_by_pattern(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self._write(tmp, "parent.json", {
+                "pinned_thresholds": [
+                    {"pattern": "A", "warning": 1, "critical": 2},
+                    {"pattern": "B", "warning": 3, "critical": 4},
+                ],
+            })
+            child = self._write(tmp, "child.json", {
+                "extends": "parent.json",
+                "pinned_thresholds": [
+                    {"pattern": "B", "warning": 30, "critical": 40},
+                    {"pattern": "C", "warning": 5, "critical": 6},
+                ],
+            })
+            merged = Application._load_policy_file(child)
+
+        by_pattern = {p["pattern"]: (p["warning"], p["critical"]) for p in merged}
+        self.assertEqual(by_pattern, {"A": (1, 2), "B": (30, 40), "C": (5, 6)})
+
+    def test_extends_resolves_relative_to_child_dir(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            sub = os.path.join(tmp, "sub"); os.makedirs(sub)
+            self._write(sub, "parent.json", {
+                "pinned_thresholds": [{"pattern": "A", "warning": 1, "critical": 2}],
+            })
+            child = self._write(sub, "child.json", {
+                "extends": "parent.json",
+                "pinned_thresholds": [],
+            })
+            merged = Application._load_policy_file(child)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["pattern"], "A")
+
+    def test_circular_extends_chain_is_detected(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            a = os.path.join(tmp, "a.json")
+            b = os.path.join(tmp, "b.json")
+            with open(a, "w") as f:
+                json.dump({"extends": "b.json", "pinned_thresholds": []}, f)
+            with open(b, "w") as f:
+                json.dump({"extends": "a.json", "pinned_thresholds": []}, f)
+            with self.assertRaisesRegex(ValueError, "circular extends chain"):
+                Application._load_policy_file(a)
+
+    def test_shipped_literal_accepted_in_validation(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "p.json", {
+                "pinned_thresholds": [
+                    {"pattern": "X", "warning": "shipped", "critical": "shipped"},
+                ],
+            })
+            merged = Application._load_policy_file(path)
+        self.assertEqual(merged[0]["warning"], "shipped")
+        self.assertEqual(merged[0]["critical"], "shipped")
+
+    def test_invalid_threshold_type_rejected(self):
+        import tempfile
+        from axonopscli.application import Application
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "p.json", {
+                "pinned_thresholds": [
+                    {"pattern": "X", "warning": "not-a-number", "critical": 1},
+                ],
+            })
+            with self.assertRaisesRegex(ValueError, "must be a number or the literal string 'shipped'"):
+                Application._load_policy_file(path)
 
 
 class TestPolicyFileLoader(unittest.TestCase):

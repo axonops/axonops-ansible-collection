@@ -2,8 +2,20 @@
 # Run tuning/tune for a named customer using their tuning/customers/<name>.env config.
 #
 # Sources the env file for ORG, CLUSTER, HOT_KEYSPACE, HOT_TABLE, and optional
-# tune knobs (DAYS, MIN_SAMPLES, MAX_DELTA, EXTRA_SET_LABELS), then exec's
-# tuning/tune with the right --set-label / --days / etc. args.
+# tune knobs (DAYS, MIN_SAMPLES, MAX_DELTA, EXTRA_SET_LABELS, POLICY,
+# REWRITES), then exec's tuning/tune with the right --set-label / --days /
+# --policy / --rewrites / etc. args.
+#
+# POLICY is a path (absolute, or relative to tuning/) to a per-customer
+# tune-alerts policy JSON. When set, it overrides the global default policy at
+# cli/exported/tune-alerts-policy.json — useful for customer-specific pinned
+# thresholds without polluting the global file.
+#
+# REWRITES is a path (absolute, or relative to tuning/) to a per-customer
+# expr-rewrites JSON ({"expr_rewrites":[{"alert":"<name>","expr":"<new expr>"}]}).
+# Applied in-memory at the start of tuning so the tuner queries the corrected
+# exprs AND apply-tuned-alerts writes them back — no separate cycle-customer
+# round-trip is needed.
 #
 # This replaces tuning/tune-<customer> one-off scripts; the customer-specific
 # wrappers are kept as thin delegators for muscle memory.
@@ -45,7 +57,28 @@ ARGS=(
 [[ -n "${DAYS:-}" ]]        && ARGS+=(--days "$DAYS")
 [[ -n "${MIN_SAMPLES:-}" ]] && ARGS+=(--min-samples "$MIN_SAMPLES")
 [[ -n "${MAX_DELTA:-}" ]]   && ARGS+=(--max-delta "$MAX_DELTA")
-for lbl in "${EXTRA_SET_LABELS[@]}"; do
+resolve_tuning_path() {
+    # Echo an absolute path: pass-through if absolute, else resolved relative
+    # to tuning/. Stops the script if the file is missing.
+    local var_name="$1" raw="$2" abs
+    if [[ "$raw" = /* ]]; then
+        abs="$raw"
+    else
+        abs="${TUNING_DIR}/${raw}"
+    fi
+    if [[ ! -f "$abs" ]]; then
+        echo "ERROR: ${var_name}=${raw} not found at ${abs}" >&2
+        exit 2
+    fi
+    echo "$abs"
+}
+if [[ -n "${POLICY:-}" ]]; then
+    ARGS+=(--policy "$(resolve_tuning_path POLICY "$POLICY")")
+fi
+if [[ -n "${REWRITES:-}" ]]; then
+    ARGS+=(--rewrites "$(resolve_tuning_path REWRITES "$REWRITES")")
+fi
+for lbl in ${EXTRA_SET_LABELS[@]+"${EXTRA_SET_LABELS[@]}"}; do
     [[ -n "$lbl" ]] && ARGS+=(--set-label "$lbl")
 done
 

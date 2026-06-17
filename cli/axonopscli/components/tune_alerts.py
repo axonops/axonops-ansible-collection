@@ -3,6 +3,7 @@ import json
 import math
 import os
 import re
+import sys
 import time
 import urllib.parse
 from copy import deepcopy
@@ -10,7 +11,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
-from axonopscli.api import ALERT_RULES_URL, QUERY_RANGE_URL
+from axonopscli.api import (
+    ALERT_RULES_URL, EVENTS_SEARCH_URL, METRIC_LABEL_VALUES_URL, QUERY_RANGE_URL,
+)
 
 
 @dataclass
@@ -320,6 +323,193 @@ class MetricQuerier:
         return out
 
 
+class SchemaDiagnostic:
+    """Probe the cluster's actual metric label values to explain a 0-series
+    query result.
+
+    When a tuning query returns 0 samples, the cause is almost always one
+    of two things: (a) the rule is correct but the metric is genuinely 0
+    on the cluster ("any > 0 is bad" rules — pin in policy), or (b) the
+    rule's expr filters on a label name the cluster doesn't emit (broken
+    schema — fix the expr). Distinguishing the two used to require manual
+    `curl` probing of /metricLabelValues; this class automates it.
+
+    For each positive equality matcher in the expr's first metric selector
+    (``label='value'`` or ``label=~'pattern'``), queries the cluster for
+    the distinct values of that label on that metric. If the API returns
+    no values for a label, that label is the schema break — report it.
+
+    Probe results are memoised per ``(metric, label)`` for the lifetime of
+    the diagnostic instance.
+    """
+
+    # Single-label matchers in the positive-equality form. The negated
+    # forms (!=, !~) don't carry information about which values exist, so
+    # don't probe them.
+    _POSITIVE_MATCHER_RE = re.compile(
+        r"([A-Za-z_][A-Za-z0-9_]*)\s*=~?\s*'([^']*)'"
+    )
+
+    def __init__(self, axonops, args):
+        self.axonops = axonops
+        self.args = args
+        self._cache = {}  # (metric, label) -> list[str]
+
+    def _label_values(self, metric: str, label: str):
+        key = (metric, label)
+        if key in self._cache:
+            return self._cache[key]
+        cluster_type = getattr(self.axonops, "get_cluster_type", lambda: None)() or "cassandra"
+        path = METRIC_LABEL_VALUES_URL.format(
+            org=self.args.org,
+            cluster_type=cluster_type,
+            cluster=self.args.cluster,
+        )
+        qs = urllib.parse.urlencode({
+            "query": metric,
+            "regex": f"{label}=([^:]+)",
+        })
+        try:
+            resp = self.axonops.do_request(url=f"{path}?{qs}", method="GET")
+        except Exception:
+            # Probe failures are diagnostic-only; don't escalate. Cache the
+            # miss so we don't hammer the API on a broken endpoint.
+            self._cache[key] = None
+            return None
+        if not isinstance(resp, dict):
+            self._cache[key] = None
+            return None
+        data = resp.get("data")
+        if not isinstance(data, list):
+            self._cache[key] = None
+            return None
+        self._cache[key] = data
+        return data
+
+    def diagnose(self, expr: str):
+        """Return a short ``broken_schema: …`` string explaining why a
+        0-series query failed, or ``None`` if no schema break was found
+        (i.e. all labels in the expr have values on the cluster, so the
+        metric is genuinely 0).
+        """
+        m = _METRIC_SELECTOR_RE.search(expr)
+        if not m:
+            return None
+        metric = m.group(1)
+        body = m.group(2)
+        for label, _value in self._POSITIVE_MATCHER_RE.findall(body):
+            # Skip well-known PromQL-internal labels — they're tested
+            # against on shipped rules but cluster won't list them via
+            # metricLabelValues.
+            if label in ("__name__",):
+                continue
+            values = self._label_values(metric, label)
+            if values is None:
+                # Probe failed; can't diagnose. Stop trying so we don't
+                # accumulate misleading "0 values" reports.
+                return None
+            if not values:
+                return (
+                    f"broken_schema: label {label!r} has 0 values on metric "
+                    f"{metric!r}; rewrite the expr to use a label the cluster "
+                    f"actually emits"
+                )
+        return None
+
+
+class EventsQuerier:
+    """Count log/event records matching an `events{...}` rule's selector
+    over a time window.
+
+    The metrics ``query_range`` endpoint returns HTTP 500 for ``events{...}``
+    queries — events live in a separate log/event store, not the metrics
+    TSDB. This class hits the dedicated POST ``/events`` search endpoint
+    and reads ``metadata._count`` so the tuner can derive thresholds for
+    event-shape rules instead of skipping them all up front.
+    """
+
+    # Matches every positive (=) and quoted-equality matcher in an events
+    # selector body. The events store uses substring matches for `message`
+    # (e.g. ``message="+word +word"``), so we copy the matcher value
+    # verbatim into the request body — no further parsing.
+    _MATCHER_RE = re.compile(r'([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"([^"]*)"')
+    _MATCHER_RE_SINGLE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*=\s*'([^']*)'")
+
+    def __init__(self, axonops, args):
+        self.axonops = axonops
+        self.args = args
+
+    @classmethod
+    def parse_filters(cls, expr: str) -> dict:
+        """Pull source / level / message / type / host_id out of an events
+        selector body. Returns an empty dict if the expr isn't recognised
+        as ``events{...}``."""
+        m = re.search(r"events\s*\{([^}]*)\}", expr)
+        if not m:
+            return {}
+        body = m.group(1)
+        out = {}
+        for lr in (cls._MATCHER_RE, cls._MATCHER_RE_SINGLE):
+            for label, value in lr.findall(body):
+                out[label] = value
+        return out
+
+    def count(self, filters: dict, start: int, end: int):
+        """Return the total event count matching ``filters`` between
+        ``start`` and ``end`` (epoch seconds), or None if the endpoint
+        wasn't usable. Empty / missing filter keys are sent as empty
+        strings — the events backend treats them as wildcards."""
+        from axonopscli.utils import HTTPCodeError
+
+        cluster_type = getattr(self.axonops, "get_cluster_type", lambda: None)() or "cassandra"
+        path = EVENTS_SEARCH_URL.format(
+            org=self.args.org,
+            cluster_type=cluster_type,
+            cluster=self.args.cluster,
+        )
+        qs = urllib.parse.urlencode({"start": start, "end": end, "limit": 1})
+        body = {
+            "source":  filters.get("source", ""),
+            "level":   filters.get("level", ""),
+            "message": filters.get("message", ""),
+            "host_id": filters.get("host_id", "") or "",
+            "type":    filters.get("type", ""),
+            "f1": "",
+            "f2": "",
+            "search_after": None,
+        }
+        try:
+            resp = self.axonops.do_request(
+                url=f"{path}?{qs}", method="POST", json_data=body,
+            )
+        except HTTPCodeError:
+            return None
+        except Exception:
+            return None
+        if not isinstance(resp, dict):
+            return None
+        meta = resp.get("metadata")
+        if not isinstance(meta, dict):
+            return None
+        try:
+            return int(meta.get("_count", 0))
+        except (TypeError, ValueError):
+            return None
+
+
+# Map ``for: "5m"`` / ``"30s"`` / ``"2h"`` / ``"500ms"`` to minutes (float).
+# Default to 5m when missing/empty — that's the platform default.
+def _for_to_minutes(for_str) -> float:
+    if not for_str:
+        return 5.0
+    m = re.match(r"^\s*(\d+)\s*(ms|s|m|h)?\s*$", str(for_str))
+    if not m:
+        return 5.0
+    n = int(m.group(1))
+    unit = m.group(2) or "m"
+    return {"ms": n / 60000.0, "s": n / 60.0, "m": float(n), "h": n * 60.0}[unit]
+
+
 class RuleFilter:
     """Decide whether a given rule name passes the user's include/exclude/rules filters.
 
@@ -374,6 +564,7 @@ class TuneAlertsConfig:
     pinned_rules: list = None       # list[dict{pattern, warning, critical}]
     set_labels: list = None         # list[tuple(metric_glob_or_None, label, value)]
     days_back: int = 7              # lookback window for the baseline query
+    expr_rewrites: dict = None      # dict[alert_name -> new_expr]; applied in-memory before tuning
 
     def __post_init__(self):
         if self.incidents is None:
@@ -382,6 +573,8 @@ class TuneAlertsConfig:
             self.pinned_rules = []
         if self.set_labels is None:
             self.set_labels = []
+        if self.expr_rewrites is None:
+            self.expr_rewrites = {}
 
 
 @dataclass
@@ -446,6 +639,14 @@ class TuneAlertsOrchestrator:
             exclude=config.exclude,
             rules=config.rules,
         )
+        # Cached label-probe helper. Used to explain 0-series query results
+        # ("insufficient data" -> "broken_schema: label X has 0 values"); the
+        # cache lives for the duration of a single tune run.
+        self.schema = SchemaDiagnostic(axonops, args)
+        # Counts log/event records for `events{...}` rules via the dedicated
+        # search endpoint (metrics query_range 500s on these). Lets us tune
+        # event-shape rules from observed rate instead of skipping them.
+        self.events = EventsQuerier(axonops, args)
 
     # ---- file I/O (called by run_tune_alerts in application.py) ----
 
@@ -479,6 +680,14 @@ class TuneAlertsOrchestrator:
 
         end_ts = int(time.time())
         start_ts = end_ts - self.config.days_back * 86400
+
+        # Apply declarative expr rewrites BEFORE tuning so the metric query,
+        # the percentile computation, the policy-pin expr rewrite, and the
+        # output JSON all see the same corrected expr. Warn — but don't fail
+        # — on rewrites that don't match a rule (the rule may have been
+        # renamed or removed since the rewrites file was authored).
+        if self.config.expr_rewrites:
+            self._apply_expr_rewrites(tuned_json)
 
         outcomes = []
         for rule in tuned_json["metricrules"]:
@@ -518,18 +727,35 @@ class TuneAlertsOrchestrator:
         pin = self._find_pinned(name)
         if pin is not None:
             pinned_pattern, pinned_warning, pinned_critical = pin
+            # The literal string "shipped" resolves to the rule's current
+            # value at apply time. Lets policy entries document "pin at
+            # whatever the rule currently has" without restating numbers.
+            if pinned_warning == "shipped":
+                pinned_warning = old_warning
+            if pinned_critical == "shipped":
+                pinned_critical = old_critical
             try:
                 _bare, operator, _old = ExprRewriter.strip_threshold(expr)
+                # Expr has a trailing threshold — rewrite it in lockstep with
+                # the JSON warningValue/criticalValue so they don't drift.
+                rule["expr"] = ExprRewriter.rewrite(expr, new_warning=pinned_warning)
             except ValueError as e:
-                return RuleOutcome(
-                    rule_name=name, status="skipped",
-                    reason=f"cannot parse expr for pinning: {e}",
-                    old_warning=old_warning, old_critical=old_critical,
-                    pinned_pattern=pinned_pattern,
-                )
+                # Log-pattern event rules (`events{message="..."}`) carry their
+                # threshold only in the rule's JSON `operator`/`warningValue`/
+                # `criticalValue` fields — there's nothing to strip from the
+                # expr. Pin via the JSON fields and leave expr alone. For any
+                # other unparseable expr, surface the original skip so latent
+                # rule bugs aren't masked by a silent pin.
+                if not _is_event_metric_rule(expr):
+                    return RuleOutcome(
+                        rule_name=name, status="skipped",
+                        reason=f"cannot parse expr for pinning: {e}",
+                        old_warning=old_warning, old_critical=old_critical,
+                        pinned_pattern=pinned_pattern,
+                    )
+                operator = rule.get("operator", "")
             rule["warningValue"] = pinned_warning
             rule["criticalValue"] = pinned_critical
-            rule["expr"] = ExprRewriter.rewrite(expr, new_warning=pinned_warning)
             return RuleOutcome(
                 rule_name=name, status="pinned",
                 reason=f"matched policy pattern {pinned_pattern!r}",
@@ -538,11 +764,17 @@ class TuneAlertsOrchestrator:
                 operator=operator, pinned_pattern=pinned_pattern,
             )
 
-        # Pre-filter `events{...}` rules: log alerts have no PromQL threshold,
-        # and the event-type alerts return 500 on query_range. Threshold tuning
-        # doesn't apply to either — collapse them into one short skip reason
-        # instead of N different "cannot parse expr"/"query failed" lines.
+        # `events{...}` rules can't go through query_range (the metrics
+        # backend 500s on the events series) but the dedicated /events
+        # search endpoint can count them. Try the events path first; only
+        # fall back to the original short-circuit if the endpoint is
+        # unreachable or the expr doesn't parse into recognised filters.
         if _is_event_metric_rule(expr):
+            event_outcome = self._tune_event_rule(
+                rule, start_ts=start_ts, end_ts=end_ts,
+            )
+            if event_outcome is not None:
+                return event_outcome
             return RuleOutcome(
                 rule_name=name, status="skipped",
                 reason="event/log-shape rule (events metric, not workload-tunable)",
@@ -587,9 +819,20 @@ class TuneAlertsOrchestrator:
             )
 
         if len(baseline_samples) < self.config.min_samples:
+            # When the query returned LITERALLY zero series, the most likely
+            # cause is a label-schema break (rule filters on a label the
+            # cluster doesn't emit) rather than a genuine "no traffic"
+            # situation. Probe the cluster's actual label values and report
+            # the offending label; fall back to the generic message when no
+            # schema break is found or the probe endpoint isn't usable.
+            reason = f"insufficient data ({len(baseline_samples)} samples)"
+            if len(baseline_samples) == 0:
+                diag = self.schema.diagnose(query_expr)
+                if diag:
+                    reason = diag
             return RuleOutcome(
                 rule_name=name, status="skipped",
-                reason=f"insufficient data ({len(baseline_samples)} samples)",
+                reason=reason,
                 old_warning=old_warning, old_critical=old_critical,
                 operator=operator, sample_count=len(baseline_samples),
             )
@@ -762,6 +1005,124 @@ class TuneAlertsOrchestrator:
                     f"{sub_ranges_completed}/{len(ranges_to_query)} sub-ranges)"
                 )
         return baseline
+
+    def _apply_expr_rewrites(self, tuned_json: dict) -> None:
+        """Rewrite rule exprs in-place per ``config.expr_rewrites``.
+
+        Matches on the rule's ``alert`` name (exact match, not glob — these
+        are surgical, not pattern-based). A no-op rewrite (new expr ==
+        current expr) is silently skipped so re-runs don't churn. Any
+        rewrite whose ``alert`` doesn't appear in the input emits a stderr
+        warning so misnamed entries don't sit silent.
+        """
+        rewrites = dict(self.config.expr_rewrites)
+        applied = 0
+        for rule in tuned_json.get("metricrules", []):
+            name = rule.get("alert")
+            if name in rewrites:
+                new_expr = rewrites.pop(name)
+                if rule.get("expr", "").strip() != new_expr.strip():
+                    rule["expr"] = new_expr
+                    applied += 1
+        if rewrites:
+            for name in rewrites:
+                print(
+                    f"WARNING: expr_rewrites entry for {name!r} did not match any rule",
+                    file=sys.stderr,
+                )
+        if applied:
+            print(f"Applied {applied} expr rewrite(s) in-memory", file=sys.stderr)
+
+    def _tune_event_rule(self, rule: dict, start_ts: int, end_ts: int):
+        """Tune a rule whose expr is `events{...}` by counting log/event
+        records through the dedicated /events search endpoint.
+
+        The events store is a separate backend; metrics query_range 500s
+        on these queries. We POST the selector and read
+        ``metadata._count`` as the total over the window, then derive a
+        per-``for``-window threshold heuristic for the operator.
+
+        Returns:
+          * ``RuleOutcome(status="tuned"|"pinned")`` on success.
+          * ``None`` if the endpoint isn't usable or the expr filters
+            can't be parsed — caller falls back to the legacy "event/
+            log-shape rule" skip.
+
+        Threshold heuristic (operator-friendly, intentionally
+        conservative):
+
+        - Let ``mean = count * for_min / window_min`` (expected events
+          per ``for`` window).
+        - When ``mean < 0.01`` (under 1 event per 100 windows): the rule
+          is "any occurrence is bad" — pin at the rule's current values,
+          status=``pinned``.
+        - Otherwise: ``warn = max(shipped_warn, ceil(mean * 5))`` and
+          ``crit = max(shipped_crit, ceil(warn * 2))``. The 5× factor
+          approximates p99 of a Poisson with low mean; the operator can
+          still override via policy. Status=``tuned``.
+
+        The total count goes into ``sample_count`` so the audit report
+        carries the observed evidence next to every event rule.
+        """
+        name = rule.get("alert", "<unnamed>")
+        expr = rule.get("expr", "")
+        operator = rule.get("operator", "")
+        old_warning = rule.get("warningValue")
+        old_critical = rule.get("criticalValue")
+
+        filters = EventsQuerier.parse_filters(expr)
+        if not filters and expr.strip() != "events{}":
+            # Unrecognisable shape — let the caller fall back.
+            return None
+
+        count = self.events.count(filters, start=start_ts, end=end_ts)
+        if count is None:
+            return None
+
+        for_min = _for_to_minutes(rule.get("for"))
+        window_min = max(1.0, (end_ts - start_ts) / 60.0)
+        mean_per_window = count * for_min / window_min
+
+        try:
+            old_w_f = float(old_warning) if old_warning is not None else 0.0
+            old_c_f = float(old_critical) if old_critical is not None else 0.0
+        except (TypeError, ValueError):
+            old_w_f = old_c_f = 0.0
+
+        if mean_per_window < 0.01:
+            # Rare enough that the shipped tight value is correct; pin.
+            rule["warningValue"] = old_warning
+            rule["criticalValue"] = old_critical
+            return RuleOutcome(
+                rule_name=name, status="pinned",
+                reason=(f"events: {count} occurrence(s) in {self.config.days_back}d "
+                        f"(mean/for-window={mean_per_window:.4f}); shipped sufficient"),
+                old_warning=old_warning, old_critical=old_critical,
+                new_warning=old_warning, new_critical=old_critical,
+                operator=operator, sample_count=count,
+                percentile_value=mean_per_window,
+            )
+
+        new_warning = max(old_w_f, math.ceil(mean_per_window * 5))
+        new_critical = max(old_c_f, math.ceil(new_warning * 2))
+
+        if new_warning == old_w_f and new_critical == old_c_f:
+            status = "pinned"
+            reason = (f"events: {count} in {self.config.days_back}d; observed rate "
+                      f"({mean_per_window:.2f}/for-window) under shipped threshold")
+        else:
+            status = "tuned"
+            reason = None
+
+        rule["warningValue"] = new_warning
+        rule["criticalValue"] = new_critical
+        return RuleOutcome(
+            rule_name=name, status=status, reason=reason,
+            old_warning=old_warning, old_critical=old_critical,
+            new_warning=new_warning, new_critical=new_critical,
+            operator=operator, sample_count=count,
+            percentile_value=mean_per_window,
+        )
 
     def _find_pinned(self, rule_name: str):
         """Return (pattern, warning, critical) for the first matching pinned
