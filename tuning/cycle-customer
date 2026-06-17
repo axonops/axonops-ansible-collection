@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# Full reconciliation cycle for a named customer.
+#
+# Reads tuning/customers/<name>.env and runs:
+#   1. Export the cluster's CURRENT state (so UI deletions/edits are honored).
+#   2. (If EXPR_PATCHER is set) Patch schema-broken exprs, apply via
+#      apply-tuned-alerts, re-export.
+#   3. Tune.
+#
+# Idempotent — safe to re-run after any tuning/default-apply or any time the
+# cluster state has drifted (UI edits, AxonOps upgrades, etc.). DOES NOT run
+# tuning/default-apply; that's the destructive seed step and stays an explicit
+# operator action.
+#
+# This replaces tuning/converge-<customer>. The customer-specific wrappers are
+# kept as thin delegators for muscle memory.
+#
+# Usage:
+#   tuning/cycle-customer <name> [extra tune-alerts args...]
+#
+# Required env:
+#   AXONOPS_TOKEN   — SaaS API token
+set -euo pipefail
+
+NAME="${1:?usage: tuning/cycle-customer <name> [extra tune-alerts args...]}"
+shift || true
+
+TUNING_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONF="${TUNING_DIR}/customers/${NAME}.env"
+
+if [[ ! -f "$CONF" ]]; then
+    echo "no customer config at ${CONF}" >&2
+    echo "available customers:" >&2
+    ls "${TUNING_DIR}/customers/" 2>/dev/null | sed 's|\.env$||;s|^|  |' >&2
+    exit 2
+fi
+# Initialize optional arrays BEFORE sourcing so the conf can append to or
+# override them without needing `declare -a` boilerplate per file.
+PRE_HOOKS=()
+# shellcheck source=/dev/null
+source "$CONF"
+
+: "${ORG:?customer config ${CONF} missing ORG}"
+: "${CLUSTER:?customer config ${CONF} missing CLUSTER}"
+
+# Pre-hooks: idempotent setup scripts (e.g. dashboard chart corrections) that
+# run before the cycle's main steps. Each entry is a path relative to tuning/.
+# Failures propagate (set -e) so a broken hook stops the cycle before the
+# destructive bits run.
+if [[ ${#PRE_HOOKS[@]} -gt 0 ]]; then
+    echo "==> [pre] Running ${#PRE_HOOKS[@]} pre-hook(s)"
+    for hook in "${PRE_HOOKS[@]}"; do
+        [[ -n "$hook" ]] || continue
+        hook_path="${TUNING_DIR}/${hook}"
+        if [[ ! -x "$hook_path" ]]; then
+            echo "  ERROR: pre-hook '${hook}' not executable at ${hook_path}" >&2
+            exit 2
+        fi
+        echo "  --- $hook ---"
+        "$hook_path"
+    done
+    echo ""
+fi
+
+# Decide whether we're running with or without the patcher — affects step
+# numbering in the output so it's clear what's happening at each stage.
+if [[ -n "${EXPR_PATCHER:-}" && -x "${TUNING_DIR}/${EXPR_PATCHER}" ]]; then
+    TOTAL=5
+    echo "==> [1/${TOTAL}] Exporting cluster's CURRENT state (reconcile from live, not stale)"
+    "${TUNING_DIR}/export" "$ORG" "$CLUSTER"
+    echo ""
+
+    echo "==> [2/${TOTAL}] Patching broken-schema exprs via ${EXPR_PATCHER}"
+    "${TUNING_DIR}/${EXPR_PATCHER}"
+    echo ""
+
+    echo "==> [3/${TOTAL}] Applying patched exprs via apply-tuned-alerts"
+    "${TUNING_DIR}/tuned-apply" "$ORG" "$CLUSTER" --yes \
+        --input "cli/exported/${ORG}/${CLUSTER}/alert_rules.schemafix.json"
+    echo ""
+
+    echo "==> [4/${TOTAL}] Re-exporting to capture the now-correct stored exprs"
+    "${TUNING_DIR}/export" "$ORG" "$CLUSTER"
+    echo ""
+
+    echo "==> [5/${TOTAL}] Tuning against the corrected exprs"
+    "${TUNING_DIR}/tune-customer" "$NAME" "$@"
+else
+    TOTAL=2
+    echo "==> [1/${TOTAL}] Exporting cluster's CURRENT state (reconcile from live, not stale)"
+    "${TUNING_DIR}/export" "$ORG" "$CLUSTER"
+    echo ""
+
+    echo "==> [2/${TOTAL}] Tuning"
+    "${TUNING_DIR}/tune-customer" "$NAME" "$@"
+fi

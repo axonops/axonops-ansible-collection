@@ -5,11 +5,24 @@ import sys
 from typing import Sequence
 
 from .axonops import AxonOps
+from .components.alerts import AlertsExporter
 from .components.dashboard import Dashboard
 from .components.repair import AdaptiveRepair
 from .components.scheduled_repair import ScheduledRepair
 from .components.silence import Silence
 from .utils import remove_not_alphanumeric
+
+# argparse.Namespace attributes that must never be printed, even in verbose
+# mode — they contain live credentials.
+_SENSITIVE_ARG_KEYS = frozenset({"token", "password"})
+
+
+def _scrubbed_args(args: argparse.Namespace) -> dict:
+    """Return a dict of argparse attrs with sensitive values masked."""
+    return {
+        k: ("***" if v else v) if k in _SENSITIVE_ARG_KEYS else v
+        for k, v in vars(args).items()
+    }
 
 
 class Application:
@@ -29,7 +42,7 @@ class Application:
                                    base_url=args.url,
                                    username=args.username,
                                    password=args.password,
-                                   cluster_type=args.cluster,
+                                   cluster_type=args.cluster_type,
                                    verbose=args.v)
         return self.axonops
 
@@ -41,6 +54,9 @@ class Application:
                             help='Name of your organisation')
         parser.add_argument('--cluster', type=str, required=False, default=os.getenv('AXONOPS_CLUSTER'),
                             help='Name of your cluster')
+        parser.add_argument('--cluster-type', type=str, required=False,
+                            default=os.getenv('AXONOPS_CLUSTER_TYPE', 'cassandra'),
+                            help='Cluster type (e.g. cassandra, kafka). Defaults to cassandra.')
         parser.add_argument('--token', type=str, required=False, default=os.getenv('AXONOPS_TOKEN'),
                             help='AUTH_TOKEN used to authenticate with the API in SaaS')
         parser.add_argument('--username', type=str, required=False, default=os.getenv('AXONOPS_USERNAME'),
@@ -208,6 +224,92 @@ class Application:
         silence_parser.add_argument('--silencescheduledreportsalerts', action='store_true',
                                     help='Silence Scheduled Reports Alerts', default=False)
 
+        alerts_parser = commands_subparser.add_parser(
+            "alerts",
+            help="Export AxonOps alert rules, routes, and integrations to JSON")
+
+        alerts_parser.set_defaults(func=self.run_alerts)
+
+        alerts_parser.add_argument('--exportpath', type=str, required=True,
+                                   help='Directory to write alert rules and integrations '
+                                        'JSON files. Created if missing.')
+        alerts_parser.add_argument('--include-secrets', action='store_true', default=False,
+                                   help='Include integration secrets (webhook URLs, API '
+                                        'keys, etc.) in the export instead of redacting. '
+                                        'When set, exported filenames are auto-appended '
+                                        'to a .gitignore in the export directory.')
+
+        apply_tuned_alerts_parser = commands_subparser.add_parser(
+            "apply-tuned-alerts",
+            help="POST a tuned alert-rules JSON back to the live AxonOps cluster")
+
+        apply_tuned_alerts_parser.set_defaults(func=self.run_apply_tuned_alerts)
+
+        apply_tuned_alerts_parser.add_argument('--input', type=str, required=True,
+                                               help='Path to the tuned alert-rules JSON file')
+        apply_tuned_alerts_parser.add_argument('--dry-run', action='store_true', default=False,
+                                               help='Print what would be POSTed without making any API calls')
+        apply_tuned_alerts_parser.add_argument('--yes', action='store_true', default=False,
+                                               help='Skip the interactive confirmation prompt')
+        apply_tuned_alerts_parser.add_argument('--continue-on-error', action='store_true', default=False,
+                                               help='Continue applying remaining rules after a POST failure '
+                                                    '(default: stop on first failure). Exit non-zero if any '
+                                                    'rule failed.')
+        apply_tuned_alerts_parser.add_argument('--allow-redacted', action='store_true', default=False,
+                                               help='Allow applying an input file that contains '
+                                                    "'***REDACTED***' values (skipped safety check). Use "
+                                                    'only if you understand that the literal sentinel '
+                                                    'string will be POSTed to the server.')
+
+        tune_alerts_parser = commands_subparser.add_parser(
+            "tune-alerts",
+            help="Tune existing alert rule thresholds against the last 7 days of observed metrics")
+
+        tune_alerts_parser.set_defaults(func=self.run_tune_alerts)
+
+        tune_alerts_parser.add_argument('--input', type=str, required=False,
+                                        help='Path to alert_rules.json (mutually exclusive with --from-api)')
+        tune_alerts_parser.add_argument('--from-api', action='store_true', default=False,
+                                        help='Fetch alert rules from the live API instead of --input')
+        tune_alerts_parser.add_argument('--output-dir', type=str, default=None,
+                                        help='Directory for output files (only valid with --from-api).')
+        tune_alerts_parser.add_argument('--profile', type=str, default='default',
+                                        choices=['noisy', 'default', 'quiet'],
+                                        help='Preset: noisy=p95/5%%-10%%, default=p99/10%%-20%%, quiet=p99.9/20%%-50%%')
+        tune_alerts_parser.add_argument('--percentile', type=float, default=None,
+                                        help='Override profile percentile (0 < P < 100)')
+        tune_alerts_parser.add_argument('--warning-headroom', type=float, default=None,
+                                        help='Override profile warning headroom (e.g. 0.10 = +10%%)')
+        tune_alerts_parser.add_argument('--critical-headroom', type=float, default=None,
+                                        help='Override profile critical headroom (e.g. 0.20 = +20%%)')
+        tune_alerts_parser.add_argument('--days', type=int, default=7,
+                                        help='Lookback window in days for the baseline query (default 7)')
+        tune_alerts_parser.add_argument('--min-samples', type=int, default=100,
+                                        help='Skip rules with fewer samples than this (default 100)')
+        tune_alerts_parser.add_argument('--max-delta', type=float, default=10.0,
+                                        help='Skip rules whose new threshold differs from original by more than this multiple (default 10)')
+        tune_alerts_parser.add_argument('--include', action='append', default=[],
+                                        help='Include rules matching this glob (repeatable)')
+        tune_alerts_parser.add_argument('--exclude', action='append', default=[],
+                                        help='Exclude rules matching this glob (repeatable; overrides --include)')
+        tune_alerts_parser.add_argument('--rule', action='append', default=[],
+                                        help='Tune only this exact rule name (repeatable)')
+        tune_alerts_parser.add_argument('--incident', action='append', default=[],
+                                        help='YYYY-MM-DD UTC day to exclude from baseline and verify coverage for (repeatable)')
+        tune_alerts_parser.add_argument('--policy', type=str, default=None,
+                                        help='Path to a JSON policy file with pinned thresholds that override '
+                                             'workload-derived tuning for matching rule-name globs. Format: '
+                                             '{"pinned_thresholds": [{"pattern": "Disk *", "warning": 70, "critical": 80}]}')
+        tune_alerts_parser.add_argument('--set-label', action='append', default=[], dest='set_label',
+                                        metavar='[METRIC_GLOB:]LABEL=VALUE',
+                                        help='Pin a label selector to a single value in the metric query used to '
+                                             'compute thresholds (the stored expr is unchanged). Repeatable. Only '
+                                             'rewrites selectors that already reference LABEL; never injects. Prefix '
+                                             'with a metric-name glob to confine an overloaded label, e.g. '
+                                             "--set-label 'cas_Table_*:scope=mytable'. Use to retarget broken "
+                                             "comma-list selectors onto one active keyspace/table, e.g. "
+                                             '--set-label keyspace=myks --set-label table=mytable')
+
         parsed_result: argparse.Namespace = parser.parse_args(args=argv)
 
         # ensure --tables is only used together with --keyspace
@@ -221,6 +323,19 @@ class Application:
         # ensure --excludedtables is only used together with --keyspace
         if getattr(parsed_result, "excludedtables", None) and not getattr(parsed_result, "keyspace", None):
             parser.error("--excludedtables requires --keyspace")
+
+        # tune-alerts input source validation
+        if getattr(parsed_result, 'func', None) == self.run_tune_alerts:
+            has_input = bool(getattr(parsed_result, 'input', None))
+            has_from_api = bool(getattr(parsed_result, 'from_api', False))
+            if has_input and has_from_api:
+                parser.error("--input and --from-api are mutually exclusive")
+            if not has_input and not has_from_api:
+                parser.error("tune-alerts requires either --input PATH or --from-api")
+            if has_from_api and not getattr(parsed_result, 'output_dir', None):
+                parser.error("--from-api requires --output-dir")
+            if has_input and getattr(parsed_result, 'output_dir', None):
+                parser.error("--output-dir is only valid with --from-api")
 
         # if func() is not present it means that no command was inserted
         if hasattr(parsed_result, 'func'):
@@ -346,3 +461,183 @@ class Application:
             silence.delete_silence(args.deletesilence)
         else:
             print("No action specified for silence management.")
+
+    def run_alerts(self, args: argparse.Namespace):
+        """ Run the alerts export """
+        if args.v:
+            print(f"Running alerts export on {args.org}/{args.cluster}")
+            print(_scrubbed_args(args))
+
+        axonops = self.get_axonops(args)
+
+        exporter = AlertsExporter(axonops, args)
+        exporter.fetch()
+        exporter.export(args.exportpath, include_secrets=args.include_secrets)
+
+    def run_apply_tuned_alerts(self, args: argparse.Namespace):
+        """Apply a tuned alert-rules JSON to the live cluster."""
+        if args.v:
+            print(f"Running apply-tuned-alerts on {args.org}/{args.cluster}")
+            print(_scrubbed_args(args))
+
+        from .components.apply_tuned_alerts import AlertsApplier, RedactedInputError
+
+        # Defer AxonOps construction until we've passed the prompt / validation
+        # gates below — we don't want a credentialed HTTP session sitting
+        # around if the user aborts. Load & validate input first.
+        axonops = self.get_axonops(args)
+        applier = AlertsApplier(axonops, args)
+
+        try:
+            input_json = applier.load_input(args.input)
+        except (ValueError, FileNotFoundError, PermissionError) as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(2)
+
+        rules = input_json.get("metricrules", [])
+        unexpected = [k for k in input_json.keys() if k not in (
+            "name", "metricrules", "eventrules", "logrules", "servicecheckrules",
+            "backuprules", "nodeprobes",
+        )]
+        if unexpected:
+            print(
+                f"WARNING: input contains unexpected top-level key(s): "
+                f"{', '.join(unexpected)} — these will be ignored.",
+                file=sys.stderr,
+            )
+
+        # Destructive operation: require explicit confirmation unless
+        # --yes is set (scripting opt-in) or --dry-run is set (no-op).
+        if not args.dry_run and not args.yes:
+            if not sys.stdin.isatty():
+                print(
+                    "ERROR: apply-tuned-alerts is destructive and stdin is not "
+                    "a TTY. Pass --yes to confirm non-interactively, or run from "
+                    "a terminal.",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+            prompt = (
+                f"About to POST {len(rules)} alert rules to "
+                f"{args.org}/{args.cluster}. Continue? [y/N] "
+            )
+            try:
+                reply = input(prompt)
+            except EOFError:
+                reply = ""
+            if reply.strip().lower() not in ("y", "yes"):
+                print("Aborted.", file=sys.stderr)
+                # 130 = "Script terminated by Control-C" convention; signals
+                # user-initiated abort to calling shells/scripts.
+                sys.exit(130)
+
+        try:
+            result = applier.apply(
+                input_json,
+                dry_run=args.dry_run,
+                continue_on_error=args.continue_on_error,
+                allow_redacted=args.allow_redacted,
+            )
+        except RedactedInputError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(2)
+
+        applier.print_summary(result)
+
+        # Exit non-zero if any rule failed (useful signal for CI pipelines).
+        if result.failed:
+            sys.exit(1)
+
+    def run_tune_alerts(self, args: argparse.Namespace):
+        """ Run the alerts tuning """
+        if args.v:
+            print(f"Running alerts tuning on {args.org}/{args.cluster}")
+            print(_scrubbed_args(args))
+
+        axonops = self.get_axonops(args)
+
+        from .components.tune_alerts import TuneAlertsOrchestrator
+
+        config = self._build_tune_alerts_config(args)
+        orchestrator = TuneAlertsOrchestrator(axonops, args, config)
+
+        if args.from_api:
+            input_json = orchestrator.fetch_from_api()
+            # write_output/report use the directory from a synthetic "input path"
+            synthetic_input = os.path.join(args.output_dir, "alert_rules.json")
+            os.makedirs(args.output_dir, exist_ok=True)
+            source_label = synthetic_input
+        else:
+            input_json = orchestrator.load_input(args.input)
+            source_label = args.input
+
+        result = orchestrator.tune_all(input_json)
+        json_path = orchestrator.write_output(source_label, result)
+        try:
+            orchestrator.write_audit_report(source_label, result)
+        except OSError as e:
+            print(
+                f"WARNING: tuned JSON written to {json_path} but audit report write failed: {e}. "
+                f"Re-run with the same arguments to regenerate the report.",
+                file=sys.stderr,
+            )
+            orchestrator.print_summary(result, json_path)
+            sys.exit(2)
+        orchestrator.print_summary(result, json_path)
+
+    @staticmethod
+    def _build_tune_alerts_config(args):
+        from .components.tune_alerts import TuneAlertsConfig, parse_set_label_arg
+
+        # Profile presets
+        presets = {
+            'noisy':   (95.0,  0.05, 0.10),
+            'default': (99.0,  0.10, 0.20),
+            'quiet':   (99.9,  0.20, 0.50),
+        }
+        p_percentile, p_warn, p_crit = presets[args.profile]
+
+        pinned_rules = []
+        if getattr(args, 'policy', None):
+            pinned_rules = Application._load_policy_file(args.policy)
+
+        set_labels = [parse_set_label_arg(a) for a in (getattr(args, 'set_label', None) or [])]
+
+        return TuneAlertsConfig(
+            profile=args.profile,
+            percentile=args.percentile if args.percentile is not None else p_percentile,
+            warning_headroom=args.warning_headroom if args.warning_headroom is not None else p_warn,
+            critical_headroom=args.critical_headroom if args.critical_headroom is not None else p_crit,
+            min_samples=args.min_samples,
+            max_delta=args.max_delta,
+            include=list(args.include or []),
+            exclude=list(args.exclude or []),
+            rules=list(args.rule or []),
+            incidents=list(args.incident or []),
+            pinned_rules=pinned_rules,
+            set_labels=set_labels,
+            days_back=args.days,
+        )
+
+    @staticmethod
+    def _load_policy_file(path):
+        """Load a JSON policy file. Returns the pinned_thresholds list.
+        Raises ValueError with a clear message on any shape problem."""
+        with open(path, "r") as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"policy file {path!r} is not valid JSON: {e}")
+        if not isinstance(data, dict):
+            raise ValueError(f"policy file {path!r} must be a JSON object at top level")
+        pinned = data.get("pinned_thresholds", [])
+        if not isinstance(pinned, list):
+            raise ValueError(f"policy file {path!r}: pinned_thresholds must be a list")
+        for i, entry in enumerate(pinned):
+            if not isinstance(entry, dict):
+                raise ValueError(f"policy file {path!r}: pinned_thresholds[{i}] must be an object")
+            for key in ("pattern", "warning", "critical"):
+                if key not in entry:
+                    raise ValueError(
+                        f"policy file {path!r}: pinned_thresholds[{i}] missing required key {key!r}")
+        return pinned
