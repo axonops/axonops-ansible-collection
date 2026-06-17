@@ -15,7 +15,6 @@
       ansible.builtin.file:
         path: /usr/share/man/man1/
         state: directory
-        recurse: true
         mode: "0755"
   roles:
     - role: java
