@@ -358,6 +358,11 @@
     disable_gpg_check: true
   when: cassandra_cqlai_binary is defined and ansible_os_family == "RedHat"
 
+- name: Provision cqlsh virtual environment
+  ansible.builtin.import_tasks: cqlsh-venv.yml
+  when: cassandra_cqlsh_venv_enabled | bool
+  tags: cqlsh
+
 - name: Systemd service for cassandra
   ansible.builtin.template:
     dest: /etc/systemd/system/cassandra.service

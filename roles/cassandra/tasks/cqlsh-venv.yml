@@ -1,0 +1,43 @@
+---
+# Provision a dedicated Python virtual environment for cqlsh.
+#
+# The cqlsh shipped inside the Cassandra tarball (and the distro package) relies
+# on a Python driver that imports stdlib modules removed in Python 3.12+
+# (e.g. asyncore, imp). On Ubuntu 24.04 / Debian 13 the system Python is >= 3.12,
+# so the bundled cqlsh aborts at startup with an import error. We install the
+# maintained standalone `cqlsh` package — which supports modern Python — into an
+# isolated venv and expose it through a wrapper, leaving the system Python and
+# the bundled cqlsh untouched.
+
+- name: Ensure Python venv/pip build dependencies are present (Debian)
+  when: ansible_os_family == "Debian"
+  ansible.builtin.package:
+    name:
+      - python3-venv
+      - python3-pip
+    state: present
+
+- name: Ensure Python pip is present (RedHat)
+  when: ansible_os_family == "RedHat"
+  ansible.builtin.package:
+    name:
+      - python3
+      - python3-pip
+    state: present
+
+- name: Create the cqlsh virtual environment and install cqlsh
+  ansible.builtin.pip:
+    name: "{{ cassandra_cqlsh_venv_packages }}"
+    virtualenv: "{{ cassandra_cqlsh_venv_path }}"
+    virtualenv_command: "{{ cassandra_cqlsh_python }} -m venv"
+    state: present
+
+- name: Install the cqlsh wrapper
+  ansible.builtin.template:
+    src: cqlsh-wrapper.sh.j2
+    dest: "{{ cassandra_cqlsh_wrapper_path }}"
+    mode: "0755"
+    owner: root
+    group: root
+
+# code: language=ansible
