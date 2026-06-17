@@ -15,6 +15,27 @@ cassandra_version: 5.0.8
 cassandra_cqlai_version: 0.1.7
 cassandra_cqlai_binary: "{{ _cassandra_cqlai_binary }}"
 
+# cqlsh virtual environment.
+# The cqlsh bundled with Cassandra fails on hosts whose system Python is >= 3.12
+# (Ubuntu 24.04, Debian 13) because its Python driver imports stdlib modules
+# removed in 3.12 (asyncore, imp). When enabled, the role provisions an isolated
+# venv with the maintained standalone `cqlsh` package and exposes it via a
+# wrapper, so cqlsh works regardless of the host Python version.
+cassandra_cqlsh_venv_enabled: true
+# Absolute path of the cqlsh virtual environment.
+cassandra_cqlsh_venv_path: /opt/cassandra-cqlsh-venv
+# Host interpreter used to create the venv (the host's own python3 is fine —
+# the standalone cqlsh package supports modern Python).
+cassandra_cqlsh_python: python3
+# Packages installed into the venv. `cqlsh` pulls in a compatible driver.
+cassandra_cqlsh_venv_packages:
+  - cqlsh
+# Path of the wrapper that execs cqlsh from the venv. Defaults to
+# /usr/local/bin/cqlsh, which shadows the broken distribution cqlsh on PATH
+# (/usr/local/bin precedes $CASSANDRA_HOME/bin) so plain `cqlsh` just works.
+# Set to e.g. /usr/local/bin/cqlsh-venv to install side-by-side instead.
+cassandra_cqlsh_wrapper_path: /usr/local/bin/cqlsh
+
 # It is recommended to leave this as false
 cassandra_start_on_boot: false
 

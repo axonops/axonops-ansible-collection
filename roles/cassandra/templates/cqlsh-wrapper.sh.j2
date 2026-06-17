@@ -1,0 +1,8 @@
+#!/bin/sh
+# {{ ansible_managed }}
+#
+# Wrapper that runs cqlsh from the dedicated virtual environment provisioned by
+# the axonops.axonops cassandra role. This makes cqlsh work on hosts whose
+# system Python is too new (>= 3.12, e.g. Ubuntu 24.04 / Debian 13) for the
+# cqlsh shipped inside the Cassandra distribution.
+exec "{{ cassandra_cqlsh_venv_path }}/bin/cqlsh" "$@"

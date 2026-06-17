@@ -63,3 +63,55 @@
       ansible.builtin.file:
         path: /tmp/guard-test
         state: absent
+
+# BDD verification — cqlsh virtual environment
+#
+# Behaviour under test: with cassandra_cqlsh_venv_enabled (the default), the role
+# MUST provision an isolated venv containing a working cqlsh and a wrapper that
+# launches it, so cqlsh runs even where the system Python is >= 3.12 (Ubuntu
+# 24.04 / Debian 13).
+- name: Verify cqlsh virtual environment (BDD)
+  hosts: all
+  gather_facts: false
+  vars:
+    cassandra_cqlsh_venv_path: /opt/cassandra-cqlsh-venv
+    cassandra_cqlsh_wrapper_path: /usr/local/bin/cqlsh
+  tasks:
+
+    - name: GIVEN — the role converged with the cqlsh venv enabled
+      ansible.builtin.stat:
+        path: "{{ cassandra_cqlsh_venv_path }}/bin/cqlsh"
+      register: verify_venv_cqlsh
+
+    - name: THEN — the venv contains a cqlsh entry point
+      ansible.builtin.assert:
+        that:
+          - verify_venv_cqlsh.stat.exists
+        fail_msg: cqlsh was not installed into {{ cassandra_cqlsh_venv_path }}
+
+    - name: GIVEN — the wrapper was installed
+      ansible.builtin.stat:
+        path: "{{ cassandra_cqlsh_wrapper_path }}"
+      register: verify_wrapper
+
+    - name: THEN — the wrapper exists and is executable
+      ansible.builtin.assert:
+        that:
+          - verify_wrapper.stat.exists
+          - verify_wrapper.stat.mode == '0755'
+        fail_msg: cqlsh wrapper missing or not executable at {{ cassandra_cqlsh_wrapper_path }}
+
+    - name: WHEN — cqlsh is launched through the wrapper on a modern-Python host
+      ansible.builtin.command: "{{ cassandra_cqlsh_wrapper_path }} --version"
+      register: verify_cqlsh_version
+      changed_when: false
+
+    - name: THEN — cqlsh starts without a Python import error and reports its version
+      ansible.builtin.assert:
+        that:
+          - verify_cqlsh_version.rc == 0
+          - "'cqlsh' in (verify_cqlsh_version.stdout + verify_cqlsh_version.stderr)"
+        fail_msg: >-
+          cqlsh failed to launch from the venv
+          (stdout={{ verify_cqlsh_version.stdout }},
+           stderr={{ verify_cqlsh_version.stderr | default('') }})

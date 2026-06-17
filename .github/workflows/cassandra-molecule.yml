@@ -74,7 +74,7 @@ jobs:
           MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
 
       - name: Run Molecule verify
-        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11'
+        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11' || matrix.scenario == 'default'
         run: molecule -v verify -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'
@@ -84,7 +84,7 @@ jobs:
           MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
 
       - name: Run Molecule idempotence
-        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11'
+        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11' || matrix.scenario == 'default'
         run: molecule -v idempotence -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'

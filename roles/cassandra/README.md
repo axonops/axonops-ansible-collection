@@ -40,6 +40,52 @@ cassandra_max_heap_size: 1G
 | `cassandra_start_on_install` | `false` | When `false`, the role installs and (per `cassandra_start_on_boot`) enables the `cassandra` service but does **not** start it on first install — the node is left for an external operator to bootstrap. When `true`, the role starts the service. A node that is already running is always (re)started so a config change takes effect, regardless of this flag. |
 | `cassandra_start_on_boot` | `false` | Controls boot-time enablement only (`systemctl enable`). Independent of `cassandra_start_on_install` — enabling at boot does not start the node during the play. |
 
+## cqlsh on modern Python (3.12+)
+
+The `cqlsh` shipped with Apache Cassandra relies on a Python driver that imports
+stdlib modules removed in Python 3.12 (e.g. `asyncore`, `imp`). On distributions
+whose **system Python is 3.12 or newer — notably Ubuntu 24.04 and Debian 13** —
+the bundled `cqlsh` aborts at startup with an import error. Older distros (Rocky
+Linux 9, Ubuntu 22.04, Debian 12) ship Python 3.9–3.11 and are unaffected.
+
+To make `cqlsh` work everywhere, the role provisions a dedicated Python virtual
+environment containing the maintained standalone [`cqlsh`](https://pypi.org/project/cqlsh/)
+package (which supports modern Python) and installs a wrapper that launches it.
+The system Python and the distribution's own `cqlsh` are left untouched.
+
+By default the wrapper is installed as `/usr/local/bin/cqlsh`, which **shadows**
+the broken distribution `cqlsh` on the `PATH` (`/usr/local/bin` precedes the
+tar install's `bin/` directory), so the plain command just works:
+
+```bash
+cqlsh <host> <port>
+```
+
+To install the wrapper side-by-side instead of shadowing, set
+`cassandra_cqlsh_wrapper_path: /usr/local/bin/cqlsh-venv` and invoke it
+explicitly:
+
+```bash
+cqlsh-venv <host> <port>
+```
+
+| Variable | Type | Default | Purpose |
+|----------|------|---------|---------|
+| `cassandra_cqlsh_venv_enabled` | bool | `true` | Provision the cqlsh venv and wrapper. Set `false` to skip entirely. |
+| `cassandra_cqlsh_venv_path` | string | `/opt/cassandra-cqlsh-venv` | Absolute path of the virtual environment. |
+| `cassandra_cqlsh_python` | string | `python3` | Target-host interpreter used to create the venv. The target's own `python3` is fine — the standalone `cqlsh` package supports Python 3.12+. |
+| `cassandra_cqlsh_venv_packages` | list | `[cqlsh]` | Packages installed into the venv. `cqlsh` pulls in a compatible driver. Pin a version (e.g. `[cqlsh==6.2.0]`) for reproducible installs. |
+| `cassandra_cqlsh_wrapper_path` | string | `/usr/local/bin/cqlsh` | Path of the wrapper script that execs cqlsh from the venv. Defaults to shadowing the distribution `cqlsh` on `PATH`. |
+
+Set `cassandra_cqlsh_venv_enabled: false` on distributions whose Python is 3.11
+or earlier (where the bundled cqlsh already works), or in air-gapped
+environments without a PyPI mirror.
+
+> **Note:** provisioning the venv installs `cqlsh` from PyPI, so the **target
+> host** needs network access (or an internal PyPI mirror) at provision time.
+> The venv is built with the target host's own `python3`; no additional Python
+> version is required.
+
 ## TLS
 
 ### JKS (default)

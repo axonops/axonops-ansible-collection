@@ -22,6 +22,18 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Added
 
+- **cassandra role**: cqlsh now works on hosts whose system Python is >= 3.12
+  (Ubuntu 24.04, Debian 13), where the bundled cqlsh aborts on removed stdlib
+  modules. The role provisions an isolated Python virtual environment with the
+  maintained standalone `cqlsh` package and installs a wrapper at
+  `/usr/local/bin/cqlsh` that launches it, shadowing the broken distribution
+  `cqlsh` on `PATH` so the plain command works (configurable via
+  `cassandra_cqlsh_wrapper_path`). New variables:
+  `cassandra_cqlsh_venv_enabled`, `cassandra_cqlsh_venv_path`,
+  `cassandra_cqlsh_python`, `cassandra_cqlsh_venv_packages`,
+  `cassandra_cqlsh_wrapper_path` (see the cassandra role README for defaults).
+  ([#116](https://github.com/axonops/axonops-ansible-collection/issues/116))
+
 - **kafka role**: added `README.md` with full variable reference, quick start, and usage examples; fixes Galaxy publish failure caused by missing role readme.
 
 - **cassandra**: preflight data-directory migration guard. The role now fails
