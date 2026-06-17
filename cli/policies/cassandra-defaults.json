@@ -1,0 +1,43 @@
+{
+  "_comment": "Default tune-alerts policy for AxonOps-managed Cassandra clusters. Pins the rules from the shipped Cassandra default catalog that the tuner cannot safely tune from observed metrics — they're either 'any > 0 is bad' (CAS failures, dropped reads/hints), low-traffic counters (timeouts, blocked threadpool tasks), system.peers-scoped, or noise-prone (underutilization, hit rates). Loaded implicitly by `tune-alerts` when --policy is not given. When the caller does pass --policy, the caller's file should `extends` this one to keep these pins and overlay customer-specific entries.",
+  "_categories": {
+    "any_gt_0_is_bad": "Failure counters that should be ~0 on a healthy cluster; observed p99 of 0 trips 'nonsensical (new=0/0)' in the tuner. Pin at the shipped tight values.",
+    "low_traffic_counters": "Timeouts and blocked threadpool tasks; rare events that almost never accumulate enough samples to tune from.",
+    "system_peers": "Default-shipped rules explicitly scoped to keyspace='system', scope='peers' — that table is tiny by design.",
+    "noise_prone": "Hit-rate / underutilization (<=) rules; observed values are the 'healthy' side and tuning toward them would silence the alert. Plus a couple of bursty counters."
+  },
+
+  "pinned_thresholds": [
+    { "pattern": "CAS Read Failures",              "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+    { "pattern": "CAS Write Failures",             "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+    { "pattern": "CAS Read Unavailables",          "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+    { "pattern": "CAS Read Unfinished Commit",     "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+    { "pattern": "CAS Write Unfinished Commit",    "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+    { "pattern": "CAS Read Condition Not Met",     "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+    { "pattern": "CAS Write Condition Not Met",    "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+
+    { "pattern": "Dropped Reads",                  "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+    { "pattern": "Dropped Hints",                  "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+    { "pattern": "Dropped Mutations",              "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+
+    { "pattern": "Coordinator Read Unavailables Per Second",  "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+    { "pattern": "Coordinator Write Unavailables Per Second", "warning": "shipped", "critical": "shipped", "_note": "any_gt_0_is_bad" },
+    { "pattern": "Coordinator Read Timeouts Per Second",      "warning": "shipped", "critical": "shipped", "_note": "low_traffic_counters" },
+    { "pattern": "Coordinator Write Timeouts Per Second",     "warning": "shipped", "critical": "shipped", "_note": "low_traffic_counters" },
+
+    { "pattern": "Total Blocked Tasks Rate",                  "warning": "shipped", "critical": "shipped", "_note": "low_traffic_counters" },
+    { "pattern": "Total Blocked Compaction Tasks Rate",       "warning": "shipped", "critical": "shipped", "_note": "low_traffic_counters" },
+    { "pattern": "Total Blocked Flush Writer Tasks Rate",     "warning": "shipped", "critical": "shipped", "_note": "low_traffic_counters" },
+    { "pattern": "Total Blocked Repair_Task Tasks Rate",      "warning": "shipped", "critical": "shipped", "_note": "low_traffic_counters" },
+    { "pattern": "Total Pending Repair_Task Tasks Rate",      "warning": "shipped", "critical": "shipped", "_note": "low_traffic_counters" },
+
+    { "pattern": "Pending ReadStage",                         "warning": "shipped", "critical": "shipped", "_note": "noise_prone; should be ~0 normally" },
+
+    { "pattern": "Tombstones Scanned per Table - 99thPercentile - system.peers table", "warning": "shipped", "critical": "shipped", "_note": "system_peers" },
+    { "pattern": "Max Partition Size - system.peers table",                            "warning": "shipped", "critical": "shipped", "_note": "system_peers" },
+    { "pattern": "SSTables Read Per Query - 99thPercentile - system.peers table",      "warning": "shipped", "critical": "shipped", "_note": "system_peers" },
+
+    { "pattern": "KeyCache HitRate Per node",                 "warning": "shipped", "critical": "shipped", "_note": "noise_prone; <= operator (low-hit-rate alert)" },
+    { "pattern": "CPU is Underutilized",                      "warning": "shipped", "critical": "shipped", "_note": "noise_prone; <= operator" }
+  ]
+}

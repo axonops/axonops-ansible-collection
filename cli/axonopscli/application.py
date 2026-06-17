@@ -299,7 +299,20 @@ class Application:
         tune_alerts_parser.add_argument('--policy', type=str, default=None,
                                         help='Path to a JSON policy file with pinned thresholds that override '
                                              'workload-derived tuning for matching rule-name globs. Format: '
-                                             '{"pinned_thresholds": [{"pattern": "Disk *", "warning": 70, "critical": 80}]}')
+                                             '{"pinned_thresholds": [{"pattern": "Disk *", "warning": 70, "critical": 80}]}. '
+                                             'Use "extends": "<path>" at the top level to chain a parent policy. '
+                                             'When --policy is omitted, the bundled cli/policies/<cluster-type>-defaults.json '
+                                             'is loaded automatically.')
+        tune_alerts_parser.add_argument('--no-default-policy', action='store_true', default=False,
+                                        help='Skip loading the bundled default policy when --policy is omitted. '
+                                             'Use to reproduce the pre-bundling behaviour (every catalog rule tuned '
+                                             'from observed metrics; no implicit pins).')
+        tune_alerts_parser.add_argument('--rewrites', type=str, default=None,
+                                        help='Path to a JSON file rewriting rule exprs in-memory before tuning, '
+                                             'for clusters whose label schema differs from what the rule expects '
+                                             '(e.g. consistency= -> scope=~). The corrected expr is what the tuner '
+                                             'queries AND what apply-tuned-alerts writes back. Format: '
+                                             '{"expr_rewrites": [{"alert": "<exact name>", "expr": "<new expr>"}]}')
         tune_alerts_parser.add_argument('--set-label', action='append', default=[], dest='set_label',
                                         metavar='[METRIC_GLOB:]LABEL=VALUE',
                                         help='Pin a label selector to a single value in the metric query used to '
@@ -597,9 +610,25 @@ class Application:
         }
         p_percentile, p_warn, p_crit = presets[args.profile]
 
+        # Load the policy chain. When the caller passes --policy, that file
+        # is the source of truth (it can `extends` the bundled default to
+        # keep universal pins). When --policy is omitted, fall back to the
+        # bundled cluster-type default so a fresh customer doesn't have 30+
+        # "skipped (nonsensical)" outcomes for the catalog's any-gt-0 rules.
+        # --no-default-policy opts out entirely.
         pinned_rules = []
         if getattr(args, 'policy', None):
             pinned_rules = Application._load_policy_file(args.policy)
+        elif not getattr(args, 'no_default_policy', False):
+            cluster_type = getattr(args, 'cluster_type', None) or "cassandra"
+            default_path = Application._default_policy_path(cluster_type)
+            if default_path is not None:
+                pinned_rules = Application._load_policy_file(default_path)
+                print(f"Loaded bundled default policy: {default_path}", file=sys.stderr)
+
+        expr_rewrites = {}
+        if getattr(args, 'rewrites', None):
+            expr_rewrites = Application._load_rewrites_file(args.rewrites)
 
         set_labels = [parse_set_label_arg(a) for a in (getattr(args, 'set_label', None) or [])]
 
@@ -615,14 +644,51 @@ class Application:
             rules=list(args.rule or []),
             incidents=list(args.incident or []),
             pinned_rules=pinned_rules,
+            expr_rewrites=expr_rewrites,
             set_labels=set_labels,
             days_back=args.days,
         )
 
     @staticmethod
-    def _load_policy_file(path):
+    def _default_policy_path(cluster_type):
+        """Return the path to the bundled default policy for a cluster type,
+        or None if none ships for that type. The policies/ directory sits
+        alongside the axonopscli package."""
+        here = os.path.dirname(os.path.abspath(__file__))
+        # cli/axonopscli/ -> cli/policies/
+        cli_dir = os.path.dirname(here)
+        candidate = os.path.join(cli_dir, "policies", f"{cluster_type}-defaults.json")
+        return candidate if os.path.isfile(candidate) else None
+
+    @staticmethod
+    def _load_policy_file(path, _seen=None):
         """Load a JSON policy file. Returns the pinned_thresholds list.
-        Raises ValueError with a clear message on any shape problem."""
+
+        Supports top-level ``"extends": "<path>"`` for policy chaining: the
+        parent file is loaded first, then the child's entries overlay it.
+        Child entries override parent entries by exact ``pattern`` match;
+        new patterns are appended in child order. The extends path is
+        resolved relative to the child file's directory.
+
+        Pinned threshold values may be the literal string ``"shipped"`` —
+        the pin path resolves this to the rule's current
+        ``warningValue``/``criticalValue`` at apply time. Useful for
+        documenting "pin at whatever the rule currently has" without
+        restating numbers.
+
+        Raises ValueError with a clear message on any shape problem,
+        including circular extends chains.
+        """
+        # Use the canonical path so a chain like A->B->A is caught regardless
+        # of how the user wrote the paths (relative vs absolute).
+        canonical = os.path.realpath(path)
+        if _seen is None:
+            _seen = set()
+        if canonical in _seen:
+            chain = " -> ".join(list(_seen) + [canonical])
+            raise ValueError(f"policy file {path!r}: circular extends chain: {chain}")
+        _seen = _seen | {canonical}
+
         with open(path, "r") as f:
             try:
                 data = json.load(f)
@@ -630,6 +696,17 @@ class Application:
                 raise ValueError(f"policy file {path!r} is not valid JSON: {e}")
         if not isinstance(data, dict):
             raise ValueError(f"policy file {path!r} must be a JSON object at top level")
+
+        # Resolve extends chain first so child overlays come on top.
+        parent_pinned = []
+        extends_path = data.get("extends")
+        if extends_path is not None:
+            if not isinstance(extends_path, str):
+                raise ValueError(f"policy file {path!r}: extends must be a string path")
+            if not os.path.isabs(extends_path):
+                extends_path = os.path.join(os.path.dirname(canonical), extends_path)
+            parent_pinned = Application._load_policy_file(extends_path, _seen=_seen)
+
         pinned = data.get("pinned_thresholds", [])
         if not isinstance(pinned, list):
             raise ValueError(f"policy file {path!r}: pinned_thresholds must be a list")
@@ -640,4 +717,57 @@ class Application:
                 if key not in entry:
                     raise ValueError(
                         f"policy file {path!r}: pinned_thresholds[{i}] missing required key {key!r}")
-        return pinned
+            for key in ("warning", "critical"):
+                v = entry[key]
+                if not isinstance(v, (int, float)) and v != "shipped":
+                    raise ValueError(
+                        f"policy file {path!r}: pinned_thresholds[{i}].{key} must be a number "
+                        f"or the literal string 'shipped' (got {v!r})")
+
+        # Overlay: child entries override parent by exact pattern; new
+        # patterns appended after parent entries in child order.
+        child_patterns = {e["pattern"] for e in pinned}
+        merged = [p for p in parent_pinned if p.get("pattern") not in child_patterns] + pinned
+        return merged
+
+    @staticmethod
+    def _load_rewrites_file(path):
+        """Load a JSON expr-rewrites file. Returns a dict mapping rule
+        ``alert`` name to its replacement ``expr`` string.
+
+        Used when the cluster's metric label schema diverges from what the
+        shipped rule assumes (e.g. ``consistency='LOCAL_QUORUM'`` when the
+        cluster encodes consistency into the ``scope`` label). The rewrites
+        apply in-memory at the start of tuning, so the tuner queries the
+        correct expr AND apply-tuned-alerts writes the correct expr back.
+
+        Schema:
+            {"expr_rewrites": [
+                {"alert": "<exact rule name>", "expr": "<new expr>",
+                 "_note": "<optional rationale>"}
+            ]}
+        """
+        with open(path, "r") as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"rewrites file {path!r} is not valid JSON: {e}")
+        if not isinstance(data, dict):
+            raise ValueError(f"rewrites file {path!r} must be a JSON object at top level")
+        entries = data.get("expr_rewrites", [])
+        if not isinstance(entries, list):
+            raise ValueError(f"rewrites file {path!r}: expr_rewrites must be a list")
+        out = {}
+        for i, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                raise ValueError(f"rewrites file {path!r}: expr_rewrites[{i}] must be an object")
+            for key in ("alert", "expr"):
+                if key not in entry:
+                    raise ValueError(
+                        f"rewrites file {path!r}: expr_rewrites[{i}] missing required key {key!r}")
+            alert = entry["alert"]
+            if alert in out:
+                raise ValueError(
+                    f"rewrites file {path!r}: duplicate entry for alert {alert!r}")
+            out[alert] = entry["expr"]
+        return out

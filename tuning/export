@@ -66,11 +66,21 @@ BASE_DIR="./cli/exported/${ORG}/${CLUSTER}"
 STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 SNAPSHOT_DIR="${BASE_DIR}/${STAMP}"
 
-# Never overwrite an existing snapshot (belt-and-suspenders at second precision).
-if [[ -e "$SNAPSHOT_DIR" ]]; then
-    echo "refusing to overwrite existing snapshot ${SNAPSHOT_DIR}" >&2
-    exit 1
-fi
+# Never overwrite an existing snapshot. STAMP is at second precision; back-to-
+# back callers (e.g. cycle-customer's step 1 export and tuned-apply's pre-
+# snapshot in step 3) can legitimately fire inside the same second. Wait up to
+# a few seconds for the clock to tick, then refuse.
+i=0
+while [[ -e "$SNAPSHOT_DIR" ]]; do
+    i=$((i+1))
+    if [[ $i -gt 3 ]]; then
+        echo "refusing to overwrite existing snapshot ${SNAPSHOT_DIR}" >&2
+        exit 1
+    fi
+    sleep 1
+    STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+    SNAPSHOT_DIR="${BASE_DIR}/${STAMP}"
+done
 mkdir -p "$SNAPSHOT_DIR"
 
 echo "Exporting alerts for org=${ORG} cluster=${CLUSTER}${LABEL:+ (label=${LABEL})} → ${SNAPSHOT_DIR}"
@@ -78,7 +88,7 @@ python3 cli/axonops.py \
     --org "$ORG" \
     --cluster "$CLUSTER" \
     alerts --exportpath "$SNAPSHOT_DIR" --include-secrets \
-    "${PASS_ARGS[@]}"
+    ${PASS_ARGS[@]+"${PASS_ARGS[@]}"}
 
 # Repoint the stable symlinks at this snapshot — only if it actually produced
 # files (an empty export writes nothing; in that case leave the prior 'latest'
