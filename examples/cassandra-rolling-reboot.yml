@@ -1,0 +1,63 @@
+---
+# Rolling OS reboot of a Cassandra cluster, ONE node at a time.
+#
+# Per node (serial: 1):
+#   drain -> stop -> reboot (wait for SSH) -> start -> wait for 9042 ->
+#   wait until `nodetool status` shows EVERY node UN before the next node.
+#
+# Safe for RF>=3 / QUORUM: only one node is ever down at a time, and the ring
+# must be fully UN before the next reboot.
+#
+#   ansible-playbook cassandra-rolling-reboot.yml -u root --private-key <key>
+#   # override the install path if non-default:  -e cassandra_home=/opt/cassandra
+- name: Rolling OS reboot of the Cassandra cluster
+  hosts: cassandra
+  become: true
+  serial: 1
+  gather_facts: true
+  max_fail_percentage: 0
+  vars:
+    cassandra_home: /opt/cassandra
+  tasks:
+    - name: Drain Cassandra before shutdown (flush + stop gossip/native)
+      ansible.builtin.command: "{{ cassandra_home }}/bin/nodetool drain"
+      changed_when: true
+
+    - name: Stop cassandra cleanly
+      ansible.builtin.systemd:
+        name: cassandra
+        state: stopped
+
+    - name: Reboot the VM and wait for it to come back
+      ansible.builtin.reboot:
+        msg: "Rolling reboot via Ansible (cassandra-rolling-reboot.yml)"
+        reboot_timeout: 600
+        post_reboot_delay: 15
+
+    - name: Ensure cassandra is started after reboot (idempotent; normally auto-starts)
+      ansible.builtin.systemd:
+        name: cassandra
+        state: started
+
+    - name: Wait for the native transport port to come back
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 9042
+        timeout: 300
+
+    - name: Wait until nodetool status reports every node UN before the next reboot
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        s=$({{ cassandra_home }}/bin/nodetool status);
+        total=$(printf '%s\n' "$s" | grep -cE '^[UD][NLJM] ');
+        un=$(printf '%s\n' "$s" | grep -cE '^UN ');
+        test "$total" -gt 0 && test "$total" = "$un"
+      args:
+        executable: /bin/bash
+      register: ring_un
+      changed_when: false
+      retries: 36
+      delay: 5
+      until: ring_un.rc == 0
+
+# code: language=ansible
