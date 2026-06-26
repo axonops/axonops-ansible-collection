@@ -5,9 +5,19 @@
   vars:
     state: started
   tasks:
-    - name: Exist if not a seed node
+    - name: Exit if not a seed node
       meta: end_play
       when: not inventory_hostname in cassandra_seeds
+
+    - name: Check if Cassandra is currently running (drain only applies to a live node)
+      ansible.builtin.systemd:
+        name: cassandra
+      register: cassandra_unit
+
+    - name: Drain Cassandra before restart (flush + stop gossip/native) when running
+      ansible.builtin.command: "{{ cassandra_home | default('/opt/cassandra') }}/bin/nodetool drain"
+      when: cassandra_unit.status.ActiveState == 'active'
+      changed_when: true
 
     - name: Start Cassandra service
       ansible.builtin.service:
@@ -33,9 +43,19 @@
   vars:
     state: started
   tasks:
-    - name: Exist if a seed node
-    - meta: end_play
+    - name: Exit if a seed node
+      meta: end_play
       when: inventory_hostname in cassandra_seeds
+
+    - name: Check if Cassandra is currently running (drain only applies to a live node)
+      ansible.builtin.systemd:
+        name: cassandra
+      register: cassandra_unit
+
+    - name: Drain Cassandra before restart (flush + stop gossip/native) when running
+      ansible.builtin.command: "{{ cassandra_home | default('/opt/cassandra') }}/bin/nodetool drain"
+      when: cassandra_unit.status.ActiveState == 'active'
+      changed_when: true
 
     - name: Start Cassandra service
       ansible.builtin.service:
