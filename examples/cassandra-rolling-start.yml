@@ -1,7 +1,11 @@
 - name: Start or restart Cassandra and AxonOps Agent
   hosts: cassandra
   become: true
-  serial: 1
+  # Default: rolling, one node at a time. For a non-default mass start (e.g. after
+  # a multi-node OOM) set cassandra_start_serial: "100%" AND pass forks >= node
+  # count (-f 12) so every node starts at once:
+  #   ansible-playbook cassandra-rolling-start.yml -e cassandra_start_serial="100%" -f 12
+  serial: "{{ cassandra_start_serial | default(1) }}"
   vars:
     state: started
   tasks:
