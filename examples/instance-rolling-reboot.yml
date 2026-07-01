@@ -8,7 +8,7 @@
 # Safe for RF>=3 / QUORUM: only one node is ever down at a time, and the ring
 # must be fully UN before the next reboot.
 #
-#   ansible-playbook cassandra-rolling-reboot.yml -u root --private-key <key>
+#   ansible-playbook instance-rolling-reboot.yml -u root --private-key <key>
 #   # override the install path if non-default:  -e cassandra_home=/opt/cassandra
 - name: Rolling OS reboot of the Cassandra cluster
   hosts: cassandra
@@ -30,7 +30,7 @@
 
     - name: Reboot the VM and wait for it to come back
       ansible.builtin.reboot:
-        msg: "Rolling reboot via Ansible (cassandra-rolling-reboot.yml)"
+        msg: "Rolling reboot via Ansible (instance-rolling-reboot.yml)"
         reboot_timeout: 600
         post_reboot_delay: 15
 
