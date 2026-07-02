@@ -55,13 +55,6 @@
           register: cassandra_gpg_keys_tmpfile
 
         - name: Download Apache Cassandra GPG keys
-          # Downloaded to a local file rather than passed as a URL directly
-          # to rpm_key: the KEYS file has a non-UTF-8 byte in one
-          # contributor's comment (Latin-1 "é" instead of UTF-8), and
-          # rpm_key's URL-fetch path strict-decodes the whole file as UTF-8
-          # before parsing, crashing with "'utf-8' codec can't decode byte
-          # ... invalid continuation byte". The local-file import path does
-          # not hit that decode.
           ansible.builtin.get_url:
             url: https://downloads.apache.org/cassandra/KEYS
             dest: "{{ cassandra_gpg_keys_tmpfile.path }}"
@@ -71,9 +64,18 @@
             force: true
 
         - name: Import Apache Cassandra GPG key
-          ansible.builtin.rpm_key:
-            key: "{{ cassandra_gpg_keys_tmpfile.path }}"
-            state: present
+          # ansible.builtin.rpm_key (both its URL-fetch and local-file import
+          # paths) crashes decoding this file on ansible-core >= 2.18:
+          # "'utf-8' codec can't decode byte 0xe9 ... invalid continuation
+          # byte". The file has one contributor's comment in Latin-1 instead
+          # of UTF-8. `rpm --import` itself handles the raw bytes fine — it
+          # never decodes the file as text — so it's used directly here
+          # instead of the module. changed_when is always true because this
+          # task only runs once per host, guarded by the marker file below.
+          ansible.builtin.command:
+            cmd: "rpm --import {{ cassandra_gpg_keys_tmpfile.path }}"
+          changed_when: true
+          # noqa: command-instead-of-module
 
         - name: Remove temp file for Apache Cassandra GPG keys
           ansible.builtin.file:
