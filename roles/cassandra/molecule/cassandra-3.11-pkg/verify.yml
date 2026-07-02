@@ -1,0 +1,41 @@
+---
+- name: Verify — Cassandra 3.11 RedHat pkg install
+  hosts: all
+  gather_facts: false
+  vars:
+    cassandra_version: 3.11.19
+    cassandra_conf_dir: /etc/cassandra/conf
+  tasks:
+    - name: Slurp yum repo file
+      ansible.builtin.slurp:
+        src: /etc/yum.repos.d/cassandra.repo
+      register: repo_slurp
+
+    - name: Cassandra311 repo stanza present with gpgkey set
+      ansible.builtin.assert:
+        that:
+          - "'[cassandra311]' in (repo_slurp.content | b64decode)"
+          - "'apache.jfrog.io/artifactory/cassandra-rpm/311x' in (repo_slurp.content | b64decode)"
+          - "'gpgkey=https://downloads.apache.org/cassandra/KEYS' in (repo_slurp.content | b64decode)"
+
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: rpm
+
+    - name: Cassandra package installed at the pinned 3.11 version
+      ansible.builtin.assert:
+        that:
+          - "'cassandra' in ansible_facts.packages"
+          - "ansible_facts.packages['cassandra'][0].version == cassandra_version"
+
+    - name: Check cassandra.yaml exists
+      ansible.builtin.stat:
+        path: "{{ cassandra_conf_dir }}/cassandra.yaml"
+      register: yaml_stat
+      failed_when: not yaml_stat.stat.exists
+
+    - name: Check jvm.options exists (3.11 single-file layout)
+      ansible.builtin.stat:
+        path: "{{ cassandra_conf_dir }}/jvm.options"
+      register: jvm_opts_stat
+      failed_when: not jvm_opts_stat.stat.exists
