@@ -19,6 +19,7 @@ All notable changes to this collection are documented here. The format is based 
 ### Fixed
 
 - **alert_route module**: typo `type: srt` corrected to `type: str` in DOCUMENTATION block, fixing Galaxy importer parse failure.
+- **cassandra role**: added a `[cassandra311]` yum repo stanza so `cassandra_install_format: pkg` works with `cassandra_version` 3.11.x on RedHat-family hosts (previously only 4.1.x/5.0.x had a repo, causing `No package cassandra-3.11.17-1 available.`). Override via `cassandra_redhat_repository_url_311x`. See `roles/cassandra/README.md` for details. ([#124](https://github.com/axonops/axonops-ansible-collection/issues/124))
 
 ### Added
 
