@@ -1,0 +1,8 @@
+---
+- name: Restart chrony
+  ansible.builtin.systemd:
+    name: "{{ chrony_service_name | default(_chrony_service_name) }}"
+    state: restarted
+    daemon_reload: true
+
+# code: language=ansible

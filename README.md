@@ -57,6 +57,7 @@ This collection provides the following Ansible roles. Click on each role for det
 - **[strimzi](docs/roles/strimzi.md)** - Deploy Apache Kafka on Kubernetes using the Strimzi operator with AxonOps images
 
 ### Infrastructure Components
+- **[chrony](docs/roles/chrony.md)** - Install and configure chrony (NTP) for time synchronization, critical for Cassandra, Kafka, and OpenSearch
 - **[cassandra](docs/roles/cassandra.md)** - Install and configure Apache Cassandra (3.11, 4.x, 5.x)
 - **[kafka](docs/roles/kafka.md)** - Install and configure Apache Kafka in KRaft mode (no ZooKeeper)
 - **[opensearch](docs/roles/opensearch.md)** - Install and configure OpenSearch for AxonOps (preferred for on-premises)

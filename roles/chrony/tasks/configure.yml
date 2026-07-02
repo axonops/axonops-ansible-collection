@@ -1,0 +1,25 @@
+---
+- name: Render chrony configuration
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: "{{ chrony_config_path | default(_chrony_config_path) }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart chrony
+
+- name: Check for systemd-timesyncd unit
+  ansible.builtin.service_facts:
+  when: chrony_disable_timesyncd | bool
+
+- name: Disable systemd-timesyncd
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    state: stopped
+    enabled: false
+    masked: true
+  when:
+    - chrony_disable_timesyncd | bool
+    - "'systemd-timesyncd.service' in ansible_facts.services"
+
+# code: language=ansible

@@ -6,6 +6,20 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Added
+
+- **chrony role**: installs and configures chrony (`chronyd`) for NTP time
+  synchronization, critical for Cassandra (timestamp-based conflict
+  resolution, LWTs), Kafka, and OpenSearch/Elasticsearch cluster health.
+  Standalone role with no dependencies. NTP-related variable names
+  (`ntp_prefered_server`, `ntp_secondary_server`, `ntp_third_server`,
+  `ntp_fourth_server`, `ntp_servers`, `ntp_pool_hosts`,
+  `ntp_allowed_clients`, `chrony_extra_options`) intentionally match the
+  legacy Digitalis `ar-chrony` role for drop-in compatibility. Also stops,
+  disables, and masks `systemd-timesyncd` when present by default
+  (`chrony_disable_timesyncd: true`) to avoid two NTP clients fighting.
+  ([#119](https://github.com/axonops/axonops-ansible-collection/issues/119))
+
 ### Changed
 
 - **cassandra (BREAKING)**: `cassandra_data_directory` now defaults to

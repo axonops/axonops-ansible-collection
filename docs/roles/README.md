@@ -50,6 +50,14 @@ Installs the AxonOps Kubernetes operator via its OCI Helm chart and deploys `Axo
 
 ### Infrastructure Components
 
+#### [chrony](chrony.md)
+Installs and configures chrony (`chronyd`) for NTP time synchronization.
+
+**Use when**: Deploying Cassandra, Kafka, or OpenSearch — accurate, synchronized clocks are
+critical for timestamp-based conflict resolution, log/retention timing, and cluster health.
+Standalone role with no dependencies; recommended on every Cassandra, Kafka, and OpenSearch
+host.
+
 #### [cassandra](cassandra.md)
 Installs and configures Apache Cassandra (versions 3.11, 4.x, and 5.x).
 
@@ -94,9 +102,10 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **operator** | AxonOps operator and platform on Kubernetes | Kubernetes cluster |
 | **k8ssandra** | Cassandra on Kubernetes | Kubernetes cluster |
 | **strimzi** | Kafka on Kubernetes | Kubernetes cluster |
-| **cassandra** | Apache Cassandra installation | Agent, Java |
-| **kafka** | Apache Kafka (KRaft) installation | Agent |
-| **opensearch** | OpenSearch installation (preferred for on-premises) | Server |
+| **chrony** | NTP time synchronization | Cassandra, Kafka, OpenSearch nodes |
+| **cassandra** | Apache Cassandra installation | Agent, Java, Chrony |
+| **kafka** | Apache Kafka (KRaft) installation | Agent, Chrony |
+| **opensearch** | OpenSearch installation (preferred for on-premises) | Server, Chrony |
 | **elastic** | Elasticsearch installation (legacy / existing deployments) | Server |
 | **java** | Java installation | Cassandra, Elastic |
 | **preflight** | System validation | Before any installation |
@@ -127,14 +136,15 @@ Deploy new Cassandra cluster with AxonOps monitoring:
 - hosts: cassandra
   roles:
     - role: axonops.axonops.preflight
+    - role: axonops.axonops.chrony
     - role: axonops.axonops.java
     - role: axonops.axonops.agent
     - role: axonops.axonops.cassandra
 ```
 
-**Roles needed**: `axonops.axonops.preflight`, `axonops.axonops.java`, `axonops.axonops.agent`, `axonops.axonops.cassandra`
+**Roles needed**: `axonops.axonops.preflight`, `axonops.axonops.chrony`, `axonops.axonops.java`, `axonops.axonops.agent`, `axonops.axonops.cassandra`
 
-**See**: [cassandra.md](cassandra.md), [agent.md](agent.md), [java.md](java.md), [preflight.md](preflight.md)
+**See**: [cassandra.md](cassandra.md), [agent.md](agent.md), [java.md](java.md), [chrony.md](chrony.md), [preflight.md](preflight.md)
 
 ---
 
