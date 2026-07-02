@@ -40,13 +40,13 @@
 - name: Set up repos Redhat
   when: ansible_os_family == 'RedHat'
   block:
-    - name: Check if Apache Cassandra GPG keys already imported
+    - name: Check if Apache Cassandra GPG key file already exists
       ansible.builtin.stat:
-        path: /etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra-imported
-      register: cassandra_gpg_keys_marker
+        path: /etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra
+      register: cassandra_gpg_key_file
 
     - name: Import Apache Cassandra GPG keys
-      when: not cassandra_gpg_keys_marker.stat.exists
+      when: not cassandra_gpg_key_file.stat.exists
       block:
         - name: Create temp file for Apache Cassandra GPG keys
           ansible.builtin.tempfile:
@@ -63,34 +63,56 @@
             # fresh empty tempfile's mtime, gets a 304, and leaves it empty.
             force: true
 
+        - name: Extract PGP key blocks to a persistent local keyring file
+          # Apache's KEYS file mixes ASCII-armored key blocks with plain-text
+          # fingerprint/signature listings between them. Two problems this
+          # avoids by extracting only the BEGIN/END PGP PUBLIC KEY BLOCK
+          # sections (the same approach rpm_key's own is_pubkey() regex
+          # uses) into a file we keep on disk:
+          #   1. Newer rpm (4.19+, e.g. RHEL/Rocky 10) refuses to import the
+          #      raw file at all: "key 1 not an armored public key."
+          #   2. dnf's own gpgkey= handling (used for repo_gpgcheck) fails
+          #      to parse the raw file on the same rpm versions: "Parsing
+          #      armored OpenPGP packet(s) failed." Pointing gpgkey= at this
+          #      local cleaned file instead of the remote URL avoids dnf
+          #      re-fetching and re-parsing the problematic raw file itself.
+          ansible.builtin.shell:
+            cmd: >-
+              awk '/-----BEGIN PGP PUBLIC KEY BLOCK-----/,/-----END PGP PUBLIC KEY BLOCK-----/'
+              {{ cassandra_gpg_keys_tmpfile.path | quote }} > /etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra
+          changed_when: true
+          # noqa: command-instead-of-module
+
+        - name: Set permissions on Apache Cassandra GPG keyring file
+          ansible.builtin.file:
+            path: /etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra
+            mode: "0644"
+
         - name: Import Apache Cassandra GPG key
           # ansible.builtin.rpm_key (both its URL-fetch and local-file import
-          # paths) crashes decoding this file on ansible-core >= 2.18:
-          # "'utf-8' codec can't decode byte 0xe9 ... invalid continuation
-          # byte". The file has one contributor's comment in Latin-1 instead
-          # of UTF-8. `rpm --import` itself handles the raw bytes fine — it
-          # never decodes the file as text — so it's used directly here
-          # instead of the module. changed_when is always true because this
-          # task only runs once per host, guarded by the marker file below.
+          # paths) crashes decoding the raw KEYS file on ansible-core >=
+          # 2.18: "'utf-8' codec can't decode byte 0xe9 ... invalid
+          # continuation byte" — one contributor's comment is Latin-1, not
+          # UTF-8. `rpm --import` itself handles the raw bytes fine, so it's
+          # used directly here instead of the module.
+          #
+          # failed_when is relaxed because rpm 4.19+'s crypto policy can
+          # reject individual legacy keys in the bundle ("Policy rejects
+          # ...: No binding signature") with rc 2, while still importing
+          # the keys actually needed to verify the repo. The subsequent
+          # repo_gpgcheck at package-install time is the real correctness
+          # gate — if the key that matters wasn't imported, that step fails
+          # loudly instead of this one failing on an unrelated stale key.
           ansible.builtin.command:
-            cmd: "rpm --import {{ cassandra_gpg_keys_tmpfile.path }}"
+            cmd: rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra
           changed_when: true
+          failed_when: false
           # noqa: command-instead-of-module
 
         - name: Remove temp file for Apache Cassandra GPG keys
           ansible.builtin.file:
             path: "{{ cassandra_gpg_keys_tmpfile.path }}"
             state: absent
-
-        - name: Mark Apache Cassandra GPG keys as imported
-          # rpm_key itself is idempotent, but the download above is not
-          # (get_url force: true always re-fetches); this marker keeps the
-          # whole block a no-op on reconverge instead of just reporting
-          # spurious "changed" every run.
-          ansible.builtin.file:
-            path: /etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra-imported
-            state: touch
-            mode: "0644"
 
     - name: Set up Cassandra yum repos
       ansible.builtin.copy:
@@ -104,21 +126,21 @@
           baseurl={{ cassandra_redhat_repository_url_311x | default('https://apache.jfrog.io/artifactory/cassandra-rpm/311x/') }}
           gpgcheck=1
           repo_gpgcheck=1
-          gpgkey=https://downloads.apache.org/cassandra/KEYS
+          gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra
 
           [cassandra41]
           name=Apache Cassandra 4.1
           baseurl={{ cassandra_redhat_repository_url_41x | default('https://redhat.cassandra.apache.org/41x/') }}
           gpgcheck=1
           repo_gpgcheck=1
-          gpgkey=https://downloads.apache.org/cassandra/KEYS
+          gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra
 
           [cassandra50]
           name=Apache Cassandra 5.0
           baseurl={{ cassandra_redhat_repository_url_50x | default('https://redhat.cassandra.apache.org/50x/') }}
           gpgcheck=1
           repo_gpgcheck=1
-          gpgkey=https://downloads.apache.org/cassandra/KEYS
+          gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra
 
     - name: Set pkg name
       ansible.builtin.set_fact:

@@ -16,7 +16,13 @@
         that:
           - "'[cassandra311]' in (repo_slurp.content | b64decode)"
           - "'apache.jfrog.io/artifactory/cassandra-rpm/311x' in (repo_slurp.content | b64decode)"
-          - "'gpgkey=https://downloads.apache.org/cassandra/KEYS' in (repo_slurp.content | b64decode)"
+          - "'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra' in (repo_slurp.content | b64decode)"
+
+    - name: Check local GPG keyring file exists
+      ansible.builtin.stat:
+        path: /etc/pki/rpm-gpg/RPM-GPG-KEY-apache-cassandra
+      register: gpg_keyring_stat
+      failed_when: not gpg_keyring_stat.stat.exists
 
     - name: Gather package facts
       ansible.builtin.package_facts:
