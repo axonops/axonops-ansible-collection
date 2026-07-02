@@ -21,5 +21,10 @@
   when:
     - chrony_disable_timesyncd | bool
     - "'systemd-timesyncd.service' in ansible_facts.services"
+    # service_facts lists every unit name systemd knows about, including ones
+    # that aren't actually installed (status: not-found) — only act on units
+    # that genuinely exist, or the systemd module fails with "Could not find
+    # the requested service".
+    - ansible_facts.services['systemd-timesyncd.service'].status != 'not-found'
 
 # code: language=ansible
