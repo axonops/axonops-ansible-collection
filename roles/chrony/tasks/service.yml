@@ -1,13 +1,14 @@
 ---
-# Only boot-time enablement is handled here. Starting the service is left to
-# the "Restart chrony" handler, notified by the config template task in
-# configure.yml — a fresh config render always reports changed, so this also
-# performs the first start, without a separate `state: started` task here
-# duplicating that restart on every install.
 - name: Enable chrony service
   ansible.builtin.systemd:
     name: "{{ chrony_service_name | default(_chrony_service_name) }}"
     enabled: "{{ chrony_service_enabled }}"
     daemon_reload: true
+
+- name: Start chrony service
+  ansible.builtin.systemd:
+    name: "{{ chrony_service_name | default(_chrony_service_name) }}"
+    state: started
+  when: chrony_start_on_install | bool
 
 # code: language=ansible

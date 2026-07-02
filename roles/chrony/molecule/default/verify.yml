@@ -71,12 +71,13 @@
           - "'leapsectz right/UTC' in (_chrony_conf_content.content | b64decode)"
         fail_msg: "chrony.conf does not contain the expected extra directive"
 
-    - name: Check chrony service is enabled and running
+    # chrony_start_on_install is false in converge.yml (this test environment
+    # doesn't grant chronyd the CAP_SYS_TIME it needs to run), so only
+    # boot-time enablement is asserted here, not the running state.
+    - name: Check chrony service is enabled
       ansible.builtin.systemd:
         name: "{{ _verify_service_name }}"
       register: _chrony_svc
-      failed_when: >
-        _chrony_svc.status.ActiveState != 'active' or
-        _chrony_svc.status.UnitFileState not in ['enabled', 'static']
+      failed_when: _chrony_svc.status.UnitFileState not in ['enabled', 'static']
 
 # code: language=ansible

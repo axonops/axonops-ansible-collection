@@ -58,6 +58,14 @@ chrony_extra_directives: []
 
 chrony_service_enabled: true
 
+# Controls whether chronyd is actually started/restarted by this role run.
+# Independent of chrony_service_enabled (boot-time enablement always
+# applies). chronyd requires CAP_SYS_TIME to adjust the system clock via
+# adjtimex(), which some CI/container environments (including this
+# collection's own Docker-based molecule tests) do not grant even when
+# running privileged containers — set this to false there.
+chrony_start_on_install: true
+
 # Stop, disable, and mask systemd-timesyncd when present, so it does not
 # fight chronyd for the NTP client role.
 chrony_disable_timesyncd: true

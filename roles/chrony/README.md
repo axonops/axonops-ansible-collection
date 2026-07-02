@@ -57,10 +57,8 @@ The NTP-related variable names (`ntp_prefered_server`, `ntp_secondary_server`,
 | `chrony_service_name` | OS-specific (`chronyd` on RedHat family, `chrony` on Debian family) | systemd unit name. |
 | `chrony_config_path` | OS-specific (`/etc/chrony.conf` on RedHat family, `/etc/chrony/chrony.conf` on Debian family) | Destination path for the rendered config. |
 | `chrony_service_enabled` | `true` | Whether the service is enabled at boot. |
+| `chrony_start_on_install` | `true` | Whether chronyd is actually started/restarted by this role run. Independent of `chrony_service_enabled` (boot-time enablement always applies). Set to `false` in environments that don't grant `CAP_SYS_TIME` (chronyd needs it to adjust the system clock via `adjtimex()`) — for example this role's own Docker-based molecule tests. |
 | `chrony_disable_timesyncd` | `true` | Stop, disable, and mask `systemd-timesyncd` when present, so it does not fight `chronyd` for the NTP client role. Safe to run on hosts where the unit does not exist. |
-
-The service is started (and restarted on config change) automatically once configured; there
-is no separate "state" variable to avoid a redundant restart immediately after first install.
 
 ## Example Playbook
 

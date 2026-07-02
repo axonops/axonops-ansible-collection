@@ -63,10 +63,8 @@ The NTP-related variable names (`ntp_prefered_server`, `ntp_secondary_server`,
 | `chrony_service_name` | OS-specific | systemd unit name (`chronyd` on RedHat family, `chrony` on Debian family). |
 | `chrony_config_path` | OS-specific | Destination path for the rendered config (`/etc/chrony.conf` on RedHat family, `/etc/chrony/chrony.conf` on Debian family). |
 | `chrony_service_enabled` | `true` | Whether the service is enabled at boot. |
+| `chrony_start_on_install` | `true` | Whether chronyd is actually started/restarted by this role run. Independent of `chrony_service_enabled` (boot-time enablement always applies). Set to `false` in environments that don't grant `CAP_SYS_TIME` (chronyd needs it to adjust the system clock via `adjtimex()`) — for example this role's own Docker-based molecule tests. |
 | `chrony_disable_timesyncd` | `true` | Stop, disable, and mask `systemd-timesyncd` when present, so it does not fight `chronyd` for the NTP client role. Safe to run on hosts where the unit does not exist. |
-
-The service is started (and restarted on config change) automatically once configured; there
-is no separate "state" variable to avoid a redundant restart immediately after first install.
 
 ## Dependencies
 
@@ -151,6 +149,11 @@ None.
   you manage that interaction yourself.
 - **Idempotency**: re-running the role with the same variables reports no changes to the
   rendered config or the service state.
+- **Containers without `CAP_SYS_TIME`**: chronyd needs `CAP_SYS_TIME` to adjust the system
+  clock via `adjtimex()`. Some container runtimes don't grant this even when running
+  privileged (this is why `chrony_start_on_install: false` is used in this role's own
+  molecule tests). Set `chrony_start_on_install: false` if you need to install and configure
+  chrony without actually starting it.
 
 ## License
 
