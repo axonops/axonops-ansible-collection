@@ -1,0 +1,30 @@
+---
+- name: Render chrony configuration
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: "{{ chrony_config_path | default(_chrony_config_path) }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart chrony
+
+- name: Check for systemd-timesyncd unit
+  ansible.builtin.service_facts:
+  when: chrony_disable_timesyncd | bool
+
+- name: Disable systemd-timesyncd
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    state: stopped
+    enabled: false
+    masked: true
+  when:
+    - chrony_disable_timesyncd | bool
+    - "'systemd-timesyncd.service' in ansible_facts.services"
+    # service_facts lists every unit name systemd knows about, including ones
+    # that aren't actually installed (status: not-found) — only act on units
+    # that genuinely exist, or the systemd module fails with "Could not find
+    # the requested service".
+    - ansible_facts.services['systemd-timesyncd.service'].status != 'not-found'
+
+# code: language=ansible

@@ -1,0 +1,41 @@
+# Managed by Ansible - axonops.axonops.chrony role. Do not edit manually.
+
+{% if ntp_prefered_server is defined and ntp_prefered_server %}
+server {{ ntp_prefered_server }} prefer iburst{{ (' ' + chrony_extra_options) if chrony_extra_options else '' }}
+{% endif %}
+{% if ntp_secondary_server is defined and ntp_secondary_server %}
+server {{ ntp_secondary_server }} iburst
+{% endif %}
+{% if ntp_third_server is defined and ntp_third_server %}
+server {{ ntp_third_server }} iburst
+{% endif %}
+{% if ntp_fourth_server is defined and ntp_fourth_server %}
+server {{ ntp_fourth_server }} iburst
+{% endif %}
+{% for host in ntp_servers %}
+server {{ host }} iburst
+{% endfor %}
+{% for host in ntp_pool_hosts %}
+pool {{ host }} iburst
+{% endfor %}
+
+# This directive specifies the file into which chronyd will store the rate
+# of gain/loss of time.
+driftfile {{ chrony_driftfile | default(_chrony_driftfile) }}
+
+{% for client in ntp_allowed_clients %}
+allow {{ client }}
+{% endfor %}
+
+{% if chrony_rtcsync %}
+# This directive enables kernel synchronisation (every 11 minutes) of the
+# real-time clock.
+rtcsync
+{% endif %}
+
+# Step the system clock instead of slewing it if the adjustment is larger
+# than the threshold, but only in the first N clock updates.
+makestep {{ chrony_makestep }}
+{% for directive in chrony_extra_directives %}
+{{ directive }}
+{% endfor %}

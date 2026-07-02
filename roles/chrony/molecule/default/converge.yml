@@ -1,0 +1,22 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    ntp_prefered_server: time.cloudflare.com
+    ntp_servers:
+      - time.google.com
+    ntp_pool_hosts:
+      - 2.molecule.pool.ntp.org
+    ntp_allowed_clients:
+      - 10.0.0.0/8
+    chrony_extra_options: "minpoll 4 maxpoll 6"
+    chrony_extra_directives:
+      - "leapsectz right/UTC"
+    # geerlingguy/docker-*-ansible molecule containers don't grant
+    # CAP_SYS_TIME even when run privileged, so chronyd cannot actually
+    # start here. Install/config/enablement are still fully exercised.
+    chrony_start_on_install: false
+  roles:
+    - role: chrony
+
+# code: language=ansible
