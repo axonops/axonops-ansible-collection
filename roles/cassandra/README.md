@@ -13,6 +13,19 @@ Installs and configures Apache Cassandra from the Apache tar distribution.
 Set `cassandra_version` to a value starting with `3.11`, `4.1`, or `5.` — anything
 else makes the role fail fast at the version assertion.
 
+With `cassandra_install_format: pkg` on RedHat-family hosts, 3.11.x is installed
+from Apache's jFrog-hosted RPM mirror (`https://apache.jfrog.io/artifactory/cassandra-rpm/311x/`,
+since `redhat.cassandra.apache.org` no longer serves 3.11 — 3.11 is EOL upstream).
+Override the URL with `cassandra_redhat_repository_url_311x` if needed. On
+Debian-family hosts, 3.11 is only available via `cassandra_install_format: tar`
+— Apache never published a 3.11 apt repo and the jFrog mirror is RPM-only.
+
+The jFrog mirror only indexes the **latest** 3.11.x point release (currently
+`3.11.19`) — older point releases (e.g. `3.11.17`) still exist as files but are
+not present in the repo's package metadata, so pinning one will fail with
+`No package cassandra-3.11.17-1 available.`. Pin an exact older 3.11 point
+release only via `cassandra_install_format: tar`.
+
 The `axonops.axonops.java` role auto-selects the Java major version from
 `cassandra_version` (Java 8 for 3.11, Java 11 for 4.1, Java 17 for 5.x); use
 `java_use_zulu: true` on RHEL 10+ / Debian 13+ where the base repos no longer
