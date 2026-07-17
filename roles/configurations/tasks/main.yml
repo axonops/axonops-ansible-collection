@@ -2,11 +2,13 @@
   ansible.builtin.set_fact:
     org: "{{ lookup('env', 'AXONOPS_ORG') | default(omit) }}"
   when: org is not defined
+  tags: always
 
 - name: Get cluster from env if not set already
   ansible.builtin.set_fact:
     cluster: "{{ lookup('env', 'AXONOPS_CLUSTER') | default(omit) }}"
   when: cluster is not defined
+  tags: always
 
 - name: Get cluster type
   ansible.builtin.set_fact:
@@ -14,6 +16,7 @@
      if lookup('env', 'AXONOPS_CLUSTER_TYPE') | length > 0
      else 'cassandra' }}"
   when: cluster_type is not defined or cluster_type | length == 0
+  tags: always
 
 - name: Assert all required variables are set
   ansible.builtin.assert:
@@ -26,6 +29,13 @@
       Required variables are missing or empty. Please ensure 'org' and 'cluster' are set.
     success_msg: >-
       All required variables for alerts are set.
+  tags: always
+
+- name: Import tasks from info.yml
+  ansible.builtin.import_tasks: info.yml
+  tags:
+  - info
+  - never
 
 - name: Import tasks from pagerduty_integration.yml
   ansible.builtin.import_tasks: pagerduty_integration.yml

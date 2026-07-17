@@ -20,6 +20,7 @@
   - [Configure a Kafka Cluster](#configure-a-kafka-cluster)
   - [Full Alert Stack Configuration](#full-alert-stack-configuration)
 - [Details playbook](#details-playbook)
+  - [Health / Config Check (`info`)](#health--config-check-info)
   - [Adaptive Repair Configuration](#adaptive-repair-configuration)
     - [Enable Adaptive Repair](#enable-adaptive-repair)
     - [Disable Adaptive Repair](#disable-adaptive-repair)
@@ -291,6 +292,59 @@ Set `cluster_type` to `kafka` to skip Cassandra-specific tasks and apply Kafka-a
 ```
 
 ## Details playbook
+
+### Health / Config Check (`info`)
+
+The `info` task performs a health and configuration check against the AxonOps API
+for the target `org` and `cluster`. It is tagged `info` **and** `never`, so it is
+skipped during a normal role run and only executes when you request it explicitly
+with `--tags info`.
+
+The task does three things:
+
+1. **API connectivity** — queries the AxonOps API for the target `org` and
+   `cluster`.
+2. **SAML validation** — if the request fails, it is retried once with `use_saml`
+   flipped to the opposite value. If the flipped value succeeds, the play fails
+   with a message telling you that `use_saml` (or the `AXONOPS_USE_SAML`
+   environment variable) is set to the wrong value. If both values fail, the
+   original connection error is surfaced.
+3. **Status check** — walks every component reported by the API and fails the
+   play if any component has a non-zero `status`. Only non-zero statuses are
+   collected; they map to labels as follows (a `status` of `0` is healthy and is
+   never collected or labelled):
+
+   | Status | Label   |
+   |--------|---------|
+   | `1`    | Warning |
+   | `2`    | Error   |
+   | other  | Unknown |
+
+On failure the `info` task returns an `unhealthy` list; each entry contains
+`type`, `name`, `status`, `label`, and a formatted `message`
+(`"<type>/<name>: <label>"`), and the failure message aggregates them, for
+example:
+
+```text
+Unhealthy components detected: cassandra/demo-cluster: Warning; kafka/orders: Error
+```
+
+```yaml
+- name: Run the AxonOps health / config check
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+
+  roles:
+    - role: axonops.axonops.configurations
+```
+
+Invoke it explicitly (it will not run otherwise):
+
+```sh
+ansible-playbook <your-playbook>.yml --tags info
+```
 
 ### Adaptive Repair Configuration
 
@@ -705,6 +759,7 @@ The role supports granular control through the following tags:
 
 | Tag                             | Description                             | Cluster Type   |
 |---------------------------------|-----------------------------------------|----------------|
+| `info`                          | Run health / config check (see note)    | All            |
 | `metrics`                       | Configure metric alerts                 | All            |
 | `backups`                       | Configure backup settings               | All            |
 | `service_checks`                | Configure service check alerts          | All            |
@@ -720,11 +775,20 @@ The role supports granular control through the following tags:
 | `dashboards`                    | Import custom dashboards                | All            |
 | `routes`                        | Configure alert routing rules           | All            |
 
+> **Note on the `info` tag:** the `info` task is tagged `info` **and** `never`, so
+> it is skipped during a normal role run and only executes when you request it
+> explicitly with `--tags info`. It performs a health / configuration check by
+> querying the AxonOps API for the target `org` and `cluster`, validating your
+> SAML setting, and failing the play if any component reports a non-zero `status`
+> (Warning, Error, or Unknown). See
+> [Health / Config Check (`info`)](#health--config-check-info) for details.
+
 ## Tasks Overview
 
 The role performs the following tasks based on the enabled tags. Integrations are configured before metric alerts to
 allow alert routing rules to reference integration names.
 
+0. **Health / Config Check** (`info` tag, opt-in via `--tags info`): Verify API connectivity, validate the `use_saml` setting, and fail if any monitored component reports an unhealthy status
 1. **Integrations**: Set up notification channels (Slack, PagerDuty, Microsoft Teams)
 2. **Metrics Alerts**: Configure threshold-based alerts for cluster metrics
 3. **Backup Configuration**: Set up backup schedules and retention policies

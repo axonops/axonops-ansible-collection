@@ -1,0 +1,14 @@
+---
+- name: "Retrieve AxonOps cluster health info for {{ org ~ '/' ~ cluster }}"
+  axonops.axonops.info:
+    org: "{{ org }}"
+    cluster: "{{ cluster }}"
+    cluster_type: "{{ cluster_type | default(omit) }}"
+    username: "{{ info.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
+    password: "{{ info.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+    auth_token: "{{ info.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+  tags:
+  - info
+  - never
+
+# code: language=ansible

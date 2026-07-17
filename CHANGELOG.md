@@ -8,6 +8,15 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Added
 
+- **configurations role**: opt-in health / config check via the `info` tag
+  (tagged `info` + `never`, so it only runs with `--tags info`). It queries the
+  AxonOps API for the target `org` and `cluster`, validates the `use_saml`
+  setting by retrying once with the opposite value (failing with a clear message
+  if the opposite value is the one that works), and fails the play if any
+  monitored component reports a non-zero `status`, returning a structured
+  `unhealthy` list.
+- **info module**: `use_saml` documentation, SAML flip-retry health check, and
+  component status validation (`unhealthy` return field).
 - **chrony role**: installs and configures chrony (`chronyd`) for NTP time
   synchronization, critical for Cassandra (timestamp-based conflict
   resolution, LWTs), Kafka, and OpenSearch/Elasticsearch cluster health.
@@ -22,6 +31,9 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Changed
 
+- **configurations role**: the preamble tasks (`org`/`cluster`/`cluster_type`
+  resolution and the required-variable assertion) are now tagged `always`, so
+  `--tags info` (and other tag selections) run the required setup standalone.
 - **cassandra (BREAKING)**: `cassandra_data_directory` now defaults to
   `/var/lib/cassandra/data` (previously `/var/lib/cassandra`), matching the
   upstream Apache Cassandra layout. New installs are unaffected. Existing
