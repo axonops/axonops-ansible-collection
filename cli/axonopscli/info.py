@@ -1,4 +1,5 @@
 from .components.nodes import Nodes
+from .components.orgs import Orgs
 
 class Info:
 
@@ -39,5 +40,8 @@ class Info:
         print()
 
         print("Info from server:")
+        orgs = Orgs(self.axonops, self.args)
+        print(orgs)
+
         nodes = Nodes(self.axonops, self.args)
         print(nodes)

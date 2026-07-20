@@ -99,6 +99,7 @@ All commands accept those attributes
 * `--username` Username used for AxonOps Self-Hosted when authentication is enabled (environment variable `AXONOPS_USERNAME`).
 * `--password` Password used for AxonOps Self-Hosted when authentication is enabled (environment variable `AXONOPS_PASSWORD`).
 * `--url` Specify the AxonOps URL if not using the AxonOps Cloud environment (environment variable `AXONOPS_URL`).
+* `-v` Verbosity. Prints the resolved URLs and every API request the CLI makes. Repeat to increase the level.
 
 ### Connections
 
@@ -119,10 +120,60 @@ export AXONOPS_TOKEN='aaaaabbbbccccddddeeee'
 ### `info` Subcommand
 Prints general information about the cluster.
 This can be used to verify that the connection to the cluster is working and to get some basic information about the cluster.
+
+The output is split into two parts:
+
+* **Info from settings** — the organisation, cluster, cluster type, connection URL and
+  authentication method resolved from your flags and environment variables. The token is
+  masked; only its first character is shown.
+* **Info from server** — the nodes registered for the cluster, followed by the health of
+  every cluster visible to your organisation.
+
+Cluster health is reported per cluster as `org/type/name`. A cluster is `healthy` when
+its status is `OK`; anything else is listed as `NOT healthy` with the reason. Statuses
+are:
+
+| Status | Meaning |
+| --- | --- |
+| `OK` | The cluster is healthy. |
+| `Warning` | The cluster has raised a warning. |
+| `Error` | The cluster is in an error state. |
+| `Unknown` | The server reported a status this CLI does not recognise. |
+
+Any cluster that is not `OK` is repeated in a `Non-OK clusters` summary at the end of the
+output, so problems are visible without reading the full list. If every cluster is
+healthy, `All clusters are healthy` is printed instead.
+
 #### Examples:
 
 ```shell
 $ pipenv run python axonops.py info
+```
+
+Example output:
+
+```text
+Info from settings:
+Organization: test
+Cluster: thingscluster
+Cluster Type: cassandra
+
+No URL specified, the connection will be made to AxonOps Cloud
+
+Token: a*******************
+This is usually used in AxonOps Cloud
+
+Info from server:
+Nodes:
+- 172.18.0.2 (ID: b167aca6-b6b1-4bd5-bc45-3e27632e844d)
+
+Clusters:
+- demo/cassandra/demo-cluster: healthy
+- demo/cassandra/warn-cluster: NOT healthy (Warning)
+- demo/kafka/k1: healthy
+
+Non-OK clusters:
+cassandra/warn-cluster: Warning
 ```
 
 ### `adaptiverepair` Subcommand
