@@ -126,8 +126,8 @@ The output is split into two parts:
 * **Info from settings** — the organisation, cluster, cluster type, connection URL and
   authentication method resolved from your flags and environment variables. The token is
   masked; only its first character is shown.
-* **Info from server** — the nodes registered for the cluster, followed by the health of
-  every cluster visible to your organisation.
+* **Info from server** — the health of every cluster visible to your organisation,
+  followed by the nodes registered for the cluster.
 
 Cluster health is reported per cluster as `org/type/name`. A cluster is `healthy` when
 its status is `OK`; anything else is listed as `NOT healthy` with the reason. Statuses
@@ -164,9 +164,6 @@ Token: a*******************
 This is usually used in AxonOps Cloud
 
 Info from server:
-Nodes:
-- 172.18.0.2 (ID: b167aca6-b6b1-4bd5-bc45-3e27632e844d)
-
 Clusters:
 - demo/cassandra/demo-cluster: healthy
 - demo/cassandra/warn-cluster: NOT healthy (Warning)
@@ -174,6 +171,9 @@ Clusters:
 
 Non-OK clusters:
 cassandra/warn-cluster: Warning
+
+Nodes:
+- 172.18.0.2 (ID: b167aca6-b6b1-4bd5-bc45-3e27632e844d)
 ```
 
 ### `adaptiverepair` Subcommand
