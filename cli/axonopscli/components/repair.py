@@ -2,18 +2,19 @@ import argparse
 
 from axonopscli.axonops import AxonOps
 
+from ..urls import ADAPTIVE_REPAIR_URL
+
 
 class AdaptiveRepair:
     """
     This class manages the logic for the adaptive repair.
     """
-    adaptive_repair_url = "/api/v1/adaptiveRepair"
 
     def __init__(self, args: argparse.Namespace, axonops: AxonOps):
         self.args = args
         self.axonops = axonops
         self.repair_data = None
-        self.full_url = f"{self.adaptive_repair_url}/{args.org}/cassandra/{args.cluster}"
+        self.full_url = f"{ADAPTIVE_REPAIR_URL}/{args.org}/cassandra/{args.cluster}"
 
     def get_actual_repair(self):
         if self.repair_data is None:

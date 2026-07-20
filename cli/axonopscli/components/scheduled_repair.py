@@ -1,19 +1,18 @@
 from axonopscli.axonops import HTTPCodeError
 
+from ..urls import ADD_REPAIR_URL, CASSANDRA_SCHEDULED_REPAIR_URL, REPAIR_URL
+
 
 class ScheduledRepair:
     """ Class to manage the Scheduled Repair in AxonOps """
-    schedule_repair_add_url = "/api/v1/addrepair"
-    repair_url = "/api/v1/repair"
-    cassandrascheduledrepair_url = "/api/v1/cassandrascheduledrepair"
 
     def __init__(self, axonops, args):
         self.axonops = axonops
         self.args = args
         self.repair_data = None
-        self.full_add_repair_url = f"{self.schedule_repair_add_url}/{args.org}/cassandra/{args.cluster}"
-        self.full_repair_url = f"{self.repair_url}/{args.org}/cassandra/{args.cluster}"
-        self.full_cassandrascheduledrepair_url = f"{self.cassandrascheduledrepair_url}/{args.org}/cassandra/{args.cluster}"
+        self.full_add_repair_url = f"{ADD_REPAIR_URL}/{args.org}/cassandra/{args.cluster}"
+        self.full_repair_url = f"{REPAIR_URL}/{args.org}/cassandra/{args.cluster}"
+        self.full_cassandrascheduledrepair_url = f"{CASSANDRA_SCHEDULED_REPAIR_URL}/{args.org}/cassandra/{args.cluster}"
 
     def remove_all_repairs_from_axonops(self):
         """ Remove all scheduled repairs from AxonOps. """
