@@ -8,6 +8,23 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Added
 
+- **CLI `info` command**: reports the health of every cluster visible to the
+  organisation. A new `Orgs` component queries `/api/v1/orgs` and flattens the
+  returned org / type / cluster tree, mapping status `0`/`1`/`2` to
+  `OK`/`Warning`/`Error` (anything else is `Unknown`). Clusters that are not OK
+  are repeated in a summary at the end of the output.
+
+### Changed
+
+- **CLI**: all API endpoints are now declared in a single `axonopscli/urls.py`
+  module instead of a per-component class attribute, so changing an endpoint is
+  a one-line edit in one place.
+
+### Fixed
+
+- **CLI**: the nodes endpoint in `AxonOps.find_nodes_ids` was missing its
+  leading slash, so it was concatenated onto the host with no separator.
+
 - **configurations role**: opt-in health / config check via the `info` tag
   (tagged `info` + `never`, so it only runs with `--tags info`). It queries the
   AxonOps API for the target `org` and `cluster`, validates the `use_saml`
