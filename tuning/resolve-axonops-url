@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Resolve the AxonOps Cloud base URL for an org by probing the API.
+#
+# A SaaS cluster lives either on the shared host (dash.axonops.cloud/<org>) or
+# on a dedicated subdomain (<org>.axonops.cloud/dashboard). This mirrors the
+# CLI's logic in cli/axonopscli/axonops.py (do_request): try the shared host
+# first, fall back to the subdomain on a 404, and echo whichever answers. The
+# CLI auto-detects internally, but the Ansible modules don't — so this lets the
+# Ansible-driven wrappers (tuning/default-apply) resolve the host the same way.
+#
+# Source of truth for the URL shapes is the CLI; keep the two in sync.
+#
+# Usage:
+#   tuning/resolve-axonops-url <org> [cluster] [cluster_type]
+#
+# Echoes the resolved base URL on stdout. The probe trace goes to stderr, so
+# callers can safely do:  AXONOPS_URL="$(tuning/resolve-axonops-url acme prod)"
+#
+# Env:
+#   AXONOPS_URL    — if set, echoed as-is (trailing slash trimmed); no probing.
+#   AXONOPS_TOKEN  — required to probe the authenticated alert-rules endpoint.
+set -euo pipefail
+
+ORG="${1:-${AXONOPS_ORG:-}}"
+CLUSTER="${2:-${AXONOPS_CLUSTER:-}}"
+CLUSTER_TYPE="${3:-${AXONOPS_CLUSTER_TYPE:-cassandra}}"
+
+if [[ -z "$ORG" ]]; then
+    echo "usage: tuning/resolve-axonops-url <org> [cluster] [cluster_type]" >&2
+    exit 2
+fi
+
+# An explicit URL wins — no probing. Matches the CLI, where a caller-supplied
+# base_url is taken as-is and locked (self-hosted, or a pinned cloud URL).
+if [[ -n "${AXONOPS_URL:-}" ]]; then
+    echo "${AXONOPS_URL%/}"
+    exit 0
+fi
+
+: "${AXONOPS_TOKEN:?AXONOPS_TOKEN must be set to probe the API}"
+
+SHARED="https://dash.axonops.cloud/${ORG}"
+SUBDOMAIN="https://${ORG}.axonops.cloud/dashboard"
+PROBE_PATH="/api/v1/alert-rules/${ORG}/${CLUSTER_TYPE}/${CLUSTER}"
+
+# -s silent, body discarded; -w prints only the HTTP status. A transport-level
+# failure (curl exits non-zero) yields code 000 → treated as "not 404", so we
+# leave the shared host in place rather than masking it behind a subdomain.
+code="$(curl -s -o /dev/null -w '%{http_code}' \
+    -H "Authorization: Bearer ${AXONOPS_TOKEN}" \
+    "${SHARED}${PROBE_PATH}" || echo 000)"
+
+if [[ "$code" == "404" ]]; then
+    echo "probe: ${SHARED} → 404 (org not on shared host); using dedicated subdomain" >&2
+    echo "$SUBDOMAIN"
+else
+    echo "probe: ${SHARED} → ${code}; using shared cloud host" >&2
+    echo "$SHARED"
+fi

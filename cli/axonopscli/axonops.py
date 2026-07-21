@@ -6,6 +6,26 @@ import requests
 from .utils import HTTPCodeError
 
 
+def _scrub_auth_headers(headers: dict) -> dict:
+    """Return a copy of headers with the Authorization value masked.
+
+    The value of Authorization — whether `Bearer <token>` or `AxonApi <token>` —
+    is a live credential. When -v prints the request line for debugging, we
+    must not leak it into stdout/stderr/CI logs.
+    """
+    if not headers:
+        return headers
+    if "Authorization" not in headers:
+        return headers
+    scrubbed = dict(headers)
+    original = scrubbed["Authorization"]
+    # Preserve the auth *scheme* (Bearer / AxonApi) since it's useful for
+    # debugging, but mask the actual token value.
+    scheme = original.split(" ", 1)[0] if original and " " in original else "***"
+    scrubbed["Authorization"] = f"{scheme} ***"
+    return scrubbed
+
+
 class AxonOps:
 
     def __init__(self, org_name: str, base_url: str = '', username: str = '', password: str = '',
@@ -24,12 +44,24 @@ class AxonOps:
         # collect the errors, will check it on every module
         self.errors = []
 
-        # clean the base url or use the default
+        # Resolve the base URL. With no explicit URL this is AxonOps Cloud,
+        # where a cluster lives either on the shared host
+        # (dash.axonops.cloud/<org>) or on a dedicated subdomain
+        # (<org>.axonops.cloud/dashboard). We can't know which up front, so we
+        # keep both candidates (shared host first) and let do_request probe:
+        # try the first, fall back to the next on a 404, then lock onto whichever
+        # shape answered. An explicit base_url (self-hosted axon-server, or a
+        # pinned cloud URL) is taken as-is — no probing.
         if not base_url:
-            self.base_url = f'https://dash.axonops.cloud/{org_name}'
+            self._base_url_candidates = [
+                f'https://dash.axonops.cloud/{org_name}',
+                f'https://{org_name}.axonops.cloud/dashboard',
+            ]
+            self._base_url_locked = False
         else:
-            # If base_url is defined,then its most likely a standalone axon-server instance which doesn't need /{org_name}
-            self.base_url = f'{base_url.rstrip("/")}'
+            self._base_url_candidates = [base_url.rstrip("/")]
+            self._base_url_locked = True
+        self.base_url = self._base_url_candidates[0]
 
         # if you have username and password, it will be used as login
         if self.username and self.password:
@@ -43,6 +75,11 @@ class AxonOps:
 
     def dash_url(self):
         return self.base_url
+
+    def _confirm_base_url(self, base_url: str):
+        """Lock onto the base URL that answered, so later requests skip probing."""
+        self.base_url = base_url
+        self._base_url_locked = True
 
     def get_jwt(self) -> str:
         """
@@ -78,8 +115,6 @@ class AxonOps:
             url (str): The relative URL after the base and the org name.
             method (str): HTTP method to use for the request (GET, POST, PUT, DELETE, etc.)
         """
-        full_url = f'{self.dash_url()}{url}'
-
         # Select the bearer if it is necessary
         bearer = ''
 
@@ -107,25 +142,51 @@ class AxonOps:
             headers['Content-type'] = 'application/json'
 
         method = method.upper()
-        if self.verbose:
-            print(f"{method} {full_url} {headers}")
 
-        try:
-            response = requests.request(method, full_url, headers=headers, data=data)
-            if response.status_code == 204:
-                if self.verbose:
-                    print(f"204 No Content received from {full_url}")
-                return {}
+        # Once locked (explicit URL, or a prior request already succeeded) only
+        # the confirmed base is tried; otherwise probe the candidates in order.
+        candidates = [self.base_url] if self._base_url_locked else list(self._base_url_candidates)
 
-            if response.status_code not in ok_codes:
-                raise HTTPCodeError(f"Call to {full_url} returned {response.status_code}")
-            if not response.text or response.text.strip() == "":
-                return {}
-            else:
-                return response.json()
-        except json.decoder.JSONDecodeError:
-            print(f"url: {full_url} header: {headers} return: {response.status_code}")
-            raise
+        last_error = None
+        for i, base in enumerate(candidates):
+            full_url = f'{base}{url}'
+            if self.verbose:
+                print(f"{method} {full_url} {_scrub_auth_headers(headers)}")
+
+            try:
+                response = requests.request(method, full_url, headers=headers, data=data)
+                if response.status_code == 204:
+                    if self.verbose:
+                        print(f"204 No Content received from {full_url}")
+                    self._confirm_base_url(base)
+                    return {}
+
+                if response.status_code not in ok_codes:
+                    error = HTTPCodeError(
+                        f"Call to {full_url} returned {response.status_code}",
+                        status_code=response.status_code,
+                    )
+                    # A 404 from an as-yet-unconfirmed base means "this host
+                    # doesn't serve this org" — try the next URL shape. Any
+                    # other status (401/403/5xx), or a 404 once the base is
+                    # confirmed (a genuinely missing resource), is surfaced.
+                    if (not self._base_url_locked
+                            and response.status_code == 404
+                            and i + 1 < len(candidates)):
+                        last_error = error
+                        continue
+                    raise error
+
+                self._confirm_base_url(base)
+                if not response.text or response.text.strip() == "":
+                    return {}
+                else:
+                    return response.json()
+            except json.decoder.JSONDecodeError:
+                print(f"url: {full_url} header: {headers} return: {response.status_code}")
+                raise
+
+        raise last_error
 
     def get_integration_output(self, cluster: str):
         """
