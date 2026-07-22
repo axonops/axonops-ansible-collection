@@ -8,13 +8,20 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Added
 
-- **CLI `info` command**: reports the health of every cluster visible to the
+- **CLI `health` command**: reports the health of every cluster visible to the
   organisation. A new `Orgs` component queries `/api/v1/orgs` and flattens the
   returned org / type / cluster tree, mapping status `0`/`1`/`2` to
-  `OK`/`Warning`/`Error` (anything else is `Unknown`). Clusters that are not OK
-  are repeated in a summary at the end of the output.
+  `OK`/`Warning`/`Error` (anything else is `Unknown`). By default only the
+  clusters that are not OK are printed; `--show-healthy` also lists the healthy
+  clusters and the nodes of `--cluster`, and `--show-orgs` lists the visible
+  organisations. The command exits `1` when any cluster is not OK, so it can be
+  used as a check in a script or a CI job.
 
 ### Changed
+
+- **CLI**: the `info` command is now `health`. The connection and authentication
+  summary it used to print is shown only with `-v`; the default output is the
+  cluster health report.
 
 - **CLI**: all API endpoints are now declared in a single `axonopscli/urls.py`
   module instead of a per-component class attribute, so changing an endpoint is

@@ -12,7 +12,7 @@ All commands run from `cli/`.
 
 ```bash
 # Run the CLI (no console-script entry point; invoke the wrapper directly)
-python3 axonops.py info
+python3 axonops.py health
 python3 axonops.py <subcommand> -h
 
 # Credentials come from env vars — see .env.axonops.example
@@ -46,7 +46,7 @@ Three layers, top to bottom:
 1. **`axonops.py`** (repo-root wrapper) — thin `main()` that constructs
    `Application` and calls `run(sys.argv[1:])`.
 2. **`axonopscli/application.py`** — the entire CLI surface. One `argparse`
-   subparser per subcommand (`info`, `repair`/`adaptiverepair`, `scheduledrepair`,
+   subparser per subcommand (`health`, `repair`/`adaptiverepair`, `scheduledrepair`,
    `dashboard`, `silence`), each wired via `set_defaults(func=self.run_*)`. Every
    global option defaults to an `AXONOPS_*` env var, so flags and environment are
    interchangeable. Cross-flag validation (e.g. `--tables` requires `--keyspace`)

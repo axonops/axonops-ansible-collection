@@ -54,26 +54,20 @@ class Orgs:
                     ))
         return clusters
 
+    def get_unhealthy_clusters(self):
+        """ Clusters whose status is anything other than 0 (OK). """
+        return [cluster for cluster in self.get_clusters() if cluster[3] != 0]
+
+    def get_healthy_clusters(self):
+        """ Clusters whose status is 0 (OK). """
+        return [cluster for cluster in self.get_clusters() if cluster[3] == 0]
+
+    def get_org_names(self):
+        """ Names of every org returned by the API, in the order given. """
+        orgs = self.get_orgs()
+        if not orgs:
+            return []
+        return [org.get('name') for org in orgs.get('children') or []]
+
     def status_label(self, status) -> str:
         return self.status_labels.get(status, "Unknown")
-
-    def __str__(self) -> str:
-        clusters = self.get_clusters()
-        if not clusters:
-            return "No clusters found"
-
-        result = "Clusters:\n"
-        for org, cluster_type, name, status in clusters:
-            label = self.status_label(status)
-            health = "healthy" if status == 0 else f"NOT healthy ({label})"
-            result += f"- {org}/{cluster_type}/{name}: {health}\n"
-
-        unhealthy = [c for c in clusters if c[3] != 0]
-        if unhealthy:
-            result += "\nNon-OK clusters:\n"
-            for _, cluster_type, name, status in unhealthy:
-                result += f"{cluster_type}/{name}: {self.status_label(status)}\n"
-        else:
-            result += "\nAll clusters are healthy\n"
-
-        return result

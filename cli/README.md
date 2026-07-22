@@ -117,63 +117,75 @@ export AXONOPS_CLUSTER="thingscluster"
 export AXONOPS_TOKEN='aaaaabbbbccccddddeeee'
 ```
 
-### `info` Subcommand
-Prints general information about the cluster.
-This can be used to verify that the connection to the cluster is working and to get some basic information about the cluster.
+### `health` Subcommand
 
-The output is split into two parts:
+Reports the health of every cluster visible to your organisation. By default it prints
+only what is wrong: either `All clusters are healthy`, or the list of clusters that are
+not OK. This makes it usable as a check in a script or a CI job.
 
-* **Info from settings** — the organisation, cluster, cluster type, connection URL and
-  authentication method resolved from your flags and environment variables. The token is
-  masked; only its first character is shown.
-* **Info from server** — the health of every cluster visible to your organisation,
-  followed by the nodes registered for the cluster.
-
-Cluster health is reported per cluster as `org/type/name`. A cluster is `healthy` when
-its status is `OK`; anything else is listed as `NOT healthy` with the reason. Statuses
-are:
+Each failing cluster is printed as `type/name: status`. Statuses are:
 
 | Status | Meaning |
 | --- | --- |
-| `OK` | The cluster is healthy. |
+| `OK` | The cluster is healthy. Not printed unless `--show-healthy` is given. |
 | `Warning` | The cluster has raised a warning. |
 | `Error` | The cluster is in an error state. |
 | `Unknown` | The server reported a status this CLI does not recognise. |
 
-Any cluster that is not `OK` is repeated in a `Non-OK clusters` summary at the end of the
-output, so problems are visible without reading the full list. If every cluster is
-healthy, `All clusters are healthy` is printed instead.
+**Exit code**: `0` when every cluster is OK (or none were found), `1` when at least one
+cluster is not OK.
+
+| Option | Description |
+| --- | --- |
+| `--show-healthy` | Also list the healthy clusters, followed by the nodes registered for `--cluster`. |
+| `--show-orgs` | Also list the organisations visible to your credentials. |
+| `-v` | Also print the resolved settings — org, cluster, cluster type, connection URL, and the authentication method. The token is masked; only its first character is shown. |
+
+> **Note**: the AxonOps API reports a status per *cluster*, not per node. The node list
+> shown by `--show-healthy` is the registered node inventory for the cluster, not a
+> per-node health verdict.
 
 #### Examples:
 
+Check whether anything is wrong:
+
 ```shell
-$ pipenv run python axonops.py info
+$ pipenv run python axonops.py health
 ```
 
-Example output:
+```text
+Unhealthy clusters:
+cassandra/warn-cluster: Warning
+```
+
+Show everything, healthy clusters and orgs included:
+
+```shell
+$ pipenv run python axonops.py health --show-healthy --show-orgs
+```
 
 ```text
-Info from settings:
-Organization: test
-Cluster: thingscluster
-Cluster Type: cassandra
-
-No URL specified, the connection will be made to AxonOps Cloud
-
-Token: a*******************
-This is usually used in AxonOps Cloud
-
-Info from server:
-Clusters:
-- demo/cassandra/demo-cluster: healthy
-- demo/cassandra/warn-cluster: NOT healthy (Warning)
-- demo/kafka/k1: healthy
-
-Non-OK clusters:
+Unhealthy clusters:
 cassandra/warn-cluster: Warning
+
+Healthy clusters:
+- demo/cassandra/demo-cluster
+- demo/kafka/k1
 
 Nodes:
 - 172.18.0.2 (ID: b167aca6-b6b1-4bd5-bc45-3e27632e844d)
+
+Orgs:
+- demo
+```
+
+Use it as a gate in a script:
+
+```shell
+if ! pipenv run python axonops.py health; then
+  echo "AxonOps reports an unhealthy cluster"
+  exit 1
+fi
 ```
 
 ### `adaptiverepair` Subcommand
