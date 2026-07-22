@@ -1,13 +1,14 @@
 import json
 
+from ..urls import DASHBOARD_TEMPLATE_URL
+
 
 class Dashboard:
-    dashboardtemplate_url = "/api/v1/dashboardtemplate"
 
     def __init__(self, axonops, args):
         self.axonops = axonops
         self.args = args
-        self.full_dashboard_url = f"{self.dashboardtemplate_url}/{args.org}/cassandra/{args.cluster}?dashver=2.0"
+        self.full_dashboard_url = f"{DASHBOARD_TEMPLATE_URL}/{args.org}/cassandra/{args.cluster}?dashver=2.0"
         self.dashboard_data = None
 
     def get_actual_dashboards(self):

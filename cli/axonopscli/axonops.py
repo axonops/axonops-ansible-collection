@@ -3,6 +3,7 @@ import urllib.parse
 from typing import List
 import requests
 
+from .urls import INTEGRATIONS_URL, LOGIN_URL, NODES_URL
 from .utils import HTTPCodeError
 
 
@@ -57,7 +58,7 @@ class AxonOps:
                 "password": self.password
             }
 
-            result, return_error = self.do_request("/api/login", json_data=json_data, method='POST')
+            result, return_error = self.do_request(LOGIN_URL, json_data=json_data, method='POST')
 
             if return_error:
                 self.errors.append(return_error)
@@ -134,7 +135,7 @@ class AxonOps:
         # if we don't have already the integration API output, call the API
         if cluster not in self.integrations_output:
             integrations, error = self.do_request(
-                f"/api/v1/integrations/{self.org_name}/{self.get_cluster_type()}/{cluster}")
+                f"{INTEGRATIONS_URL}/{self.org_name}/{self.get_cluster_type()}/{cluster}")
             if error is not None:
                 return None, error
 
@@ -201,7 +202,7 @@ class AxonOps:
         return None, None
 
     def find_nodes_ids(self, nodes, org, cluster):
-        nodes_returned, error = self.do_request(f"api/v1/nodes/{org}/{self.get_cluster_type()}/{cluster}")
+        nodes_returned, error = self.do_request(f"{NODES_URL}/{org}/{self.get_cluster_type()}/{cluster}")
         if error is not None:
             return None, error
 

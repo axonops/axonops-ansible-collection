@@ -54,9 +54,15 @@ class Application:
 
         commands_subparser = parser.add_subparsers(help="commands")
 
-        info_parser = commands_subparser.add_parser("info",
-                                                    help="Print information about the cluster and the AxonOps environment")
-        info_parser.set_defaults(func=self.run_info)
+        health_parser = commands_subparser.add_parser("health",
+                                                     help="Report the health of the clusters in the AxonOps environment")
+        health_parser.set_defaults(func=self.run_health)
+
+        health_parser.add_argument('--show-healthy', action='store_true',
+                                   help='Also list the healthy clusters and the nodes of the current cluster')
+
+        health_parser.add_argument('--show-orgs', action='store_true',
+                                   help='Also list the organisations visible to the current credentials')
 
         adaptive_repair_parser = commands_subparser.add_parser(
             "repair", aliases=['adaptiverepair'],
@@ -247,17 +253,18 @@ class Application:
                 print(f"Org: {args.org}")
                 print(f"Cluster: {args.cluster}")
 
-    def run_info(self, args: argparse.Namespace):
-        """ Run the info command """
+    def run_health(self, args: argparse.Namespace):
+        """ Run the health command """
         if args.v:
-            print(f"Running info on {args.org}")
+            print(f"Running health on {args.org}")
             print(args)
 
         axonops = self.get_axonops(args)
 
-        from .info import Info
-        info = Info(axonops, args)
-        info.print_info()
+        from .health import Health
+        health = Health(axonops, args)
+        if not health.print_health():
+            sys.exit(1)
 
     def run_dashboard(self, args: argparse.Namespace):
         """ Run the dashboard management """

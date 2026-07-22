@@ -1,12 +1,13 @@
+from ..urls import NODES_URL
+
 _cached_data = None
 
 class Nodes:
-    node_url = "/api/v1/nodes"
 
     def __init__(self, axonops, args):
         self.axonops = axonops
         self.args = args
-        self.full_url = f"{self.node_url}/{self.args.org}/cassandra/{self.args.cluster}"
+        self.full_url = f"{NODES_URL}/{self.args.org}/cassandra/{self.args.cluster}"
 
         self.get_nodes()
 
