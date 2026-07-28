@@ -37,6 +37,8 @@
 - name: Install Java
   ansible.builtin.include_role:
     name: axonops.axonops.java
+    apply:
+      tags: [install]
   vars:
     java_pkg: "{{ kafka__java_pkg }}"
     java_zulu_version: "{{ kafka_java_version }}"
@@ -167,6 +169,8 @@
 - name: Install and configure AxonOps agent
   ansible.builtin.include_role:
     name: axonops.axonops.agent
+    apply:
+      tags: [axonops_agent, install]
   vars:
     axon_java_agent: "{{ kafka_axonops_java_agent }}"
     axon_agent_customer_name: "{{ kafka_axonops_org }}"
