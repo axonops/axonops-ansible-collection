@@ -1,0 +1,117 @@
+---
+- name: Verify per-listener configuration
+  hosts: all
+  gather_facts: false
+  vars:
+    kafka_tls_generate_local_dir: /tmp/molecule-kafka-listeners
+  tasks:
+    - name: Read server.properties
+      ansible.builtin.slurp:
+        src: /opt/kafka/config/server.properties
+      register: kafka_props_content
+
+    - name: Decode server.properties
+      ansible.builtin.set_fact:
+        kafka_props: "{{ kafka_props_content.content | b64decode }}"
+
+    - name: Assert both listeners are bound, with the controller listener appended
+      ansible.builtin.assert:
+        that:
+          - "'listeners=INTERNAL://:9092,COMPLIANCE://:9094,CONTROLLER://:9093' in kafka_props"
+        fail_msg: "listeners line does not match the declared kafka_listeners"
+
+    - name: Assert each listener is advertised on its own host and port
+      ansible.builtin.assert:
+        that:
+          - "'advertised.listeners=INTERNAL://' in kafka_props"
+          - "',COMPLIANCE://kafka-compliance.example.com:9094' in kafka_props"
+        fail_msg: "advertised.listeners does not cover both listeners"
+
+    - name: Assert the first listener is used for inter-broker traffic
+      ansible.builtin.assert:
+        that:
+          - "'inter.broker.listener.name=INTERNAL' in kafka_props"
+        fail_msg: "inter-broker listener should default to the first kafka_listeners entry"
+
+    - name: Assert protocols are derived from each listener's tls/sasl flags
+      ansible.builtin.assert:
+        that:
+          - "',INTERNAL:SASL_PLAINTEXT' in kafka_props"
+          - "',COMPLIANCE:SSL' in kafka_props"
+        fail_msg: >-
+          listener.security.protocol.map does not reflect the per-listener
+          tls/sasl flags — INTERNAL inherits sasl from the cluster,
+          COMPLIANCE sets tls: true and sasl: false
+
+    - name: Assert TLS material is configured even though kafka_tls_enabled is false
+      ansible.builtin.assert:
+        that:
+          - "'ssl.keystore.type=PEM' in kafka_props"
+          - "'ssl.keystore.location=/etc/kafka/tls/keystore.pem' in kafka_props"
+          - "'ssl.truststore.location=/etc/kafka/tls/ca.pem' in kafka_props"
+        fail_msg: "a listener sets tls: true, so the keystore must be configured"
+
+    - name: Assert per-listener client auth override is rendered
+      ansible.builtin.assert:
+        that:
+          - "'listener.name.compliance.ssl.client.auth=none' in kafka_props"
+        fail_msg: >-
+          COMPLIANCE sets client_auth: none, which differs from the cluster
+          default and must be emitted as a per-listener override
+
+    - name: Assert SASL is scoped to the SASL listener only
+      ansible.builtin.assert:
+        that:
+          - "'listener.name.internal.sasl.enabled.mechanisms=PLAIN' in kafka_props"
+          - "'listener.name.controller.sasl.enabled.mechanisms=PLAIN' in kafka_props"
+          - "'listener.name.compliance.sasl' not in kafka_props"
+        fail_msg: "SASL config must cover INTERNAL and CONTROLLER but not COMPLIANCE"
+
+    - name: Stat keystore file
+      ansible.builtin.stat:
+        path: /etc/kafka/tls/keystore.pem
+      register: kafka_keystore_stat
+
+    - name: Assert TLS material was provisioned and locked down
+      ansible.builtin.assert:
+        that:
+          - kafka_keystore_stat.stat.exists
+          - kafka_keystore_stat.stat.pw_name == 'kafka'
+          - kafka_keystore_stat.stat.mode == '0600'
+        fail_msg: "/etc/kafka/tls/keystore.pem missing or wrong perms"
+
+    - name: Read admin.properties
+      ansible.builtin.slurp:
+        src: /opt/kafka/config/admin.properties
+      register: kafka_admin_content
+
+    - name: Assert admin client matches the listener bound to port 9092
+      ansible.builtin.assert:
+        that:
+          - "'security.protocol=SASL_PLAINTEXT' in (kafka_admin_content.content | b64decode)"
+          - "'ssl.keystore.location' not in (kafka_admin_content.content | b64decode)"
+        fail_msg: >-
+          admin.properties must describe the listener on 9092, which the topic,
+          ACL and SCRAM-user tasks bootstrap against
+
+    # The generated certificate is staged on the control node, which has the
+    # cryptography library available.
+    - name: Read generated certificate
+      community.crypto.x509_certificate_info:
+        path: "{{ kafka_tls_generate_local_dir }}/{{ inventory_hostname }}.crt"
+      register: kafka_cert_info
+      delegate_to: localhost
+      become: false
+
+    - name: Assert certificate covers every advertised host
+      ansible.builtin.assert:
+        that:
+          - "'DNS:kafka-compliance.example.com' in kafka_cert_info.subject_alt_name"
+          - "'DNS:localhost' in kafka_cert_info.subject_alt_name"
+          - "'IP:127.0.0.1' in kafka_cert_info.subject_alt_name"
+        fail_msg: >-
+          generated certificate SANs do not cover every listener's advertised
+          host — a client or scanner connecting there would fail hostname
+          verification. Got {{ kafka_cert_info.subject_alt_name }}
+
+# code: language=ansible

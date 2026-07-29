@@ -13,7 +13,8 @@
     group: "{{ kafka_group }}"
     mode: "0750"
 
-- name: Generate self-signed TLS material (dev only)
+# The shared CA is created earlier by tls_ca.yml, under a play-wide condition.
+- name: Sign per-host TLS material (dev only)
   ansible.builtin.import_tasks: tls_generate.yml
   when: kafka_tls_mode == 'generate'
 

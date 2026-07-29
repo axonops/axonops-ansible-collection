@@ -72,14 +72,52 @@ kafka_rack: ""
 
 # --- Listeners --------------------------------------------------------------
 
-# Override auto-derived listeners. Auto-derivation:
-#   combined node  → [PLAINTEXT://:9092, CONTROLLER://:9093]
-#   broker-only    → [PLAINTEXT://:9092]
-#   controller-only → [CONTROLLER://:9093]
+# Broker listeners. Leave empty to derive a single listener on 9092 from
+# kafka_tls_enabled / kafka_sasl_enabled — the historical behaviour:
+#   neither  → PLAINTEXT://:9092
+#   sasl     → SASL_PLAINTEXT://:9092
+#   tls      → SSL://:9092
+#   both     → SASL_SSL://:9092
+#
+# Set it to declare the broker listeners yourself, one entry each. Each entry
+# carries its own security, so a second endpoint can differ from the first —
+# e.g. an internal SASL listener plus a TLS listener for external clients or a
+# certificate scanner.
+#
+# The CONTROLLER listener on 9093 is always managed by the role and must not
+# appear here. Entries are ignored on controller-only nodes, so this is safe to
+# set play-wide on a mixed broker/controller play.
+#
+# Each entry:
+#   name            (str, required) — listener name, e.g. INTERNAL. Unique,
+#                                     alphanumeric/underscore, not CONTROLLER.
+#   port            (int, required) — bind port. 9093 is reserved.
+#   tls             (bool, optional) — terminate TLS. Defaults to kafka_tls_enabled.
+#   sasl            (bool, optional) — require SASL. Defaults to kafka_sasl_enabled.
+#   client_auth     (str, optional) — TLS listeners: none | requested | required.
+#                                     Defaults to kafka_tls_client_auth. Set to
+#                                     none for clients that hold no certificate
+#                                     of their own.
+#   advertised_host (str, optional) — defaults to kafka_node_ip
+#   advertised_port (int, optional) — defaults to port
+#
+# The listener's security protocol is derived from tls/sasl by the same rule the
+# role applies cluster-wide, and TLS material is provisioned by kafka_tls_mode
+# whenever any listener sets tls: true — so a TLS listener works here even with
+# kafka_tls_enabled: false. Any listener setting tls or sasl requires
+# kafka_security_enabled: true.
 kafka_listeners: []
+# - name: INTERNAL
+#   port: 9092
+#   tls: false
+# - name: COMPLIANCE
+#   port: 9094
+#   tls: true
+#   sasl: false
+#   client_auth: none
 
-# Override the inter-broker listener name. Leave empty to auto-derive from
-# the security state (PLAINTEXT or SSL).
+# Override the inter-broker listener name. Leave empty to use the first entry in
+# kafka_listeners, or the auto-derived listener when it is empty.
 kafka_inter_broker_listener_name: ""
 
 # --- Performance ------------------------------------------------------------
@@ -129,6 +167,18 @@ kafka_tls_generate_ca_cn: "Kafka Dev CA"
 kafka_tls_generate_validity_days: 3650
 # Control-node directory used to stage the generated CA between hosts
 kafka_tls_generate_local_dir: "/tmp/kafka-tls-{{ kafka_axonops_cluster_name | default('dev') }}"
+
+# Key parameters for generated CA and per-host certificates. Raise the size or
+# switch type if a certificate scanner enforces a stronger baseline.
+kafka_tls_generate_key_type: RSA
+kafka_tls_generate_key_size: 2048
+
+# Extra SANs appended to the generated per-host certificate, in OpenSSL form
+# ("DNS:kafka.example.com", "IP:203.0.113.10"). The role already includes
+# inventory_hostname, localhost, 127.0.0.1, kafka_node_ip and the advertised
+# host of every entry in kafka_listeners; use this for load balancer names,
+# public DNS records or IPv6 literals.
+kafka_tls_generate_extra_sans: []
 
 # Remote directory the broker reads PEM files from. The role places
 # kafka.crt, kafka.key and ca.crt here for custom and generate modes;

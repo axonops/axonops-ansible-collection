@@ -119,6 +119,13 @@
         - ansible_facts.services['axon-agent.service'] is defined
         - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
 
+# Must run before firewall.yml and config.yml — both consume the normalised
+# extra listener list. Tagged 'always' so partial runs (--tags config) still
+# have the fact defined.
+- name: Validate and normalise extra listeners
+  ansible.builtin.import_tasks: listeners.yml
+  tags: always
+
 - name: Install Kafka
   ansible.builtin.import_tasks: install.yml
   tags: install

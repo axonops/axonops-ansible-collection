@@ -2,15 +2,19 @@
 - name: Populate service facts for firewall detection
   ansible.builtin.service_facts:
 
-- name: Open Kafka broker port in firewalld
+# kafka__broker_listeners covers every broker listener, including the derived
+# one on 9092, and is empty on controller-only nodes.
+- name: Open Kafka broker listener ports in firewalld
   ansible.posix.firewalld:
-    port: "9092/tcp"
+    port: "{{ item.port }}/tcp"
     permanent: true
     state: enabled
     immediate: true
   become: true
+  loop: "{{ kafka__broker_listeners | default([]) }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.port }})"
   when:
-    - "'broker' in kafka_node_roles"
     - ansible_facts.services['firewalld.service'] is defined
     - ansible_facts.services['firewalld.service'].state == 'running'
 
@@ -26,14 +30,16 @@
     - ansible_facts.services['firewalld.service'] is defined
     - ansible_facts.services['firewalld.service'].state == 'running'
 
-- name: Open Kafka broker port in ufw
+- name: Open Kafka broker listener ports in ufw
   community.general.ufw:
     rule: allow
-    port: "9092"
+    port: "{{ item.port }}"
     proto: tcp
   become: true
+  loop: "{{ kafka__broker_listeners | default([]) }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.port }})"
   when:
-    - "'broker' in kafka_node_roles"
     - ansible_facts.services['ufw.service'] is defined
     - ansible_facts.services['ufw.service'].state == 'running'
 

@@ -1,0 +1,52 @@
+---
+# Multi-listener scenario: an internal SASL listener on 9092 plus a TLS
+# listener on 9094 with role-generated certificates. Exercises the case where
+# TLS material must be provisioned even though kafka_tls_enabled is false, and
+# where per-listener security differs from the cluster-wide flags.
+- name: Converge (per-listener security via kafka_listeners)
+  hosts: all
+  become: true
+  vars:
+    kafka_version: "4.3.0"
+    kafka_node_id: 1
+    kafka_node_roles:
+      - broker
+      - controller
+    kafka_heap_size: "512m"
+    kafka_opts:
+      - "-XX:NewSize=64m"
+      - "-XX:MaxNewSize=64m"
+    kafka_data_dirs:
+      - /var/lib/kafka
+    # Skip systemd start in container — verify config + on-disk artefacts only
+    kafka_start_on_install: false
+    kafka_start_on_boot: false
+    # Cluster-wide: SASL on, TLS off. The COMPLIANCE listener opts into TLS.
+    kafka_security_enabled: true
+    kafka_tls_enabled: false
+    kafka_tls_mode: generate
+    kafka_tls_generate_local_dir: /tmp/molecule-kafka-listeners
+    kafka_tls_generate_validity_days: 365
+    kafka_sasl_enabled: true
+    kafka_sasl_mechanism: PLAIN
+    kafka_sasl_inter_broker_user: kafka-admin
+    kafka_sasl_inter_broker_password: "molecule-admin-secret"
+    kafka_sasl_plain_users:
+      - name: kafka-admin
+        password: "molecule-admin-secret"
+      - name: app1
+        password: "molecule-app1-secret"
+    kafka_listeners:
+      - name: INTERNAL
+        port: 9092
+      - name: COMPLIANCE
+        port: 9094
+        tls: true
+        sasl: false
+        client_auth: none
+        advertised_host: kafka-compliance.example.com
+
+  roles:
+    - role: kafka
+
+# code: language=ansible

@@ -11,12 +11,16 @@ controller.quorum.voters={% for host in groups['kafka__group_controller_nodes'] 
 
 ############################# Socket Server Settings #############################
 
-listeners={{ kafka__effective_listeners | join(',') }}
+{% set lsep = joiner(',') %}
+listeners={% for l in kafka__broker_listeners %}{{ lsep() }}{{ l.name }}://:{{ l.port }}{% endfor %}{% if kafka__has_controller | bool %}{{ lsep() }}{{ kafka__controller_listener_name }}://:9093{% endif %}
 
-inter.broker.listener.name={{ kafka_inter_broker_listener_name | default('', true) or kafka__broker_listener_name }}
+
+inter.broker.listener.name={{ kafka_inter_broker_listener_name | default('', true) or (kafka__broker_listeners | map(attribute='name') | first | default(kafka__broker_listener_name)) }}
 
 {% if kafka__has_broker | bool %}
-advertised.listeners={{ kafka__broker_listener_name }}://{{ kafka_node_ip }}:9092
+{% set asep = joiner(',') %}
+advertised.listeners={% for l in kafka__broker_listeners %}{{ asep() }}{{ l.name }}://{{ l.advertised_host }}:{{ l.advertised_port }}{% endfor %}
+
 {% if kafka_rack | default('') | length > 0 %}
 broker.rack={{ kafka_rack }}
 {% endif %}
@@ -24,9 +28,10 @@ broker.rack={{ kafka_rack }}
 
 controller.listener.names={{ kafka__controller_listener_name }}
 
-listener.security.protocol.map={{ kafka__controller_listener_name }}:{{ kafka__controller_protocol }},PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
+listener.security.protocol.map={{ kafka__controller_listener_name }}:{{ kafka__controller_protocol }},PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL{% for l in kafka__broker_listeners if l.name not in ['PLAINTEXT', 'SSL', 'SASL_PLAINTEXT', 'SASL_SSL'] %},{{ l.name }}:{{ l.protocol }}{% endfor %}
 
-{% if kafka__tls_on | bool %}
+
+{% if kafka__tls_needed | bool %}
 ############################# TLS #############################
 
 ssl.keystore.type=PEM
@@ -38,6 +43,14 @@ ssl.truststore.type=PEM
 ssl.truststore.location={{ kafka__tls_truststore_file }}
 ssl.client.auth={{ kafka_tls_client_auth }}
 ssl.endpoint.identification.algorithm=
+{% for l in kafka__broker_listeners if l.tls and l.client_auth != kafka_tls_client_auth %}
+{% if loop.first %}
+
+# Listeners whose client_auth differs from the cluster default. All listeners
+# share the host's keystore and truststore above.
+{% endif %}
+listener.name.{{ l.name | lower }}.ssl.client.auth={{ l.client_auth }}
+{% endfor %}
 {% endif %}
 
 {% if kafka__sasl_on | bool %}
@@ -53,10 +66,10 @@ sasl.mechanism.controller.protocol={{ kafka_sasl_mechanism }}
 # must be declared explicitly for each SASL listener.
 # Broker-only nodes still need the controller listener JAAS (used as the
 # client config when they fetch from the Raft quorum).
-{% if kafka__has_broker | bool %}
-listener.name.{{ kafka__broker_listener_name | lower }}.sasl.enabled.mechanisms={{ kafka_sasl_mechanism }}
-listener.name.{{ kafka__broker_listener_name | lower }}.{{ kafka__sasl_mech_lower }}.sasl.jaas.config={{ kafka__sasl_login_module }} required username="{{ kafka_sasl_inter_broker_user }}" password="{{ kafka_sasl_inter_broker_password }}"{% if kafka_sasl_mechanism == 'PLAIN' %}{% for u in kafka_sasl_plain_users %} user_{{ u.name }}="{{ u.password }}"{% endfor %}{% endif %};
-{% endif %}
+{% for l in kafka__broker_listeners if l.sasl %}
+listener.name.{{ l.name | lower }}.sasl.enabled.mechanisms={{ kafka_sasl_mechanism }}
+listener.name.{{ l.name | lower }}.{{ kafka__sasl_mech_lower }}.sasl.jaas.config={{ kafka__sasl_login_module }} required username="{{ kafka_sasl_inter_broker_user }}" password="{{ kafka_sasl_inter_broker_password }}"{% if kafka_sasl_mechanism == 'PLAIN' %}{% for u in kafka_sasl_plain_users %} user_{{ u.name }}="{{ u.password }}"{% endfor %}{% endif %};
+{% endfor %}
 
 listener.name.{{ kafka__controller_listener_name | lower }}.sasl.enabled.mechanisms={{ kafka_sasl_mechanism }}
 listener.name.{{ kafka__controller_listener_name | lower }}.{{ kafka__sasl_mech_lower }}.sasl.jaas.config={{ kafka__sasl_login_module }} required username="{{ kafka_sasl_inter_broker_user }}" password="{{ kafka_sasl_inter_broker_password }}"{% if kafka_sasl_mechanism == 'PLAIN' %}{% for u in kafka_sasl_plain_users %} user_{{ u.name }}="{{ u.password }}"{% endfor %}{% endif %};

@@ -1,0 +1,79 @@
+---
+# ============================================================================
+# Kafka Role - Local CA for generate mode (DEV ONLY)
+# ============================================================================
+# Creates the staging directory and self-signed CA on the control node, once
+# per play.
+#
+# These tasks are deliberately separate from tls_generate.yml. run_once tasks
+# execute on the FIRST host in the play and evaluate their conditions — and read
+# their variables — against that host, which may not need TLS at all. With
+# per-listener TLS a play can mix controller-only nodes (no TLS material) with
+# brokers that have a TLS listener; any per-host condition on these tasks would
+# skip the CA for the entire play whenever the first host is a controller. So
+# this file is imported under the single play-wide kafka__tls_generate_anywhere,
+# which folds in both the TLS requirement and kafka_tls_mode.
+#
+# For the same reason the kafka_tls_generate_* settings below are read from the
+# first host in the play: set them play-wide, not on a broker-only group, or the
+# CA is silently built from the role defaults.
+
+- name: Ensure local TLS staging directory exists
+  ansible.builtin.file:
+    path: "{{ kafka_tls_generate_local_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Check for existing CA private key on control node
+  ansible.builtin.stat:
+    path: "{{ kafka_tls_generate_local_dir }}/ca.key"
+  register: kafka__reg_local_ca
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Generate CA private key
+  community.crypto.openssl_privatekey:
+    path: "{{ kafka_tls_generate_local_dir }}/ca.key"
+    size: "{{ kafka_tls_generate_key_size | int }}"
+    type: "{{ kafka_tls_generate_key_type }}"
+    format: pkcs8
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: not kafka__reg_local_ca.stat.exists
+
+- name: Generate CA certificate signing request
+  community.crypto.openssl_csr:
+    path: "{{ kafka_tls_generate_local_dir }}/ca.csr"
+    privatekey_path: "{{ kafka_tls_generate_local_dir }}/ca.key"
+    common_name: "{{ kafka_tls_generate_ca_cn }}"
+    basic_constraints:
+      - "CA:TRUE"
+    basic_constraints_critical: true
+    key_usage:
+      - keyCertSign
+      - cRLSign
+    key_usage_critical: true
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: not kafka__reg_local_ca.stat.exists
+
+- name: Self-sign CA certificate
+  community.crypto.x509_certificate:
+    path: "{{ kafka_tls_generate_local_dir }}/ca.crt"
+    privatekey_path: "{{ kafka_tls_generate_local_dir }}/ca.key"
+    csr_path: "{{ kafka_tls_generate_local_dir }}/ca.csr"
+    provider: selfsigned
+    selfsigned_not_after: "+{{ kafka_tls_generate_validity_days }}d"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: not kafka__reg_local_ca.stat.exists
+
+# code: language=ansible

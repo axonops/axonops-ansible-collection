@@ -64,16 +64,70 @@ Installs and configures Apache Kafka in **KRaft mode** (no ZooKeeper) on RHEL/De
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `kafka_listeners` | `[]` | Override auto-derived listeners. Leave empty to use role defaults based on `kafka_node_roles`. |
-| `kafka_inter_broker_listener_name` | `""` | Listener name used for inter-broker communication. Leave empty to auto-derive from the security state (`PLAINTEXT`, `SSL`, `SASL_PLAINTEXT`, or `SASL_SSL`). |
+| `kafka_listeners` | `[]` | Broker listeners. Leave empty to derive a single listener on 9092 from the cluster-wide security flags. |
+| `kafka_inter_broker_listener_name` | `""` | Listener used for inter-broker communication. Leave empty to use the first entry in `kafka_listeners`. |
 
-Auto-derived listener defaults by topology:
+Left empty, one broker listener is derived on port 9092 from `kafka_tls_enabled` and `kafka_sasl_enabled`:
 
 | Node roles | Listeners |
 |-----------|-----------|
 | `[broker, controller]` | `PLAINTEXT://:9092,CONTROLLER://:9093` |
 | `[broker]` | `PLAINTEXT://:9092` |
 | `[controller]` | `CONTROLLER://:9093` |
+
+The `CONTROLLER` listener on 9093 is always managed by the role and must not be listed in `kafka_listeners`. Entries are ignored on controller-only nodes, so the variable is safe to set play-wide on a mixed broker/controller play.
+
+Set `kafka_listeners` to declare broker listeners yourself. Each entry carries its own security, so one broker can serve endpoints with different settings:
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | Listener name, alphanumeric/underscore. Not `CONTROLLER`. |
+| `port` | yes | — | Bind port. 9093 is reserved for the controller listener. |
+| `tls` | no | `kafka_tls_enabled` | Terminate TLS on this listener |
+| `sasl` | no | `kafka_sasl_enabled` | Require SASL on this listener |
+| `client_auth` | no | `kafka_tls_client_auth` | `none` \| `requested` \| `required` — TLS listeners only |
+| `advertised_host` | no | `kafka_node_ip` | Host advertised to clients |
+| `advertised_port` | no | `port` | Port advertised to clients |
+
+Each listener's security protocol is derived from its `tls`/`sasl` flags by the same rule the role applies cluster-wide:
+
+| `tls` | `sasl` | Protocol |
+|-------|--------|----------|
+| `false` | `false` | `PLAINTEXT` |
+| `false` | `true` | `SASL_PLAINTEXT` |
+| `true` | `false` | `SSL` |
+| `true` | `true` | `SASL_SSL` |
+
+Any listener setting `tls` or `sasl` requires `kafka_security_enabled: true`; `sasl: true` additionally requires `kafka_sasl_enabled: true`.
+
+**Adding a TLS endpoint without changing the existing one** — for example so a certificate scanner has something to inspect, while internal traffic stays as it was:
+
+```yaml
+kafka_security_enabled: true
+kafka_sasl_enabled: true
+kafka_tls_enabled: false      # the cluster default stays plaintext
+kafka_tls_mode: generate      # role creates the CA and per-host certs
+
+kafka_listeners:
+  - name: INTERNAL
+    port: 9092                # inherits sasl: true from the cluster
+  - name: COMPLIANCE
+    port: 9094
+    tls: true
+    sasl: false
+    client_auth: none         # the scanner holds no certificate of its own
+```
+
+TLS material is provisioned whenever *any* listener sets `tls: true`, so this works with `kafka_tls_enabled: false`. All listeners share the host's keystore and truststore; only `client_auth` is emitted per listener when it differs from `kafka_tls_client_auth`.
+
+Two things the role keeps consistent for you:
+
+- **Certificate SANs.** In `generate` mode the per-host certificate covers `inventory_hostname`, `localhost`, `127.0.0.1`, `kafka_node_ip` and the `advertised_host` of every listener, so a client connecting on any endpoint passes hostname verification. Add load balancer names or IPv6 literals via `kafka_tls_generate_extra_sans`.
+- **The role's own clients.** `admin.properties` and the AxonOps agent client config bootstrap against `localhost:9092`, so they follow whichever listener is bound to that port — not the cluster-wide flags.
+
+Firewall rules are opened for every declared listener port when `kafka_configure_firewall` is true.
+
+> **Breaking change**: `kafka_listeners` previously took bare strings (`"SASL_SSL://:9092"`). It now takes mappings. The role fails with a migration message if strings are found. Deployments that left it empty are unaffected — the derived output is unchanged.
 
 ### Performance
 
@@ -153,6 +207,9 @@ Security is opt-in via `kafka_security_enabled`. When `false` (default), behavio
 | `kafka_tls_pki_cert_path` / `kafka_tls_pki_key_path` / `kafka_tls_pki_ca_path` | `/opt/tls/kafka/{cert,key,ca}.pem` | Broker-host paths written by `axonops.axonops.pki_agent` |
 | `kafka_tls_generate_ca_cn` | `Kafka Dev CA` | CN of the self-signed CA in `generate` mode |
 | `kafka_tls_generate_validity_days` | `3650` | Validity of generated CA + per-host certs |
+| `kafka_tls_generate_key_type` | `RSA` | Key type for generated CA + per-host certs |
+| `kafka_tls_generate_key_size` | `2048` | Key size for generated CA + per-host certs |
+| `kafka_tls_generate_extra_sans` | `[]` | Extra SANs in OpenSSL form (`DNS:kafka.example.com`, `IP:203.0.113.10`) appended to the generated certificate |
 | `kafka_tls_generate_local_dir` | `/tmp/kafka-tls-{{ kafka_axonops_cluster_name \| default('dev') }}` | Control-node staging directory for the generated CA and per-host PEM material |
 | `kafka_tls_remote_dir` | `/etc/kafka/tls` | On-disk location of `keystore.pem` and `ca.pem` |
 
@@ -192,6 +249,8 @@ kafka_tls_ca: /home/ops/secrets/ca.crt
 ```
 
 **`generate` mode (DEV ONLY)** — role creates a self-signed CA on the control node and signs per-host certs. Requires `community.crypto` and the Python `cryptography` package on the control node. **Do not use in production.**
+
+> **Set `kafka_tls_mode` and the `kafka_tls_generate_*` variables play-wide**, not on a broker-only group. The CA is built once per play by `run_once` tasks, which Ansible executes on the first host in the play — often a controller. Those tasks read these variables from that host, so scoping them to brokers means the CA is silently built from the role defaults. The listener definitions in `kafka_listeners` are per-host and can safely be group-scoped.
 
 ```yaml
 kafka_security_enabled: true

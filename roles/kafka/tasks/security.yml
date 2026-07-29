@@ -4,12 +4,15 @@
 # ============================================================================
 # Runs only when kafka_security_enabled is true. Each sub-feature is opt-in.
 
+# kafka__tls_needed is true when kafka_tls_enabled is set OR when any entry in
+# kafka_listeners sets tls: true — one TLS listener needs the same on-disk PEM
+# material even if the other listeners stay plaintext.
 - name: Assert TLS mode is valid
   ansible.builtin.assert:
     that:
       - kafka_tls_mode in ['custom', 'pki_agent', 'generate']
     fail_msg: "kafka_tls_mode must be one of: custom, pki_agent, generate"
-  when: kafka_tls_enabled | bool
+  when: kafka__tls_needed | bool
   tags: tls
 
 - name: Assert custom-mode TLS paths are provided
@@ -22,13 +25,22 @@
       kafka_tls_mode is 'custom' but kafka_tls_cert / kafka_tls_key /
       kafka_tls_ca are not all set.
   when:
-    - kafka_tls_enabled | bool
+    - kafka__tls_needed | bool
     - kafka_tls_mode == 'custom'
+  tags: tls
+
+# Single play-wide guard with no per-host term. These tasks are run_once, so
+# any host-specific condition here would be evaluated against the first host in
+# the play and could skip the CA for everyone. kafka_tls_mode is folded into
+# kafka__tls_generate_fact in listeners.yml for exactly that reason.
+- name: Create local CA (generate mode)
+  ansible.builtin.import_tasks: tls_ca.yml
+  when: kafka__tls_generate_anywhere | bool
   tags: tls
 
 - name: Configure TLS
   ansible.builtin.import_tasks: tls.yml
-  when: kafka_tls_enabled | bool
+  when: kafka__tls_needed | bool
   tags: tls
 
 - name: Configure SASL pre-flight

@@ -1,0 +1,132 @@
+---
+# ============================================================================
+# Kafka Role - Broker listener normalisation
+# ============================================================================
+# Expands kafka_listeners into kafka__broker_listeners: one dict per broker
+# listener with every field resolved and the security protocol derived from its
+# tls/sasl flags. When kafka_listeners is empty a single listener on 9092 is
+# derived from the cluster-wide security flags, reproducing the role's
+# historical behaviour.
+#
+# Runs before firewall.yml and config.yml, which both consume the result.
+# The CONTROLLER listener is not part of this list — it is always managed by
+# the role. Controller-only nodes end up with an empty list.
+
+- name: Assert listener entries are mappings
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+    fail_msg: >-
+      kafka_listeners entries must be mappings, e.g.
+      {name: INTERNAL, port: 9092, tls: false}. The bare-string form
+      ("SASL_SSL://:9092") is no longer supported — give the listener a name,
+      a port, and tls/sasl flags instead.
+  loop: "{{ kafka_listeners }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Assert listener entries are well formed
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name is string
+      - item.name is match('^[A-Za-z0-9_]+$')
+      - item.name | upper != 'CONTROLLER'
+      - item.port is defined
+      - item.port | int > 0
+      - item.port | int != 9093
+      - item.client_auth | default('none') in ['none', 'requested', 'required']
+    fail_msg: >-
+      Invalid kafka_listeners entry {{ item | to_json }}. Required: name
+      (alphanumeric/underscore, not CONTROLLER, which the role manages itself)
+      and port (not 9093, reserved for the controller listener). Optional
+      client_auth must be none, requested or required.
+  loop: "{{ kafka_listeners }}"
+  loop_control:
+    label: "{{ item.name | default('<unnamed>') }}"
+
+- name: Assert listener names and ports are unique
+  ansible.builtin.assert:
+    that:
+      - (kafka_listeners | map(attribute='name') | map('upper') | unique | length) == (kafka_listeners | length)
+      - (kafka_listeners | map(attribute='port') | unique | length) == (kafka_listeners | length)
+    fail_msg: >-
+      kafka_listeners contains a duplicate name or port. Kafka rejects a
+      listener list with either.
+  when: kafka_listeners | length > 0
+
+- name: Assert secured listeners have security enabled
+  ansible.builtin.assert:
+    that:
+      - kafka_security_enabled | bool
+    fail_msg: >-
+      kafka_listeners sets tls or sasl on a listener but
+      kafka_security_enabled is false. TLS material and SASL credentials are
+      provisioned by the security tasks; set kafka_security_enabled: true.
+  when: >-
+    kafka_listeners | selectattr('tls', 'defined') | selectattr('tls') | list | length > 0
+    or kafka_listeners | selectattr('sasl', 'defined') | selectattr('sasl') | list | length > 0
+
+- name: Assert SASL listeners have SASL enabled
+  ansible.builtin.assert:
+    that:
+      - kafka_sasl_enabled | bool
+    fail_msg: >-
+      kafka_listeners sets sasl: true on a listener but kafka_sasl_enabled is
+      false. SASL listeners reuse the cluster's credentials, which only exist
+      when SASL is enabled cluster-wide.
+  when: kafka_listeners | selectattr('sasl', 'defined') | selectattr('sasl') | list | length > 0
+
+# Empty on controller-only nodes: kafka_listeners describes broker endpoints.
+- name: Initialise broker listener list
+  ansible.builtin.set_fact:
+    kafka__broker_listeners: []
+    kafka__listeners_input: >-
+      {{ [] if not (kafka__has_broker | bool)
+         else (kafka_listeners if kafka_listeners | length > 0
+               else [{'name': kafka__broker_protocol, 'port': 9092}]) }}
+
+# protocol is derived from tls/sasl by the same rule the role applies
+# cluster-wide (see kafka__broker_protocol in vars/main.yml).
+- name: Normalise broker listeners
+  ansible.builtin.set_fact:
+    kafka__broker_listeners: >-
+      {{ kafka__broker_listeners + [{
+           'name': item.name,
+           'port': item.port | int,
+           'tls': l_tls | bool,
+           'sasl': l_sasl | bool,
+           'protocol': 'SASL_SSL' if (l_tls | bool and l_sasl | bool)
+                       else ('SASL_PLAINTEXT' if l_sasl | bool
+                       else ('SSL' if l_tls | bool else 'PLAINTEXT')),
+           'client_auth': item.client_auth | default(kafka_tls_client_auth),
+           'advertised_host': item.advertised_host | default(kafka_node_ip),
+           'advertised_port': item.advertised_port | default(item.port) | int,
+         }] }}
+  vars:
+    l_tls: "{{ item.tls | default(kafka__tls_on) }}"
+    l_sasl: "{{ item.sasl | default(kafka__sasl_on) }}"
+  loop: "{{ kafka__listeners_input }}"
+  loop_control:
+    label: "{{ item.name }}:{{ item.port }}"
+
+# Role vars are not visible through hostvars, so publish this as a fact: the
+# run_once CA tasks need to know whether ANY host in the play needs generated
+# TLS material, not just the host run_once happens to land on. The TLS mode is
+# folded in here so the guard on those tasks has no per-host term left — it is
+# evaluated against the first host in the play, which may have a different
+# kafka_tls_mode (or the role default) than the hosts that actually need a CA.
+- name: Promote TLS material requirement to hostvars
+  ansible.builtin.set_fact:
+    kafka__tls_generate_fact: "{{ (kafka__tls_needed | bool) and kafka_tls_mode == 'generate' }}"
+
+- name: Report listeners skipped on controller-only node
+  ansible.builtin.debug:
+    msg: >-
+      kafka_listeners is set but {{ inventory_hostname }} is a controller-only
+      node — it runs the CONTROLLER listener only.
+  when:
+    - kafka_listeners | length > 0
+    - not (kafka__has_broker | bool)
+
+# code: language=ansible

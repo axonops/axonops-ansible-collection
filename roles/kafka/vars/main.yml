@@ -45,13 +45,39 @@ kafka__sasl_login_module: >-
 kafka__broker_listener_name: "{{ kafka__broker_protocol }}"
 kafka__controller_listener_name: CONTROLLER
 
-kafka__default_listeners: >-
-  {{
-    ([kafka__broker_listener_name ~ '://:9092'] if kafka__has_broker | bool else []) +
-    ([kafka__controller_listener_name ~ '://:9093'] if kafka__has_controller | bool else [])
-  }}
+# Broker listeners, normalised by tasks/listeners.yml. The fact is always set
+# there — empty on controller-only nodes.
 
-kafka__effective_listeners: "{{ (kafka_listeners | length > 0) | ternary(kafka_listeners, kafka__default_listeners) }}"
+# The listener the role's own clients bootstrap against: kafka-topics.sh,
+# kafka-acls.sh, kafka-configs.sh and the AxonOps agent all connect to
+# localhost:9092, so admin.properties and the agent client config must describe
+# whichever listener is bound there. Falls back to the first broker listener,
+# then to the controller settings on controller-only nodes.
+kafka__bootstrap_listener: >-
+  {{ ((kafka__broker_listeners | default([]) | selectattr('port', 'equalto', 9092) | list)
+      + (kafka__broker_listeners | default([]))
+      + [{'protocol': kafka__controller_protocol, 'tls': kafka__tls_on, 'sasl': kafka__sasl_on}]) | first }}
+
+# TLS material must be on disk when the controller listeners terminate TLS *or*
+# when any broker listener does — a single TLS listener is enough to need a
+# keystore, even with kafka_tls_enabled: false.
+kafka__tls_needed: >-
+  {{ kafka__sec_on and ((kafka_tls_enabled | bool)
+     or (kafka__broker_listeners | default([]) | selectattr('tls') | list | length > 0)) }}
+
+# True when ANY host in the play needs a generated CA. run_once tasks execute on
+# the first host in the play and evaluate their conditions — and read their
+# variables — against that host, which may be a controller-only node with no TLS
+# listeners and a different kafka_tls_mode. The shared CA in tls_ca.yml is
+# therefore guarded by this alone: it carries no per-host term.
+#
+# For the same reason the kafka_tls_generate_* settings are read from the first
+# host in the play. Set them play-wide (they describe one cluster-wide CA), not
+# on a broker-only group, or the CA is built from the role defaults instead.
+kafka__tls_generate_anywhere: >-
+  {{ ansible_play_hosts
+     | map('extract', hostvars, 'kafka__tls_generate_fact')
+     | map('default', false) | map('bool') | select | list | length > 0 }}
 
 # TLS material paths used by template + tasks.
 # Kafka 4.x PEM keystore loads a single file containing the cert chain followed
@@ -71,6 +97,22 @@ kafka__tls_src_ca: "{{ kafka_tls_pki_ca_path if kafka_tls_mode == 'pki_agent' el
 # Normalised key (PKCS#8) used to build the keystore. Kafka's PEM keystore
 # loader rejects PKCS#1 RSA keys, so source keys are converted in place.
 kafka__tls_normalised_key: "{{ kafka_tls_remote_dir }}/normalised.key"
+
+# SANs for the generated per-host certificate (generate mode). Every name a
+# client — or a certificate scanner — may connect to has to appear here, so the
+# advertised host of each extra listener is folded in. Entries that are all
+# digits and dots are treated as IPv4 and emitted as IP: SANs, everything else
+# as DNS:. IPv6 literals must be supplied via kafka_tls_generate_extra_sans.
+kafka__tls_san_candidates: >-
+  {{ ([inventory_hostname, 'localhost', '127.0.0.1']
+      + ([kafka_node_ip] if kafka_node_ip is defined else [])
+      + (kafka__broker_listeners | default([])
+         | map(attribute='advertised_host') | select('string') | reject('equalto', '') | list))
+     | unique | list }}
+kafka__tls_generate_sans: >-
+  {{ ((kafka__tls_san_candidates | reject('match', '^[0-9.]+$') | map('regex_replace', '^', 'DNS:') | list)
+      + (kafka__tls_san_candidates | select('match', '^[0-9.]+$') | map('regex_replace', '^', 'IP:') | list)
+      + kafka_tls_generate_extra_sans) | unique | list }}
 
 # Reload helper script used as pki_agent reload_command. Reassembles keystore on
 # cert rotation then restarts kafka.
