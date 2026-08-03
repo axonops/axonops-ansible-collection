@@ -1,13 +1,13 @@
 from .nodes import Nodes
+from ..urls import SILENCE_WINDOW_URL
 
 
 class Silence:
-    silence_window_url = "/api/v1/silenceWindow"
 
     def __init__(self, axonops, args):
         self.axonops = axonops
         self.args = args
-        self.full_url = f"{self.silence_window_url}/{self.args.org}/cassandra/{self.args.cluster}"
+        self.full_url = f"{SILENCE_WINDOW_URL}/{self.args.org}/cassandra/{self.args.cluster}"
 
         self.nodes = Nodes(axonops, args)
 
