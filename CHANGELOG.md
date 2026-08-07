@@ -42,6 +42,9 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Changed
 
+- **CLI**: `--help` now describes the tool as the "AxonOps CLI" rather than the
+  "AxonOps Adaptive Repair CLI", which no longer covered what it does.
+
 - **CLI**: the `info` command is now `health`. The connection and authentication
   summary it used to print is shown only with `-v`; the default output is the
   cluster health report.
