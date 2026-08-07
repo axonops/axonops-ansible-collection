@@ -1,0 +1,23 @@
+[project]
+name = "axonops-ansible-collection"
+version = "0.1.0"
+description = "AxonOps Ansible Collection utilities"
+readme = "README.md"
+requires-python = ">=3.13"
+
+authors = [
+  { name = "AxonOps" }
+]
+
+dependencies = [
+  "yamllint==1.35.1",
+  "ansible-lint>=6.13.1,<25.0.0",
+  "pylint>=2.16.2,<4.0.0",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
