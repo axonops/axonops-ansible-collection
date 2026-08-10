@@ -8,6 +8,29 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Added
 
+- **Configurations exporter**: new `configurations_exporter/` tool that exports the
+  AxonOps configuration of a cluster as YAML. `configurations_exporter.py` is a thin
+  front end over the new `src` package (`application.py`, `axonops.py`, `exporter.py`,
+  `urls.py`, `utils.py`). The `export` command reads alert rules, dashboards,
+  integrations, health checks, log collectors, silences, adaptive and scheduled
+  repairs, backups, commitlog archiving, and agent disconnection tolerance, and writes
+  one YAML file per section into `exports/<org>/<cluster>/<section>.yaml`;
+  `--section` restricts the export. Sections the API rejects — a cluster with no
+  commitlog archiving configured, say — are skipped and named in the summary;
+  `--fail-on-error` stops at the first one instead. A `sections` command lists what
+  can be exported. Every global option
+  (`--org`, `--cluster`, `--cluster-type`, `--token`, `--username`, `--password`,
+  `--url`) falls back to the matching `AXONOPS_*` environment variable. Only the org
+  is required: without `--cluster` the cluster list is read from `/api/v1/orgs` and
+  every cluster of the organisation is exported, each with the type the API reports
+  for it; credentials are optional too, so a self-hosted instance with authentication
+  disabled is exported without sending an `Authorization` header. Every export also
+  writes the matching CLI settings into `exports/<org>/`: a `.env.axonops` with the
+  connection variables (the token and the password are left as commented
+  placeholders — no credential is written to disk) and an `<org>.sh` replaying the
+  configuration through `axonopscli`. Sections the CLI cannot set yet are listed as a
+  TODO comment in the script.
+
 - **CLI `health` command**: reports the health of every cluster visible to the
   organisation. A new `Orgs` component queries `/api/v1/orgs` and flattens the
   returned org / type / cluster tree, mapping status `0`/`1`/`2` to
@@ -18,6 +41,9 @@ All notable changes to this collection are documented here. The format is based 
   used as a check in a script or a CI job.
 
 ### Changed
+
+- **CLI**: `--help` now describes the tool as the "AxonOps CLI" rather than the
+  "AxonOps Adaptive Repair CLI", which no longer covered what it does.
 
 - **CLI**: the `info` command is now `health`. The connection and authentication
   summary it used to print is shown only with `-v`; the default output is the

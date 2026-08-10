@@ -35,7 +35,7 @@ class Application:
 
     def run(self, argv: Sequence):
 
-        parser = argparse.ArgumentParser(description='AxonOps Adaptive Repair CLI')
+        parser = argparse.ArgumentParser(description='AxonOps CLI')
 
         parser.add_argument('--org', type=str, required=False, default=os.getenv('AXONOPS_ORG'),
                             help='Name of your organisation')
