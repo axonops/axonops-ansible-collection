@@ -6,9 +6,9 @@ An [Ansible Execution Environment](https://ansible.readthedocs.io/projects/build
 
 Published image: **`ghcr.io/axonops/axonops-ansible-ee`**
 
-## What it is, and what it is not
+## What it is
 
-The image carries `ansible-core`, this collection and its dependencies — and deliberately no entrypoint of its own. `docker run` with no command drops you at a shell; give it a command to run something:
+It is a runtime, not a task. The image carries `ansible-core`, this collection and its dependencies — no baked-in playbook, no one-shot bootstrap behaviour and deliberately no entrypoint of its own. `docker run` with no command drops you at a shell; give it a command to run something:
 
 ```bash
 docker run --rm \
@@ -118,7 +118,7 @@ Reference a specific version from a consumer (for example a Docker Compose stack
 ```yaml
 services:
   axonops-bootstrap:
-    image: ghcr.io/axonops/axonops-ansible-ee:v0.6.3
+    image: ghcr.io/axonops/axonops-ansible-ee:vX.Y.Z
     command: ["ansible-playbook", "axonops.axonops.alert_bootstrap"]
     environment:
       AXONOPS_URL: http://axon-server:8080
