@@ -1,0 +1,68 @@
+---
+# Ansible Builder definition for the AxonOps Ansible Execution Environment.
+#
+# The image bundles a pinned ansible-core, a pinned checkout of this collection
+# and every Python dependency the AxonOps modules need, so that a container
+# started from it can run any playbook of this collection without reaching
+# Galaxy or PyPI at run time.
+#
+# It is deliberately generic: it carries no entrypoint and no single playbook,
+# so one image serves every consumer. Callers pass the playbook they want as
+# the container command.
+#
+# Build locally with:
+#   ansible-builder build \
+#     --file ci/execution-environment/execution-environment.yml \
+#     --context ci/execution-environment/_context \
+#     --tag ghcr.io/axonops/axonops-ansible-ee:local
+version: 3
+
+images:
+  base_image:
+    # centos:stream9, pinned by manifest-list digest (multi-arch).
+    #
+    # stream9 ships Python 3.9 as /usr/bin/python3, which ansible-core 2.18 does
+    # not support, so python3.12 is installed below and the build is run with
+    # PYCMD=/usr/bin/python3.12.
+    #
+    # stream10 would provide Python 3.12 out of the box, but its x86_64 build
+    # requires the x86-64-v3 CPU baseline: it cannot be built under QEMU
+    # emulation on Apple Silicon, and it refuses to run on pre-Haswell x86
+    # hardware. stream9 keeps both working.
+    name: quay.io/centos/centos:stream9@sha256:04bad0b08ac68a63b1810ea78a9d2ed4fb431e11d9c4c3916418edd4932856bd
+
+dependencies:
+  ansible_core:
+    package_pip: ansible-core==2.18.4
+  ansible_runner:
+    package_pip: ansible-runner==2.4.1
+  galaxy: requirements.yml
+  python: requirements.txt
+  system: bindep.txt
+
+options:
+  package_manager_path: /usr/bin/dnf
+
+additional_build_steps:
+  # ansible-core 2.18 needs Python >= 3.11; stream9's default python3 is 3.9.
+  # Every stage inherits from base, so installing it here covers them all.
+  prepend_base:
+    - RUN $PKGMGR install -y python3.12 python3.12-pip && $PKGMGR clean all
+
+  # The galaxy stage runs before bindep processing, so git has to be installed
+  # here for the git-sourced collection in requirements.yml to resolve.
+  prepend_galaxy:
+    - RUN $PKGMGR install -y git-core && $PKGMGR clean all
+
+  append_final:
+    # No ENTRYPOINT on purpose. Playbooks shipped in the collection's
+    # playbooks/ directory are runnable by FQCN from this image, so a consumer
+    # that wants a one-shot container passes the playbook as the command
+    # (`ansible-playbook axonops.axonops.<playbook>`) rather than needing an
+    # image of its own.
+    #
+    # Fail the build rather than publish an image whose collection is missing.
+    - RUN ansible-doc -l axonops.axonops >/dev/null
+    - LABEL org.opencontainers.image.source=https://github.com/axonops/axonops-ansible-collection
+    - LABEL org.opencontainers.image.description="AxonOps Ansible Execution Environment"
+    - LABEL org.opencontainers.image.licenses=Apache-2.0

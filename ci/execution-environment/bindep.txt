@@ -1,0 +1,6 @@
+# System packages required to build and run the Execution Environment.
+git-core [platform:rpm]
+python3-devel [platform:rpm compile]
+gcc [platform:rpm compile]
+libffi-devel [platform:rpm compile]
+openssl-devel [platform:rpm compile]

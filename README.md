@@ -129,6 +129,12 @@ in the [./examples](./examples) directory. There are two sections:
 - axon-server: list here the IP address or hostname of the server where you would like to install AxonOps
 - cassandra: these are the Apache Cassandra nodes where the agent will be installed
 
+## Container image
+
+An [Ansible Execution Environment](./ci/execution-environment/README.md) bundling this collection and its
+dependencies is published to `ghcr.io/axonops/axonops-ansible-ee`. Use it to run collection playbooks
+from a container without installing Ansible or fetching anything from Galaxy at start-up.
+
 ## Examples
 
 ### axon-agent.yml

@@ -8,6 +8,18 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Added
 
+- **Ansible Execution Environment**: new `ci/execution-environment/`
+  `ansible-builder` (v3) definition producing `ghcr.io/axonops/axonops-ansible-ee`,
+  a self-contained image bundling `ansible-core` 2.18.4, this collection installed from an
+  explicit git tag, and the Python dependencies the AxonOps modules need. The base image is
+  pinned by manifest digest and nothing is downloaded from Galaxy or PyPI at container start. The
+  image carries no entrypoint: consumers pass the playbook to run as the container command, so a
+  single image serves every use of the collection from a container.
+  `.github/workflows/execution-environment.yml` builds it for `linux/amd64` and `linux/arm64`,
+  pushes a version tag plus `latest` on `v*` git tags, and builds without pushing on pull
+  requests. `ci/execution-environment/README.md` documents the reproducible local build and
+  the published tag scheme.
+
 - **Configurations exporter**: new `configurations_exporter/` tool that exports the
   AxonOps configuration of a cluster as YAML. `configurations_exporter.py` is a thin
   front end over the new `src` package (`application.py`, `axonops.py`, `exporter.py`,

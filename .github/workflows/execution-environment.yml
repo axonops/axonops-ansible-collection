@@ -1,0 +1,201 @@
+---
+name: Ansible Execution Environment
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'ci/execution-environment/**'
+      - '.github/workflows/execution-environment.yml'
+  workflow_dispatch:
+    inputs:
+      collection_ref:
+        description: 'Git tag, branch or commit of this collection to bake into the image'
+        required: true
+        type: string
+      image_tag:
+        description: 'Tag to publish under'
+        required: true
+        type: string
+      push:
+        description: 'Push the image to GHCR'
+        required: false
+        default: true
+        type: boolean
+      update_latest:
+        description: 'Also move the :latest tag to this build'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  IMAGE: ghcr.io/axonops/axonops-ansible-ee
+  EE_DIR: ci/execution-environment
+  PYCMD: /usr/bin/python3.12
+
+concurrency:
+  group: ee-build-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build and publish EE
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate the dispatched collection ref
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          COLLECTION_REF: ${{ inputs.collection_ref }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          for value in "$COLLECTION_REF" "$IMAGE_TAG"; do
+            if [[ ! "$value" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+              echo "::error::'${value}' contains characters that are not valid in a git ref or image tag"
+              exit 1
+            fi
+          done
+          # Release tags are owned by the tag-push path, which publishes only
+          # what the committed pin says. Letting a manual build claim one would
+          # put an unreproducible image behind a release tag.
+          if [[ "$IMAGE_TAG" =~ ^v[0-9] ]]; then
+            echo "::error::'${IMAGE_TAG}' looks like a release tag. Push the git tag instead, or choose another image tag."
+            exit 1
+          fi
+
+      - name: Resolve collection ref and image tags
+        id: refs
+        env:
+          INPUT_COLLECTION_REF: ${{ inputs.collection_ref }}
+          INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+          INPUT_PUSH: ${{ inputs.push }}
+          INPUT_UPDATE_LATEST: ${{ inputs.update_latest }}
+        run: |
+          case "${{ github.event_name }}" in
+            workflow_dispatch)
+              COLLECTION_REF="${INPUT_COLLECTION_REF}"
+              IMAGE_TAG="${INPUT_IMAGE_TAG}"
+              PUSH="${INPUT_PUSH}"
+              # Manual builds do not move :latest unless explicitly asked to —
+              # dispatch is how arbitrary refs get test-built.
+              UPDATE_LATEST="${INPUT_UPDATE_LATEST}"
+              ;;
+            push)
+              COLLECTION_REF="${GITHUB_REF_NAME}"
+              IMAGE_TAG="${GITHUB_REF_NAME}"
+              PUSH=true
+              UPDATE_LATEST=true
+              ;;
+            *)
+              # Pull requests validate the build only. The checkout is shallow
+              # and carries no tags, so the collection is baked in from main
+              # rather than from a release tag.
+              COLLECTION_REF=main
+              IMAGE_TAG="pr-${{ github.event.number }}"
+              PUSH=false
+              UPDATE_LATEST=false
+              ;;
+          esac
+          {
+            echo "collection_ref=${COLLECTION_REF}"
+            echo "image_tag=${IMAGE_TAG}"
+            echo "push=${PUSH}"
+            echo "update_latest=${UPDATE_LATEST}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check the EE requirements pin the tag being released
+        if: github.event_name == 'push'
+        run: |
+          # The committed pin is the reproducible record of what a release image
+          # contains: rewriting it here instead would make a local build of the
+          # same commit produce a different image. Bump it in the release commit
+          # alongside galaxy.yml.
+          PINNED=$(yq -r '.collections[] | select(.type == "git") | .version' \
+            "${EE_DIR}/requirements.yml")
+          if [[ "${PINNED}" != "${GITHUB_REF_NAME}" ]]; then
+            echo "::error::${EE_DIR}/requirements.yml pins '${PINNED}', but the tag is '${GITHUB_REF_NAME}'. Update it and re-tag."
+            exit 1
+          fi
+
+      - name: Pin the collection ref in the EE galaxy requirements
+        if: github.event_name != 'push'
+        env:
+          COLLECTION_REF: ${{ steps.refs.outputs.collection_ref }}
+        run: |
+          yq -i "(.collections[] | select(.type == \"git\") | .version) = \"${COLLECTION_REF}\"" \
+            "${EE_DIR}/requirements.yml"
+          cat "${EE_DIR}/requirements.yml"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ansible-builder
+        run: pip install 'ansible-builder==3.1.0'
+
+      - name: Generate build context
+        run: |
+          ansible-builder create \
+            --file "${EE_DIR}/execution-environment.yml" \
+            --context "${EE_DIR}/_context" \
+            --output-filename Containerfile
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the native image and verify it is self-contained
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.EE_DIR }}/_context
+          file: ${{ env.EE_DIR }}/_context/Containerfile
+          load: true
+          build-args: |
+            PYCMD=${{ env.PYCMD }}
+          tags: axonops-ansible-ee:verify
+
+      - name: Verify the collection resolves with networking disabled
+        run: |
+          docker run --rm --network none axonops-ansible-ee:verify \
+            ansible-galaxy collection list | grep -q 'axonops.axonops'
+          docker run --rm --network none axonops-ansible-ee:verify \
+            ansible --version | head -1
+
+      - name: Log in to GHCR
+        if: steps.refs.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the multi-architecture image
+        if: steps.refs.outputs.push == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.EE_DIR }}/_context
+          file: ${{ env.EE_DIR }}/_context/Containerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            PYCMD=${{ env.PYCMD }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.refs.outputs.image_tag }}
+            ${{ steps.refs.outputs.update_latest == 'true' && format('{0}:latest', env.IMAGE) || '' }}
+          provenance: false

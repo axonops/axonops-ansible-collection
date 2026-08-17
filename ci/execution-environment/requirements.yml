@@ -1,0 +1,14 @@
+---
+# Collections baked into the Execution Environment.
+#
+# axonops.axonops is installed from an explicit git tag rather than from Galaxy
+# so that the image can be built for a tag before (or without) a Galaxy release.
+#
+# This pin is the reproducible record of what a released image contains: bump it
+# in the release commit, alongside the galaxy.yml version. A `v*` tag whose
+# requirements pin does not match fails the Execution Environment build.
+# Manual `workflow_dispatch` builds override it with the ref they are given.
+collections:
+  - name: https://github.com/axonops/axonops-ansible-collection.git
+    type: git
+    version: v0.6.3
