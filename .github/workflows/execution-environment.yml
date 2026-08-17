@@ -68,6 +68,13 @@ jobs:
               exit 1
             fi
           done
+          # Release tags are owned by the tag-push path, which publishes only
+          # what the committed pin says. Letting a manual build claim one would
+          # put an unreproducible image behind a release tag.
+          if [[ "$IMAGE_TAG" =~ ^v[0-9] ]]; then
+            echo "::error::'${IMAGE_TAG}' looks like a release tag. Push the git tag instead, or choose another image tag."
+            exit 1
+          fi
 
       - name: Resolve collection ref and image tags
         id: refs
@@ -116,7 +123,8 @@ jobs:
           # contains: rewriting it here instead would make a local build of the
           # same commit produce a different image. Bump it in the release commit
           # alongside galaxy.yml.
-          PINNED=$(sed -n 's|^    version: ||p' "${EE_DIR}/requirements.yml")
+          PINNED=$(yq -r '.collections[] | select(.type == "git") | .version' \
+            "${EE_DIR}/requirements.yml")
           if [[ "${PINNED}" != "${GITHUB_REF_NAME}" ]]; then
             echo "::error::${EE_DIR}/requirements.yml pins '${PINNED}', but the tag is '${GITHUB_REF_NAME}'. Update it and re-tag."
             exit 1
@@ -124,8 +132,10 @@ jobs:
 
       - name: Pin the collection ref in the EE galaxy requirements
         if: github.event_name != 'push'
+        env:
+          COLLECTION_REF: ${{ steps.refs.outputs.collection_ref }}
         run: |
-          sed -i "s|^    version: .*|    version: ${{ steps.refs.outputs.collection_ref }}|" \
+          yq -i "(.collections[] | select(.type == \"git\") | .version) = \"${COLLECTION_REF}\"" \
             "${EE_DIR}/requirements.yml"
           cat "${EE_DIR}/requirements.yml"
 
