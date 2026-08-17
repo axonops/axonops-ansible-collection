@@ -36,8 +36,30 @@ From the root of this repository:
 ansible-builder build \
   --file ci/execution-environment/execution-environment.yml \
   --context ci/execution-environment/_context \
+  --build-arg PYCMD=/usr/bin/python3.12 \
   --tag ghcr.io/axonops/axonops-alert-bootstrap-ee:local \
   -v 3
+```
+
+`PYCMD` is required: the base image's default `python3` is 3.9, and `ansible-core` 2.18 needs 3.11 or newer, so the build runs against the `python3.12` installed into the base stage.
+
+`ansible-builder build` leaves the image in the Buildx cache. To get a runnable local image, or to build for several architectures at once, build the generated context directly:
+
+```bash
+# Load a single-architecture image into the local Docker daemon
+docker buildx build --load \
+  --build-arg PYCMD=/usr/bin/python3.12 \
+  -f ci/execution-environment/_context/Dockerfile \
+  -t ghcr.io/axonops/axonops-alert-bootstrap-ee:local \
+  ci/execution-environment/_context
+
+# Build and push both architectures
+docker buildx build --platform linux/amd64,linux/arm64 --push \
+  --provenance=false \
+  --build-arg PYCMD=/usr/bin/python3.12 \
+  -f ci/execution-environment/_context/Dockerfile \
+  -t ghcr.io/axonops/axonops-alert-bootstrap-ee:vX.Y.Z \
+  ci/execution-environment/_context
 ```
 
 The generated build context under `ci/execution-environment/_context/` is disposable and is not committed.
@@ -48,7 +70,7 @@ To build a different release of the collection, change `version:` in [`requireme
 
 | Component | Pinned to | Defined in |
 | --- | --- | --- |
-| Base image | `quay.io/centos/centos:stream9`, by manifest digest | `execution-environment.yml` |
+| Base image | `quay.io/centos/centos:stream9`, by manifest digest, plus `python3.12` | `execution-environment.yml` |
 | `ansible-core` | `2.18.4` | `execution-environment.yml` |
 | `ansible-runner` | `2.4.1` | `execution-environment.yml` |
 | `axonops.axonops` collection | An explicit git tag of this repository | `requirements.yml` |

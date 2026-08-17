@@ -108,6 +108,8 @@ jobs:
           context: ${{ env.EE_DIR }}/_context
           file: ${{ env.EE_DIR }}/_context/Containerfile
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            PYCMD=/usr/bin/python3.12
           push: ${{ steps.refs.outputs.push == 'true' }}
           tags: |
             ${{ env.IMAGE }}:${{ steps.refs.outputs.image_tag }}
