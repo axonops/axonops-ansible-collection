@@ -1,10 +1,16 @@
-<a href="https://axonops.com"><img src="https://axonops.com/wp-content/uploads/2024/05/axonops-logo.png" alt="AxonOps" height="60"></a>
+<a href="https://axonops.com"><img src="https://digitalis-marketplace-assets.s3.us-east-1.amazonaws.com/AxonopsDigitalMaster_AxonopsFullLogoBlue.jpg" alt="AxonOps" height="60"></a>
 
 # AxonOps Alert Bootstrap Execution Environment
 
 An [Ansible Execution Environment](https://ansible.readthedocs.io/projects/builder/) image that bundles the `axonops.axonops` collection and everything it needs to talk to an AxonOps server, so a container can apply AxonOps configuration without downloading anything at start-up.
 
 Published image: **`ghcr.io/axonops/axonops-alert-bootstrap-ee`**
+
+## Current status
+
+The image ships `ansible-core`, the collection and its dependencies — nothing else. It has no bootstrap playbook and no entrypoint of its own yet, so `docker run` drops you at a shell rather than applying any alert rules.
+
+The default alert-rule profile and the bootstrap playbook that consumes it land in [#130](https://github.com/axonops/axonops-ansible-collection/issues/130); `execution-environment.yml` marks the single place they plug in. Until then the image is useful as a ready-made runtime for playbooks you mount in yourself.
 
 ## Quick start
 
@@ -36,10 +42,13 @@ From the root of this repository:
 ansible-builder build \
   --file ci/execution-environment/execution-environment.yml \
   --context ci/execution-environment/_context \
+  --output-filename Containerfile \
   --build-arg PYCMD=/usr/bin/python3.12 \
   --tag ghcr.io/axonops/axonops-alert-bootstrap-ee:local \
   -v 3
 ```
+
+`--output-filename Containerfile` matches what CI generates. Without it the file is named after whichever runtime `ansible-builder` detects locally — `Dockerfile` for Docker, `Containerfile` for Podman — so pinning it keeps the local and CI builds operating on identically named files.
 
 `PYCMD` is required: the base image's default `python3` is 3.9, and `ansible-core` 2.18 needs 3.11 or newer, so the build runs against the `python3.12` installed into the base stage.
 
@@ -49,7 +58,7 @@ ansible-builder build \
 # Load a single-architecture image into the local Docker daemon
 docker buildx build --load \
   --build-arg PYCMD=/usr/bin/python3.12 \
-  -f ci/execution-environment/_context/Dockerfile \
+  -f ci/execution-environment/_context/Containerfile \
   -t ghcr.io/axonops/axonops-alert-bootstrap-ee:local \
   ci/execution-environment/_context
 
@@ -57,7 +66,7 @@ docker buildx build --load \
 docker buildx build --platform linux/amd64,linux/arm64 --push \
   --provenance=false \
   --build-arg PYCMD=/usr/bin/python3.12 \
-  -f ci/execution-environment/_context/Dockerfile \
+  -f ci/execution-environment/_context/Containerfile \
   -t ghcr.io/axonops/axonops-alert-bootstrap-ee:vX.Y.Z \
   ci/execution-environment/_context
 ```
@@ -86,10 +95,10 @@ The Python dependencies here are the runtime subset only. The repository-root `r
 | Trigger | Tags pushed |
 | --- | --- |
 | Git tag `vX.Y.Z` | `:vX.Y.Z` and `:latest`, both resolving to the same digest |
-| `workflow_dispatch` | The tag given as input, plus `:latest` |
+| `workflow_dispatch` | The tag given as input; `:latest` only if the `update_latest` input is set |
 | Pull request | Nothing — the image is built to validate the definition, then discarded |
 
-Images are built for `linux/amd64` and `linux/arm64`.
+Images are built for `linux/amd64` and `linux/arm64`. Every run — pull requests included — builds the native image first and asserts that `ansible-galaxy collection list` finds `axonops.axonops` with `--network none`, so a build that quietly stopped being self-contained fails before anything is published.
 
 Reference a specific version from a consumer (for example a Docker Compose stack in `axonops-containers`) rather than `:latest`, so that stack's behaviour does not change under it:
 
