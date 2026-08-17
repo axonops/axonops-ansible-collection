@@ -1,16 +1,20 @@
 ---
-# Ansible Builder definition for the AxonOps alert bootstrap Execution Environment.
+# Ansible Builder definition for the AxonOps Ansible Execution Environment.
 #
 # The image bundles a pinned ansible-core, a pinned checkout of this collection
 # and every Python dependency the AxonOps modules need, so that a container
-# started from it can apply alert rules without reaching Galaxy or PyPI at run
-# time.
+# started from it can run any playbook of this collection without reaching
+# Galaxy or PyPI at run time.
+#
+# It is deliberately generic: it carries no entrypoint and no single playbook,
+# so one image serves every consumer. Callers pass the playbook they want as
+# the container command.
 #
 # Build locally with:
 #   ansible-builder build \
 #     --file ci/execution-environment/execution-environment.yml \
 #     --context ci/execution-environment/_context \
-#     --tag ghcr.io/axonops/axonops-alert-bootstrap-ee:local
+#     --tag ghcr.io/axonops/axonops-ansible-ee:local
 version: 3
 
 images:
@@ -51,15 +55,14 @@ additional_build_steps:
     - RUN $PKGMGR install -y git-core && $PKGMGR clean all
 
   append_final:
-    # ISSUE #130 EXTENSION POINT
-    # The alert bootstrap playbook and its entrypoint land here, as:
-    #   - COPY _build/files/alert_bootstrap.yml /runner/project/alert_bootstrap.yml
-    #   - ENTRYPOINT ["ansible-playbook", "/runner/project/alert_bootstrap.yml"]
-    # together with an `additional_build_files` entry copying the playbook and
-    # the selected alert profile into the build context. No other part of this
-    # definition needs to change.
+    # No ENTRYPOINT on purpose. Playbooks shipped in the collection's
+    # playbooks/ directory are runnable by FQCN from this image, so a consumer
+    # that wants a one-shot container passes the playbook as the command
+    # (`ansible-playbook axonops.axonops.<playbook>`) rather than needing an
+    # image of its own.
+    #
     # Fail the build rather than publish an image whose collection is missing.
     - RUN ansible-doc -l axonops.axonops >/dev/null
     - LABEL org.opencontainers.image.source=https://github.com/axonops/axonops-ansible-collection
-    - LABEL org.opencontainers.image.description="AxonOps alert bootstrap Execution Environment"
+    - LABEL org.opencontainers.image.description="AxonOps Ansible Execution Environment"
     - LABEL org.opencontainers.image.licenses=Apache-2.0

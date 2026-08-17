@@ -1,5 +1,5 @@
 ---
-name: Alert bootstrap Execution Environment
+name: Ansible Execution Environment
 
 on:
   push:
@@ -31,7 +31,7 @@ on:
         type: boolean
 
 env:
-  IMAGE: ghcr.io/axonops/axonops-alert-bootstrap-ee
+  IMAGE: ghcr.io/axonops/axonops-ansible-ee
   EE_DIR: ci/execution-environment
   PYCMD: /usr/bin/python3.12
 
@@ -144,13 +144,13 @@ jobs:
           load: true
           build-args: |
             PYCMD=${{ env.PYCMD }}
-          tags: axonops-alert-bootstrap-ee:verify
+          tags: axonops-ansible-ee:verify
 
       - name: Verify the collection resolves with networking disabled
         run: |
-          docker run --rm --network none axonops-alert-bootstrap-ee:verify \
+          docker run --rm --network none axonops-ansible-ee:verify \
             ansible-galaxy collection list | grep -q 'axonops.axonops'
-          docker run --rm --network none axonops-alert-bootstrap-ee:verify \
+          docker run --rm --network none axonops-ansible-ee:verify \
             ansible --version | head -1
 
       - name: Log in to GHCR

@@ -132,7 +132,7 @@ in the [./examples](./examples) directory. There are two sections:
 ## Container image
 
 An [Ansible Execution Environment](./ci/execution-environment/README.md) bundling this collection and its
-dependencies is published to `ghcr.io/axonops/axonops-alert-bootstrap-ee`. Use it to run collection playbooks
+dependencies is published to `ghcr.io/axonops/axonops-ansible-ee`. Use it to run collection playbooks
 from a container without installing Ansible or fetching anything from Galaxy at start-up.
 
 ## Examples

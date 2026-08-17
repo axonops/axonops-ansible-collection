@@ -1,31 +1,38 @@
 <a href="https://axonops.com"><img src="https://digitalis-marketplace-assets.s3.us-east-1.amazonaws.com/AxonopsDigitalMaster_AxonopsFullLogoBlue.jpg" alt="AxonOps" height="60"></a>
 
-# AxonOps Alert Bootstrap Execution Environment
+# AxonOps Ansible Execution Environment
 
-An [Ansible Execution Environment](https://ansible.readthedocs.io/projects/builder/) image that bundles the `axonops.axonops` collection and everything it needs to talk to an AxonOps server, so a container can apply AxonOps configuration without downloading anything at start-up.
+An [Ansible Execution Environment](https://ansible.readthedocs.io/projects/builder/) image that bundles the `axonops.axonops` collection and everything it needs to talk to an AxonOps server, so a container can run any playbook of this collection without downloading anything at start-up.
 
-Published image: **`ghcr.io/axonops/axonops-alert-bootstrap-ee`**
+Published image: **`ghcr.io/axonops/axonops-ansible-ee`**
 
-## Current status
+## What it is, and what it is not
 
-The image ships `ansible-core`, the collection and its dependencies — nothing else. It has no bootstrap playbook and no entrypoint of its own yet, so `docker run` drops you at a shell rather than applying any alert rules.
+The image carries `ansible-core`, this collection and its dependencies — and deliberately no entrypoint of its own. `docker run` with no command drops you at a shell; give it a command to run something:
 
-The default alert-rule profile and the bootstrap playbook that consumes it land in [#130](https://github.com/axonops/axonops-ansible-collection/issues/130); `execution-environment.yml` marks the single place they plug in. Until then the image is useful as a ready-made runtime for playbooks you mount in yourself.
+```bash
+docker run --rm \
+  -e AXONOPS_URL -e AXONOPS_ORG -e AXONOPS_CLUSTER \
+  ghcr.io/axonops/axonops-ansible-ee:latest \
+  ansible-playbook /work/my-playbook.yml
+```
+
+One generic image serves every consumer. Playbooks shipped in the collection's `playbooks/` directory are runnable by FQCN (`ansible-playbook axonops.axonops.<playbook>`), so a one-shot bootstrap container is a command, not a second image.
 
 ## Quick start
 
 Pull and inspect the published image:
 
 ```bash
-docker pull ghcr.io/axonops/axonops-alert-bootstrap-ee:latest
-docker run --rm ghcr.io/axonops/axonops-alert-bootstrap-ee:latest ansible --version
-docker run --rm ghcr.io/axonops/axonops-alert-bootstrap-ee:latest ansible-galaxy collection list
+docker pull ghcr.io/axonops/axonops-ansible-ee:latest
+docker run --rm ghcr.io/axonops/axonops-ansible-ee:latest ansible --version
+docker run --rm ghcr.io/axonops/axonops-ansible-ee:latest ansible-galaxy collection list
 ```
 
 Prove the image is self-contained — this must succeed with networking disabled:
 
 ```bash
-docker run --rm --network none ghcr.io/axonops/axonops-alert-bootstrap-ee:latest \
+docker run --rm --network none ghcr.io/axonops/axonops-ansible-ee:latest \
   ansible-galaxy collection list
 ```
 
@@ -44,7 +51,7 @@ ansible-builder build \
   --context ci/execution-environment/_context \
   --output-filename Containerfile \
   --build-arg PYCMD=/usr/bin/python3.12 \
-  --tag ghcr.io/axonops/axonops-alert-bootstrap-ee:local \
+  --tag ghcr.io/axonops/axonops-ansible-ee:local \
   -v 3
 ```
 
@@ -59,7 +66,7 @@ ansible-builder build \
 docker buildx build --load \
   --build-arg PYCMD=/usr/bin/python3.12 \
   -f ci/execution-environment/_context/Containerfile \
-  -t ghcr.io/axonops/axonops-alert-bootstrap-ee:local \
+  -t ghcr.io/axonops/axonops-ansible-ee:local \
   ci/execution-environment/_context
 
 # Build and push both architectures
@@ -67,7 +74,7 @@ docker buildx build --platform linux/amd64,linux/arm64 --push \
   --provenance=false \
   --build-arg PYCMD=/usr/bin/python3.12 \
   -f ci/execution-environment/_context/Containerfile \
-  -t ghcr.io/axonops/axonops-alert-bootstrap-ee:vX.Y.Z \
+  -t ghcr.io/axonops/axonops-ansible-ee:vX.Y.Z \
   ci/execution-environment/_context
 ```
 
@@ -104,9 +111,15 @@ Reference a specific version from a consumer (for example a Docker Compose stack
 
 ```yaml
 services:
-  axonops-alert-bootstrap:
-    image: ghcr.io/axonops/axonops-alert-bootstrap-ee:v0.6.3
+  axonops-bootstrap:
+    image: ghcr.io/axonops/axonops-ansible-ee:v0.6.3
+    command: ["ansible-playbook", "axonops.axonops.alert_bootstrap"]
+    environment:
+      AXONOPS_URL: http://axon-server:8080
+      AXONOPS_ORG: example
 ```
+
+The `alert_bootstrap` playbook above is the one being added in [#130](https://github.com/axonops/axonops-ansible-collection/issues/130); it does not exist yet.
 
 ## Contact
 
