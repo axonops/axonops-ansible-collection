@@ -82,6 +82,12 @@ The generated build context under `ci/execution-environment/_context/` is dispos
 
 To build a different release of the collection, change `version:` in [`requirements.yml`](requirements.yml) to the git tag you want, or pass the tag to the `workflow_dispatch` trigger in CI.
 
+## Cutting a release
+
+`version:` in [`requirements.yml`](requirements.yml) is the reproducible record of what a released image contains, so it is bumped by hand in the release commit — the same commit that bumps `galaxy.yml`. Tagging that commit then builds an image whose contents match what a local build of the same commit produces.
+
+The build enforces it: a `v*` tag whose `requirements.yml` pin does not name that tag fails with the mismatch, rather than silently publishing an image the repository cannot reproduce. Manual `workflow_dispatch` builds are exempt — overriding the ref is what they are for.
+
 ## What is in the image
 
 | Component | Pinned to | Defined in |
