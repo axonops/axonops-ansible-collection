@@ -1,0 +1,11 @@
+---
+# Collections baked into the Execution Environment.
+#
+# axonops.axonops is installed from an explicit git tag rather than from Galaxy
+# so that the image can be built for a tag before (or without) a Galaxy release.
+# CI overwrites the `version` below with the tag being built; keep it in step
+# with galaxy.yml when editing by hand.
+collections:
+  - name: https://github.com/axonops/axonops-ansible-collection.git
+    type: git
+    version: v0.6.3

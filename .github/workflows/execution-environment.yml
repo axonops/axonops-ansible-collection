@@ -1,0 +1,115 @@
+---
+name: Alert bootstrap Execution Environment
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'ci/execution-environment/**'
+      - '.github/workflows/execution-environment.yml'
+  workflow_dispatch:
+    inputs:
+      collection_ref:
+        description: 'Git tag or commit of this collection to bake into the image'
+        required: true
+        type: string
+      image_tag:
+        description: 'Tag to publish under (in addition to latest)'
+        required: true
+        type: string
+      push:
+        description: 'Push the image to GHCR'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  IMAGE: ghcr.io/axonops/axonops-alert-bootstrap-ee
+  EE_DIR: ci/execution-environment
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build and publish EE
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve collection ref and image tags
+        id: refs
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            COLLECTION_REF='${{ inputs.collection_ref }}'
+            IMAGE_TAG='${{ inputs.image_tag }}'
+            PUSH='${{ inputs.push }}'
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            COLLECTION_REF="${GITHUB_REF_NAME}"
+            IMAGE_TAG="${GITHUB_REF_NAME}"
+            PUSH=true
+          else
+            # Pull requests validate the build only; the collection is baked in
+            # from the most recent release tag reachable from the PR head.
+            COLLECTION_REF="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo main)"
+            IMAGE_TAG="pr-${{ github.event.number }}"
+            PUSH=false
+          fi
+          echo "collection_ref=${COLLECTION_REF}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "push=${PUSH}" >> "$GITHUB_OUTPUT"
+
+      - name: Pin the collection ref in the EE galaxy requirements
+        run: |
+          sed -i "s|^    version: .*|    version: ${{ steps.refs.outputs.collection_ref }}|" \
+            "${EE_DIR}/requirements.yml"
+          cat "${EE_DIR}/requirements.yml"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ansible-builder
+        run: pip install 'ansible-builder==3.1.0'
+
+      - name: Generate build context
+        run: |
+          ansible-builder create \
+            --file "${EE_DIR}/execution-environment.yml" \
+            --context "${EE_DIR}/_context" \
+            --output-filename Containerfile
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: steps.refs.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.EE_DIR }}/_context
+          file: ${{ env.EE_DIR }}/_context/Containerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ steps.refs.outputs.push == 'true' }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.refs.outputs.image_tag }}
+            ${{ env.IMAGE }}:latest
+          provenance: false
