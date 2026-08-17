@@ -15,8 +15,10 @@ version: 3
 
 images:
   base_image:
-    # centos:stream9, pinned by manifest-list digest (multi-arch).
-    name: quay.io/centos/centos:stream9@sha256:04bad0b08ac68a63b1810ea78a9d2ed4fb431e11d9c4c3916418edd4932856bd
+    # centos:stream10, pinned by manifest-list digest (multi-arch).
+    # stream10 ships Python 3.12 as /usr/bin/python3; stream9 ships 3.9, which
+    # ansible-core 2.18 does not support.
+    name: quay.io/centos/centos:stream10@sha256:b7f85bb8be4c471bc62842156a51bbf224b15243943733bd54e86ba5fd79b1fc
 
 dependencies:
   ansible_core:
