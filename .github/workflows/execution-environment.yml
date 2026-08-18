@@ -116,22 +116,7 @@ jobs:
             echo "update_latest=${UPDATE_LATEST}"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Check the EE requirements pin the tag being released
-        if: github.event_name == 'push'
-        run: |
-          # The committed pin is the reproducible record of what a release image
-          # contains: rewriting it here instead would make a local build of the
-          # same commit produce a different image. Bump it in the release commit
-          # alongside galaxy.yml.
-          PINNED=$(yq -r '.collections[] | select(.type == "git") | .version' \
-            "${EE_DIR}/requirements.yml")
-          if [[ "${PINNED}" != "${GITHUB_REF_NAME}" ]]; then
-            echo "::error::${EE_DIR}/requirements.yml pins '${PINNED}', but the tag is '${GITHUB_REF_NAME}'. Update it and re-tag."
-            exit 1
-          fi
-
       - name: Pin the collection ref in the EE galaxy requirements
-        if: github.event_name != 'push'
         env:
           COLLECTION_REF: ${{ steps.refs.outputs.collection_ref }}
         run: |

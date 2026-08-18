@@ -13,7 +13,11 @@ All notable changes to this collection are documented here. The format is based 
   `.github/workflows/release.yml` derives the version from the `v*` tag, writes it into
   `galaxy.yml` on the default branch and pushes that bump commit, and applies the same
   version to the tree used by the package and publish jobs so the artefact uploaded to the
-  GitHub release and to Ansible Galaxy always carries the tagged version.
+  GitHub release and to Ansible Galaxy always carries the tagged version. The Execution
+  Environment release build follows the same rule: it now bakes in the collection at the tag
+  being built instead of failing when `ci/execution-environment/requirements.yml` still pinned
+  the previous release, and the release workflow commits the matching pin back to the default
+  branch alongside the `galaxy.yml` bump.
 
 ### Added
 

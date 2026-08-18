@@ -30,26 +30,30 @@ jobs:
               exit 1
           fi
 
-      - name: Bump galaxy.yml version on the default branch
+      - name: Bump the version on the default branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          EE_REQUIREMENTS=ci/execution-environment/requirements.yml
 
           git fetch origin "$DEFAULT_BRANCH"
           git checkout "$DEFAULT_BRANCH"
 
-          if grep -q "^version: ${VERSION}$" galaxy.yml; then
-            echo "galaxy.yml already at ${VERSION}, nothing to bump"
+          sed -i -E "s/^version: .*/version: ${VERSION}/" galaxy.yml
+          # Keep the Execution Environment pin in step with the release, so the
+          # committed record on the default branch names the tag just released.
+          sed -i -E "s/^( +version: )v[0-9].*/\1${GITHUB_REF_NAME}/" "$EE_REQUIREMENTS"
+
+          if git diff --quiet -- galaxy.yml "$EE_REQUIREMENTS"; then
+            echo "Already at ${VERSION}, nothing to bump"
             exit 0
           fi
 
-          sed -i -E "s/^version: .*/version: ${VERSION}/" galaxy.yml
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add galaxy.yml
+          git add galaxy.yml "$EE_REQUIREMENTS"
           git commit -m "chore(release): bump collection version to ${VERSION}"
           git push origin "HEAD:${DEFAULT_BRANCH}"
 
