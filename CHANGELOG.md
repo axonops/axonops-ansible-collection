@@ -6,6 +6,15 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Changed
+
+- **Release workflow**: tagging the repository now bumps the collection version
+  automatically instead of failing when `galaxy.yml` was not updated by hand.
+  `.github/workflows/release.yml` derives the version from the `v*` tag, writes it into
+  `galaxy.yml` on the default branch and pushes that bump commit, and applies the same
+  version to the tree used by the package and publish jobs so the artefact uploaded to the
+  GitHub release and to Ansible Galaxy always carries the tagged version.
+
 ### Added
 
 - **Ansible Execution Environment**: new `ci/execution-environment/`

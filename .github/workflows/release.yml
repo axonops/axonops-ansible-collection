@@ -13,9 +13,13 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Fail if tag is not prefixed by v
         run: |
@@ -26,15 +30,28 @@ jobs:
               exit 1
           fi
 
-      - name: Check the galaxy.yml version has been updated
+      - name: Bump galaxy.yml version on the default branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(echo $GITHUB_REF_NAME | sed 's/^v//g')
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          VERSION="${GITHUB_REF_NAME#v}"
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
 
-          if ! grep -q "version: $VERSION" galaxy.yml; then
-            echo "Please update galaxy.yml with the version $VERSION"
-            exit 1
+          git fetch origin "$DEFAULT_BRANCH"
+          git checkout "$DEFAULT_BRANCH"
+
+          if grep -q "^version: ${VERSION}$" galaxy.yml; then
+            echo "galaxy.yml already at ${VERSION}, nothing to bump"
+            exit 0
           fi
+
+          sed -i -E "s/^version: .*/version: ${VERSION}/" galaxy.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add galaxy.yml
+          git commit -m "chore(release): bump collection version to ${VERSION}"
+          git push origin "HEAD:${DEFAULT_BRANCH}"
 
       - name: Create release
         env:
@@ -58,6 +75,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+      - name: Set galaxy.yml version from tag
+        run: sed -i -E "s/^version: .*/version: ${GITHUB_REF_NAME#v}/" galaxy.yml
       - name: Install ansible
         run: sudo apt update && sudo apt-get -y install ansible
       - name: Package
@@ -78,6 +97,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+      - name: Set galaxy.yml version from tag
+        run: sed -i -E "s/^version: .*/version: ${GITHUB_REF_NAME#v}/" galaxy.yml
       - name: Install ansible
         run: sudo apt update && sudo apt-get -y install ansible
       - name: Build and publish collection
