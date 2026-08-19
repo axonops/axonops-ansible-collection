@@ -15,6 +15,12 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
+- **Execution Environment base image**: re-pinned the `centos:stream9` manifest-list digest in
+  `ci/execution-environment/execution-environment.yml` to
+  `sha256:64e5a212e4f2e7b706dbd822968914bb8def7de0a7fdfd3bf248241f8758101c`. The previous digest
+  had been pruned from quay.io, so every EE build failed with
+  `failed to resolve source metadata ... not found`.
+
 - **Collection dependencies**: `galaxy.yml` now declares the collections the roles call
   (`ansible.posix`, `community.general`, `community.crypto`, `community.docker`,
   `kubernetes.core`) as `dependencies:`, so `ansible-galaxy collection install axonops.axonops`
