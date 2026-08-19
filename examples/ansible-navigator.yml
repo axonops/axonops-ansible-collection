@@ -1,0 +1,41 @@
+---
+# ansible-navigator configuration for running these examples inside the AxonOps
+# Execution Environment, so nothing has to be installed on the control node
+# beyond ansible-navigator itself and a container runtime.
+#
+#   pip install ansible-navigator
+#   ansible-navigator run axon-agent.yml -i inventory
+#
+# Run it from this directory (ansible-navigator picks up the config file from
+# the current working directory) or point at it explicitly with
+# ANSIBLE_NAVIGATOR_CONFIG=/path/to/ansible-navigator.yml.
+ansible-navigator:
+  execution-environment:
+    enabled: true
+    # Pin a release rather than :latest so a run's behaviour does not change
+    # under you. Published tags: https://github.com/axonops/axonops-ansible-collection/pkgs/container/axonops-ansible-ee
+    image: ghcr.io/axonops/axonops-ansible-ee:v0.6.4
+    pull:
+      # Pull only when the image is not already present locally.
+      policy: missing
+    # Set to podman if that is your runtime — including when `docker` on the
+    # host is a podman shim, which navigator cannot detect on its own.
+    container-engine: docker
+    environment-variables:
+      pass:
+        # Use the control node's ssh-agent for host authentication. Navigator
+        # mounts ~/.ssh into the container itself, so do not add a volume mount
+        # for it: a duplicate destination makes the container fail to start.
+        - SSH_AUTH_SOCK
+        # Credentials for the AxonOps modules used by the configurations role.
+        - AXONOPS_TOKEN
+        - AXONOPS_ORG
+  playbook-artifact:
+    # Every run is saved and can be replayed with `ansible-navigator replay`.
+    enable: true
+    save-as: "{playbook_dir}/artifacts/{playbook_name}-{time_stamp}.json"
+  logging:
+    level: warning
+
+# Drop `mode: stdout` in here, or pass --mode stdout, for plain streaming output
+# in CI. Left unset, navigator starts its interactive TUI.

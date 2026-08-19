@@ -6,6 +6,13 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Added
+
+- **ansible-navigator example**: `examples/ansible-navigator.yml` runs the example playbooks inside
+  `ghcr.io/axonops/axonops-ansible-ee`, so a control node needs only a container runtime and
+  `ansible-navigator`. `examples/README.md` documents the interactive TUI, `--mode stdout` for CI,
+  artifact replay, and the podman and `~/.ssh` mount gotchas.
+
 ### Fixed
 
 - **Collection dependencies**: `galaxy.yml` now declares the collections the roles call

@@ -105,7 +105,8 @@ ansible-playbook -i inventory cassandra-rolling-start.yml -e "state=restarted"
 
 ## Prerequisites
 
-1. **Ansible installed** on your control machine (version 2.10+)
+1. **Ansible installed** on your control machine (version 2.10+), or a container runtime plus
+   `ansible-navigator` — see [Running from a container with ansible-navigator](#running-from-a-container-with-ansible-navigator)
 2. **SSH access** to target hosts with sudo privileges
 3. **Inventory file** defining your host groups:
    - `cassandra`: Hosts for Cassandra nodes
@@ -143,6 +144,38 @@ ansible-playbook -i inventory examples/axon-server.yml
 ```bash
 ansible-playbook -i inventory examples/cassandra-4.1.yml
 ```
+
+## Running from a container with ansible-navigator
+
+[ansible-navigator.yml](ansible-navigator.yml) runs these playbooks inside the AxonOps
+[Execution Environment](../ci/execution-environment/README.md), so the control node needs no
+Ansible install and no `ansible-galaxy` step — the collection and its dependencies are already in
+the image.
+
+```bash
+pip install ansible-navigator
+cd examples
+ansible-navigator run axon-agent.yml -i inventory
+```
+
+That starts navigator's interactive TUI: number keys drill into a play, then a task, then the task
+result; `Esc` goes back, `:q` quits, and `:doc <module>`, `:collections` and `:images` inspect the
+environment. For plain streaming output — in CI, or when piping to a log — add `--mode stdout`.
+
+Because `playbook-artifact` is enabled, each run is saved under `examples/artifacts/` and can be
+re-examined later without re-running anything:
+
+```bash
+ansible-navigator replay artifacts/axon-agent-<timestamp>.json
+```
+
+Notes:
+
+- Set `container-engine: podman` in the config if that is your runtime. This is also needed when
+  `docker` on the host is a podman shim, which navigator cannot detect for itself.
+- Navigator mounts `~/.ssh` into the container itself. Do not add your own volume mount for it —
+  the container then fails to start with `duplicate mount destination`.
+- Pin the image to a release tag rather than `:latest` so runs stay reproducible.
 
 ## Common Configuration Patterns
 

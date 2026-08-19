@@ -21,3 +21,6 @@ __pycache__/
 
 # Ansible Builder generated context
 ci/execution-environment/_context/
+
+# ansible-navigator run artifacts
+examples/artifacts/
