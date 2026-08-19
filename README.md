@@ -40,15 +40,19 @@ offering flexibility for those who prefer different automation solutions.
 >
 > 🔧 If you are **upgrading from a previous version** of this role, please **review your configuration** and explicitly set the `cassandra_install_format` to match your environment.
 
-## Role Documentation
+
+
+## Roles Documentation
 
 This collection provides the following Ansible roles. Click on each role for detailed documentation, configuration options, and examples:
+
+### AxonOps Alerts and configurations
+- **[configurations](docs/roles/configurations.md)** - Configure alerts, integrations, and monitoring settings
 
 ### AxonOps Components
 - **[agent](docs/roles/agent.md)** - Install and configure AxonOps Agent for Cassandra monitoring
 - **[server](docs/roles/server.md)** - Install and configure AxonOps Server (self-hosted deployments)
 - **[dash](docs/roles/dash.md)** - Install and configure AxonOps Dashboard web interface
-- **[configurations](docs/roles/configurations.md)** - Configure alerts, integrations, and monitoring settings
 - **[cqlai](docs/roles/cqlai.md)** - Install CQL AI, the AI-powered CQL shell for Apache Cassandra
 
 ### Kubernetes / Operator

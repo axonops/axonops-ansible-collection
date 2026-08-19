@@ -86,10 +86,12 @@ ansible-galaxy collection install $LATEST
 **Note**: the tarball will be installed into the directory configured
 in [COLLECTIONS_PATHS](https://docs.ansible.com/ansible/latest/reference_appendices/config.html#collections-paths).
 
+
 **Verify installation:**
+
 To verify the installation you can use the command:
 `ansible-galaxy collection list | grep axonops`.
----
+
 
 ### Install directly from Git
 
