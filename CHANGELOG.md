@@ -6,6 +6,19 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Collection dependencies**: `galaxy.yml` now declares the collections the roles call
+  (`ansible.posix`, `community.general`, `community.crypto`, `community.docker`,
+  `kubernetes.core`) as `dependencies:`, so `ansible-galaxy collection install axonops.axonops`
+  installs them automatically. They are also added to
+  `ci/execution-environment/requirements.yml`, fixing execution-environment runs that failed with
+  `couldn't resolve module/action 'ansible.posix.sysctl'` because the published
+  `ghcr.io/axonops/axonops-ansible-ee` image contained only `axonops.axonops`. The
+  self-containment check in `.github/workflows/execution-environment.yml` now asserts every
+  collection is present and resolvable with networking disabled, so the regression cannot ship
+  again. Fixes [#135](https://github.com/axonops/axonops-ansible-collection/issues/135).
+
 ### Changed
 
 - **Release workflow**: tagging the repository now bumps the collection version

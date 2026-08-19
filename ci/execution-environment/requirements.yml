@@ -13,3 +13,15 @@ collections:
   - name: https://github.com/axonops/axonops-ansible-collection.git
     type: git
     version: v0.6.3
+
+# The collections the roles call. These are also declared in the repository-root
+# `galaxy.yml` as dependencies of `axonops.axonops`; they are repeated here so the
+# image contents do not depend on the dependency-resolution behaviour of whichever
+# `ansible-galaxy` version `ansible-builder` happens to run.
+  - name: ansible.posix
+  - name: community.general
+  - name: community.crypto
+  - name: community.docker
+    version: ">=3.0.0"
+  - name: kubernetes.core
+    version: ">=3.0.0"
