@@ -80,7 +80,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       - name: Set galaxy.yml version from tag
-        run: sed -i -E "s/^version: .*/version: ${GITHUB_REF_NAME#v}/" galaxy.yml
+        run: |
+          sed -i -E "s/^version: .*/version: ${GITHUB_REF_NAME#v}/" galaxy.yml
       - name: Install ansible
         run: sudo apt update && sudo apt-get -y install ansible
       - name: Package
@@ -102,7 +103,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       - name: Set galaxy.yml version from tag
-        run: sed -i -E "s/^version: .*/version: ${GITHUB_REF_NAME#v}/" galaxy.yml
+        run: |
+          sed -i -E "s/^version: .*/version: ${GITHUB_REF_NAME#v}/" galaxy.yml
       - name: Install ansible
         run: sudo apt update && sudo apt-get -y install ansible
       - name: Build and publish collection

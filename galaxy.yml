@@ -12,3 +12,10 @@ tags: [observability, monitoring, cassandra, kafka, axonops, elasticsearch, open
 repository: https://github.com/axonops/axonops-ansible-collection
 issues: https://github.com/axonops/axonops-ansible-collection/issues
 documentation: https://axonops.com/docs
+
+dependencies:
+  ansible.posix: "*"
+  community.general: "*"
+  community.crypto: "*"
+  community.docker: ">=3.0.0"
+  kubernetes.core: ">=3.0.0"

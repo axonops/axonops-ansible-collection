@@ -155,10 +155,24 @@ jobs:
             PYCMD=${{ env.PYCMD }}
           tags: axonops-ansible-ee:verify
 
-      - name: Verify the collection resolves with networking disabled
+      - name: Verify the collections resolve with networking disabled
         run: |
+          # Every collection the roles call must be baked in, not just this one:
+          # a playbook using any role has to run without reaching Galaxy.
+          installed=$(docker run --rm --network none axonops-ansible-ee:verify \
+            ansible-galaxy collection list)
+          echo "$installed"
+          for collection in axonops.axonops ansible.posix community.general \
+                            community.crypto community.docker kubernetes.core; do
+            if ! grep -q "^${collection} " <<<"$installed"; then
+              echo "::error::${collection} is missing from the image"
+              exit 1
+            fi
+          done
+          # Resolving a module from a dependency proves the collection is on the
+          # search path, not merely present on disk.
           docker run --rm --network none axonops-ansible-ee:verify \
-            ansible-galaxy collection list | grep -q 'axonops.axonops'
+            ansible-doc -t module ansible.posix.sysctl >/dev/null
           docker run --rm --network none axonops-ansible-ee:verify \
             ansible --version | head -1
 

@@ -6,6 +6,32 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Added
+
+- **ansible-navigator example**: `examples/ansible-navigator.yml` runs the example playbooks inside
+  `ghcr.io/axonops/axonops-ansible-ee`, so a control node needs only a container runtime and
+  `ansible-navigator`. `examples/README.md` documents the interactive TUI, `--mode stdout` for CI,
+  artifact replay, and the podman and `~/.ssh` mount gotchas.
+
+### Fixed
+
+- **Execution Environment base image**: re-pinned the `centos:stream9` manifest-list digest in
+  `ci/execution-environment/execution-environment.yml` to
+  `sha256:64e5a212e4f2e7b706dbd822968914bb8def7de0a7fdfd3bf248241f8758101c`. The previous digest
+  had been pruned from quay.io, so every EE build failed with
+  `failed to resolve source metadata ... not found`.
+
+- **Collection dependencies**: `galaxy.yml` now declares the collections the roles call
+  (`ansible.posix`, `community.general`, `community.crypto`, `community.docker`,
+  `kubernetes.core`) as `dependencies:`, so `ansible-galaxy collection install axonops.axonops`
+  installs them automatically. They are also added to
+  `ci/execution-environment/requirements.yml`, fixing execution-environment runs that failed with
+  `couldn't resolve module/action 'ansible.posix.sysctl'` because the published
+  `ghcr.io/axonops/axonops-ansible-ee` image contained only `axonops.axonops`. The
+  self-containment check in `.github/workflows/execution-environment.yml` now asserts every
+  collection is present and resolvable with networking disabled, so the regression cannot ship
+  again. Fixes [#135](https://github.com/axonops/axonops-ansible-collection/issues/135).
+
 ### Changed
 
 - **Release workflow**: tagging the repository now bumps the collection version

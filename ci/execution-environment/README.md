@@ -96,10 +96,17 @@ An image published under a release tag therefore contains that tag of the collec
 | `ansible-core` | `2.18.4` | `execution-environment.yml` |
 | `ansible-runner` | `2.4.1` | `execution-environment.yml` |
 | `axonops.axonops` collection | An explicit git tag of this repository | `requirements.yml` |
+| Collections the roles call | `ansible.posix`, `community.general`, `community.crypto`, `community.docker`, `kubernetes.core` | `requirements.yml`, and `dependencies:` in `galaxy.yml` |
 | Python runtime dependencies | Exact versions | `requirements.txt` |
 | System packages | `git-core` plus the build toolchain | `bindep.txt` |
 
 The collection is installed from a git tag rather than from Ansible Galaxy so the image can be built for a release tag without waiting for the Galaxy publish to complete.
+
+The collections the roles call are declared twice on purpose: as `dependencies:` in the
+repository-root `galaxy.yml`, so a plain `ansible-galaxy collection install axonops.axonops`
+pulls them on any control node, and again in `requirements.yml`, so the image contents do not
+depend on the dependency-resolution behaviour of whichever `ansible-galaxy` version
+`ansible-builder` runs. Adding a collection to a role means updating both.
 
 The Python dependencies here are the runtime subset only. The repository-root `requirements.txt` also carries development tooling (`ansible-lint`, `black`, `pylint`, `yamllint`), which has no place in a runtime image.
 
