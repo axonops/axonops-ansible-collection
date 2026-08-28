@@ -144,11 +144,15 @@
       ansible.builtin.include_tasks: ../../tasks/disable-swap.yml
       vars:
         cassandra_fstab_path: "{{ verify_fstab }}"
+        # never call swapoff here: the container shares the runner's kernel
+        cassandra_swapoff_active: false
 
     - name: WHEN — the swap disabling tasks run a second time
       ansible.builtin.include_tasks: ../../tasks/disable-swap.yml
       vars:
         cassandra_fstab_path: "{{ verify_fstab }}"
+        # never call swapoff here: the container shares the runner's kernel
+        cassandra_swapoff_active: false
 
     - name: THEN — read back the resulting fstab
       ansible.builtin.slurp:

@@ -69,7 +69,9 @@ All notable changes to this collection are documented here. The format is based 
   `shenandoah` and `g1` scenarios. The host-level tuning tasks (sysctl, swap, THP) now detect
   container guests from `ansible_virtualization_tech_guest` as well as
   `ansible_virtualization_type`, so they no longer run — and tune the host kernel — inside
-  containers that report a virtualization type other than `docker`. Fixes
+  containers that report a virtualization type other than `docker`, and `swapoff -a` is
+  gated behind `cassandra_swapoff_active` so the fstab rewrite can be exercised on its own.
+  Fixes
   [#142](https://github.com/axonops/axonops-ansible-collection/issues/142).
 
 ### Added

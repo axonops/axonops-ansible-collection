@@ -43,41 +43,29 @@
     - name: THEN — Shenandoah is selected with its default adaptive heuristic
       ansible.builtin.assert:
         that:
-          - "'-XX:+UseShenandoahGC' in options"
-          - options | select('search', 'ShenandoahGCHeuristics') | list | length == 0
+          - "'-XX:+UseShenandoahGC' in ((item.content | b64decode).splitlines() | reject('match', '^\\s*#') | list)"
+          - "((item.content | b64decode).splitlines() | reject('match', '^\\s*#') | select('search', 'ShenandoahGCHeuristics') | list | length) == 0"
         fail_msg: "{{ item.item }} does not select Shenandoah with the default adaptive heuristic"
       loop: "{{ verify_jvm_options.results }}"
       loop_control:
         label: "{{ item.item }}"
-      vars:
-        options: >-
-          {{ (item.content | b64decode).splitlines()
-             | reject('match', '^\\s*#') | list }}
 
     - name: THEN — Transparent Huge Pages are not enabled in the JVM options
       ansible.builtin.assert:
         that:
-          - "'-XX:+UseTransparentHugePages' not in options"
+          - "'-XX:+UseTransparentHugePages' not in ((item.content | b64decode).splitlines() | reject('match', '^\\s*#') | list)"
         fail_msg: "{{ item.item }} still enables Transparent Huge Pages"
       loop: "{{ verify_jvm_options.results }}"
       loop_control:
         label: "{{ item.item }}"
-      vars:
-        options: >-
-          {{ (item.content | b64decode).splitlines()
-             | reject('match', '^\\s*#') | list }}
 
     - name: THEN — no fixed young generation size is emitted
       ansible.builtin.assert:
         that:
-          - options | select('match', '^-Xmn') | list | length == 0
+          - "((item.content | b64decode).splitlines() | reject('match', '^\\s*#') | select('match', '^-Xmn') | list | length) == 0"
         fail_msg: "{{ item.item }} sets a fixed young generation size"
       loop: "{{ verify_jvm_options.results }}"
       loop_control:
         label: "{{ item.item }}"
-      vars:
-        options: >-
-          {{ (item.content | b64decode).splitlines()
-             | reject('match', '^\\s*#') | list }}
 
 # code: language=ansible

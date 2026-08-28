@@ -124,6 +124,7 @@ host, so `sysctl`, `swapoff` and THP writes would tune the host instead of the g
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `cassandra_disable_swap` | `true` | Disable swap entirely: `swapoff -a` and comment out every swap entry in fstab so it is not re-enabled after reboot |
+| `cassandra_swapoff_active` | `true` | Run `swapoff -a`. Set `false` to apply only the fstab rewrite |
 | `cassandra_fstab_path` | `/etc/fstab` | fstab file rewritten when disabling swap (override only for testing) |
 | `cassandra_disable_thp` | `true` | Disable Transparent Huge Pages via the `cassandra-disable-thp.service` systemd unit (writes `never` to both `transparent_hugepage/enabled` and `transparent_hugepage/defrag` at boot) |
 | `cassandra_thp_service_manage` | `true` | Enable and start that unit (set `false` only when exercising the tasks without systemd, e.g. in molecule) |

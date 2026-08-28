@@ -42,15 +42,11 @@
     - name: THEN — G1 is selected and Transparent Huge Pages are not enabled
       ansible.builtin.assert:
         that:
-          - "'-XX:+UseG1GC' in options"
-          - "'-XX:+UseTransparentHugePages' not in options"
+          - "'-XX:+UseG1GC' in ((item.content | b64decode).splitlines() | reject('match', '^\\s*#') | list)"
+          - "'-XX:+UseTransparentHugePages' not in ((item.content | b64decode).splitlines() | reject('match', '^\\s*#') | list)"
         fail_msg: "{{ item.item }} does not render the expected G1 options"
       loop: "{{ verify_jvm_options.results }}"
       loop_control:
         label: "{{ item.item }}"
-      vars:
-        options: >-
-          {{ (item.content | b64decode).splitlines()
-             | reject('match', '^\\s*#') | list }}
 
 # code: language=ansible
