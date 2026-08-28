@@ -11,6 +11,17 @@
   when: opensearch_cluster_name is not defined or opensearch_cluster_name == 'opensearch'
   tags: always
 
+- name: Validate host architecture is supported
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture in ['x86_64', 'aarch64']
+    fail_msg: >-
+      Unsupported architecture '{{ ansible_architecture }}'. OpenSearch bundles are
+      published for x86_64 and aarch64 only. Installing a bundle built for another
+      architecture leaves an unrunnable JDK and the service fails at start with
+      'Exec format error'. Override opensearch_arch if you know a suitable bundle exists.
+  tags: always
+
 - name: Validate admin password is set when security is enabled
   ansible.builtin.assert:
     that:

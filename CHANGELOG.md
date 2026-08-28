@@ -6,6 +6,19 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Fixed
+
+- **OpenSearch on aarch64**: the `opensearch` role hardcoded the `linux-x64` tarball, so on an
+  arm64 host it installed the x86-64 bundle and the service died 70 ms after start with the
+  bundled JDK reporting `Exec format error` — masked in the journal, because
+  `install_demo_configuration.sh` discards stderr and `opensearch-tar-install.sh` prints an
+  unrelated `OPENSEARCH_INITIAL_ADMIN_PASSWORD` banner unconditionally. The download URL now uses
+  the new `opensearch_arch` variable, derived from `ansible_architecture` (`x64` / `arm64`) and
+  overridable, and the cached tarball path is arch-qualified so a stale wrong-arch download is not
+  reused. A preflight assert rejects other architectures with an actionable message instead of
+  installing an unrunnable bundle. Fixes #140. Pre-existing since the role was added in #61; not
+  a regression from the version bump above.
+
 ### Changed
 
 - **Default Apache Cassandra version bumped to 5.0.9**: `cassandra_version` (already `5.0.9` in

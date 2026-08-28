@@ -17,6 +17,7 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `opensearch_version` | `3.8.0` | OpenSearch version to install |
+| `opensearch_arch` | derived from `ansible_architecture` | Bundle architecture: `x64` on x86_64 hosts, `arm64` on aarch64. Override only to force a specific bundle. |
 | `opensearch_cluster_name` | `opensearch` | Cluster name |
 | `opensearch_cluster_type` | `multi-node` | `single-node` or `multi-node` |
 | `opensearch_install_root` | `/usr/share/opensearch` | Installation directory |
