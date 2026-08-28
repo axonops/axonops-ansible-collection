@@ -1,0 +1,18 @@
+---
+# Disable swap entirely. Cassandra must never be swapped out: a swapped-out
+# node stays in the ring but responds slowly enough to be worse than a node
+# that is down. vm.swappiness is not a substitute for disabling swap.
+
+- name: Disable all active swap devices
+  ansible.builtin.command:
+    cmd: swapoff -a
+  changed_when: true
+  when: ansible_swaptotal_mb | default(0) | int > 0
+
+- name: Comment out swap entries in fstab
+  ansible.builtin.replace:
+    path: "{{ cassandra_fstab_path }}"
+    regexp: '^(?!#)(\S+\s+\S+\s+swap\s+.*)$'
+    replace: '# \1  # swap disabled by Ansible for Cassandra'
+
+# code: language=ansible

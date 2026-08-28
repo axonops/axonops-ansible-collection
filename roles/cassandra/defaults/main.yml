@@ -384,6 +384,14 @@ cassandra_transparent_data_encryption_options:
 cassandra_jemalloc_enabled: true
 # cassandra_libjemalloc_path: ""  # auto-detected when cassandra_jemalloc_enabled is true
 
+# OS tuning
+# Disable swap entirely (swapoff + comment out swap entries in /etc/fstab).
+cassandra_disable_swap: true
+# fstab file rewritten when disabling swap (overridable for testing).
+cassandra_fstab_path: /etc/fstab
+# Disable Transparent Huge Pages at the OS level via a systemd unit.
+cassandra_disable_thp: true
+
 # JVM
 cassandra_jvm_use_shenandoah: false
 cassandra_max_queued_native_transport_requests: 1024

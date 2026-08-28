@@ -114,6 +114,33 @@ complete playbook including AxonOps agent.
 | `cassandra_compaction_throughput` | `64MiB/s` | Compaction throughput limit |
 | `cassandra_stream_throughput_outbound` | `24MiB/s` | Stream throughput limit |
 
+### Operating System Tuning
+
+Applied by the role on non-container hosts (`os-config.yml`).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_disable_swap` | `true` | Disable swap entirely: `swapoff -a` and comment out every swap entry in fstab so it is not re-enabled after reboot |
+| `cassandra_fstab_path` | `/etc/fstab` | fstab file rewritten when disabling swap (override only for testing) |
+| `cassandra_disable_thp` | `true` | Disable Transparent Huge Pages via the `cassandra-disable-thp.service` systemd unit (writes `never` to `transparent_hugepage/enabled` and `defrag` at boot) |
+
+Swap is disabled outright rather than tuned down with `vm.swappiness`. A swapped-out
+Cassandra node stays in the ring while answering too slowly to be useful, which is worse
+for the cluster than a node that is down. THP is likewise disabled entirely — the JVM
+options deliberately do **not** set `-XX:+UseTransparentHugePages`.
+
+The role also sets Cassandra's sysctl tunables in `/etc/sysctl.d/99-cassandra.conf`,
+`/etc/security/limits.d/cassandra.conf`, and disables `irqbalance`.
+
+Read-ahead is **not** configured by this role. If you tune it, note that
+`blockdev --setra` takes 512-byte sectors, so an 8 KiB read-ahead is `16` sectors.
+
+### Garbage Collector
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_jvm_use_shenandoah` | `false` | Use Shenandoah instead of G1. Shenandoah runs with its default `adaptive` heuristic; the role never sets the `compact` heuristic or a fixed young generation size (`-Xmn`) |
+
 ### CQL Behavior
 
 | Variable | Default | Description |
@@ -432,6 +459,9 @@ cassandra_jmx_access_file: "/opt/cassandra/conf/jmxremote.access"
 ## Tags
 
 - `cassandra`: Apply all Cassandra installation and configuration tasks
+- `performance`: OS tuning only (sysctl, swap, THP)
+- `swap`: Disable swap only
+- `thp`: Disable Transparent Huge Pages only
 
 ## Notes
 

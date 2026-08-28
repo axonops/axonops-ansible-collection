@@ -115,3 +115,57 @@
           cqlsh failed to launch from the venv
           (stdout={{ verify_cqlsh_version.stdout }},
            stderr={{ verify_cqlsh_version.stderr | default('') }})
+
+# BDD verification — swap is disabled persistently and idempotently
+#
+# Behaviour under test: the swap-disabling tasks MUST comment out every active
+# swap entry in fstab so swap is not re-enabled after reboot, MUST leave
+# non-swap and already-commented entries untouched, and MUST be idempotent.
+
+- name: Verify swap disabling (BDD)
+  hosts: all
+  gather_facts: false
+  vars:
+    verify_fstab: /tmp/fstab-swap-test
+  tasks:
+
+    - name: GIVEN — an fstab with an active swap entry, a commented one and a data mount
+      ansible.builtin.copy:
+        dest: "{{ verify_fstab }}"
+        mode: "0644"
+        content: |
+          UUID=1111 /            ext4 defaults 0 1
+          UUID=2222 none         swap sw       0 0
+          /dev/sdb1 none         swap sw       0 0
+          # UUID=3333 none       swap sw       0 0
+          /dev/sdc1 /var/lib/cassandra xfs defaults 0 0
+
+    - name: WHEN — the swap disabling tasks run
+      ansible.builtin.include_tasks: ../../tasks/disable-swap.yml
+      vars:
+        cassandra_fstab_path: "{{ verify_fstab }}"
+
+    - name: WHEN — the swap disabling tasks run a second time
+      ansible.builtin.include_tasks: ../../tasks/disable-swap.yml
+      vars:
+        cassandra_fstab_path: "{{ verify_fstab }}"
+
+    - name: THEN — read back the resulting fstab
+      ansible.builtin.slurp:
+        src: "{{ verify_fstab }}"
+      register: verify_fstab_content
+
+    - name: THEN — no active swap entry remains and the other entries are untouched
+      ansible.builtin.assert:
+        that:
+          - fstab_lines | reject('match', '^\\s*#') | select('search', '\\sswap\\s') | list | length == 0
+          - fstab_lines | select('search', '^# UUID=2222') | list | length == 1
+          - fstab_lines | select('search', '^# /dev/sdb1') | list | length == 1
+          - fstab_lines | select('search', '^# UUID=3333') | list | length == 1
+          - fstab_lines | select('search', '^/dev/sdc1 /var/lib/cassandra') | list | length == 1
+          - fstab_lines | select('search', '^UUID=1111 /\\s') | list | length == 1
+        fail_msg: "swap entries were not disabled correctly in fstab"
+      vars:
+        fstab_lines: "{{ (verify_fstab_content.content | b64decode).splitlines() }}"
+
+# code: language=ansible

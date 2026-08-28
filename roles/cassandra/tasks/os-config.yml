@@ -14,7 +14,6 @@
     reload: true
     sysctl_file: /etc/sysctl.d/99-cassandra.conf
   loop:
-    - {name: "vm.swappiness", value: "1"}
     - {name: "vm.overcommit_memory", value: "1"}
     - {name: "vm.max_map_count", value: "1048575"}
     - {name: "net.ipv4.tcp_keepalive_time", value: "300"}
@@ -30,6 +29,26 @@
     - sysctl
     - performance
   when: ansible_virtualization_type != "docker"
+
+- name: Disable swap
+  ansible.builtin.import_tasks: disable-swap.yml
+  when:
+    - cassandra_disable_swap | bool
+    - ansible_virtualization_type != "docker"
+  tags:
+    - cassandra
+    - performance
+    - swap
+
+- name: Disable Transparent Huge Pages
+  ansible.builtin.import_tasks: disable-thp.yml
+  when:
+    - cassandra_disable_thp | bool
+    - ansible_virtualization_type != "docker"
+  tags:
+    - cassandra
+    - performance
+    - thp
 
 - name: Setup irqbalance
   ansible.builtin.copy:

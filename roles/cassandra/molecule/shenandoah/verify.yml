@@ -1,0 +1,58 @@
+---
+# BDD verification — Shenandoah JVM options
+#
+# Behaviour under test: when cassandra_jvm_use_shenandoah is true the rendered
+# JVM options MUST select Shenandoah with its default adaptive heuristic, and
+# MUST NOT enable Transparent Huge Pages, select the compact heuristic, or fix
+# the young generation size with -Xmn.
+
+- name: Verify Shenandoah JVM options (BDD)
+  hosts: all
+  gather_facts: false
+  vars:
+    cassandra_version: 5.0.6
+    cassandra_conf_dir: /opt/apache-cassandra-5.0.6/conf
+    jvm_options_files:
+      - jvm11-server.options
+      - jvm17-server.options
+  tasks:
+
+    - name: GIVEN — the converged node rendered its JVM options with Shenandoah enabled
+      ansible.builtin.slurp:
+        src: "{{ cassandra_conf_dir }}/{{ item }}"
+      loop: "{{ jvm_options_files }}"
+      register: verify_jvm_options
+
+    - name: THEN — Shenandoah is selected with its default adaptive heuristic
+      ansible.builtin.assert:
+        that:
+          - "'-XX:+UseShenandoahGC' in options"
+          - "'ShenandoahGCHeuristics' not in options"
+        fail_msg: "{{ item.item }} does not select Shenandoah with the default adaptive heuristic"
+      loop: "{{ verify_jvm_options.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      vars:
+        options: "{{ item.content | b64decode }}"
+
+    - name: THEN — Transparent Huge Pages are not enabled in the JVM options
+      ansible.builtin.assert:
+        that:
+          - "'-XX:+UseTransparentHugePages' not in (item.content | b64decode)"
+        fail_msg: "{{ item.item }} still enables Transparent Huge Pages"
+      loop: "{{ verify_jvm_options.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: THEN — no fixed young generation size is emitted
+      ansible.builtin.assert:
+        that:
+          - active_lines | select('match', '^-Xmn') | list | length == 0
+        fail_msg: "{{ item.item }} sets a fixed young generation size"
+      loop: "{{ verify_jvm_options.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      vars:
+        active_lines: "{{ (item.content | b64decode).splitlines() | reject('match', '^\\s*#') | list }}"
+
+# code: language=ansible

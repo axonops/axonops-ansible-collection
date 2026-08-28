@@ -65,6 +65,20 @@ All notable changes to this collection are documented here. The format is based 
   `ansible-navigator`. `examples/README.md` documents the interactive TUI, `--mode stdout` for CI,
   artifact replay, and the podman and `~/.ssh` mount gotchas.
 
+### Changed
+
+- **cassandra role — OS and JVM tuning aligned with current guidance** (#142):
+  - Transparent Huge Pages are now disabled at the OS level by a
+    `cassandra-disable-thp.service` systemd unit (`cassandra_disable_thp`, default `true`),
+    and `-XX:+UseTransparentHugePages` has been removed from the 4.1.x and 5.0.x JVM
+    options templates.
+  - Swap is now disabled outright — `swapoff -a` plus commenting out swap entries in
+    fstab (`cassandra_disable_swap`, default `true`) — instead of relying on
+    `vm.swappiness=1`, which has been dropped from `/etc/sysctl.d/99-cassandra.conf`.
+  - Shenandoah keeps its default `adaptive` heuristic and emits no fixed young generation
+    size; this is now covered by a molecule `verify.yml` for the `shenandoah` and `g1`
+    scenarios.
+
 ### Fixed
 
 - **Execution Environment base image**: re-pinned the `centos:stream9` manifest-list digest in
