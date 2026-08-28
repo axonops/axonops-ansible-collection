@@ -28,13 +28,13 @@
     - cassandra
     - sysctl
     - performance
-  when: ansible_virtualization_type != "docker"
+  when: not cassandra_running_in_container | bool
 
 - name: Disable swap
   ansible.builtin.import_tasks: disable-swap.yml
   when:
     - cassandra_disable_swap | bool
-    - ansible_virtualization_type != "docker"
+    - not cassandra_running_in_container | bool
   tags:
     - cassandra
     - performance
@@ -44,7 +44,7 @@
   ansible.builtin.import_tasks: disable-thp.yml
   when:
     - cassandra_disable_thp | bool
-    - ansible_virtualization_type != "docker"
+    - not cassandra_running_in_container | bool
   tags:
     - cassandra
     - performance

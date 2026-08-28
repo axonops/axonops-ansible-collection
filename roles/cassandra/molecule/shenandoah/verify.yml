@@ -44,32 +44,40 @@
       ansible.builtin.assert:
         that:
           - "'-XX:+UseShenandoahGC' in options"
-          - "'ShenandoahGCHeuristics' not in options"
+          - options | select('search', 'ShenandoahGCHeuristics') | list | length == 0
         fail_msg: "{{ item.item }} does not select Shenandoah with the default adaptive heuristic"
       loop: "{{ verify_jvm_options.results }}"
       loop_control:
         label: "{{ item.item }}"
       vars:
-        options: "{{ item.content | b64decode }}"
+        options: >-
+          {{ (item.content | b64decode).splitlines()
+             | reject('match', '^\\s*#') | list }}
 
     - name: THEN — Transparent Huge Pages are not enabled in the JVM options
       ansible.builtin.assert:
         that:
-          - "'-XX:+UseTransparentHugePages' not in (item.content | b64decode)"
+          - "'-XX:+UseTransparentHugePages' not in options"
         fail_msg: "{{ item.item }} still enables Transparent Huge Pages"
       loop: "{{ verify_jvm_options.results }}"
       loop_control:
         label: "{{ item.item }}"
+      vars:
+        options: >-
+          {{ (item.content | b64decode).splitlines()
+             | reject('match', '^\\s*#') | list }}
 
     - name: THEN — no fixed young generation size is emitted
       ansible.builtin.assert:
         that:
-          - active_lines | select('match', '^-Xmn') | list | length == 0
+          - options | select('match', '^-Xmn') | list | length == 0
         fail_msg: "{{ item.item }} sets a fixed young generation size"
       loop: "{{ verify_jvm_options.results }}"
       loop_control:
         label: "{{ item.item }}"
       vars:
-        active_lines: "{{ (item.content | b64decode).splitlines() | reject('match', '^\\s*#') | list }}"
+        options: >-
+          {{ (item.content | b64decode).splitlines()
+             | reject('match', '^\\s*#') | list }}
 
 # code: language=ansible

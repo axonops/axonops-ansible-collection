@@ -49,6 +49,8 @@
       loop_control:
         label: "{{ item.item }}"
       vars:
-        options: "{{ item.content | b64decode }}"
+        options: >-
+          {{ (item.content | b64decode).splitlines()
+             | reject('match', '^\\s*#') | list }}
 
 # code: language=ansible

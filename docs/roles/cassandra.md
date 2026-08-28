@@ -116,7 +116,10 @@ complete playbook including AxonOps agent.
 
 ### Operating System Tuning
 
-Applied by the role on non-container hosts (`os-config.yml`).
+Applied by the role on non-container hosts (`os-config.yml`). Container guests are
+detected from `ansible_virtualization_type` / `ansible_virtualization_tech_guest` against
+`cassandra_container_virt_types` and skipped — inside a container the kernel belongs to the
+host, so `sysctl`, `swapoff` and THP writes would tune the host instead of the guest.
 
 | Variable | Default | Description |
 |----------|---------|-------------|

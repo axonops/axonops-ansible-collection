@@ -66,7 +66,10 @@ All notable changes to this collection are documented here. The format is based 
   of relying on `vm.swappiness=1`, which has been dropped from
   `/etc/sysctl.d/99-cassandra.conf`. Shenandoah keeps its default `adaptive` heuristic and emits
   no fixed young generation size, now asserted by molecule `verify.yml` playbooks for the
-  `shenandoah` and `g1` scenarios. Fixes
+  `shenandoah` and `g1` scenarios. The host-level tuning tasks (sysctl, swap, THP) now detect
+  container guests from `ansible_virtualization_tech_guest` as well as
+  `ansible_virtualization_type`, so they no longer run — and tune the host kernel — inside
+  containers that report a virtualization type other than `docker`. Fixes
   [#142](https://github.com/axonops/axonops-ansible-collection/issues/142).
 
 ### Added
