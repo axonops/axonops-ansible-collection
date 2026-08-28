@@ -6,6 +6,58 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Fixed
+
+- **`examples/self-hosted-example/` was not runnable as documented**: the playbooks referenced
+  inventory groups that were never defined, so the quick starts failed on an undefined variable,
+  and the AxonOps Server inventory was missing variables the `server` role requires. The three
+  groups are now consistently named and, being valid Python identifiers, no longer trigger
+  Ansible's `Invalid characters were found in group names` warning: `axonops_server`,
+  `axonops_searchdb`, `axonops_cassandra` (role tag names are unchanged). Also fixed:
+  - `axon_server_org_name` is now set in both server inventories — the `server` role asserts on it,
+    so step 3 of both quick starts previously aborted.
+  - The search backend connection settings, including the OpenSearch admin credentials, moved to
+    the `axonops_server` group where the `server` role actually runs; they had worked only because
+    one host was a member of both groups. The Cassandra metrics store settings
+    (`axon_server_cql_hosts` and credentials) were absent entirely and have been added.
+  - For Elasticsearch, `axon_server_searchdb_hosts` pointed at the server rather than the search
+    nodes, and the hand-maintained `es_master_nodes` list named a single master-eligible node,
+    leaving the cluster without a quorum and without `cluster.initial_master_nodes` so it never
+    bootstrapped. All three nodes are now master-eligible and hold data, with the seed and
+    bootstrap lists derived from the group.
+  - `axon-cassandra.yml` documented itself as deploying the AxonOps Agent but omitted the `agent`
+    role; it now includes it, and its host-specific variables moved to the inventory.
+  - The dashboard was left on the `axon_dash_listen_address` default of `127.0.0.1` and so was
+    unreachable; both inventories now bind it explicitly.
+  - The README documents the group contract, the required variables, the Cassandra-before-server
+    ordering, and how to reach the dashboard.
+
+- **OpenSearch on aarch64**: the `opensearch` role hardcoded the `linux-x64` tarball, so on an
+  arm64 host it installed the x86-64 bundle and the service died 70 ms after start with the
+  bundled JDK reporting `Exec format error` — masked in the journal, because
+  `install_demo_configuration.sh` discards stderr and `opensearch-tar-install.sh` prints an
+  unrelated `OPENSEARCH_INITIAL_ADMIN_PASSWORD` banner unconditionally. The download URL now uses
+  the new `opensearch_arch` variable, derived from `ansible_architecture` (`x64` / `arm64`) and
+  overridable, and the cached tarball path is arch-qualified so a stale wrong-arch download is not
+  reused. A preflight assert rejects other architectures with an actionable message instead of
+  installing an unrunnable bundle. Fixes #140. Pre-existing since the role was added in #61; not
+  a regression from the version bump above.
+
+### Changed
+
+- **Default Apache Cassandra version bumped to 5.0.9**: `cassandra_version` (already `5.0.9` in
+  `roles/cassandra/defaults/main.yml`) is now consistent everywhere — `k8ssandra_cassandra_version`
+  and `k8ssandra_image_tag` in `roles/k8ssandra/defaults/main.yml`, all `cassandra` and `k8ssandra`
+  molecule scenarios, `examples/k8ssandra.yml`, `examples/full-example/`, and the docs. The
+  `ghcr.io/axonops/k8ssandra/cassandra:5.0.9` image tag is published, so no k8ssandra pin is held back.
+
+- **Default OpenSearch version bumped to 3.8.0**: `opensearch_version` in
+  `roles/opensearch/defaults/main.yml`, both opensearch molecule scenarios,
+  `examples/opensearch.yml`, and the docs. No `opensearch.yml` config keys, security-plugin
+  settings, or `searchguard-tlstool` behaviour used by the role changed between 3.6.0 and 3.8.0,
+  so the templates are unchanged. `devcluster_opensearch_version` stays on the 2.x line (`2.19.1`)
+  by design.
+
 ### Added
 
 - **ansible-navigator example**: `examples/ansible-navigator.yml` runs the example playbooks inside

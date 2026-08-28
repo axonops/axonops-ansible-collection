@@ -22,8 +22,9 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `opensearch_version` | `3.6.0` | OpenSearch version to install |
+| `opensearch_version` | `3.8.0` | OpenSearch version to install |
 | `opensearch_download_url` | `https://artifacts.opensearch.org/releases/bundle/opensearch` | Base URL for the OpenSearch tar.gz download |
+| `opensearch_arch` | derived from `ansible_architecture` | Bundle architecture: `x64` on x86_64 hosts, `arm64` on aarch64. Override only to force a specific bundle. |
 | `opensearch_install_root` | `/usr/share/opensearch` | Directory where OpenSearch is extracted |
 | `opensearch_conf_dir` | `{{ opensearch_install_root }}/config` | Configuration directory |
 | `opensearch_user` | `opensearch` | System user that runs the OpenSearch process |
@@ -492,7 +493,7 @@ curl -k -u admin:your_password \
 
 - **`/etc/hosts` population**: When `opensearch_populate_etc_hosts` is `true`, the role writes entries for every host in the current play to `/etc/hosts`. Entries are idempotent and managed within a marked block, so re-running the role safely updates them.
 
-- **Supported architecture**: The role downloads the `linux-x64` (AMD64) tarball. ARM64 nodes are not currently supported.
+- **Supported architecture**: x86_64 and aarch64. The bundle architecture is selected automatically from `ansible_architecture` via `opensearch_arch` (`x64` / `arm64`); any other architecture is rejected by a preflight assert, since installing a bundle built for the wrong architecture leaves an unrunnable bundled JDK and the service fails at start with `Exec format error`. Note that CI exercises amd64 only.
 
 ## License
 

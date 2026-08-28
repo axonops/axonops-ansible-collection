@@ -1,9 +1,41 @@
 all:
   children:
-    axonops-server:
+    axonops_server:
       hosts:
         157.90.235.43:
-    axonops-searchdb:
+      vars:
+        # Organisation name. REQUIRED by the server role — the play fails without it.
+        # Keep this in sync with axon_agent_customer_name on the Cassandra nodes.
+        axon_server_org_name: mycompany
+
+        # Search backend connection, consumed by the server role.
+        # Use https:// and set axon_server_searchdb_tls_skip_verify: true when using
+        # the auto-generated self-signed certificates from opensearch_tls_mode: generate
+        axon_server_searchdb_hosts: "{{ groups['axonops_searchdb'] | map('regex_replace', '^(.*)$', 'https://\\1:9200') | list }}"
+        axon_server_searchdb_username: admin
+        # Must match opensearch_admin_password below.
+        # Store this in Ansible Vault in production.
+        axon_server_searchdb_password: "changeme"
+        axon_server_searchdb_tls_skip_verify: true
+
+        # Cassandra metrics store. Without it the server has nowhere to write metrics.
+        # PLACEHOLDER — replace these with every node in the axonops_cassandra group
+        # of inventories/cassandra.yml. This cannot be derived from groups[...] because
+        # the Cassandra hosts live in a separate inventory file.
+        axon_server_cql_hosts:
+          - "157.90.235.43:9042"
+          - "188.245.42.4:9042"
+          - "168.119.234.32:9042"
+        axon_server_username: cassandra
+        axon_server_password: cassandra
+        axon_server_local_dc: default
+
+        # Dashboard. The role defaults to 127.0.0.1, which is unreachable from
+        # outside the host — bind it to a routable address instead.
+        axon_dash_listen_address: 0.0.0.0
+        axon_dash_listen_port: 3000
+
+    axonops_searchdb:
       hosts:
         157.90.235.43:
         188.245.42.4:
@@ -16,15 +48,3 @@ all:
         opensearch_domain_name: example.com
         # Store the admin password in Ansible Vault in production
         opensearch_admin_password: "changeme"
-
-        # AxonOps Server search_db connection
-        # Use https:// and set axon_server_searchdb_tls_skip_verify: true when using
-        # the auto-generated self-signed certificates from opensearch_tls_mode: generate
-        axon_server_searchdb_hosts:
-          - "https://157.90.235.43:9200"
-          - "https://188.245.42.4:9200"
-          - "https://168.119.234.32:9200"
-        axon_server_searchdb_username: admin
-        # Must match opensearch_admin_password
-        axon_server_searchdb_password: "changeme"
-        axon_server_searchdb_tls_skip_verify: true

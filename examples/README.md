@@ -52,7 +52,7 @@ search backend for on-premises deployments.
 - System tuning (vm.max_map_count, THP, memory lock)
 
 **Key Variables:**
-- `opensearch_version`: OpenSearch version (default: `3.6.0`)
+- `opensearch_version`: OpenSearch version (default: `3.8.0`)
 - `opensearch_cluster_type`: `single-node` or `multi-node`
 - `opensearch_admin_password`: Admin password (use Ansible Vault)
 - `opensearch_domain_name`: Domain for certificate DNs

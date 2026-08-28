@@ -45,7 +45,7 @@ These defaults apply to all clusters unless overridden per-cluster.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `k8ssandra_cassandra_version` | `5.0.6` | Cassandra version (must be 5.x) |
+| `k8ssandra_cassandra_version` | `5.0.9` | Cassandra version (must be 5.x) |
 | `k8ssandra_image` | `ghcr.io/axonops/k8ssandra/cassandra` | AxonOps container image |
 | `k8ssandra_dc_name` | `dc1` | Default datacenter name |
 | `k8ssandra_dc_size` | `3` | Default number of nodes per datacenter |
@@ -134,7 +134,7 @@ Deploy a 3-node Cassandra 5.x cluster with AxonOps monitoring:
 
     k8ssandra_clusters:
       - name: my-cluster
-        cassandra_version: "5.0.6"
+        cassandra_version: "5.0.9"
         dc_name: dc1
         dc_size: 3
         storage_size: 10Gi
@@ -158,7 +158,7 @@ Deploy a 3-node Cassandra 5.x cluster with AxonOps monitoring:
 
     k8ssandra_clusters:
       - name: production
-        cassandra_version: "5.0.6"
+        cassandra_version: "5.0.9"
         dc_name: us-east-1
         dc_size: 6
         storage_size: 100Gi
@@ -187,7 +187,7 @@ Deploy a 3-node Cassandra 5.x cluster with AxonOps monitoring:
 
     k8ssandra_clusters:
       - name: global-cluster
-        cassandra_version: "5.0.6"
+        cassandra_version: "5.0.9"
         dc_name: us-east-1
         dc_size: 3
         storage_size: 50Gi

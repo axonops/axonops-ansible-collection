@@ -5,7 +5,7 @@
 
   # AxonOps Ansible Collection: Full Deployment Example
 
-  [![Apache Cassandra](https://img.shields.io/badge/Apache%20Cassandra-5.0.5-1287B1?style=for-the-badge&logo=apache-cassandra)](https://cassandra.apache.org/)
+  [![Apache Cassandra](https://img.shields.io/badge/Apache%20Cassandra-5.0.9-1287B1?style=for-the-badge&logo=apache-cassandra)](https://cassandra.apache.org/)
   [![Ansible](https://img.shields.io/badge/Ansible-Automation-EE0000?style=for-the-badge&logo=ansible)](https://www.ansible.com/)
   [![AxonOps](https://img.shields.io/badge/AxonOps-Monitoring-4A90E2?style=for-the-badge)](https://axonops.com/)
 </div>

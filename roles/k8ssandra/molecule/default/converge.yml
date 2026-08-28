@@ -15,7 +15,7 @@
         k8ssandra_clusters:
           - name: molecule-test
             namespace: k8ssandra-operator
-            cassandra_version: "5.0.6"
+            cassandra_version: "5.0.9"
             dc_name: dc1
             dc_size: 1
             storage_size: 1Gi

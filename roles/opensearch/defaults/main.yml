@@ -5,8 +5,12 @@
 
 # --- Version and Installation -----------------------------------------------
 
-opensearch_version: "3.6.0"
+opensearch_version: "3.8.0"
 opensearch_download_url: "https://artifacts.opensearch.org/releases/bundle/opensearch"
+
+# Architecture of the OpenSearch bundle to download. Derived from the host's
+# ansible_architecture; override only to force a specific bundle.
+opensearch_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'x64' }}"
 
 # Installation format: tar
 opensearch_install_root: /usr/share/opensearch
