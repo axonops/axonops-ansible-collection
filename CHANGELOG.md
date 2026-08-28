@@ -58,26 +58,23 @@ All notable changes to this collection are documented here. The format is based 
   so the templates are unchanged. `devcluster_opensearch_version` stays on the 2.x line (`2.19.1`)
   by design.
 
+- **cassandra role — OS and JVM tuning aligned with current guidance**: Transparent Huge Pages are
+  now disabled at the operating-system level by a `cassandra-disable-thp.service` systemd unit
+  (`cassandra_disable_thp`, default `true`), and `-XX:+UseTransparentHugePages` has been removed
+  from the 4.1.x and 5.0.x JVM options templates. Swap is now disabled outright — `swapoff -a`
+  plus commenting out swap entries in fstab (`cassandra_disable_swap`, default `true`) — instead
+  of relying on `vm.swappiness=1`, which has been dropped from
+  `/etc/sysctl.d/99-cassandra.conf`. Shenandoah keeps its default `adaptive` heuristic and emits
+  no fixed young generation size, now asserted by molecule `verify.yml` playbooks for the
+  `shenandoah` and `g1` scenarios. Fixes
+  [#142](https://github.com/axonops/axonops-ansible-collection/issues/142).
+
 ### Added
 
 - **ansible-navigator example**: `examples/ansible-navigator.yml` runs the example playbooks inside
   `ghcr.io/axonops/axonops-ansible-ee`, so a control node needs only a container runtime and
   `ansible-navigator`. `examples/README.md` documents the interactive TUI, `--mode stdout` for CI,
   artifact replay, and the podman and `~/.ssh` mount gotchas.
-
-### Changed
-
-- **cassandra role — OS and JVM tuning aligned with current guidance** (#142):
-  - Transparent Huge Pages are now disabled at the OS level by a
-    `cassandra-disable-thp.service` systemd unit (`cassandra_disable_thp`, default `true`),
-    and `-XX:+UseTransparentHugePages` has been removed from the 4.1.x and 5.0.x JVM
-    options templates.
-  - Swap is now disabled outright — `swapoff -a` plus commenting out swap entries in
-    fstab (`cassandra_disable_swap`, default `true`) — instead of relying on
-    `vm.swappiness=1`, which has been dropped from `/etc/sysctl.d/99-cassandra.conf`.
-  - Shenandoah keeps its default `adaptive` heuristic and emits no fixed young generation
-    size; this is now covered by a molecule `verify.yml` for the `shenandoah` and `g1`
-    scenarios.
 
 ### Fixed
 

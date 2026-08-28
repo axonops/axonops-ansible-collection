@@ -9,6 +9,9 @@
   changed_when: true
   when: ansible_swaptotal_mb | default(0) | int > 0
 
+# Matches the conventional '<device> <mountpoint> swap <options> <dump> <pass>'
+# layout. Entries not in that form are left alone, so an unchanged fstab is not
+# proof that the host has no swap.
 - name: Comment out swap entries in fstab
   ansible.builtin.replace:
     path: "{{ cassandra_fstab_path }}"

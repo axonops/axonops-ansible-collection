@@ -391,6 +391,8 @@ cassandra_disable_swap: true
 cassandra_fstab_path: /etc/fstab
 # Disable Transparent Huge Pages at the OS level via a systemd unit.
 cassandra_disable_thp: true
+# Enable and start the THP unit (disabled when exercising the tasks under molecule).
+cassandra_thp_service_manage: true
 
 # JVM
 cassandra_jvm_use_shenandoah: false

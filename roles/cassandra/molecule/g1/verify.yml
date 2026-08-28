@@ -9,11 +9,29 @@
   hosts: all
   gather_facts: false
   vars:
-    cassandra_conf_dir: /opt/apache-cassandra-5.0.6/conf
     jvm_options_files:
       - jvm11-server.options
       - jvm17-server.options
   tasks:
+
+    - name: GIVEN — the tar install laid down a Cassandra configuration directory
+      ansible.builtin.find:
+        paths: /opt
+        patterns: "apache-cassandra-*"
+        file_type: directory
+      register: verify_install_dir
+
+    - name: THEN — exactly one Cassandra install directory was found
+      ansible.builtin.assert:
+        that:
+          - verify_install_dir.files | length == 1
+        fail_msg: >-
+          expected exactly one apache-cassandra-* directory under /opt,
+          found {{ verify_install_dir.files | length }}
+
+    - name: GIVEN — the configuration directory is known
+      ansible.builtin.set_fact:
+        cassandra_conf_dir: "{{ verify_install_dir.files[0].path }}/conf"
 
     - name: GIVEN — the converged node rendered its JVM options with G1 enabled
       ansible.builtin.slurp:

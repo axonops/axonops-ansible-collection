@@ -169,3 +169,64 @@
         fstab_lines: "{{ (verify_fstab_content.content | b64decode).splitlines() }}"
 
 # code: language=ansible
+
+# BDD verification — Transparent Huge Pages are disabled at the OS level
+#
+# Behaviour under test: the THP tasks MUST install an executable script that
+# writes 'never' to the THP sysfs knobs, and a oneshot systemd unit that runs
+# it before Cassandra starts. The unit is not enabled here — the molecule
+# container is not a systemd host.
+
+- name: Verify Transparent Huge Pages disabling (BDD)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: WHEN — the THP disabling tasks run
+      ansible.builtin.include_tasks: ../../tasks/disable-thp.yml
+      vars:
+        cassandra_thp_service_manage: false
+
+    - name: THEN — collect the installed script and unit
+      ansible.builtin.stat:
+        path: /usr/local/sbin/cassandra-disable-thp.sh
+      register: verify_thp_script
+
+    - name: THEN — the script is installed and executable
+      ansible.builtin.assert:
+        that:
+          - verify_thp_script.stat.exists
+          - verify_thp_script.stat.mode == '0755'
+        fail_msg: the THP disabling script was not installed
+
+    - name: THEN — read the script and the unit
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      loop:
+        - /usr/local/sbin/cassandra-disable-thp.sh
+        - /etc/systemd/system/cassandra-disable-thp.service
+      register: verify_thp_files
+
+    - name: THEN — the script disables THP on both sysfs paths
+      ansible.builtin.assert:
+        that:
+          - "'/sys/kernel/mm/transparent_hugepage/enabled' in script"
+          - "'/sys/kernel/mm/transparent_hugepage/defrag' in script"
+          - "'echo never' in script"
+        fail_msg: the THP disabling script does not turn THP off
+      vars:
+        script: "{{ verify_thp_files.results[0].content | b64decode }}"
+
+    - name: THEN — the unit is a oneshot ordered before Cassandra
+      ansible.builtin.assert:
+        that:
+          - "'Type=oneshot' in unit"
+          - "'RemainAfterExit=yes' in unit"
+          - "'Before=cassandra.service' in unit"
+          - "'ExecStart=/usr/local/sbin/cassandra-disable-thp.sh' in unit"
+          - "'WantedBy=basic.target' in unit"
+        fail_msg: the THP systemd unit is not ordered before Cassandra
+      vars:
+        unit: "{{ verify_thp_files.results[1].content | b64decode }}"
+
+# code: language=ansible

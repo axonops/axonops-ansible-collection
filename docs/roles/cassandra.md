@@ -122,7 +122,8 @@ Applied by the role on non-container hosts (`os-config.yml`).
 |----------|---------|-------------|
 | `cassandra_disable_swap` | `true` | Disable swap entirely: `swapoff -a` and comment out every swap entry in fstab so it is not re-enabled after reboot |
 | `cassandra_fstab_path` | `/etc/fstab` | fstab file rewritten when disabling swap (override only for testing) |
-| `cassandra_disable_thp` | `true` | Disable Transparent Huge Pages via the `cassandra-disable-thp.service` systemd unit (writes `never` to `transparent_hugepage/enabled` and `defrag` at boot) |
+| `cassandra_disable_thp` | `true` | Disable Transparent Huge Pages via the `cassandra-disable-thp.service` systemd unit (writes `never` to both `transparent_hugepage/enabled` and `transparent_hugepage/defrag` at boot) |
+| `cassandra_thp_service_manage` | `true` | Enable and start that unit (set `false` only when exercising the tasks without systemd, e.g. in molecule) |
 
 Swap is disabled outright rather than tuned down with `vm.swappiness`. A swapped-out
 Cassandra node stays in the ring while answering too slowly to be useful, which is worse

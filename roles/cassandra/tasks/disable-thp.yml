@@ -42,11 +42,13 @@
       [Install]
       WantedBy=basic.target
 
+# Skipped when the tasks are exercised outside a systemd host (molecule).
 - name: Enable and start the THP disabling unit
   ansible.builtin.systemd:
     name: cassandra-disable-thp.service
     daemon_reload: true
     enabled: true
     state: started
+  when: cassandra_thp_service_manage | bool
 
 # code: language=ansible
