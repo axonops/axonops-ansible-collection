@@ -1,5 +1,5 @@
 - name: Installs and configures the Search backend for AxonOps Server
-  hosts: axonops-searchdb
+  hosts: axonops_searchdb
   become: true
 
   pre_tasks:

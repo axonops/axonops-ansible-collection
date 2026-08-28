@@ -1,5 +1,5 @@
 - name: Deploy AxonOps Server
-  hosts: axonops-server
+  hosts: axonops_server
   become: true
 
   pre_tasks:

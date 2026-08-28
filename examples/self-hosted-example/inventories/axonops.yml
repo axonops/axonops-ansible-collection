@@ -1,62 +1,54 @@
 all:
   children:
-    axonops-server:
+    axonops_server:
       hosts:
         157.90.235.43:
-    axonops-searchdb:
-      hosts:
-        157.90.235.43:
-          es_config:
-            cluster.name: "test-axonops-cluster"
-            discovery.seed_hosts: "{{ es_master_nodes }}"
-            http.host: "{{ ansible_default_ipv4.address }}"
-            http.port: 9200
-            node.data: false
-            node.master: true
-            transport.host: "{{ ansible_default_ipv4.address}}"
-            transport.port: 9300
-            bootstrap.memory_lock: false
-        188.245.42.4:
-          es_config:
-            node.name: "{{ inventory_hostname }}"
-            cluster.name: "test-axonops-cluster"
-            discovery.seed_hosts: "{{ es_master_nodes }}"
-            http.host: "{{ ansible_default_ipv4.address }}"
-            http.port: 9200
-            transport.host: "{{ ansible_default_ipv4.address}}"
-            transport.port: 9300
-            node.data: true
-            node.master: false
-            bootstrap.memory_lock: true
-        168.119.234.32:
-          es_config:
-            node.name: "{{ inventory_hostname }}"
-            cluster.name: "test-axonops-cluster"
-            discovery.seed_hosts: "{{ es_master_nodes }}"
-            http.port: 9200
-            transport.host: "{{ ansible_default_ipv4.address}}"
-            transport.port: 9300
-            node.data: true
-            node.master: false
       vars:
-        # AxonOps Server
+        # Organisation name. REQUIRED by the server role — the play fails without it.
+        # Keep this in sync with axon_agent_customer_name on the Cassandra nodes.
+        axon_server_org_name: mycompany
+
+        # Search backend connection, consumed by the server role.
         # axon_server_searchdb_hosts accepts a list of URLs (server >= 2.0.4 syntax)
-        axon_server_searchdb_hosts: "{{ groups['axonops-server'] | map('regex_replace', '^(.*)$', 'http://\\1:9200') | list }}"
+        axon_server_searchdb_hosts: "{{ groups['axonops_searchdb'] | map('regex_replace', '^(.*)$', 'http://\\1:9200') | list }}"
+        # This example runs Elasticsearch without authentication. If X-Pack security
+        # is enabled on your cluster, set both of these (use Ansible Vault):
+        # axon_server_searchdb_username: elastic
+        # axon_server_searchdb_password: "changeme"
 
+        # Cassandra metrics store. Point this at your Cassandra nodes — without it
+        # the server has nowhere to write metrics.
+        axon_server_cql_hosts:
+          - "157.90.235.43:9042"
+        axon_server_username: cassandra
+        axon_server_password: cassandra
+        axon_server_local_dc: default
 
-        # AxonOps Search DB
+        # Dashboard. The role defaults to 127.0.0.1, which is unreachable from
+        # outside the host — bind it to a routable address instead.
+        axon_dash_listen_address: 0.0.0.0
+        axon_dash_listen_port: 3000
+
+    axonops_searchdb:
+      hosts:
+        157.90.235.43:
+        188.245.42.4:
+        168.119.234.32:
+      vars:
         es_heap_size: "1g"
-        es_master_nodes: ["157.90.235.43:9300"]
-
-        cassandra_cluster_name: axonops
-        cassandra_dc: default
-        cassandra_rack: rack1
-        axon_java_agent: "axon-cassandra5.0-agent-jdk17"
-        axon_agent_server_host: localhost
-        axon_agent_tls_mode: "disabled"
-        axon_agent_customer_name: "mycompany"
-        cassandra_start_on_boot: true
-        # This example auto-discover the IP address, in production you might want to set this to a static IP
-        cassandra_listen_address: "{{ ansible_default_ipv4.address }}"
-        cassandra_rpc_address: "{{ ansible_default_ipv4.address }}"
-        cassandra_seeds: "{{ groups['axonops-cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | first }}"
+        # All three nodes are master-eligible and hold data, so the cluster keeps a
+        # quorum (2 of 3) if one node is lost. Seed and bootstrap lists are derived
+        # from the group so they cannot drift out of sync with the host list.
+        es_config:
+          cluster.name: "test-axonops-cluster"
+          node.name: "{{ inventory_hostname }}"
+          discovery.seed_hosts: "{{ groups['axonops_searchdb'] | map('regex_replace', '^(.*)$', '\\1:9300') | list }}"
+          # Only used the first time the cluster starts; safe to remove afterwards.
+          cluster.initial_master_nodes: "{{ groups['axonops_searchdb'] }}"
+          http.host: "{{ ansible_default_ipv4.address }}"
+          http.port: 9200
+          transport.host: "{{ ansible_default_ipv4.address }}"
+          transport.port: 9300
+          node.master: true
+          node.data: true
+          bootstrap.memory_lock: false
