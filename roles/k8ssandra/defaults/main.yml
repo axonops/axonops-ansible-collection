@@ -33,7 +33,7 @@ k8ssandra_operator_wait_timeout: 300
 #   k8ssandra_clusters:
 #     - name: my-cluster
 #       namespace: k8ssandra-operator
-#       cassandra_version: "5.0.6"
+#       cassandra_version: "5.0.9"
 #       dc_name: dc1
 #       dc_size: 3
 #       storage_size: 10Gi
@@ -52,12 +52,12 @@ k8ssandra_clusters: []
 # --- Cluster Defaults (applied when not set per-cluster) --------------------
 
 # Cassandra version - only 5.x is supported
-k8ssandra_cassandra_version: "5.0.6"
+k8ssandra_cassandra_version: "5.0.9"
 
 # AxonOps container image
 k8ssandra_image: "ghcr.io/axonops/k8ssandra/cassandra"
 # Image tag defaults to the cassandra_version if not set per-cluster
-k8ssandra_image_tag: "5.0.6"
+k8ssandra_image_tag: "5.0.9"
 
 # Datacenter defaults
 k8ssandra_dc_name: dc1

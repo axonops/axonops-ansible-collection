@@ -59,7 +59,7 @@ complete playbook including AxonOps agent.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `cassandra_version` | `5.0.5` | Version of Cassandra to install |
+| `cassandra_version` | `5.0.9` | Version of Cassandra to install |
 | `cassandra_cluster_name` | `default` | Name of the Cassandra cluster |
 | `cassandra_dc` | `default` | Datacenter name |
 | `cassandra_rack` | `rack1` | Rack name |
@@ -220,7 +220,7 @@ Store the resulting PEM content in Ansible Vault.
   hosts: cassandra
   become: true
   vars:
-    cassandra_version: 5.0.5
+    cassandra_version: 5.0.9
     cassandra_cluster_name: test-cluster
     cassandra_dc: DC1
 
@@ -342,7 +342,7 @@ Store the resulting PEM content in Ansible Vault.
   become: true
   vars:
     # Cluster Configuration
-    cassandra_version: 5.0.5
+    cassandra_version: 5.0.9
     cassandra_cluster_name: production
     cassandra_dc: DC1
     cassandra_rack: "{{ ansible_hostname | regex_replace('^.*rack([0-9]+).*$', 'rack\\1') }}"

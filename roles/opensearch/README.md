@@ -22,7 +22,7 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `opensearch_version` | `3.6.0` | OpenSearch version to install |
+| `opensearch_version` | `3.8.0` | OpenSearch version to install |
 | `opensearch_download_url` | `https://artifacts.opensearch.org/releases/bundle/opensearch` | Base URL for the OpenSearch tar.gz download |
 | `opensearch_install_root` | `/usr/share/opensearch` | Directory where OpenSearch is extracted |
 | `opensearch_conf_dir` | `{{ opensearch_install_root }}/config` | Configuration directory |

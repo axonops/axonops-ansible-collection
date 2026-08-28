@@ -2,7 +2,7 @@
 - name: Converge — cassandra role with TLS disabled (default cassandra_use_password_files)
   hosts: all
   vars:
-    cassandra_version: "5.0.7"
+    cassandra_version: "5.0.9"
     cassandra_start_on_install: false
     cassandra_install_format: tar
     cassandra_cluster_name: jks-tls-disabled-test

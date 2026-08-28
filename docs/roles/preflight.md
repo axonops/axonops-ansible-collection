@@ -101,7 +101,7 @@ None
   hosts: cassandra
   become: true
   vars:
-    cassandra_version: 5.0.5
+    cassandra_version: 5.0.9
     cassandra_cluster_name: production
     java_pkg: java-17-openjdk-headless
 
@@ -131,7 +131,7 @@ None
     preflight_check_swap: true
 
     # Cassandra configuration
-    cassandra_version: 5.0.5
+    cassandra_version: 5.0.9
     cassandra_cluster_name: production
     cassandra_dc: DC1
     java_pkg: java-17-openjdk-headless

@@ -26,7 +26,7 @@
     k8ssandra_clusters:
       - name: axonops-k8ssandra-5
         namespace: k8ssandra-operator
-        cassandra_version: "5.0.6"
+        cassandra_version: "5.0.9"
         dc_name: dc1
         dc_size: 3
         storage_size: 10Gi

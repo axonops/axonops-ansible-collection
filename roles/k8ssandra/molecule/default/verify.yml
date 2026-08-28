@@ -58,8 +58,8 @@
     - name: Verify cluster spec values
       ansible.builtin.assert:
         that:
-          - _cluster_cr.resources[0].spec.cassandra.serverVersion == "5.0.6"
-          - _cluster_cr.resources[0].spec.cassandra.serverImage == "ghcr.io/axonops/k8ssandra/cassandra:5.0.6"
+          - _cluster_cr.resources[0].spec.cassandra.serverVersion == "5.0.9"
+          - _cluster_cr.resources[0].spec.cassandra.serverImage == "ghcr.io/axonops/k8ssandra/cassandra:5.0.9"
           - _cluster_cr.resources[0].spec.cassandra.datacenters | length == 1
           - _cluster_cr.resources[0].spec.cassandra.datacenters[0].metadata.name == "dc1"
           - _cluster_cr.resources[0].spec.cassandra.datacenters[0].size == 1

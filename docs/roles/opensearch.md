@@ -16,7 +16,7 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `opensearch_version` | `3.6.0` | OpenSearch version to install |
+| `opensearch_version` | `3.8.0` | OpenSearch version to install |
 | `opensearch_cluster_name` | `opensearch` | Cluster name |
 | `opensearch_cluster_type` | `multi-node` | `single-node` or `multi-node` |
 | `opensearch_install_root` | `/usr/share/opensearch` | Installation directory |
@@ -98,7 +98,7 @@ All paths are on the **control node** and will be copied to each OpenSearch node
   become: true
 
   vars:
-    opensearch_version: "3.6.0"
+    opensearch_version: "3.8.0"
     opensearch_cluster_name: axonops-dev
     opensearch_cluster_type: single-node
     opensearch_heap_size: "1g"
@@ -117,7 +117,7 @@ All paths are on the **control node** and will be copied to each OpenSearch node
   become: true
 
   vars:
-    opensearch_version: "3.6.0"
+    opensearch_version: "3.8.0"
     opensearch_cluster_name: axonops-production
     opensearch_cluster_type: multi-node
     opensearch_heap_size: "4g"

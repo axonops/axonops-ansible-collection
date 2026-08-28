@@ -6,6 +6,21 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Changed
+
+- **Default Apache Cassandra version bumped to 5.0.9**: `cassandra_version` (already `5.0.9` in
+  `roles/cassandra/defaults/main.yml`) is now consistent everywhere — `k8ssandra_cassandra_version`
+  and `k8ssandra_image_tag` in `roles/k8ssandra/defaults/main.yml`, all `cassandra` and `k8ssandra`
+  molecule scenarios, `examples/k8ssandra.yml`, `examples/full-example/`, and the docs. The
+  `ghcr.io/axonops/k8ssandra/cassandra:5.0.9` image tag is published, so no k8ssandra pin is held back.
+
+- **Default OpenSearch version bumped to 3.8.0**: `opensearch_version` in
+  `roles/opensearch/defaults/main.yml`, both opensearch molecule scenarios,
+  `examples/opensearch.yml`, and the docs. No `opensearch.yml` config keys, security-plugin
+  settings, or `searchguard-tlstool` behaviour used by the role changed between 3.6.0 and 3.8.0,
+  so the templates are unchanged. `devcluster_opensearch_version` stays on the 2.x line (`2.19.1`)
+  by design.
+
 ### Added
 
 - **ansible-navigator example**: `examples/ansible-navigator.yml` runs the example playbooks inside
