@@ -48,8 +48,17 @@
     interval: "{{ tcpcheck_item.interval }}"
     timeout: "{{ tcpcheck_item.timeout }}"
     tcp: "{{ tcpcheck_item.tcp }}"
+    base_url: "{{ base_url | default(omit) }}"
+    auth_token: "{{ tcpcheck_item.auth_token | default(auth_token | default(omit)) }}"
+    api_token: "{{ tcpcheck_item.api_token | default(api_token | default(omit)) }}"
+    username: "{{ tcpcheck_item.username | default(username | default(omit)) }}"
+    password: "{{ tcpcheck_item.password | default(password | default(omit)) }}"
+    override_saas: "{{ override_saas | default(omit) }}"
+    use_saml: "{{ use_saml | default(omit) }}"
+    validate_certs: "{{ validate_certs | default(omit) }}"
   with_items:
     "{{ axonops_tcp_check }}"
+  no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
   loop_control:
     loop_var: tcpcheck_item
   tags:
@@ -69,9 +78,14 @@
     timeout: "{{ shellcheck_item.timeout }}"
     shell: "{{ shellcheck_item.shell | default('/bin/bash') }}"
     script: "{{ shellcheck_item.script }}"
-    auth_token: "{{ shellcheck_item.auth_token | default(auth_token | default(lookup('env', 'AXONOPS_TOKEN'))) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
-    username: "{{ shellcheck_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
-    password: "{{ shellcheck_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+    base_url: "{{ base_url | default(omit) }}"
+    auth_token: "{{ shellcheck_item.auth_token | default(auth_token | default(omit)) }}"
+    api_token: "{{ shellcheck_item.api_token | default(api_token | default(omit)) }}"
+    username: "{{ shellcheck_item.username | default(username | default(omit)) }}"
+    password: "{{ shellcheck_item.password | default(password | default(omit)) }}"
+    override_saas: "{{ override_saas | default(omit) }}"
+    use_saml: "{{ use_saml | default(omit) }}"
+    validate_certs: "{{ validate_certs | default(omit) }}"
   with_items:
     "{{ axonops_shell_check }}"
   no_log: "{{ false if enable_logging is defined and enable_logging else true }}"

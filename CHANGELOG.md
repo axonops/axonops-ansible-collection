@@ -83,6 +83,31 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
+- **`configurations` role: credentials, `cluster_type`, and DSE support**: task files for
+  `alert_routes`, `adaptive_repair`, `dashboards`, `log_alerts`, `backups`, `metrics_alerts`,
+  `slack_integration`, `human_readableid`, `logcollector`, `pagerduty_integration`,
+  `teams_integration`, `agent_disconnection_tolerance`, `commitlogs_archive`, `service_checks`, and
+  `info` no longer duplicate a partial, buggy `lookup('env', 'AXONOPS_TOKEN')` /
+  `lookup('env', 'AXONOPS_API_TOKEN')` chain for `auth_token` (the second fallback incorrectly
+  reused the `api_token` env var). They now pass `base_url`, `auth_token`, `api_token`, `username`,
+  `password`, `override_saas`, `use_saml`, and `validate_certs` straight through with
+  `default(omit)`, trusting the shared `env_fallback` already declared once in
+  `plugins/module_utils/axonops_utils.py`, while still allowing a per-item override (e.g.
+  `adaptive_repair.auth_token`) to take precedence over a role-level variable, which takes
+  precedence over the environment variable.
+  Seven of those files (`adaptive_repair`, `agent_disconnection_tolerance`, `human_readableid`,
+  `logcollector`, `pagerduty_integration`, `slack_integration`, `teams_integration`) were also never
+  passing `cluster_type` to their module call at all, silently defaulting to `cassandra` regardless
+  of the role's actual `cluster_type` — this broke every one of these features against a Kafka or
+  DSE cluster. All are fixed to forward `cluster_type` the same way the other task files already
+  did.
+  `roles/configurations/tasks/main.yml` now lowercases `cluster_type` unconditionally (AxonOps
+  registers cluster types in lowercase, e.g. `dse`, not `DSE`), and the `cassandra`-only `when:`
+  gates on `adaptive_repair`, `commitlogs_archive`, and `human_readableid` now also match `dse`,
+  since DSE is Cassandra-based and was being incorrectly excluded.
+  `docs/roles/configurations.md` documents the full variable resolution order (per-item → role
+  variable → environment variable → module default) and the lowercase `cluster_type` requirement.
+
 - **Execution Environment base image**: re-pinned the `centos:stream9` manifest-list digest in
   `ci/execution-environment/execution-environment.yml` to
   `sha256:64e5a212e4f2e7b706dbd822968914bb8def7de0a7fdfd3bf248241f8758101c`. The previous digest

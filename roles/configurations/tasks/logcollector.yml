@@ -23,6 +23,7 @@
   axonops.axonops.logcollector:
     org: "{{ org }}"
     cluster: "{{ cluster }}"
+    cluster_type: "{{ logcollector_item.cluster_type | default(cluster_type | default(omit)) }}"
     name: "{{ logcollector_item.name }}"
     interval: "{{ logcollector_item.interval | default('5s') }}"
     timeout: "{{ logcollector_item.timeout | default('1m') }}"
@@ -30,11 +31,17 @@
     dateFormat: "{{ logcollector_item.dateFormat }}"
     readonly: "{{ logcollector_item.readonly | default(false) }}"
     present: "{{ logcollector_item.present | default(true) }}"
-    auth_token: "{{ logcollector_item.auth_token | default(auth_token | default(lookup('env', 'AXONOPS_TOKEN'))) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
-    username: "{{ logcollector_item.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
-    password: "{{ logcollector_item.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+    base_url: "{{ base_url | default(omit) }}"
+    auth_token: "{{ logcollector_item.auth_token | default(auth_token | default(omit)) }}"
+    api_token: "{{ logcollector_item.api_token | default(api_token | default(omit)) }}"
+    username: "{{ logcollector_item.username | default(username | default(omit)) }}"
+    password: "{{ logcollector_item.password | default(password | default(omit)) }}"
+    override_saas: "{{ override_saas | default(omit) }}"
+    use_saml: "{{ use_saml | default(omit) }}"
+    validate_certs: "{{ validate_certs | default(omit) }}"
   with_items:
     "{{ axonops_logcollectors }}"
+  no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
   loop_control:
     loop_var: logcollector_item
   tags:
