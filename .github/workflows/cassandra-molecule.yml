@@ -88,7 +88,7 @@ jobs:
           MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
 
       - name: Run Molecule verify
-        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11' || matrix.scenario == 'cassandra-3.11-pkg' || matrix.scenario == 'default'
+        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11' || matrix.scenario == 'cassandra-3.11-pkg' || matrix.scenario == 'default' || matrix.scenario == 'shenandoah' || matrix.scenario == 'g1'
         run: molecule -v verify -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'

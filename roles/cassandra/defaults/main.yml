@@ -384,6 +384,31 @@ cassandra_transparent_data_encryption_options:
 cassandra_jemalloc_enabled: true
 # cassandra_libjemalloc_path: ""  # auto-detected when cassandra_jemalloc_enabled is true
 
+# OS tuning
+# Host-level tuning (sysctl, swap, THP) is skipped inside containers: the kernel
+# is the host's, so applying it there would tune the host, not the guest.
+cassandra_container_virt_types:
+  - docker
+  - container
+  - containerd
+  - podman
+  - lxc
+  - systemd-nspawn
+cassandra_running_in_container: >-
+  {{ (ansible_virtualization_tech_guest | default([]) | intersect(cassandra_container_virt_types) | length > 0)
+     or (ansible_virtualization_type | default('') in cassandra_container_virt_types) }}
+# Disable swap entirely (swapoff + comment out swap entries in /etc/fstab).
+cassandra_disable_swap: true
+# Run 'swapoff -a'. Only set false to exercise the fstab rewrite on its own —
+# a container shares the host kernel, so swapoff there disables the host's swap.
+cassandra_swapoff_active: true
+# fstab file rewritten when disabling swap (overridable for testing).
+cassandra_fstab_path: /etc/fstab
+# Disable Transparent Huge Pages at the OS level via a systemd unit.
+cassandra_disable_thp: true
+# Enable and start the THP unit (disabled when exercising the tasks under molecule).
+cassandra_thp_service_manage: true
+
 # JVM
 cassandra_jvm_use_shenandoah: false
 cassandra_max_queued_native_transport_requests: 1024

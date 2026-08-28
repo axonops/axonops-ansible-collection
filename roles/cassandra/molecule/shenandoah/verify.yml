@@ -1,0 +1,71 @@
+---
+# BDD verification — Shenandoah JVM options
+#
+# Behaviour under test: when cassandra_jvm_use_shenandoah is true the rendered
+# JVM options MUST select Shenandoah with its default adaptive heuristic, and
+# MUST NOT enable Transparent Huge Pages, select the compact heuristic, or fix
+# the young generation size with -Xmn.
+
+- name: Verify Shenandoah JVM options (BDD)
+  hosts: all
+  gather_facts: false
+  vars:
+    jvm_options_files:
+      - jvm11-server.options
+      - jvm17-server.options
+  tasks:
+
+    - name: GIVEN — the tar install laid down a Cassandra configuration directory
+      ansible.builtin.find:
+        paths: /opt
+        patterns: "apache-cassandra-*"
+        file_type: directory
+      register: verify_install_dir
+
+    - name: THEN — exactly one Cassandra install directory was found
+      ansible.builtin.assert:
+        that:
+          - verify_install_dir.files | length == 1
+        fail_msg: >-
+          expected exactly one apache-cassandra-* directory under /opt,
+          found {{ verify_install_dir.files | length }}
+
+    - name: GIVEN — the configuration directory is known
+      ansible.builtin.set_fact:
+        cassandra_conf_dir: "{{ verify_install_dir.files[0].path }}/conf"
+
+    - name: GIVEN — the converged node rendered its JVM options with Shenandoah enabled
+      ansible.builtin.slurp:
+        src: "{{ cassandra_conf_dir }}/{{ item }}"
+      loop: "{{ jvm_options_files }}"
+      register: verify_jvm_options
+
+    - name: THEN — Shenandoah is selected with its default adaptive heuristic
+      ansible.builtin.assert:
+        that:
+          - "'-XX:+UseShenandoahGC' in ((item.content | b64decode).splitlines() | reject('match', '^\\s*#') | list)"
+          - "((item.content | b64decode).splitlines() | reject('match', '^\\s*#') | select('search', 'ShenandoahGCHeuristics') | list | length) == 0"
+        fail_msg: "{{ item.item }} does not select Shenandoah with the default adaptive heuristic"
+      loop: "{{ verify_jvm_options.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: THEN — Transparent Huge Pages are not enabled in the JVM options
+      ansible.builtin.assert:
+        that:
+          - "'-XX:+UseTransparentHugePages' not in ((item.content | b64decode).splitlines() | reject('match', '^\\s*#') | list)"
+        fail_msg: "{{ item.item }} still enables Transparent Huge Pages"
+      loop: "{{ verify_jvm_options.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: THEN — no fixed young generation size is emitted
+      ansible.builtin.assert:
+        that:
+          - "((item.content | b64decode).splitlines() | reject('match', '^\\s*#') | select('match', '^-Xmn') | list | length) == 0"
+        fail_msg: "{{ item.item }} sets a fixed young generation size"
+      loop: "{{ verify_jvm_options.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+# code: language=ansible

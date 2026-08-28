@@ -115,3 +115,122 @@
           cqlsh failed to launch from the venv
           (stdout={{ verify_cqlsh_version.stdout }},
            stderr={{ verify_cqlsh_version.stderr | default('') }})
+
+# BDD verification — swap is disabled persistently and idempotently
+#
+# Behaviour under test: the swap-disabling tasks MUST comment out every active
+# swap entry in fstab so swap is not re-enabled after reboot, MUST leave
+# non-swap and already-commented entries untouched, and MUST be idempotent.
+
+- name: Verify swap disabling (BDD)
+  hosts: all
+  gather_facts: false
+  vars:
+    verify_fstab: /tmp/fstab-swap-test
+  tasks:
+
+    - name: GIVEN — an fstab with an active swap entry, a commented one and a data mount
+      ansible.builtin.copy:
+        dest: "{{ verify_fstab }}"
+        mode: "0644"
+        content: |
+          UUID=1111 /            ext4 defaults 0 1
+          UUID=2222 none         swap sw       0 0
+          /dev/sdb1 none         swap sw       0 0
+          # UUID=3333 none       swap sw       0 0
+          /dev/sdc1 /var/lib/cassandra xfs defaults 0 0
+
+    - name: WHEN — the swap disabling tasks run
+      ansible.builtin.include_tasks: ../../tasks/disable-swap.yml
+      vars:
+        cassandra_fstab_path: "{{ verify_fstab }}"
+        # never call swapoff here: the container shares the runner's kernel
+        cassandra_swapoff_active: false
+
+    - name: WHEN — the swap disabling tasks run a second time
+      ansible.builtin.include_tasks: ../../tasks/disable-swap.yml
+      vars:
+        cassandra_fstab_path: "{{ verify_fstab }}"
+        # never call swapoff here: the container shares the runner's kernel
+        cassandra_swapoff_active: false
+
+    - name: THEN — read back the resulting fstab
+      ansible.builtin.slurp:
+        src: "{{ verify_fstab }}"
+      register: verify_fstab_content
+
+    - name: THEN — no active swap entry remains and the other entries are untouched
+      ansible.builtin.assert:
+        that:
+          - fstab_lines | reject('match', '^\\s*#') | select('search', '\\sswap\\s') | list | length == 0
+          - fstab_lines | select('search', '^# UUID=2222') | list | length == 1
+          - fstab_lines | select('search', '^# /dev/sdb1') | list | length == 1
+          - fstab_lines | select('search', '^# UUID=3333') | list | length == 1
+          - fstab_lines | select('search', '^/dev/sdc1 /var/lib/cassandra') | list | length == 1
+          - fstab_lines | select('search', '^UUID=1111 /\\s') | list | length == 1
+        fail_msg: "swap entries were not disabled correctly in fstab"
+      vars:
+        fstab_lines: "{{ (verify_fstab_content.content | b64decode).splitlines() }}"
+
+# code: language=ansible
+
+# BDD verification — Transparent Huge Pages are disabled at the OS level
+#
+# Behaviour under test: the THP tasks MUST install an executable script that
+# writes 'never' to the THP sysfs knobs, and a oneshot systemd unit that runs
+# it before Cassandra starts. The unit is not enabled here — the molecule
+# container is not a systemd host.
+
+- name: Verify Transparent Huge Pages disabling (BDD)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: WHEN — the THP disabling tasks run
+      ansible.builtin.include_tasks: ../../tasks/disable-thp.yml
+      vars:
+        cassandra_thp_service_manage: false
+
+    - name: THEN — collect the installed script and unit
+      ansible.builtin.stat:
+        path: /usr/local/sbin/cassandra-disable-thp.sh
+      register: verify_thp_script
+
+    - name: THEN — the script is installed and executable
+      ansible.builtin.assert:
+        that:
+          - verify_thp_script.stat.exists
+          - verify_thp_script.stat.mode == '0755'
+        fail_msg: the THP disabling script was not installed
+
+    - name: THEN — read the script and the unit
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      loop:
+        - /usr/local/sbin/cassandra-disable-thp.sh
+        - /etc/systemd/system/cassandra-disable-thp.service
+      register: verify_thp_files
+
+    - name: THEN — the script disables THP on both sysfs paths
+      ansible.builtin.assert:
+        that:
+          - "'/sys/kernel/mm/transparent_hugepage/enabled' in script"
+          - "'/sys/kernel/mm/transparent_hugepage/defrag' in script"
+          - "'echo never' in script"
+        fail_msg: the THP disabling script does not turn THP off
+      vars:
+        script: "{{ verify_thp_files.results[0].content | b64decode }}"
+
+    - name: THEN — the unit is a oneshot ordered before Cassandra
+      ansible.builtin.assert:
+        that:
+          - "'Type=oneshot' in unit"
+          - "'RemainAfterExit=yes' in unit"
+          - "'Before=cassandra.service' in unit"
+          - "'ExecStart=/usr/local/sbin/cassandra-disable-thp.sh' in unit"
+          - "'WantedBy=basic.target' in unit"
+        fail_msg: the THP systemd unit is not ordered before Cassandra
+      vars:
+        unit: "{{ verify_thp_files.results[1].content | b64decode }}"
+
+# code: language=ansible
