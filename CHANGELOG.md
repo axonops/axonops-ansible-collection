@@ -8,43 +8,28 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
-- **`examples/self-hosted-example/` was not runnable as documented**: the playbooks and inventories
-  referenced group names that do not exist, and the AxonOps Server inventory was missing required
-  variables. Every group reference now resolves against the three documented groups
-  (`axonops_server`, `axonops_searchdb`, `axonops_cassandra`):
-  - `axon-cassandra.yml`, `inventories/cassandra.yml` and `cassandra-5.0.yml` referenced
-    `groups['cassandra']` and `groups['axon-server']`, neither of which is defined, so the plays
-    failed on an undefined variable.
-  - `inventories/axonops.yml` derived `cassandra_seeds` from `groups['axonops_cassandra']`, a group
-    that inventory does not define, and carried a block of `cassandra_*` / `axon_agent_*` variables
-    under `axonops_searchdb`, where no Cassandra host ever reads them.
-  - `axon_server_org_name` was set in neither inventory, so step 3 of both README quick starts
-    aborted on the `server` role assert: `axon_server_org_name must be set`.
-  - `axon_server_searchdb_*` (including the OpenSearch admin credentials) sat under
-    `axonops_searchdb` group vars while the `server` role runs on `axonops_server`; it only worked
-    because one host happened to be in both groups. These, plus the new `axon_server_cql_hosts`
-    metrics-store settings, now live on `axonops_server`.
-  - `inventories/axonops.yml` built `axon_server_searchdb_hosts` from `groups['axonops_server']`,
-    pointing AxonOps Server at itself instead of at the Elasticsearch nodes.
-  - `es_master_nodes` was a hand-maintained one-element list naming the single `node.master: true`
-    node, leaving the Elasticsearch cluster with no quorum and no `cluster.initial_master_nodes`,
-    so a fresh cluster never bootstrapped. All three nodes are now master-eligible and hold data,
-    and both `discovery.seed_hosts` and `cluster.initial_master_nodes` are derived from the
-    `axonops_searchdb` group. The unused `es_master_nodes` variable is gone, along with the
-    per-host `es_config` blocks that had drifted (a missing `node.name`, a missing `http.host`).
-  - `axon-cassandra.yml` documented itself as deploying the AxonOps Agent but never included the
-    `agent` role; it now does, and its host-specific variables moved to `inventories/cassandra.yml`
-    so play vars no longer silently override the inventory.
-  - The dashboard was left on the `axon_dash_listen_address` default of `127.0.0.1`, unreachable
-    from outside the server. Both inventories now bind it explicitly.
-  - README quick start step 4 ran `axon-cassandra.yml` against `inventories/axonops-opensearch.yml`,
-    which defines no Cassandra group, so the play matched zero hosts and silently did nothing. The
-  - The inventory groups were renamed from hyphens to underscores (`axonops-server` →
-    `axonops_server`, and likewise for `axonops_searchdb` / `axonops_cassandra`). Ansible warned
-    `Invalid characters were found in group names` on every run, because a hyphen is not a valid
-    Python identifier and so cannot be used unquoted in Jinja. Role tag names are unchanged.
-
-    README now documents the group contract, the required variables, Cassandra before server
+- **`examples/self-hosted-example/` was not runnable as documented**: the playbooks referenced
+  inventory groups that were never defined, so the quick starts failed on an undefined variable,
+  and the AxonOps Server inventory was missing variables the `server` role requires. The three
+  groups are now consistently named and, being valid Python identifiers, no longer trigger
+  Ansible's `Invalid characters were found in group names` warning: `axonops_server`,
+  `axonops_searchdb`, `axonops_cassandra` (role tag names are unchanged). Also fixed:
+  - `axon_server_org_name` is now set in both server inventories — the `server` role asserts on it,
+    so step 3 of both quick starts previously aborted.
+  - The search backend connection settings, including the OpenSearch admin credentials, moved to
+    the `axonops_server` group where the `server` role actually runs; they had worked only because
+    one host was a member of both groups. The Cassandra metrics store settings
+    (`axon_server_cql_hosts` and credentials) were absent entirely and have been added.
+  - For Elasticsearch, `axon_server_searchdb_hosts` pointed at the server rather than the search
+    nodes, and the hand-maintained `es_master_nodes` list named a single master-eligible node,
+    leaving the cluster without a quorum and without `cluster.initial_master_nodes` so it never
+    bootstrapped. All three nodes are now master-eligible and hold data, with the seed and
+    bootstrap lists derived from the group.
+  - `axon-cassandra.yml` documented itself as deploying the AxonOps Agent but omitted the `agent`
+    role; it now includes it, and its host-specific variables moved to the inventory.
+  - The dashboard was left on the `axon_dash_listen_address` default of `127.0.0.1` and so was
+    unreachable; both inventories now bind it explicitly.
+  - The README documents the group contract, the required variables, the Cassandra-before-server
     ordering, and how to reach the dashboard.
 
 - **OpenSearch on aarch64**: the `opensearch` role hardcoded the `linux-x64` tarball, so on an

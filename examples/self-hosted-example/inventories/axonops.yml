@@ -16,10 +16,14 @@ all:
         # axon_server_searchdb_username: elastic
         # axon_server_searchdb_password: "changeme"
 
-        # Cassandra metrics store. Point this at your Cassandra nodes — without it
-        # the server has nowhere to write metrics.
+        # Cassandra metrics store. Without it the server has nowhere to write metrics.
+        # PLACEHOLDER — replace these with every node in the axonops_cassandra group
+        # of inventories/cassandra.yml. This cannot be derived from groups[...] because
+        # the Cassandra hosts live in a separate inventory file.
         axon_server_cql_hosts:
           - "157.90.235.43:9042"
+          - "188.245.42.4:9042"
+          - "168.119.234.32:9042"
         axon_server_username: cassandra
         axon_server_password: cassandra
         axon_server_local_dc: default

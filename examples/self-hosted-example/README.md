@@ -99,7 +99,7 @@ AxonOps Server needs Cassandra for metrics storage, so deploy it before the serv
 ansible-playbook -i inventories/cassandra.yml axon-cassandra.yml
 ```
 
-Then set `axon_server_cql_hosts` in `inventories/axonops-opensearch.yml` to those Cassandra nodes.
+Then check `axon_server_cql_hosts` in `inventories/axonops-opensearch.yml` and update it to match the Cassandra nodes you just deployed — it ships pre-filled with placeholder addresses.
 
 ### 4. Deploy AxonOps Server and Dashboard
 
@@ -127,6 +127,10 @@ ansible-playbook -i inventories/cassandra.yml     axon-cassandra.yml
 ansible-playbook -i inventories/axonops.yml       axon-server.yml
 ```
 
+Each inventory file uses the same three placeholder IP addresses for illustration only. They do
+not describe one shared three-node topology — a real deployment needs enough hosts to cover all
+three groups.
+
 ## Inventory Reference
 
 ### `inventories/axonops-opensearch.yml`
@@ -152,7 +156,7 @@ AxonOps Server variables, set on `axonops_server`:
 | `axon_server_searchdb_username` | Username for AxonOps Server to connect to OpenSearch (typically `admin`) |
 | `axon_server_searchdb_password` | Must match `opensearch_admin_password` |
 | `axon_server_searchdb_tls_skip_verify` | Set to `true` when using auto-generated self-signed certificates |
-| `axon_server_cql_hosts` | List of `host:port` Cassandra contact points for the metrics store |
+| `axon_server_cql_hosts` | List of `host:port` Cassandra contact points for the metrics store. Placeholder — set to the nodes in `inventories/cassandra.yml` |
 | `axon_server_username` / `axon_server_password` | Cassandra credentials |
 | `axon_server_local_dc` | Cassandra datacentre name. Must match `cassandra_dc` |
 | `axon_dash_listen_address` / `axon_dash_listen_port` | Dashboard bind address and port |
@@ -189,7 +193,7 @@ The `server` role detects the version automatically and writes the correct forma
 
 - **Never commit passwords in plain text.** Use [Ansible Vault](https://docs.ansible.com/ansible/latest/vault_guide/) to encrypt sensitive values. This applies to `opensearch_admin_password`, `axon_server_searchdb_password`, and `axon_server_password`.
 - **The `firewalld` stop task** in each playbook is included only so the examples work without additional firewall configuration. Remove it in production and configure proper rules instead.
-- **TLS skip verify** (`axon_server_searchdb_tls_skip_verify: true`) is acceptable when using auto-generated self-signed certificates in a trusted private network. For production, supply certificates from a trusted CA using `opensearch_tls_mode: custom` and set `skip_verify` to `false`.
+- **TLS skip verify** (`axon_server_searchdb_tls_skip_verify: true`) is acceptable when using auto-generated self-signed certificates in a trusted private network. For production, supply certificates from a trusted CA using `opensearch_tls_mode: custom` and set `axon_server_searchdb_tls_skip_verify` to `false`.
 - **The dashboard binds to `0.0.0.0` in these examples.** Put it behind TLS with `axon_dash_nginx` before exposing it.
 
 ## Related Documentation
