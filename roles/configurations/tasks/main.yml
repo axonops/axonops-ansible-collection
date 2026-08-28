@@ -18,6 +18,11 @@
   when: cluster_type is not defined or cluster_type | length == 0
   tags: always
 
+- name: Normalize cluster_type casing
+  ansible.builtin.set_fact:
+    cluster_type: "{{ cluster_type | lower }}"
+  tags: always
+
 - name: Assert all required variables are set
   ansible.builtin.assert:
     that:
@@ -61,10 +66,10 @@
   ansible.builtin.import_tasks: service_checks.yml
   tags: service_checks
 
-- name: Import tasks from adaptive_repair.yml
+- name: "Import tasks from adaptive_repair.yml cluster type {{ cluster_type }}"
   ansible.builtin.import_tasks: adaptive_repair.yml
   tags: adaptive_repair
-  when: cluster_type == 'cassandra'
+  when: cluster_type == 'cassandra' or cluster_type == 'dse'
 
 - name: Import tasks from agent_disconnection_tolerance.yml
   ansible.builtin.import_tasks: agent_disconnection_tolerance.yml
@@ -74,11 +79,11 @@
 - name: Import tasks from commitlogs_archive.yml
   ansible.builtin.import_tasks: commitlogs_archive.yml
   tags: commitlogs_archive
-  when: cluster_type == 'cassandra'
+  when: cluster_type == 'cassandra' or cluster_type == 'dse'
 
 - name: Import tasks from human_readableid.yml
   ansible.builtin.import_tasks: human_readableid.yml
-  when: human_readableid is defined and cluster_type == 'cassandra'
+  when: human_readableid is defined and (cluster_type == 'cassandra' or cluster_type == 'dse')
   tags: human_readableid
 
 - name: Import tasks from log_alerts.yml

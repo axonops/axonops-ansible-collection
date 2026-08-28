@@ -151,8 +151,31 @@ ls -l ~/git/ansible_collections/axonops
 
 ## Authentication & Settings
 
-The ansible role accepts configuration via both environment variables and Ansible variables.
-The required variables are `org` and `cluster`, which can be set in either way.
+Every variable below can be set **either** as a playbook/role variable **or** as an environment variable on the
+control node (this role always runs against `hosts: localhost`, so the module reads the same shell environment you
+export before running `ansible-playbook`) — you don't need to pick one style for the whole play. The required
+variables are `org` and `cluster`, which can be set either way.
+
+For authentication settings and `cluster_type` (`auth_token`, `api_token`, `username`, `password`, `cluster_type`),
+the same variable can also be set **per item** inside any of the loop-based config blocks (`adaptive_repair`,
+`agent_disconnection_tolerance`, `human_readableid`, `logcollector`, `pagerduty_integration`, `slack_integration`,
+`teams_integration`, or entries in `axonops_alert_routes`, `axonops_alert_rules`, `axonops_log_alert_rule`,
+`axonops_dashboard_templates`, `axonops_backups`, `axonops_commitlog_archive`, `axonops_shell_check`). Resolution
+order, highest priority first:
+
+1. The value set on the item itself (e.g. `adaptive_repair.auth_token`)
+2. The role/playbook variable (e.g. `auth_token: "{{ vault_axonops_token }}"` in `vars:`)
+3. The environment variable (e.g. `export AXONOPS_TOKEN=...`)
+4. The module's built-in default, if any (e.g. `cluster_type` defaults to `cassandra`)
+
+This lets you, for example, set one `auth_token` for the whole play but override `cluster_type` per alert rule, or
+rely entirely on environment variables and skip `vars:` altogether.
+
+**Note on `cluster_type`:** the accepted values are lowercase — `cassandra`, `kafka`, or `dse` — matching how AxonOps
+registers the cluster's type server-side. Mismatched casing (e.g. `DSE`) will cause the role to skip Cassandra/DSE-only
+tasks and any explicit module call to fail with `non existing cluster type ...`. The role-level `cluster_type`
+variable is automatically lowercased for you; a **per-item** `cluster_type` override (e.g. `alert_item.cluster_type`)
+is not — set per-item overrides in lowercase explicitly.
 
 ### List of Variables
 
@@ -367,6 +390,14 @@ This allows you to enable or disable adaptive repair settings for your cluster.
 | `segmenttargetsizemb` | Set the target size in MB for each segment repaired at time.                     | integer | `omit`  |
 | `segmenttimeout`      | Set the timeout in seconds for each segment repair operation.                    | String  | `2h`    |
 | `tableparallelism`    | Set the number of tables processed in parallel.                                  | integer | `10`    |
+| `cluster_type`        | Override the role-level `cluster_type` for this task only.                      | String  | (unset) |
+| `auth_token`          | Override the role-level `auth_token` for this task only.                        | String  | (unset) |
+| `api_token`           | Override the role-level `api_token` for this task only.                         | String  | (unset) |
+| `username`            | Override the role-level `username` for this task only.                          | String  | (unset) |
+| `password`            | Override the role-level `password` for this task only.                          | String  | (unset) |
+
+See [Authentication & Settings](#authentication--settings) for how these fall back to role variables and then
+environment variables when left unset.
 
 #### Enable Adaptive Repair
 
@@ -768,10 +799,10 @@ The role supports granular control through the following tags:
 | `slack`                         | Configure Slack integration             | All            |
 | `pagerduty_integration`         | Configure PagerDuty integration         | All            |
 | `teams`                         | Configure Microsoft Teams integration   | All            |
-| `adaptive_repair`               | Configure adaptive repair settings      | Cassandra only |
+| `adaptive_repair`               | Configure adaptive repair settings      | Cassandra, DSE  |
 | `agent_disconnection_tolerance` | Configure agent disconnection tolerance | All            |
-| `commitlogs_archive`            | Configure commit log archiving          | Cassandra only |
-| `human_readableid`              | Configure human-readable IDs            | Cassandra only |
+| `commitlogs_archive`            | Configure commit log archiving          | Cassandra, DSE  |
+| `human_readableid`              | Configure human-readable IDs            | Cassandra, DSE  |
 | `log_alerts`                    | Configure log-based alerts              | All            |
 | `logcollector`                  | Configure log collector                 | All            |
 | `dashboards`                    | Import custom dashboards                | All            |
@@ -795,10 +826,10 @@ allow alert routing rules to reference integration names.
 2. **Metrics Alerts**: Configure threshold-based alerts for cluster metrics
 3. **Backup Configuration**: Set up backup schedules and retention policies
 4. **Service Checks**: Configure service availability monitoring
-5. **Adaptive Repair** (Cassandra only): Configure automated repair scheduling
+5. **Adaptive Repair** (Cassandra, DSE): Configure automated repair scheduling
 6. **Agent Disconnection Tolerance**: Configure tolerance for agent disconnections
-7. **Commit Log Archiving** (Cassandra only): Configure commit log archive settings
-8. **Human-Readable IDs** (Cassandra only): Configure human-readable node identifiers
+7. **Commit Log Archiving** (Cassandra, DSE): Configure commit log archive settings
+8. **Human-Readable IDs** (Cassandra, DSE): Configure human-readable node identifiers
 9. **Log Alerts**: Configure alerts based on log patterns
 10. **Log Collector**: Configure log collection settings
 11. **Dashboards**: Import and configure custom dashboards

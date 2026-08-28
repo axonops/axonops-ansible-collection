@@ -3,11 +3,18 @@
   axonops.axonops.human_readableid:
     org: "{{ org }}"
     cluster: "{{ cluster }}"
+    cluster_type: "{{ human_readableid.cluster_type | default(cluster_type | default(omit)) }}"
     present: "{{ human_readableid.present | default(true) }}"
     id: "{{ human_readableid.id | default('axon_agent_hostname') }}"
-    auth_token: "{{ human_readableid.auth_token | default(auth_token | default(lookup('env', 'AXONOPS_TOKEN'))) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
-    username: "{{ human_readableid.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
-    password: "{{ human_readableid.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+    base_url: "{{ base_url | default(omit) }}"
+    auth_token: "{{ human_readableid.auth_token | default(auth_token | default(omit)) }}"
+    api_token: "{{ human_readableid.api_token | default(api_token | default(omit)) }}"
+    username: "{{ human_readableid.username | default(username | default(omit)) }}"
+    password: "{{ human_readableid.password | default(password | default(omit)) }}"
+    override_saas: "{{ override_saas | default(omit) }}"
+    use_saml: "{{ use_saml | default(omit) }}"
+    validate_certs: "{{ validate_certs | default(omit) }}"
+  no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
   tags:
   - axonops_human_readableid
   - human_readableid

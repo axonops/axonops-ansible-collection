@@ -3,10 +3,16 @@
   axonops.axonops.adaptive_repair:
     org: "{{ org }}"
     cluster: "{{ cluster }}"
-    username: "{{ adaptive_repair.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
-    password: "{{ adaptive_repair.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
+    cluster_type: "{{ adaptive_repair.cluster_type | default(cluster_type | default(omit)) }}"
+    base_url: "{{ base_url | default(omit) }}"
+    username: "{{ adaptive_repair.username | default(username | default(omit)) }}"
+    password: "{{ adaptive_repair.password | default(password | default(omit)) }}"
     active: "{{ adaptive_repair.enabled | default(true) }}"
-    auth_token: "{{ adaptive_repair.auth_token | default(auth_token | default(lookup('env', 'AXONOPS_TOKEN'))) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    auth_token: "{{ adaptive_repair.auth_token | default(auth_token | default(omit)) }}"
+    api_token: "{{ adaptive_repair.api_token | default(api_token | default(omit)) }}"
+    override_saas: "{{ override_saas | default(omit) }}"
+    use_saml: "{{ use_saml | default(omit) }}"
+    validate_certs: "{{ validate_certs | default(omit) }}"
     excludedtables: "{{ adaptive_repair.excludedtables | default([]) }}"
     filter_twcs: "{{ adaptive_repair.filter_twcs | default(True) }}"
     gc_grace: "{{ adaptive_repair.gc_grace | default(omit) }}"
@@ -15,6 +21,7 @@
     segmenttargetsizemb: "{{ adaptive_repair.segmenttargetsizemb | default(omit) }}"
     segmenttimeout: "{{ adaptive_repair.segmenttimeout | default(omit) }}"
     tableparallelism: "{{ adaptive_repair.tableparallelism | default(omit) }}"
+  no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
   tags:
   - axonops_adaptive_repair
   - adaptive_repair

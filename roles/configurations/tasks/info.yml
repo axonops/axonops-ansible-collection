@@ -4,9 +4,14 @@
     org: "{{ org }}"
     cluster: "{{ cluster }}"
     cluster_type: "{{ cluster_type | default(omit) }}"
-    username: "{{ info.username | default(lookup('env', 'AXONOPS_USERNAME')) | default(omit) }}"
-    password: "{{ info.password | default(lookup('env', 'AXONOPS_PASSWORD')) | default(omit) }}"
-    auth_token: "{{ info.auth_token | default(lookup('env', 'AXONOPS_TOKEN')) | default(lookup('env', 'AXONOPS_API_TOKEN')) | default(omit) }}"
+    base_url: "{{ base_url | default(omit) }}"
+    username: "{{ username | default(omit) }}"
+    password: "{{ password | default(omit) }}"
+    auth_token: "{{ auth_token | default(omit) }}"
+    api_token: "{{ api_token | default(omit) }}"
+    override_saas: "{{ override_saas | default(omit) }}"
+    use_saml: "{{ use_saml | default(omit) }}"
+    validate_certs: "{{ validate_certs | default(omit) }}"
   tags:
   - info
   - never
