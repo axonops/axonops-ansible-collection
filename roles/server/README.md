@@ -28,6 +28,23 @@ axon_server_org_name: mycompany  # required
           - http://127.0.0.1:9200
 ```
 
+## Reporting service (Reports v2)
+
+From Reports v2, the `axon_dash` config block and `axon_dash_url` option are removed from the
+AxonOps Server config. This role only ever templated the scalar `axon_dash_url` (never an
+`axon_dash:` block), and now gates it to `axon_server_version < 2.0.4`. For `latest` or `>= 2.0.4`
+it instead templates `axon_reports_url` from `axon_server_reports_url` (env `AXON_REPORTS_URL`),
+telling the server where to reach the reporting service.
+
+```yaml
+axon_server_reports_url: "http://127.0.0.1:8081"  # default; where axon-server reaches axon-reporting
+```
+
+The reporting service (`axon-reporting`) is installed and run by the `dash` role, since it must
+be co-located with `axon-dash`. Override `axon_server_reports_url` when `axon-dash` runs on a
+different host to `axon-server`. For `axon-server < 2.0.4`, the legacy `axon_dash_url` variable is
+still templated when set.
+
 ## LDAP Authentication
 
 To enable LDAP, set `axon_server_ldap_enabled: true` and supply `axon_server_ldap_setting`.

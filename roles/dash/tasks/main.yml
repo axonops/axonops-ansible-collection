@@ -76,6 +76,10 @@
     state: started
     enabled: true
 
+- name: Reporting service tasks (Reports v2)
+  ansible.builtin.import_tasks: reporting.yml
+  when: axon_dash_reporting_enabled | bool
+
 - name: Nginx tasks
   ansible.builtin.import_tasks: nginx.yml
   when: axon_dash_nginx is defined and axon_dash_nginx.enabled

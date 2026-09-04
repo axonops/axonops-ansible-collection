@@ -1,0 +1,52 @@
+---
+# Reports v2 — install and run axon-reporting on the same host as axon-dash.
+# The axon-reporting package deprecates and replaces axon-dash-pdf / axon-dash-pdf2.
+
+- name: Add version to the axon-reporting package name
+  ansible.builtin.set_fact:
+    axon_reporting_versioned_package: "axon-reporting-{{ axon_reporting_version }}"
+  when: axon_reporting_version is defined and axon_reporting_version != ''
+
+# Online installation
+- name: Ensure AxonOps reporting service is installed.
+  ansible.builtin.package:
+    name: "{{ axon_reporting_versioned_package | default('axon-reporting') }}"
+    state: "{{ axon_reporting_state }}"
+  notify:
+    - restart axon-reporting
+  when: has_internet_access
+
+# Offline installation
+- name: Offline installation of axon-reporting
+  when: not has_internet_access and axon_reporting_download_path is defined
+  block:
+    - name: Set RPM architecture variable
+      ansible.builtin.set_fact:
+        pkg_arch: >-
+          {% if ansible_architecture == 'aarch64' %}aarch64{% else %}x86_64{% endif %}
+
+    - name: Copy AxonOps reporting package to target
+      ansible.builtin.copy:
+        src: "{{ axon_reporting_download_path }}"
+        dest: "/tmp/axon-reporting-{{ axon_reporting_version }}.{{ pkg_arch }}.rpm"
+        mode: "0644"
+        owner: "{{ ansible_user | default('root') }}"
+        group: "{{ ansible_user | default('root') }}"
+
+    - name: Install AxonOps reporting offline
+      ansible.builtin.package:
+        name: "/tmp/axon-reporting-{{ axon_reporting_version }}.{{ pkg_arch }}.rpm"
+        state: present
+      notify:
+        - restart axon-reporting
+
+- name: Make sure the reporting service is started on boot
+  when:
+    - axon_reporting_start_at_boot
+    - axon_reporting_state == 'present'
+  ansible.builtin.service:
+    name: axon-reporting
+    state: started
+    enabled: true
+
+# code: language=ansible
