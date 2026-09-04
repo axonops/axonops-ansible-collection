@@ -16,6 +16,8 @@
     axon_agent_server_host: localhost
     axon_agent_tls_mode: "disabled"
     axon_agent_customer_name: "mycompany"
+    # Required by the server role; must match axon_agent_customer_name.
+    axon_server_org_name: "{{ axon_agent_customer_name }}"
     cassandra_start_on_boot: true
     cassandra_listen_address: "localhost"
     cassandra_rpc_address: "localhost"

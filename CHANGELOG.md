@@ -28,6 +28,12 @@ All notable changes to this collection are documented here. The format is based 
 
 ### Fixed
 
+- **`examples/axon-server.yml` failed the `server` role preflight**: the playbook runs the
+  `server` role but never set `axon_server_org_name`, which the role asserts on, so the run aborted
+  with `axon_server_org_name must be set`. It now sets
+  `axon_server_org_name: "{{ axon_agent_customer_name }}"`, keeping the org name and the agent
+  customer name in sync from a single value.
+
 - **`examples/self-hosted-example/` was not runnable as documented**: the playbooks referenced
   inventory groups that were never defined, so the quick starts failed on an undefined variable,
   and the AxonOps Server inventory was missing variables the `server` role requires. The three
