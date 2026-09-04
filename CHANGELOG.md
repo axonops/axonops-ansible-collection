@@ -6,6 +6,26 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Added
+
+- **Reports v2 support** (ASB-4652): the `dash` role now installs and runs the new
+  `axon-reporting` service, which replaces the deprecated `axon-dash-pdf` / `axon-dash-pdf2`
+  packages and must be co-located with `axon-dash`. New variables: `axon_dash_reporting_enabled`
+  (default `true`), `axon_dash_reporting_url` (`AXON_REPORTING_URL`, written as
+  `axon-dash.reporting_url`), `axon_reporting_state`, `axon_reporting_version`,
+  `axon_reporting_start_at_boot`, and `axon_reporting_download_path` for offline installs. The
+  `server` role gains `axon_server_reports_url` (`AXON_REPORTS_URL`, default
+  `http://127.0.0.1:8081`), templated as `axon_reports_url` for `axon-server` `latest` / `>= 2.0.4`.
+
+### Changed
+
+- **`server` role — Reports v2 config**: the `axon_dash` config block and `axon_dash_url` option
+  are removed from the AxonOps Server config in Reports v2. This role only ever templated the
+  scalar `axon_dash_url`, now gated to `axon-server < 2.0.4`; for `latest` / `>= 2.0.4` it templates
+  `axon_reports_url` instead.
+- **`dash` molecule**: reporting is disabled in the default converge scenario until the
+  `axon-reporting` package is published to the public repositories.
+
 ### Fixed
 
 - **`examples/self-hosted-example/` was not runnable as documented**: the playbooks referenced

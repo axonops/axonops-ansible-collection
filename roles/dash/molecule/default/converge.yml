@@ -2,5 +2,10 @@
 - name: Converge
   hosts: all
 
+  vars:
+    # axon-reporting (Reports v2) is not yet published to the public repos, so the
+    # package install would fail in CI. Re-enable once the package ships.
+    axon_dash_reporting_enabled: false
+
   roles:
     - role: dash

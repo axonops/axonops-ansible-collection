@@ -14,6 +14,20 @@ axon_agent_beta_repository: absent
 has_internet_access: true
 axon_dash_version: ""
 
+# Reports v2 — the axon-reporting service installs the reporting service and the
+# dependencies axon-dash needs to generate reports. It MUST run on the same host as
+# axon-dash, so this role installs and configures it alongside the dashboard.
+axon_dash_reporting_enabled: true
+# AXON_REPORTING_URL: where axon-dash reaches the reporting service. Required for
+# reporting to function. Left blank omits reporting_url from axon-dash.yml.
+axon_dash_reporting_url: "http://127.0.0.1:8081"
+axon_reporting_state: present
+# Pin a specific axon-reporting package version, e.g. "1.2.3". Empty installs latest.
+axon_reporting_version: ""
+axon_reporting_start_at_boot: true
+# Offline install: path on the control node to the axon-reporting .rpm to copy and install.
+#axon_reporting_download_path: ""
+
 axon_dash_nginx:
   enabled: false
   hostname: "{{ ansible_fqdn }}"
