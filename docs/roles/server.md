@@ -99,6 +99,18 @@ for new on-premises deployments. The same `axon_server_searchdb_*` variables are
 |----------|---------|-------------|
 | `axon_server_notification_interval` | `3h` | Interval between repeated notifications for the same alert |
 
+### Reporting Configuration (Reports v2)
+
+From Reports v2, the `axon_dash` config block and `axon_dash_url` option are removed from the
+AxonOps Server config. This role only ever templated the scalar `axon_dash_url` (never an
+`axon_dash:` block), and now gates it to `axon-server < 2.0.4`. For `axon_server_version` `latest`
+or `>= 2.0.4` it instead templates `axon_reports_url` from the variable below, telling the server
+where to reach the reporting service (`axon-reporting`, installed by the `dash` role).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `axon_server_reports_url` | `http://127.0.0.1:8081` | `AXON_REPORTS_URL`; where `axon-server` reaches the reporting service. Override when `axon-dash` is on a different host |
+
 ### Repository Configuration
 
 | Variable | Default | Description |
