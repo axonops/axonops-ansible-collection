@@ -95,6 +95,7 @@ All commands accept those attributes
 
 * `--org` Name of your organisation (environment variable `AXONOPS_ORG`).
 * `--cluster` Name of your cluster (environment variable `AXONOPS_CLUSTER`).
+* `--cluster-type` Type of your cluster: `cassandra` (default), `dse`, or `kafka` (environment variable `AXONOPS_CLUSTER_TYPE`).
 * `--token` AUTH_TOKEN used to authenticate with the API in AxonOps Cloud (environment variable `AXONOPS_TOKEN`).
 * `--username` Username used for AxonOps Self-Hosted when authentication is enabled (environment variable `AXONOPS_USERNAME`).
 * `--password` Password used for AxonOps Self-Hosted when authentication is enabled (environment variable `AXONOPS_PASSWORD`).

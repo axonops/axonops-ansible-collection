@@ -73,9 +73,11 @@ modified payload back. The CLI never constructs payloads from scratch; it patche
 what the server returned. Preserve this when adding options — a new flag is a new
 guarded block in `set_options()`, not a new request.
 
-Note the `cassandra` segment is hardcoded into every component's `full_url` even
-though `AxonOps` carries a configurable `cluster_type` — only `AxonOps`'s own
-methods (`get_integration_output`, `find_nodes_ids`) honour `cluster_type`.
+`full_url` is built from `args.cluster_type` (global `--cluster-type` /
+`AXONOPS_CLUSTER_TYPE`, default `cassandra`; also accepts `dse` and `kafka`),
+not a hardcoded literal. `Application.get_axonops()` forwards the same
+`args.cluster_type` into `AxonOps(cluster_type=...)`, so `AxonOps`'s own methods
+(`get_integration_output`, `find_nodes_ids`) stay in sync with component URLs.
 
 ### Auth and base URL
 

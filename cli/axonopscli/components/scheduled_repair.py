@@ -10,9 +10,9 @@ class ScheduledRepair:
         self.axonops = axonops
         self.args = args
         self.repair_data = None
-        self.full_add_repair_url = f"{ADD_REPAIR_URL}/{args.org}/cassandra/{args.cluster}"
-        self.full_repair_url = f"{REPAIR_URL}/{args.org}/cassandra/{args.cluster}"
-        self.full_cassandrascheduledrepair_url = f"{CASSANDRA_SCHEDULED_REPAIR_URL}/{args.org}/cassandra/{args.cluster}"
+        self.full_add_repair_url = f"{ADD_REPAIR_URL}/{args.org}/{args.cluster_type}/{args.cluster}"
+        self.full_repair_url = f"{REPAIR_URL}/{args.org}/{args.cluster_type}/{args.cluster}"
+        self.full_cassandrascheduledrepair_url = f"{CASSANDRA_SCHEDULED_REPAIR_URL}/{args.org}/{args.cluster_type}/{args.cluster}"
 
     def remove_all_repairs_from_axonops(self):
         """ Remove all scheduled repairs from AxonOps. """
