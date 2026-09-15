@@ -45,7 +45,7 @@ NODES_PAYLOAD = [{'host_id': 'b167aca6', 'HostIP': '172.18.0.2'}]
 
 
 def make_args(**overrides):
-    args = dict(v=0, org='demo', cluster='demo-cluster', url=None, token=None,
+    args = dict(v=0, org='demo', cluster='demo-cluster', cluster_type='cassandra', url=None, token=None,
                 username=None, password=None, show_healthy=False, show_orgs=False)
     args.update(overrides)
     return types.SimpleNamespace(**args)

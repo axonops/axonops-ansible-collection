@@ -6,6 +6,16 @@ All notable changes to this collection are documented here. The format is based 
 
 ## [Unreleased]
 
+### Added
+
+- **CLI: `--cluster-type` flag**: `cli/axonopscli` accepted only Cassandra clusters. Every
+  component built its API URL with a hardcoded `cassandra` segment, so the CLI could not target a
+  DSE or Kafka cluster no matter what was passed. Added a global `--cluster-type` flag (env var
+  `AXONOPS_CLUSTER_TYPE`, default `cassandra`, also accepts `dse` and `kafka`) and threaded it
+  through every component's URL (`nodes`, `repair`, `scheduledrepair`, `dashboard`, `silence`).
+  Also fixed `Application.get_axonops()`, which was passing the cluster *name* into the
+  `cluster_type` parameter of the `AxonOps` client instead of an actual cluster type.
+
 ### Fixed
 
 - **`examples/self-hosted-example/` was not runnable as documented**: the playbooks referenced

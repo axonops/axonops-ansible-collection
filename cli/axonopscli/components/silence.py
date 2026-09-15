@@ -7,7 +7,7 @@ class Silence:
     def __init__(self, axonops, args):
         self.axonops = axonops
         self.args = args
-        self.full_url = f"{SILENCE_WINDOW_URL}/{self.args.org}/cassandra/{self.args.cluster}"
+        self.full_url = f"{SILENCE_WINDOW_URL}/{self.args.org}/{self.args.cluster_type}/{self.args.cluster}"
 
         self.nodes = Nodes(axonops, args)
 

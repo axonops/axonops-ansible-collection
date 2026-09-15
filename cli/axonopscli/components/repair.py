@@ -14,7 +14,7 @@ class AdaptiveRepair:
         self.args = args
         self.axonops = axonops
         self.repair_data = None
-        self.full_url = f"{ADAPTIVE_REPAIR_URL}/{args.org}/cassandra/{args.cluster}"
+        self.full_url = f"{ADAPTIVE_REPAIR_URL}/{args.org}/{args.cluster_type}/{args.cluster}"
 
     def get_actual_repair(self):
         if self.repair_data is None:
