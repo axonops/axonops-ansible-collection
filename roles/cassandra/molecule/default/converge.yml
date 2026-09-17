@@ -9,6 +9,8 @@
     cassandra_version: "5.0.9"
     cassandra_start_on_boot: false
     cassandra_install_format: tar
+    # Exercise the AxonOps agent block in cassandra-env.sh (ASB-4712)
+    axon_java_agent: "axon-cassandra5.0-agent-jdk17"
   pre_tasks:
     # bug in the container we use for testing
     - name: "Create /usr/share/man/man1/"
