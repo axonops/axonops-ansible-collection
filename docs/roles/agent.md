@@ -154,10 +154,10 @@ None
     axon_java_agent: "axon-cassandra4.1-agent"
     # Automatically configure cassandra-env.sh
     axon_agent_cassandra_config_directory: /opt/cassandra/conf
-    # For Cassandra < 5
-    axon_agent_cassandra_config: 'JVM_OPTS="$JVM_OPTS -javaagent:/usr/share/axonops/axon-cassandra4.0-agent.jar=/etc/axonops/axon-agent.yml"'
-    # For Cassandra >= 5, use this instead:
-    # axon_agent_cassandra_config: '. /usr/share/axonops/axonops-jvm.options'
+    # Preferred for AxonOps agents >= 1.1.0 (3.11/4.0/4.1/5.0 all ship this file):
+    axon_agent_cassandra_config: '. /usr/share/axonops/axonops-jvm.options'
+    # Older agents that do not ship the options file use the raw -javaagent line:
+    # axon_agent_cassandra_config: 'JVM_OPTS="$JVM_OPTS -javaagent:/usr/share/axonops/axon-cassandra4.0-agent.jar=/etc/axonops/axon-agent.yml"'
 
   roles:
     - role: axonops.axonops.agent
@@ -166,7 +166,7 @@ None
 ## Notes
 
 - **Sudoers Configuration**: The role automatically configures sudo permissions for the axonops user to manage the Cassandra service
-- **Automatic Cassandra Configuration**: You can optionally configure the role to automatically add the AxonOps agent configuration to Cassandra's `cassandra-env.sh` file by setting `axon_agent_cassandra_config_directory` and `axon_agent_cassandra_config`. Check the [AxonOps documentation](https://axonops.com/docs/get_started/agent_setup/) for the correct configuration line for your Cassandra version
+- **Automatic Cassandra Configuration**: You can optionally configure the role to automatically add the AxonOps agent configuration to Cassandra's `cassandra-env.sh` file by setting `axon_agent_cassandra_config_directory` and `axon_agent_cassandra_config`. Prefer sourcing the options file (`. /usr/share/axonops/axonops-jvm.options`), shipped by AxonOps Cassandra agents >= 1.1.0 for 3.11/4.0/4.1/5.0; older agents use the raw `-javaagent:` line. The role matches any existing AxonOps line and replaces it, so switching methods on an existing install does not add the agent twice. Check the [AxonOps documentation](https://axonops.com/docs/get_started/agent_setup/) for the correct configuration line for your Cassandra version
 - **Service Configuration**: By default, the role does not include the service-specific configuration in `axon-agent.yml` unless `axon_agent_include_service_config` is set to `true`
 - **Repository Management**: The role supports public, beta, and dev repositories. Use `axon_agent_public_repository`, `axon_agent_beta_repository`, and `axon_agent_dev_repository` to control which repositories are enabled
 - **Offline Installation**: For air-gapped environments, set `has_internet_access: false` and `axon_java_agent_force_offline_install: true`

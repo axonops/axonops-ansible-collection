@@ -16,7 +16,22 @@ All notable changes to this collection are documented here. The format is based 
   Also fixed `Application.get_axonops()`, which was passing the cluster *name* into the
   `cluster_type` parameter of the `AxonOps` client instead of an actual cluster type.
 
+### Changed
+
+- **Cassandra agent loaded via `axonops-jvm.options`** (ASB-4712): the `cassandra` role
+  `cassandra-env.sh` templates (3.11.x, 4.1.x, 5.0.x) now source
+  `/usr/share/axonops/axonops-jvm.options` when that file is present (shipped by AxonOps
+  Cassandra agents >= 1.1.0 for 3.11/4.0/4.1/5.0), and fall back to the raw
+  `-javaagent:...` line only on older agents that do not provide it. The check is done at
+  runtime in the shell, so it is correct regardless of the installed agent version.
+
 ### Fixed
+
+- **`agent` role added the agent twice on method switch** (ASB-4712): the
+  `Add AxonOps agent config to cassandra-env.sh` task appended `axon_agent_cassandra_config`
+  with no `regexp`, so switching an existing install from the old raw `-javaagent` line to
+  `. /usr/share/axonops/axonops-jvm.options` left both lines and loaded the agent twice. The
+  task now matches any existing `axonops` agent line and replaces it in place.
 
 - **`examples/self-hosted-example/` was not runnable as documented**: the playbooks referenced
   inventory groups that were never defined, so the quick starts failed on an undefined variable,
