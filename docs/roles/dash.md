@@ -29,6 +29,27 @@ The `dash` role installs and configures the AxonOps Dashboard (axon-dash), which
 | `axon_dash_listen_port` | `3000` | Port the dashboard listens on |
 | `axon_dash_server_endpoint` | `http://127.0.0.1:8080` | URL of the AxonOps Server |
 
+### Reporting Service Configuration (Reports v2)
+
+From Reports v2, the `axon-reporting` package replaces the deprecated `axon-dash-pdf` /
+`axon-dash-pdf2` packages. It installs the reporting service and the dependencies `axon-dash`
+needs to generate reports, and **must run on the same host as `axon-dash`** — so the `dash` role
+installs and starts it. The AxonOps Server reaches the reporting service via
+`axon_server_reports_url` in the `server` role.
+
+When upgrading from Reports v1, the role installs `axon-reporting` alongside any existing
+`axon-dash-pdf` / `axon-dash-pdf2` packages; it does **not** remove them. Uninstall the old
+packages manually once Reports v2 is confirmed working.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `axon_dash_reporting_enabled` | `true` | Install and run the `axon-reporting` service alongside `axon-dash` |
+| `axon_dash_reporting_url` | `http://127.0.0.1:8081` | `AXON_REPORTING_URL`; where `axon-dash` reaches the reporting service. Required for reporting; written as `axon-dash.reporting_url` |
+| `axon_reporting_state` | `present` | State of the reporting package: `present` or `absent` |
+| `axon_reporting_version` | `""` (latest) | Specific `axon-reporting` version to install, or empty for latest |
+| `axon_reporting_start_at_boot` | `true` | Enable the reporting service to start at boot |
+| `axon_reporting_download_path` | _unset_ | Offline install: path on the control node to the `axon-reporting` `.rpm` |
+
 ### Nginx Reverse Proxy Configuration
 
 | Variable | Default | Description |

@@ -56,9 +56,17 @@ tls:
   skipVerify: "{{ axon_server_tls_skipverify | default('false') }}"
 {% endif %}
 
+{% if axon_server_version == 'latest' or (axon_server_version is defined and axon_server_version is version('2.0.4', '>=')) %}
+{% if axon_server_reports_url is defined and axon_server_reports_url %}
+# Reports v2 (axon-server >= 2.0.4): URL where axon-server reaches the reporting
+# service (AXON_REPORTS_URL). axon-reporting runs alongside axon-dash.
+axon_reports_url: {{ axon_server_reports_url }}
+{% endif %}
+{% else %}
 {% if axon_dash_url is defined and axon_dash_url %}
-# axon-dash public URL (used in notification links)
+# axon-dash public URL (used in notification links) — legacy, axon-server < 2.0.4
 axon_dash_url: {{ axon_dash_url }}
+{% endif %}
 {% endif %}
 
 alerting:

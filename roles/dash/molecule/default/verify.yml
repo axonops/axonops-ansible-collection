@@ -1,0 +1,26 @@
+---
+- name: Verify
+  hosts: all
+  vars:
+    # Must match converge.yml: reporting install is disabled (package not yet
+    # published), but axon_dash_reporting_url keeps its default, so the template
+    # must still emit reporting_url — install and URL are intentionally decoupled.
+    axon_dash_reporting_enabled: false
+  tasks:
+    - name: Read rendered axon-dash.yml
+      ansible.builtin.slurp:
+        src: /etc/axonops/axon-dash.yml
+      register: axon_dash_config
+
+    - name: Decode rendered config
+      ansible.builtin.set_fact:
+        axon_dash_config_text: "{{ axon_dash_config.content | b64decode }}"
+
+    - name: Assert reporting_url is templated from axon_dash_reporting_url
+      ansible.builtin.assert:
+        that:
+          - "'reporting_url:' in axon_dash_config_text"
+          - "axon_dash_reporting_url in axon_dash_config_text"
+        fail_msg: >-
+          Expected axon-dash.reporting_url to be templated from axon_dash_reporting_url
+          even when axon_dash_reporting_enabled is false.

@@ -1,0 +1,23 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Read rendered axon-server.yml
+      ansible.builtin.slurp:
+        src: /etc/axonops/axon-server.yml
+      register: axon_server_config
+
+    - name: Decode rendered config
+      ansible.builtin.set_fact:
+        axon_server_config_text: "{{ axon_server_config.content | b64decode }}"
+
+    - name: Assert Reports v2 axon_reports_url is templated and legacy axon_dash_url is not
+      # converge installs axon_server_version=latest, which resolves to a real
+      # version >= 2.0.4, so the new-syntax branch must be selected.
+      ansible.builtin.assert:
+        that:
+          - "'axon_reports_url:' in axon_server_config_text"
+          - "'axon_dash_url:' not in axon_server_config_text"
+        fail_msg: >-
+          Expected axon_reports_url (Reports v2), not legacy axon_dash_url, for
+          axon_server_version=latest.

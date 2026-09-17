@@ -43,6 +43,12 @@ axon_server_ldap_setting:
 
 axon_server_tls_mode: disabled
 
+# Reports v2 — URL where axon-server reaches the reporting service (AXON_REPORTS_URL).
+# The reporting service (axon-reporting) runs on the same host as axon-dash. Override
+# when axon-dash is on a different host to axon-server. Applies to axon-server >= 2.0.4;
+# replaces the removed axon_dash_url / axon_dash config.
+axon_server_reports_url: "http://127.0.0.1:8081"
+
 # How long to wait before sending a notification again if it has already
 # been sent successfully for an alert. (Usually ~3h or more).
 axon_server_notification_interval: '3h'

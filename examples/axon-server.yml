@@ -16,6 +16,8 @@
     axon_agent_server_host: localhost
     axon_agent_tls_mode: "disabled"
     axon_agent_customer_name: "mycompany"
+    # Required by the server role; must match axon_agent_customer_name.
+    axon_server_org_name: "{{ axon_agent_customer_name }}"
     cassandra_start_on_boot: true
     cassandra_listen_address: "localhost"
     cassandra_rpc_address: "localhost"
@@ -27,6 +29,10 @@
     opensearch_cluster_type: single-node
     opensearch_admin_password: "changeme"
     opensearch_domain_name: example.com
+    # All-in-one host: bind OpenSearch to loopback so axon-server reaches it at
+    # 127.0.0.1:9200. The default binds ansible_default_ipv4 (often a public IP),
+    # which leaves 127.0.0.1:9200 closed and axon-server unable to connect.
+    opensearch_network_host: 127.0.0.1
 
     # AxonOps Server connection to OpenSearch
     axon_server_searchdb_hosts:
