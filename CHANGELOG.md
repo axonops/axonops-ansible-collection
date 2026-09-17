@@ -16,6 +16,13 @@ All notable changes to this collection are documented here. The format is based 
   `axon_reporting_start_at_boot`, and `axon_reporting_download_path` for offline installs. The
   `server` role gains `axon_server_reports_url` (`AXON_REPORTS_URL`, default
   `http://127.0.0.1:8081`), templated as `axon_reports_url` for `axon-server` `latest` / `>= 2.0.4`.
+- **CLI: `--cluster-type` flag**: `cli/axonopscli` accepted only Cassandra clusters. Every
+  component built its API URL with a hardcoded `cassandra` segment, so the CLI could not target a
+  DSE or Kafka cluster no matter what was passed. Added a global `--cluster-type` flag (env var
+  `AXONOPS_CLUSTER_TYPE`, default `cassandra`, also accepts `dse` and `kafka`) and threaded it
+  through every component's URL (`nodes`, `repair`, `scheduledrepair`, `dashboard`, `silence`).
+  Also fixed `Application.get_axonops()`, which was passing the cluster *name* into the
+  `cluster_type` parameter of the `AxonOps` client instead of an actual cluster type.
 
 ### Changed
 
