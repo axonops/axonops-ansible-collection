@@ -88,7 +88,7 @@
 21-:--add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED
 
 
-{% if opensearch_tmp_dir is defined %}
+{% if opensearch_tmp_dir is defined and opensearch_tmp_dir | length > 0 %}
 ## Custom temp directory (avoid /tmp with noexec issue)
 -Djava.io.tmpdir={{ opensearch_tmp_dir }}
 {% endif %}

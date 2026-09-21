@@ -1,0 +1,47 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: GIVEN — the role converged with opensearch_tmp_dir set to ""
+      ansible.builtin.slurp:
+        src: /usr/share/opensearch/config/jvm.options
+      register: _jvm_content
+
+    - name: THEN — jvm.options renders no empty java.io.tmpdir override
+      ansible.builtin.assert:
+        that:
+          - jvm_options | regex_search('-Djava\\.io\\.tmpdir=(""\\s*)?$', multiline=True) is none
+        fail_msg: "jvm.options contains an empty java.io.tmpdir override"
+      vars:
+        jvm_options: "{{ _jvm_content.content | b64decode }}"
+
+    - name: THEN — jvm.options keeps only the OPENSEARCH_TMPDIR package default
+      ansible.builtin.assert:
+        that:
+          - "'-Djava.io.tmpdir=${OPENSEARCH_TMPDIR}' in (_jvm_content.content | b64decode)"
+        fail_msg: "jvm.options lost the OpenSearch package default temp directory"
+
+    - name: WHEN — the rendered systemd unit is read
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/opensearch.service
+      register: _os_unit_content
+
+    - name: THEN — the unit sets no empty OPENSEARCH_TMPDIR
+      ansible.builtin.assert:
+        that:
+          - "'OPENSEARCH_TMPDIR' not in (_os_unit_content.content | b64decode)"
+        fail_msg: "opensearch.service sets OPENSEARCH_TMPDIR from an empty variable"
+
+    - name: WHEN — the default temp directory path is inspected
+      ansible.builtin.stat:
+        path: /var/lib/opensearch/tmp
+      register: _os_stray_dir
+
+    - name: THEN — no directory was created from the empty variable
+      ansible.builtin.assert:
+        that:
+          - not _os_stray_dir.stat.exists
+        fail_msg: "a temp directory was created despite opensearch_tmp_dir being empty"
+
+# code: language=ansible

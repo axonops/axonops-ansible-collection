@@ -19,9 +19,10 @@ defaults:
 
 jobs:
   molecule:
-    name: Molecule OpenSearch (${{ matrix.distro }})
+    name: Molecule OpenSearch (${{ matrix.scenario }} / ${{ matrix.distro }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         distro:
           - rockylinux9
@@ -31,6 +32,9 @@ jobs:
           - ubuntu2604
           - debian12
           - debian13
+        scenario:
+          - default
+          - noexec-tmp
 
     steps:
       - name: Check out the codebase.
@@ -45,20 +49,38 @@ jobs:
         run: pip3 install ansible molecule molecule-plugins[docker] docker
 
       - name: Run Molecule destroy (ignore failures)
-        run: molecule -v destroy
+        run: molecule -v destroy -s ${{ matrix.scenario }}
         continue-on-error: true
         env:
           PY_COLORS: '1'
           ANSIBLE_FORCE_COLOR: '1'
           MOLECULE_DISTRO: ${{ matrix.distro }}
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
-          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.distro }}
+          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.scenario }}-${{ matrix.distro }}
 
       - name: Run Molecule converge
-        run: molecule -v converge
+        run: molecule -v converge -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'
           ANSIBLE_FORCE_COLOR: '1'
           MOLECULE_DISTRO: ${{ matrix.distro }}
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
-          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.distro }}
+          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule verify
+        run: molecule -v verify -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule idempotence
+        run: molecule -v idempotence -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.scenario }}-${{ matrix.distro }}

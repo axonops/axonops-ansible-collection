@@ -94,6 +94,18 @@ complete playbook including AxonOps agent.
 | `cassandra_saved_caches_directory` | `/var/lib/cassandra/saved_caches` | Saved caches directory |
 | `cassandra_hints_directory` | `/var/lib/cassandra/hints` | Hints directory |
 | `cassandra_log_dir` | `/var/log/cassandra` | Log directory |
+| `cassandra_java_tmp_dir` | `/tmp` | JVM temp directory (`-Djava.io.tmpdir`, `-Dio.netty.native.workdir`, `TMPDIR`). When set to anything other than `/tmp`, the role creates it as `cassandra:cassandra` with mode `0750` |
+| `cassandra_jna_tmp_dir` | `/tmp` | JNA temp directory (`-Djna.tmpdir`), where JNA unpacks its native library. When set to anything other than `/tmp`, the role creates it as `cassandra:cassandra` with mode `0750` |
+
+Point both at a directory on an `exec`-capable filesystem when `/tmp` is
+mounted `noexec` — Cassandra cannot unpack its native libraries otherwise.
+The role never touches `/tmp` itself: leave either variable at its default and
+no directory task runs for it.
+
+> **Behaviour change:** `cassandra_java_tmp_dir` was previously created with
+> mode `1777` (world-writable, sticky). It is now created with mode `0750`.
+> Any process outside the `cassandra` user and group that writes to that
+> directory loses access.
 
 ### Authentication and Authorization
 
