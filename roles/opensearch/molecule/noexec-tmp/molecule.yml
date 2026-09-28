@@ -6,7 +6,7 @@ dependency:
 driver:
   name: docker
 platforms:
-  - name: ${MOLECULE_INSTANCE_NAME:-"elastic"}
+  - name: ${MOLECULE_INSTANCE_NAME:-"noexec-tmp"}
     image: "geerlingguy/docker-${MOLECULE_DISTRO:-rockylinux9}-ansible:latest"
     command: ${MOLECULE_DOCKER_COMMAND:-""}
     volumes:

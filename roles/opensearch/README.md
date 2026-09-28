@@ -53,7 +53,7 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `opensearch_heap_size` | `1g` | JVM heap size. Applied to both `-Xms` and `-Xmx`. Use `g` for gigabytes or `m` for megabytes (e.g. `4g`, `512m`). As a rule of thumb, set this to no more than half of available RAM |
-| `opensearch_tmp_dir` | _(not set)_ | Custom temporary directory for the JVM. Set this when `/tmp` is mounted with `noexec`, which prevents OpenSearch from starting |
+| `opensearch_tmp_dir` | `/var/lib/opensearch/tmp` | Temporary directory for the JVM (`-Djava.io.tmpdir`) and the `OPENSEARCH_TMPDIR` environment variable in the systemd unit. Created by the role, owned by `opensearch:opensearch`, mode `0750`. Set to `""` to fall back to the distribution defaults |
 
 ### Security Plugin
 
@@ -411,7 +411,13 @@ Enable `opensearch_iac_enable` when running the role from a CI/CD pipeline or ap
 
 ### Custom /tmp Directory
 
-If `/tmp` is mounted with `noexec` on your hosts, OpenSearch cannot extract its native libraries there and will fail to start. Set `opensearch_tmp_dir` to a directory on a `exec`-capable filesystem.
+If `/tmp` is mounted with `noexec` on your hosts, OpenSearch cannot extract its native libraries there and will fail to start. CIS-hardened builds and Amazon Linux 2023 mount `/tmp` that way by default.
+
+The role handles this out of the box: `opensearch_tmp_dir` defaults to `/var/lib/opensearch/tmp`, which the role creates as `opensearch:opensearch` with mode `0750`. That path is used for both `-Djava.io.tmpdir` in `jvm.options` and `Environment=OPENSEARCH_TMPDIR=` in the systemd unit, so plugins and helper scripts that read the environment variable land in the same place as the JVM.
+
+`PrivateTmp=true` in the unit does not remove the `noexec` flag — a private `/tmp` namespace inherits the mount options of its parent mount.
+
+Override the path when you want the directory somewhere else, or set `opensearch_tmp_dir: ""` to disable the override and use the distribution defaults.
 
 ```yaml
 - name: Deploy OpenSearch with custom temp directory

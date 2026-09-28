@@ -37,7 +37,33 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `opensearch_heap_size` | `1g` | JVM heap size (e.g. `1g`, `512m`) |
-| `opensearch_tmp_dir` | — | Custom temp directory (for noexec /tmp) |
+| `opensearch_tmp_dir` | `/var/lib/opensearch/tmp` | Temp directory for the JVM (`-Djava.io.tmpdir`) and the `OPENSEARCH_TMPDIR` environment variable in the systemd unit. Created by the role, owned by `opensearch:opensearch`, mode `0750`. Set to `""` to use the distribution defaults |
+
+### Temp directory and `noexec` on `/tmp`
+
+OpenSearch extracts native libraries at startup and cannot do so from a
+filesystem mounted `noexec`. CIS-hardened builds and Amazon Linux 2023 mount
+`/tmp` that way by default, which stops the service from starting.
+
+The role points both the JVM and the surrounding shell environment at
+`opensearch_tmp_dir`:
+
+- `jvm.options` renders `-Djava.io.tmpdir={{ opensearch_tmp_dir }}` after the
+  packaged `-Djava.io.tmpdir=${OPENSEARCH_TMPDIR}` line. The JVM applies the
+  last `-D` for a property, so the role's value wins.
+- The systemd unit renders `Environment=OPENSEARCH_TMPDIR={{ opensearch_tmp_dir }}`,
+  so plugins, helper scripts and child processes that read `OPENSEARCH_TMPDIR`
+  rather than `java.io.tmpdir` use the same directory.
+
+The directory is created by the role, owned by `opensearch:opensearch`, with
+mode `0750`.
+
+`PrivateTmp=true` in the unit does **not** help here. A private `/tmp`
+namespace inherits the mount options of its parent mount, so it does not clear
+the `noexec` flag.
+
+Set `opensearch_tmp_dir: ""` to disable the override entirely and fall back to
+the distribution defaults. No directory is created in that case.
 
 ### Security
 

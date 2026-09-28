@@ -41,8 +41,11 @@ opensearch_bootstrap_memory_lock: true
 
 opensearch_heap_size: "1g"
 
-# Custom temp directory (useful when /tmp is mounted noexec)
-# opensearch_tmp_dir:
+# Custom temp directory (useful when /tmp is mounted noexec, e.g. CIS-hardened
+# builds and Amazon Linux 2023). Used for both -Djava.io.tmpdir and the
+# OPENSEARCH_TMPDIR environment variable in the systemd unit. Set to an empty
+# string to leave the distribution defaults in place.
+opensearch_tmp_dir: /var/lib/opensearch/tmp
 
 # --- Security Plugin --------------------------------------------------------
 

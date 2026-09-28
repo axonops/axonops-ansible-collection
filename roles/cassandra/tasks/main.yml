@@ -105,11 +105,19 @@
   ansible.builtin.file:
     path: "{{ cassandra_java_tmp_dir }}"
     state: directory
-    mode: "1777"
+    mode: "0750"
     owner: "cassandra"
     group: "cassandra"
   when: cassandra_java_tmp_dir is defined and cassandra_java_tmp_dir != '' and cassandra_java_tmp_dir != "/tmp"
 
+- name: Create JNA tmp dir for Cassandra if it is not /tmp
+  ansible.builtin.file:
+    path: "{{ cassandra_jna_tmp_dir }}"
+    state: directory
+    mode: "0750"
+    owner: "cassandra"
+    group: "cassandra"
+  when: cassandra_jna_tmp_dir is defined and cassandra_jna_tmp_dir != '' and cassandra_jna_tmp_dir != "/tmp"
 
 - name: Create AxonOps User
   tags: axonops_user

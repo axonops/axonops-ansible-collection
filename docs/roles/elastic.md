@@ -69,6 +69,12 @@ The `elastic` role installs and configures Elasticsearch for use with AxonOps Se
 |----------|---------|-------------|
 | `es_data_dirs` | - | Array of data directory paths |
 | `es_log_dir` | - | Log directory path |
+| `es_tmp_dir` | `/tmp` | Temp directory used for `ES_TMPDIR` and `-Djava.io.tmpdir`. When set to anything other than `/tmp`, the role creates it as `elasticsearch:elasticsearch` with mode `0750` |
+
+Set `es_tmp_dir` to a directory on an `exec`-capable filesystem when `/tmp` is
+mounted `noexec` — Elasticsearch cannot unpack its native libraries otherwise.
+The role never touches `/tmp` itself: leave `es_tmp_dir` at its default and no
+directory task runs.
 
 ### Security (X-Pack)
 

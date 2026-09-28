@@ -276,4 +276,47 @@
       vars:
         unit: "{{ verify_thp_files.results[1].content | b64decode }}"
 
+- name: Verify temp directory management (BDD)
+  hosts: all
+  gather_facts: false
+  vars:
+    # Tar install: conf lives under the unpacked distribution, not /etc/cassandra
+    cassandra_env_path: "/opt/apache-cassandra-5.0.9/conf/cassandra-env.sh"
+  tasks:
+
+    - name: GIVEN — the role converged with both temp dirs off /tmp
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /var/lib/cassandra/tmp
+        - /var/lib/cassandra/jna-tmp
+      register: verify_tmp_dirs
+
+    - name: THEN — each temp directory exists, is service-owned and mode 0750
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isdir
+          - item.stat.pw_name == 'cassandra'
+          - item.stat.gr_name == 'cassandra'
+          - item.stat.mode == '0750'
+        fail_msg: "{{ item.item }} is missing or has the wrong ownership/mode"
+      loop: "{{ verify_tmp_dirs.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: WHEN — the rendered cassandra-env.sh is read
+      ansible.builtin.slurp:
+        src: "{{ cassandra_env_path }}"
+      register: verify_cassandra_env
+
+    - name: THEN — both temp directories are passed to the JVM
+      ansible.builtin.assert:
+        that:
+          - "'-Djna.tmpdir=/var/lib/cassandra/jna-tmp' in cassandra_env"
+          - "'-Djava.io.tmpdir=/var/lib/cassandra/tmp' in cassandra_env"
+        fail_msg: cassandra-env.sh does not point the JVM at the custom temp directories
+      vars:
+        cassandra_env: "{{ verify_cassandra_env.content | b64decode }}"
+
 # code: language=ansible

@@ -78,4 +78,38 @@
           - _conf_dir.stat.pw_name == 'opensearch'
           - _conf_dir.stat.gr_name == 'opensearch'
 
+    # --- Temp directory (noexec /tmp mitigation, issue #146) ----------------
+
+    - name: GIVEN — the role converged with the default opensearch_tmp_dir
+      ansible.builtin.stat:
+        path: /var/lib/opensearch/tmp
+      register: _os_tmp_dir
+
+    - name: THEN — the temp directory is service-owned and mode 0750
+      ansible.builtin.assert:
+        that:
+          - _os_tmp_dir.stat.exists
+          - _os_tmp_dir.stat.isdir
+          - _os_tmp_dir.stat.pw_name == 'opensearch'
+          - _os_tmp_dir.stat.gr_name == 'opensearch'
+          - _os_tmp_dir.stat.mode == '0750'
+        fail_msg: "/var/lib/opensearch/tmp is missing or has the wrong ownership/mode"
+
+    - name: THEN — jvm.options overrides java.io.tmpdir with the custom directory
+      ansible.builtin.assert:
+        that:
+          - "'-Djava.io.tmpdir=/var/lib/opensearch/tmp' in (_jvm_content.content | b64decode)"
+        fail_msg: "jvm.options does not override java.io.tmpdir"
+
+    - name: WHEN — the rendered systemd unit is read
+      ansible.builtin.slurp:
+        src: /etc/systemd/system/opensearch.service
+      register: _os_unit_content
+
+    - name: THEN — the unit exports OPENSEARCH_TMPDIR for the service environment
+      ansible.builtin.assert:
+        that:
+          - "'Environment=OPENSEARCH_TMPDIR=/var/lib/opensearch/tmp' in (_os_unit_content.content | b64decode)"
+        fail_msg: "opensearch.service does not set OPENSEARCH_TMPDIR"
+
 # code: language=ansible

@@ -45,6 +45,15 @@
     mode: "0600"
   notify: Restart OpenSearch
 
+- name: Create custom OpenSearch tmp directory
+  ansible.builtin.file:
+    path: "{{ opensearch_tmp_dir }}"
+    state: directory
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    mode: "0750"
+  when: opensearch_tmp_dir is defined and opensearch_tmp_dir | length > 0
+
 - name: Deploy JVM options
   ansible.builtin.template:
     src: jvm.options.j2
@@ -53,15 +62,6 @@
     group: "{{ opensearch_group }}"
     mode: "0600"
   notify: Restart OpenSearch
-
-- name: Create custom OpenSearch tmp directory
-  ansible.builtin.file:
-    path: "{{ opensearch_tmp_dir }}"
-    state: directory
-    owner: "{{ opensearch_user }}"
-    group: "{{ opensearch_group }}"
-    mode: "0755"
-  when: opensearch_tmp_dir is defined
 
 - name: Deploy systemd service
   ansible.builtin.template:
