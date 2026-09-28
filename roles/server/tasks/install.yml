@@ -59,8 +59,9 @@
         group: root
         mode: "0644"
         content: |
-          [Service]
+          [Unit]
           After=network-online.target cassandra.service opensearch.service
+          Wants=network-online.target
       notify:
         - Reload systemd
 
@@ -68,23 +69,14 @@
   ansible.builtin.package_facts:
     manager: auto
 
-- name: Set installed axon-server version
+- name: Set axon_server_version fact from installed version
   ansible.builtin.set_fact:
-    installed_server_version: >-
-      {{ (
-        ansible_facts.packages['axon-server'][0].version
-        if ansible_os_family == 'RedHat'
-        else
-        (ansible_facts.packages['axon-server'][0].version | split('-') | first)
-      ) | default(omit) }}
+    axon_server_version: >-
+      {{ ansible_facts.packages['axon-server'][0].version
+         if ansible_os_family == 'RedHat'
+         else (ansible_facts.packages['axon-server'][0].version | split('-') | first) }}
   when:
     - axon_server_version == 'latest'
     - "'axon-server' in ansible_facts.packages"
-
-- name: Set axon_server_version fact from installed version
-  ansible.builtin.set_fact:
-    axon_server_version: "{{ installed_server_version }}"
-  when:
-    - axon_server_version == 'latest'
 
 # code: language=ansible

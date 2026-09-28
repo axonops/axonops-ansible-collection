@@ -2,10 +2,8 @@
 - name: Verify
   hosts: all
   vars:
-    # Must match converge.yml: reporting install is disabled (package not yet
-    # published), but axon_dash_reporting_url keeps its default, so the template
-    # must still emit reporting_url — install and URL are intentionally decoupled.
-    axon_dash_reporting_enabled: false
+    # Role defaults are not loaded here; must match the default in defaults/main.yml.
+    axon_dash_reporting_url: "http://127.0.0.1:8081"
   tasks:
     - name: Read rendered axon-dash.yml
       ansible.builtin.slurp:
