@@ -35,7 +35,7 @@ From Reports v2, the `axon-reporting` package replaces the deprecated `axon-dash
 `axon-dash-pdf2` packages. It installs the reporting service and the dependencies `axon-dash`
 needs to generate reports, and **must run on the same host as `axon-dash`** — so the `dash` role
 installs and starts it. The AxonOps Server reaches the reporting service via
-`axon_server_reports_url` in the `server` role.
+`axon_server_reporting_url` in the `server` role.
 
 When upgrading from Reports v1, the role installs `axon-reporting` alongside any existing
 `axon-dash-pdf` / `axon-dash-pdf2` packages; it does **not** remove them. Uninstall the old

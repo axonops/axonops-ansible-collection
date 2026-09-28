@@ -57,10 +57,10 @@ tls:
 {% endif %}
 
 {% if axon_server_version == 'latest' or (axon_server_version is defined and axon_server_version is version('2.0.4', '>=')) %}
-{% if axon_server_reports_url is defined and axon_server_reports_url %}
+{% if axon_server_reporting_url is defined and axon_server_reporting_url %}
 # Reports v2 (axon-server >= 2.0.4): URL where axon-server reaches the reporting
-# service (AXON_REPORTS_URL). axon-reporting runs alongside axon-dash.
-axon_reports_url: {{ axon_server_reports_url }}
+# service (AXON_REPORTING_URL). axon-reporting runs alongside axon-dash.
+axon_reporting_url: {{ axon_server_reporting_url }}
 {% endif %}
 {% else %}
 {% if axon_dash_url is defined and axon_dash_url %}

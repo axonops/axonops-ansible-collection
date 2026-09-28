@@ -33,7 +33,7 @@ host as `axon-dash`** — so this role installs and starts it alongside the dash
 Reporting is enabled by default. `axon_dash_reporting_url` (env `AXON_REPORTING_URL`) tells
 `axon-dash` where to reach the reporting service and is required for reporting to function; it is
 written to `axon-dash.yml` as `axon-dash.reporting_url`. The AxonOps Server also needs to reach
-the reporting service — set `axon_server_reports_url` in the `server` role (see its README).
+the reporting service — set `axon_server_reporting_url` in the `server` role (see its README).
 
 ```yaml
 axon_dash_reporting_enabled: true                 # install and run axon-reporting (default)
