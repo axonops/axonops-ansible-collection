@@ -279,6 +279,9 @@
 - name: Verify temp directory management (BDD)
   hosts: all
   gather_facts: false
+  vars:
+    # Tar install: conf lives under the unpacked distribution, not /etc/cassandra
+    cassandra_env_path: "/opt/apache-cassandra-5.0.9/conf/cassandra-env.sh"
   tasks:
 
     - name: GIVEN — the role converged with both temp dirs off /tmp
@@ -304,7 +307,7 @@
 
     - name: WHEN — the rendered cassandra-env.sh is read
       ansible.builtin.slurp:
-        src: /etc/cassandra/cassandra-env.sh
+        src: "{{ cassandra_env_path }}"
       register: verify_cassandra_env
 
     - name: THEN — both temp directories are passed to the JVM
