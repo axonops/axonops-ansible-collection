@@ -32,7 +32,7 @@ axon_server_org_name: mycompany  # required
 
 From Reports v2, the `axon_dash` config block and `axon_dash_url` option are removed from the
 AxonOps Server config. This role only ever templated the scalar `axon_dash_url` (never an
-`axon_dash:` block), and now gates it to `axon_server_version < 2.0.4`. For `latest` or `>= 2.0.4`
+`axon_dash:` block), and now gates it to `axon_server_version < 2.0.39`. For `latest` or `>= 2.0.39`
 it instead templates `axon_reporting_url` from `axon_server_reporting_url` (env `AXON_REPORTING_URL`),
 telling the server where to reach the reporting service.
 
@@ -42,7 +42,7 @@ axon_server_reporting_url: "http://127.0.0.1:8081"  # default; where axon-server
 
 The reporting service (`axon-reporting`) is installed and run by the `dash` role, since it must
 be co-located with `axon-dash`. Override `axon_server_reporting_url` when `axon-dash` runs on a
-different host to `axon-server`. For `axon-server < 2.0.4`, the legacy `axon_dash_url` variable is
+different host to `axon-server`. For `axon-server < 2.0.39`, the legacy `axon_dash_url` variable is
 still templated when set.
 
 ## LDAP Authentication

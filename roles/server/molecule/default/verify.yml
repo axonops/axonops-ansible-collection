@@ -13,7 +13,7 @@
 
     - name: Assert Reports v2 axon_reporting_url is templated and legacy axon_dash_url is not
       # converge installs axon_server_version=latest, which resolves to a real
-      # version >= 2.0.4, so the new-syntax branch must be selected.
+      # version >= 2.0.39, so the new-syntax branch must be selected.
       ansible.builtin.assert:
         that:
           - "'axon_reporting_url:' in axon_server_config_text"
