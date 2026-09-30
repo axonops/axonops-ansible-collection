@@ -1,0 +1,50 @@
+# {{ ansible_managed }}
+# Initial cn=config tree. Loaded once with slapadd -n 0; later changes are
+# applied online by the openldap role.
+
+dn: cn=config
+objectClass: olcGlobal
+cn: config
+olcArgsFile: {{ _openldap_run_dir }}/slapd.args
+olcPidFile: {{ _openldap_run_dir }}/slapd.pid
+
+dn: cn=module{0},cn=config
+objectClass: olcModuleList
+cn: module{0}
+olcModulePath: {{ _openldap_module_path }}
+{% for module in _openldap_modules %}
+olcModuleLoad: {{ '{' ~ loop.index0 ~ '}' ~ module }}
+{% endfor %}
+
+dn: cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: schema
+
+include: file://{{ _openldap_schema_dir }}/core.ldif
+include: file://{{ _openldap_schema_dir }}/cosine.ldif
+include: file://{{ _openldap_schema_dir }}/nis.ldif
+include: file://{{ _openldap_schema_dir }}/inetorgperson.ldif
+
+dn: olcDatabase={-1}frontend,cn=config
+objectClass: olcDatabaseConfig
+objectClass: olcFrontendConfig
+olcDatabase: {-1}frontend
+
+dn: olcDatabase={0}config,cn=config
+objectClass: olcDatabaseConfig
+olcDatabase: {0}config
+olcAccess: {0}to * by dn.exact=gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth manage by * none
+
+dn: olcDatabase={1}mdb,cn=config
+objectClass: olcDatabaseConfig
+objectClass: olcMdbConfig
+olcDatabase: {1}mdb
+olcDbDirectory: {{ openldap_data_dir }}
+olcSuffix: {{ openldap_base_dn }}
+olcRootDN: {{ openldap_admin_dn }}
+olcDbMaxSize: {{ openldap_db_max_size }}
+olcDbIndex: objectClass eq
+olcDbIndex: uid eq
+olcDbIndex: cn eq
+olcDbIndex: member eq
+olcDbIndex: memberOf eq

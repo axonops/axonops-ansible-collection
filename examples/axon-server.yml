@@ -6,6 +6,8 @@
     # Search backend: set install_opensearch or install_elastic to true (not both)
     install_opensearch: true
     install_elastic: false
+    # Local OpenLDAP directory for axon-server LDAP login and role mapping
+    install_openldap: true
     axon_server_cql_hosts:
       - localhost:9042
     axon_dash_listen_address: 0.0.0.0
@@ -18,6 +20,8 @@
     axon_agent_customer_name: "mycompany"
     # Required by the server role; must match axon_agent_customer_name.
     axon_server_org_name: "{{ axon_agent_customer_name }}"
+    # Start Cassandra on first install (single-node demo)
+    cassandra_start_on_install: true
     cassandra_start_on_boot: true
     cassandra_listen_address: "localhost"
     cassandra_rpc_address: "localhost"
@@ -46,6 +50,47 @@
     # axon_server_searchdb_hosts:
     #   - "http://127.0.0.1:9200"
 
+    # --- OpenLDAP configuration (used when install_openldap: true) ---
+    # One sample user per AxonOps role. Store all passwords in Ansible Vault
+    # in production. axon-server only enables LDAP with a license key.
+    # axon_server_license_key: "your-license-key"
+    openldap_admin_password: "changeme"
+    # axon-server runs on this host, so it reaches slapd over loopback.
+    # Enable TLS (openldap_tls_mode: generate) if the directory is remote.
+    openldap_axon_server_host: localhost
+    openldap_users:
+      - uid: superuser
+        cn: Super User
+        sn: User
+        mail: superuser@example.com
+        password: "changeme-super"
+        groups: [axonops_super]       # superUserRole
+      - uid: admin
+        cn: Admin User
+        sn: User
+        mail: admin@example.com
+        password: "changeme-admin"
+        groups: [axonops_admin]       # adminRole
+      - uid: readonly
+        cn: Read Only
+        sn: User
+        mail: readonly@example.com
+        password: "changeme-readonly"
+        groups: [axonops_readonly]    # readOnlyRole
+      - uid: backup
+        cn: Backup Admin
+        sn: User
+        mail: backup@example.com
+        password: "changeme-backup"
+        groups: [axonops_backup]      # backupAdminRole
+
+    # AxonOps Server LDAP authentication, using the setting published by the
+    # openldap role. The published setting has no bindPassword, so add it here.
+    axon_server_ldap_enabled: "{{ install_openldap | default(false) | bool }}"
+    axon_server_ldap_setting: >-
+      {{ openldap_axon_server_ldap_setting | default({})
+         | combine({'bindPassword': openldap_admin_password}) }}
+
 
   pre_tasks:
     # This is only for this example to work, please review your firewall settings and requirements
@@ -72,6 +117,9 @@
     - role: axonops.axonops.elastic
       tags: elastic
       when: install_elastic is defined and install_elastic
+    - role: axonops.axonops.openldap
+      tags: openldap
+      when: install_openldap is defined and install_openldap
     - role: axonops.axonops.server
       tags: server, axonops-server
     - role: axonops.axonops.dash

@@ -49,6 +49,9 @@ When a new role is added or an existing role is renamed/removed, `README.md` (ro
 4. [IN PROGRESS] OpenSearch README
    - Comprehensive user-focused README written by docs-quality-reviewer; committed as `9e4385b`
 
+5. [IN PROGRESS] openldap role (issue #150, branch feat/openldap-role)
+   - Role, molecule (default/tls/no-password, systemd containers), workflow, docs and example written; devcluster openldap container deferred to follow-up
+
 ## Recent Progress (2026-03 to 2026-04)
 
 - Added `opensearch` role: tar-based install, security plugin, TLS (generate or custom mode), system tuning, multi-node support (`feat: add opensearch role`, PR #61)
@@ -82,6 +85,7 @@ When a new role is added or an existing role is renamed/removed, `README.md` (ro
 | `java` | Java (JDK) install helper | ✅ |
 | `k8ssandra` | K8ssandra operator + K8ssandraCluster CR (Kubernetes) | ✅ |
 | `opensearch` | OpenSearch cluster install + security + tuning | ✅ |
+| `openldap` | Local OpenLDAP directory (cn=config, memberOf, TLS) seeded for axon-server LDAP auth | ✅ |
 | `operator` | AxonOps Kubernetes operator install + AxonOpsPlatform CR (Kubernetes) | ✅ |
 | `devcluster` | Docker Compose-based AxonOps dev/demo stack (OpenSearch + server + dash + Cassandra) | ✅ |
 | `preflight` | Pre-flight checks (OS, Java, disk) | — |

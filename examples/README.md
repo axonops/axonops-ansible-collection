@@ -40,6 +40,21 @@ Deploys a complete AxonOps Server stack including Cassandra, a search backend, a
 - `axon_server_searchdb_hosts`: Search backend endpoints (OpenSearch or Elasticsearch, server >= 2.0.4)
 - `axon_server_searchdb_username` / `axon_server_searchdb_password`: Credentials (required for OpenSearch with Security plugin)
 - `axon_server_searchdb_tls_skip_verify`: Set to `true` when using auto-generated OpenSearch TLS certificates
+- `install_openldap`: Set to `true` to also install a local OpenLDAP directory (via the `openldap` role) seeded with four sample users — `superuser`/`admin`/`readonly`/`backup` — mapped to the `axonops_super`/`axonops_admin`/`axonops_readonly`/`axonops_backup` groups. Requires `axon_server_license_key`; axon-server ignores LDAP settings without a license.
+
+#### [openldap-axon-server.yml](openldap-axon-server.yml)
+Deploys a local OpenLDAP directory on its own host, then configures AxonOps Server to authenticate against it.
+
+**Features:**
+- OpenLDAP with TLS (`openldap_tls_mode: generate`), two seeded users each in a different group
+- AxonOps Server LDAP login wired from the `openldap` role's published `openldap_axon_server_ldap_setting` fact, with `bindPassword` added from vault (the fact never carries it)
+- Separate `ldap` and `axon-server` inventory groups
+
+**Key Variables:**
+- `openldap_admin_password`: LDAP admin bind password (vault)
+- `openldap_users` / `openldap_groups`: Seeded directory content
+- `axon_server_license_key`: Required — axon-server only enables LDAP with a valid license key
+- `axon_server_ldap_setting`: Built from `openldap_axon_server_ldap_setting` combined with the vaulted `bindPassword`
 
 #### [opensearch.yml](opensearch.yml)
 Deploys an OpenSearch cluster for use as the AxonOps Server search backend. OpenSearch is the preferred
@@ -111,7 +126,9 @@ ansible-playbook -i inventory cassandra-rolling-start.yml -e "state=restarted"
 3. **Inventory file** defining your host groups:
    - `cassandra`: Hosts for Cassandra nodes
    - `axon-server`: Hosts for AxonOps Server
+   - `ldap`: Host for the local OpenLDAP directory (only for [openldap-axon-server.yml](openldap-axon-server.yml))
 4. **Network connectivity** between nodes for Cassandra cluster formation
+5. **`community.general` collection** — required by the `openldap` role's LDAP modules (`ansible-galaxy collection install -r ../requirements.yml`). The role installs `python3-ldap` on the managed host itself.
 
 ## Quick Start
 

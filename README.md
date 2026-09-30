@@ -71,6 +71,7 @@ This collection provides the following Ansible roles. Click on each role for det
 ### Security
 
 - **[pki_agent](docs/roles/pki_agent.md)** - Automated PKI certificate management using OpenBao Agent
+- **[openldap](docs/roles/openldap.md)** - Local OpenLDAP directory for AxonOps Server LDAP authentication and role mapping
 
 ### Utilities
 

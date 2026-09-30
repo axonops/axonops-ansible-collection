@@ -83,6 +83,13 @@ Installs Java (OpenJDK or Azul Zulu) on target systems.
 
 **Use when**: Deploying Cassandra, Elasticsearch, or any Java-dependent component.
 
+### Security Roles
+
+#### [openldap](openldap.md)
+Installs a local OpenLDAP directory, seeds it with users and groups, and publishes a ready-made `axon_server_ldap_setting` for the server role.
+
+**Use when**: You want AxonOps LDAP authentication and role mapping without an existing corporate directory, for demos, CI or small installs.
+
 ### Utility Roles
 
 #### [preflight](preflight.md)
@@ -108,6 +115,7 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **opensearch** | OpenSearch installation (preferred for on-premises) | Server, Chrony |
 | **elastic** | Elasticsearch installation (legacy / existing deployments) | Server |
 | **java** | Java installation | Cassandra, Elastic |
+| **openldap** | Local LDAP directory for AxonOps auth | Server |
 | **preflight** | System validation | Before any installation |
 
 ## Common Deployment Patterns
@@ -334,6 +342,40 @@ Deploy the AxonOps operator and a full AxonOps platform stack on Kubernetes. The
 **Roles needed**: `axonops.axonops.operator`
 
 **See**: [operator.md](operator.md)
+
+---
+
+### Pattern 9: Self-Hosted AxonOps Server with Local LDAP Authentication
+
+Add a local OpenLDAP directory when there's no corporate directory available yet, and wire
+axon-server to authenticate against it:
+
+```yaml
+- hosts: ldap
+  vars:
+    openldap_admin_password: "{{ vault_openldap_admin_password }}"
+  roles:
+    - role: axonops.axonops.openldap
+
+- hosts: axon-server
+  vars:
+    axon_server_license_key: "{{ vault_axon_server_license_key }}"  # required for LDAP
+    axon_server_ldap_enabled: true
+    axon_server_ldap_setting: >-
+      {{ hostvars[groups['ldap'][0]]['openldap_axon_server_ldap_setting']
+         | combine({'bindPassword': vault_openldap_admin_password}) }}
+  roles:
+    - role: axonops.axonops.server
+```
+
+The `openldap` role seeds groups matching `rolesMapping` (`axonops_super`, `axonops_admin`,
+`axonops_readonly`, `axonops_backup`) and publishes `openldap_axon_server_ldap_setting` — without
+`bindPassword`, which must be added from vault as shown above. axon-server ignores LDAP settings
+without a license key.
+
+**Roles needed**: `axonops.axonops.openldap`, `axonops.axonops.server`
+
+**See**: [openldap.md](openldap.md), [server.md](server.md#ldap-configuration), [openldap-axon-server.yml](../../examples/openldap-axon-server.yml)
 
 ## Getting Started
 

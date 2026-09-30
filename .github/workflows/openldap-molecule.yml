@@ -1,0 +1,89 @@
+---
+name: OpenLDAP Molecule
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'roles/openldap/**'
+      - '.github/workflows/openldap-molecule.yml'
+  pull_request:
+    paths:
+      - 'roles/openldap/**'
+      - '.github/workflows/openldap-molecule.yml'
+
+defaults:
+  run:
+    working-directory: roles/openldap
+
+jobs:
+  molecule:
+    name: Molecule OpenLDAP (${{ matrix.scenario }} / ${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - rockylinux9
+          - rockylinux10
+          - ubuntu2204
+          - ubuntu2404
+          - ubuntu2604
+          - debian12
+          - debian13
+        scenario:
+          - default
+          - tls
+          - no-password
+
+    steps:
+      - name: Check out the codebase.
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install test dependencies.
+        run: pip3 install ansible molecule molecule-plugins[docker] docker
+
+      - name: Run Molecule destroy (ignore failures)
+        run: molecule -v destroy -s ${{ matrix.scenario }}
+        continue-on-error: true
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: openldap-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule converge
+        run: molecule -v converge -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: openldap-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule idempotence
+        if: matrix.scenario != 'no-password'
+        run: molecule -v idempotence -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: openldap-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule verify
+        if: matrix.scenario != 'no-password'
+        run: molecule -v verify -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: openldap-${{ matrix.scenario }}-${{ matrix.distro }}
