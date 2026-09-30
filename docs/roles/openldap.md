@@ -19,7 +19,7 @@ The `server` role does not depend on this role. You can point axon-server at any
 
 - Ansible 2.15 or higher
 - `community.general` collection (LDAP modules): `ansible-galaxy collection install community.general`
-- A clean target host with systemd. The role refuses to run on a host that already has an OpenLDAP database it did not create.
+- A target host with systemd and no OpenLDAP data you need to keep. The role replaces an *empty* package-default database (for example the EL `dc=my-domain,dc=com` placeholder created when `slapd` was started once). It refuses to touch a database that holds entries.
 - Supported platforms: Rocky Linux / RHEL 9 and 10, Ubuntu 22.04 / 24.04 / 26.04, Debian 12 / 13
 
 The role installs these packages on the target host:
@@ -265,7 +265,7 @@ Run these steps once against a real axon-server:
 
 1. **Preflight.** Asserts the admin password, base DN, TLS settings, groups and users are valid.
 2. **Install.** Installs the packages. On Debian and Ubuntu, `slapd` is preseeded not to create a database.
-3. **Bootstrap.** On the first run only, the role builds a minimal `cn=config` tree with `slapadd -n 0`: modules, the core/cosine/nis/inetorgperson schemas, and the MDB database at `olcDatabase={1}mdb`. On the RHEL family this replaces the package's placeholder configuration. If the host already has a database the role did not create, the role stops.
+3. **Bootstrap.** On the first run only, the role builds a minimal `cn=config` tree with `slapadd -n 0`: modules, the core/cosine/nis/inetorgperson schemas, and the MDB database at `olcDatabase={1}mdb`. On the RHEL family this replaces the package's placeholder configuration. If `slapd` was already started with the package default configuration, the role stops it and replaces the database only when it is empty. A database with entries makes the role stop without changes.
 4. **Service.** Sets the listeners (systemd drop-in on the RHEL family, `/etc/default/slapd` on Debian and Ubuntu) and starts `slapd`.
 5. **Online configuration.** Over `ldapi:///`, sets the log level, TLS files, ACLs, overlays and the admin password.
 6. **Seeding.** Creates the base entry, OUs, users and groups. A password is re-hashed only when a bind with the configured password fails, so reruns report `changed=0`.

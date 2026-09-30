@@ -13,17 +13,69 @@
     path: "{{ openldap_data_dir }}/data.mdb"
   register: _openldap_data_file
 
-- name: Refuse to overwrite a directory this role did not create
-  ansible.builtin.fail:
-    msg: >-
-      {{ openldap_data_dir }}/data.mdb exists but
-      {{ _openldap_config_root }}/slapd.d has no olcDatabase={1}mdb entry. This
-      host already runs an OpenLDAP directory that this role did not create.
-      The role will not replace it. Move the existing data and configuration
-      away, or use a clean host.
+# A data.mdb without our {1}mdb config usually means slapd was started once
+# with the package default database (dc=my-domain,dc=com on EL). That is safe
+# to replace only if every existing MDB database is empty.
+- name: Inspect an existing directory the role did not create
   when:
     - not _openldap_mdb_config.stat.exists
     - _openldap_data_file.stat.exists
+  block:
+    - name: List existing MDB database suffixes
+      ansible.builtin.command:
+        argv:
+          - slapcat
+          - -F
+          - "{{ _openldap_config_root }}/slapd.d"
+          - -n
+          - "0"
+          - -a
+          - (objectClass=olcMdbConfig)
+      register: _openldap_existing_dbs
+      changed_when: false
+
+    - name: Count entries in each existing MDB database
+      ansible.builtin.command:
+        argv:
+          - slapcat
+          - -F
+          - "{{ _openldap_config_root }}/slapd.d"
+          - -b
+          - "{{ item }}"
+      loop: "{{ _openldap_existing_suffixes }}"
+      register: _openldap_existing_entries
+      changed_when: false
+
+    - name: Refuse to overwrite a directory this role did not create
+      ansible.builtin.fail:
+        msg: >-
+          {{ openldap_data_dir }}/data.mdb exists but
+          {{ _openldap_config_root }}/slapd.d has no olcDatabase={1}mdb entry,
+          and the existing database ({{ _openldap_existing_suffixes | join(', ') }})
+          holds entries. This host already runs an OpenLDAP directory that this
+          role did not create. The role will not replace it. Move the existing
+          data and configuration away, or use a clean host.
+      when: >-
+        _openldap_existing_entries.results
+        | map(attribute='stdout') | select | list | length > 0
+
+    - name: Stop slapd before replacing the empty package default database
+      ansible.builtin.systemd:
+        name: slapd
+        state: stopped
+      when: openldap_start_on_install
+
+    - name: Remove the empty package default database files
+      ansible.builtin.file:
+        path: "{{ openldap_data_dir }}/{{ item }}"
+        state: absent
+      loop:
+        - data.mdb
+        - lock.mdb
+  vars:
+    _openldap_existing_suffixes: >-
+      {{ _openldap_existing_dbs.stdout | default('')
+         | regex_findall('(?m)^olcSuffix: (.+)$') }}
 
 - name: Bootstrap cn=config
   when: not _openldap_mdb_config.stat.exists
