@@ -1,7 +1,6 @@
 ---
 - name: Converge
   hosts: all
-  become: true
   vars:
     # Test-only credentials for a throwaway container.
     openldap_admin_password: "molecule-admin-pass"

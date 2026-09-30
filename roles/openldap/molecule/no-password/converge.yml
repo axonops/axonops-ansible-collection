@@ -3,7 +3,6 @@
 # openldap_admin_password is not set, before it installs anything.
 - name: Converge
   hosts: all
-  become: true
   tasks:
     - name: Run the role without openldap_admin_password
       block:

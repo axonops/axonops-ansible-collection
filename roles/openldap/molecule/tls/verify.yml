@@ -1,7 +1,6 @@
 ---
 - name: Verify
   hosts: all
-  become: true
   gather_facts: true
   vars:
     base_dn: "dc=axonops,dc=local"

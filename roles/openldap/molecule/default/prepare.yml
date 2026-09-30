@@ -4,7 +4,6 @@
 # payloads) under a fresh tmpfs. Mask it before converge.
 - name: Prepare
   hosts: all
-  become: true
   gather_facts: false
   tasks:
     - name: Mask tmp.mount
