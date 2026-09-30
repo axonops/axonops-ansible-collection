@@ -92,7 +92,7 @@ An image published under a release tag therefore contains that tag of the collec
 
 | Component | Pinned to | Defined in |
 | --- | --- | --- |
-| Base image | `quay.io/centos/centos:stream9`, by manifest digest, plus `python3.12` | `execution-environment.yml` |
+| Base image | `quay.io/centos/centos:stream9` (tag), plus `python3.12` | `execution-environment.yml` |
 | `ansible-core` | `2.18.4` | `execution-environment.yml` |
 | `ansible-runner` | `2.4.1` | `execution-environment.yml` |
 | `axonops.axonops` collection | An explicit git tag of this repository | `requirements.yml` |
