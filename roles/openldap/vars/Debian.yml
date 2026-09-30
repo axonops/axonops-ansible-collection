@@ -1,0 +1,15 @@
+---
+_openldap_packages:
+  - slapd
+  - ldap-utils
+  - python3-ldap
+_openldap_user: openldap
+_openldap_group: openldap
+_openldap_config_root: /etc/ldap
+_openldap_schema_dir: /etc/ldap/schema
+_openldap_module_path: /usr/lib/ldap
+_openldap_modules:
+  - back_mdb
+  - memberof
+  - refint
+_openldap_run_dir: /run/slapd

@@ -1,0 +1,42 @@
+---
+# Publishes openldap_axon_server_ldap_setting, a ready-made value for the
+# server role's axon_server_ldap_setting. Keys are camelCase because
+# axon-server reads them verbatim. bindPassword is left out on purpose so the
+# admin password never lands in a fact cache; the consumer adds it from vault.
+
+- name: Build axon-server rolesMapping from openldap_groups
+  ansible.builtin.set_fact:
+    _openldap_roles_mapping: >-
+      {{ _openldap_roles_mapping | default({}) | combine({
+           item.axon_role: 'cn=' ~ item.name ~ ',' ~ openldap_groups_ou ~ ',' ~ openldap_base_dn
+         }) }}
+  loop: "{{ openldap_groups | selectattr('axon_role', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Publish openldap_axon_server_ldap_setting
+  ansible.builtin.set_fact:
+    openldap_axon_server_ldap_setting:
+      host: "{{ openldap_axon_server_host }}"
+      port: "{{ (openldap_ldaps_port if openldap_listen_ldaps else openldap_ldap_port) | int }}"
+      useSSL: "{{ openldap_listen_ldaps | bool }}"
+      startTLS: "{{ (not openldap_listen_ldaps) and openldap_tls_mode != 'disabled' }}"
+      insecureSkipVerify: "{{ openldap_axon_server_insecure_skip_verify | bool }}"
+      base: "{{ openldap_base_dn }}"
+      bindDN: "{{ openldap_admin_dn }}"
+      userFilter: "(uid=%s)"
+      rolesAttribute: memberOf
+      callAttempts: 3
+      rolesMapping:
+        _global_: "{{ _openldap_roles_mapping | default({}) }}"
+
+- name: Warn that axon-server will not verify the LDAP certificate
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: openldap_axon_server_ldap_setting has insecureSkipVerify: true,
+      so axon-server will not verify this directory's certificate. Trust the CA
+      on the axon-server host and set
+      openldap_axon_server_insecure_skip_verify: false.
+  when:
+    - openldap_tls_mode != 'disabled'
+    - openldap_axon_server_insecure_skip_verify | bool

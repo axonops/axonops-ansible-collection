@@ -1,0 +1,15 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    # Test-only credentials for a throwaway container.
+    openldap_admin_password: "molecule-admin-pass"
+    openldap_tls_mode: generate
+    openldap_listen_ldaps: true
+    openldap_users:
+      - uid: carol
+        password: "carol-pass"
+        groups: [axonops_super]
+  roles:
+    - role: openldap

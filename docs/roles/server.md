@@ -80,6 +80,8 @@ for new on-premises deployments. The same `axon_server_searchdb_*` variables are
 | `axon_server_ldap_enabled` | `false` | Enable LDAP authentication |
 | `axon_server_ldap_setting` | - | LDAP configuration object (see example below) |
 
+No directory yet? The [openldap](openldap.md) role installs a local OpenLDAP server, seeds groups that match `rolesMapping`, and publishes a ready-made `axon_server_ldap_setting`.
+
 ### Retention Configuration
 
 | Variable | Default | Description |

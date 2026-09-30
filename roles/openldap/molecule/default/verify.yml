@@ -1,0 +1,94 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    base_dn: "dc=axonops,dc=local"
+    admin_dn: "cn=admin,dc=axonops,dc=local"
+    admin_pw: "molecule-admin-pass"
+    alice_dn: "uid=alice,ou=People,dc=axonops,dc=local"
+  tasks:
+    - name: Check slapd is running
+      ansible.builtin.systemd_service:
+        name: slapd
+      register: openldap_verify_slapd
+      failed_when: openldap_verify_slapd.status.ActiveState != 'active'
+
+    - name: Search the directory as admin
+      ansible.builtin.command:
+        argv: [ldapsearch, -x, -LLL, -H, "ldap://localhost", -D, "{{ admin_dn }}", -w, "{{ admin_pw }}",
+               -b, "{{ base_dn }}", dn]
+      register: openldap_verify_all
+      changed_when: false
+
+    - name: Assert base DN, OUs, groups and users exist
+      ansible.builtin.assert:
+        that:
+          - "'dn: ' ~ base_dn in openldap_verify_all.stdout"
+          - "'dn: ou=People,' ~ base_dn in openldap_verify_all.stdout"
+          - "'dn: ou=Groups,' ~ base_dn in openldap_verify_all.stdout"
+          - "'dn: cn=axonops_super,ou=Groups,' ~ base_dn in openldap_verify_all.stdout"
+          - "'dn: cn=axonops_admin,ou=Groups,' ~ base_dn in openldap_verify_all.stdout"
+          - "'dn: cn=axonops_readonly,ou=Groups,' ~ base_dn in openldap_verify_all.stdout"
+          - "'dn: cn=axonops_backup,ou=Groups,' ~ base_dn in openldap_verify_all.stdout"
+          - "'dn: ' ~ alice_dn in openldap_verify_all.stdout"
+          - "'dn: uid=bob,ou=People,' ~ base_dn in openldap_verify_all.stdout"
+
+    - name: Bind as alice and read her memberOf
+      ansible.builtin.command:
+        argv: [ldapsearch, -x, -LLL, -H, "ldap://localhost", -D, "{{ alice_dn }}", -w, alice-pass,
+               -b, "{{ alice_dn }}", -s, base, memberOf]
+      register: openldap_verify_alice
+      changed_when: false
+
+    - name: Assert alice memberOf lists her groups
+      ansible.builtin.assert:
+        that:
+          - "'memberOf: cn=axonops_admin,ou=Groups,' ~ base_dn in openldap_verify_alice.stdout"
+          - "'memberOf: cn=axonops_backup,ou=Groups,' ~ base_dn in openldap_verify_alice.stdout"
+          - "'axonops_readonly' not in openldap_verify_alice.stdout"
+
+    - name: Bind as alice with a wrong password
+      ansible.builtin.command:
+        argv: [ldapwhoami, -x, -H, "ldap://localhost", -D, "{{ alice_dn }}", -w, wrong-pass]
+      register: openldap_verify_wrong
+      changed_when: false
+      failed_when: openldap_verify_wrong.rc != 49
+
+    - name: Search the directory anonymously
+      ansible.builtin.command:
+        argv: [ldapsearch, -x, -LLL, -H, "ldap://localhost", -b, "{{ base_dn }}", "(objectClass=*)"]
+      register: openldap_verify_anon
+      changed_when: false
+      failed_when: false
+
+    - name: Assert anonymous users cannot read entries
+      ansible.builtin.assert:
+        that:
+          - "alice_dn not in openldap_verify_anon.stdout"
+          - "'userPassword' not in openldap_verify_anon.stdout"
+
+    - name: Read the root DSE anonymously
+      ansible.builtin.command:
+        argv: [ldapsearch, -x, -LLL, -H, "ldap://localhost", -b, "", -s, base, namingContexts]
+      register: openldap_verify_rootdse
+      changed_when: false
+
+    - name: Assert the root DSE is readable
+      ansible.builtin.assert:
+        that:
+          - "'namingContexts: ' ~ base_dn in openldap_verify_rootdse.stdout"
+
+    - name: Read alice's password hash as admin
+      ansible.builtin.command:
+        argv: [ldapsearch, -x, -LLL, -o, ldif-wrap=no, -H, "ldap://localhost", -D, "{{ admin_dn }}", -w, "{{ admin_pw }}",
+               -b, "{{ alice_dn }}", -s, base, userPassword]
+      register: openldap_verify_hash
+      changed_when: false
+
+    - name: Assert the password is stored hashed
+      ansible.builtin.assert:
+        that:
+          # userPassword is base64 in LDIF; "{SSHA}" encodes to "e1NTSEF9".
+          - "'userPassword:: e1NTSEF9' in openldap_verify_hash.stdout"

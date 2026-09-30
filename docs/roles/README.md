@@ -83,6 +83,13 @@ Installs Java (OpenJDK or Azul Zulu) on target systems.
 
 **Use when**: Deploying Cassandra, Elasticsearch, or any Java-dependent component.
 
+### Security Roles
+
+#### [openldap](openldap.md)
+Installs a local OpenLDAP directory, seeds it with users and groups, and publishes a ready-made `axon_server_ldap_setting` for the server role.
+
+**Use when**: You want AxonOps LDAP authentication and role mapping without an existing corporate directory, for demos, CI or small installs.
+
 ### Utility Roles
 
 #### [preflight](preflight.md)
@@ -108,6 +115,7 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **opensearch** | OpenSearch installation (preferred for on-premises) | Server, Chrony |
 | **elastic** | Elasticsearch installation (legacy / existing deployments) | Server |
 | **java** | Java installation | Cassandra, Elastic |
+| **openldap** | Local LDAP directory for AxonOps auth | Server |
 | **preflight** | System validation | Before any installation |
 
 ## Common Deployment Patterns

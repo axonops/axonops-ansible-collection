@@ -1,0 +1,84 @@
+---
+# Builds a minimal cn=config tree with slapadd the first time the role runs.
+# Everything that can change later (ACLs, TLS, overlays, root password) is
+# managed online over ldapi:/// in config.yml, so it stays idempotent.
+
+- name: Check for a role-managed cn=config database
+  ansible.builtin.stat:
+    path: "{{ _openldap_config_root }}/slapd.d/cn=config/olcDatabase={1}mdb.ldif"
+  register: _openldap_mdb_config
+
+- name: Check for existing directory data
+  ansible.builtin.stat:
+    path: "{{ openldap_data_dir }}/data.mdb"
+  register: _openldap_data_file
+
+- name: Refuse to overwrite a directory this role did not create
+  ansible.builtin.fail:
+    msg: >-
+      {{ openldap_data_dir }}/data.mdb exists but
+      {{ _openldap_config_root }}/slapd.d has no olcDatabase={1}mdb entry. This
+      host already runs an OpenLDAP directory that this role did not create.
+      The role will not replace it. Move the existing data and configuration
+      away, or use a clean host.
+  when:
+    - not _openldap_mdb_config.stat.exists
+    - _openldap_data_file.stat.exists
+
+- name: Bootstrap cn=config
+  when: not _openldap_mdb_config.stat.exists
+  block:
+    - name: Remove package default cn=config
+      ansible.builtin.file:
+        path: "{{ _openldap_config_root }}/slapd.d"
+        state: absent
+
+    - name: Create cn=config directory
+      ansible.builtin.file:
+        path: "{{ _openldap_config_root }}/slapd.d"
+        state: directory
+        owner: "{{ _openldap_user }}"
+        group: "{{ _openldap_group }}"
+        mode: "0750"
+
+    - name: Render bootstrap LDIF
+      ansible.builtin.template:
+        src: bootstrap.ldif.j2
+        dest: "{{ _openldap_config_root }}/axonops-bootstrap.ldif"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Load bootstrap LDIF into cn=config
+      ansible.builtin.command:
+        argv:
+          - slapadd
+          - -n
+          - "0"
+          - -F
+          - "{{ _openldap_config_root }}/slapd.d"
+          - -l
+          - "{{ _openldap_config_root }}/axonops-bootstrap.ldif"
+      changed_when: true
+
+    - name: Set cn=config ownership
+      ansible.builtin.file:
+        path: "{{ _openldap_config_root }}/slapd.d"
+        state: directory
+        recurse: true
+        owner: "{{ _openldap_user }}"
+        group: "{{ _openldap_group }}"
+
+  always:
+    - name: Remove bootstrap LDIF
+      ansible.builtin.file:
+        path: "{{ _openldap_config_root }}/axonops-bootstrap.ldif"
+        state: absent
+
+- name: Create data directory
+  ansible.builtin.file:
+    path: "{{ openldap_data_dir }}"
+    state: directory
+    owner: "{{ _openldap_user }}"
+    group: "{{ _openldap_group }}"
+    mode: "0700"

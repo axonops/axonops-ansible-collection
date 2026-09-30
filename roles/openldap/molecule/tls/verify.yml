@@ -1,0 +1,54 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    base_dn: "dc=axonops,dc=local"
+    carol_dn: "uid=carol,ou=People,dc=axonops,dc=local"
+    ca_file: "{{ '/etc/openldap' if ansible_facts['os_family'] == 'RedHat' else '/etc/ldap' }}/tls/ca.crt"
+  tasks:
+    - name: Wait for the LDAPS listener
+      ansible.builtin.wait_for:
+        port: 636
+        timeout: 30
+
+    - name: Bind as carol over LDAPS
+      ansible.builtin.command:
+        argv: [ldapsearch, -x, -LLL, -H, "ldaps://localhost:636", -D, "{{ carol_dn }}", -w, carol-pass,
+               -b, "{{ carol_dn }}", -s, base, memberOf]
+      environment:
+        LDAPTLS_CACERT: "{{ ca_file }}"
+        LDAPTLS_REQCERT: demand
+      register: openldap_verify_ldaps
+      changed_when: false
+
+    - name: Assert LDAPS search returns carol's groups
+      ansible.builtin.assert:
+        that:
+          - "'memberOf: cn=axonops_super,ou=Groups,' ~ base_dn in openldap_verify_ldaps.stdout"
+
+    - name: Bind as carol with StartTLS on 389
+      ansible.builtin.command:
+        argv: [ldapwhoami, -x, -ZZ, -H, "ldap://localhost:389", -D, "{{ carol_dn }}", -w, carol-pass]
+      environment:
+        LDAPTLS_CACERT: "{{ ca_file }}"
+        LDAPTLS_REQCERT: demand
+      register: openldap_verify_starttls
+      changed_when: false
+
+    - name: Assert StartTLS bind succeeded
+      ansible.builtin.assert:
+        that:
+          - "'dn:' ~ carol_dn in openldap_verify_starttls.stdout"
+
+    - name: Read certificate details
+      ansible.builtin.command:
+        argv: [openssl, x509, -in, "{{ ca_file }}", -noout, -ext, subjectAltName]
+      register: openldap_verify_san
+      changed_when: false
+
+    - name: Assert certificate carries localhost in its SANs
+      ansible.builtin.assert:
+        that:
+          - "'DNS:localhost' in openldap_verify_san.stdout"
