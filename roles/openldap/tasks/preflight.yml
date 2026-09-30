@@ -73,3 +73,11 @@
       non-empty string password, and every group in 'groups' must be listed in
       openldap_groups.
     quiet: true
+
+- name: Warn license key is not set
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: OpenLDAP server will be ignored by axon-server because axon_server_license_key is not set.
+               Set it to enable LDAP authentication in axon-server.
+  when: axon_server_license_key is not defined or axon_server_license_key | length == 0
+  tags: always
