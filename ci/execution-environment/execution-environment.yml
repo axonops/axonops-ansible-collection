@@ -19,7 +19,8 @@ version: 3
 
 images:
   base_image:
-    # centos:stream9, pinned by manifest-list digest (multi-arch).
+    # centos:stream9, pinned by tag (multi-arch). Not pinned by digest:
+    # quay.io prunes old stream9 digests, which breaks every build.
     #
     # stream9 ships Python 3.9 as /usr/bin/python3, which ansible-core 2.18 does
     # not support, so python3.12 is installed below and the build is run with
@@ -29,7 +30,7 @@ images:
     # requires the x86-64-v3 CPU baseline: it cannot be built under QEMU
     # emulation on Apple Silicon, and it refuses to run on pre-Haswell x86
     # hardware. stream9 keeps both working.
-    name: quay.io/centos/centos:stream9@sha256:64e5a212e4f2e7b706dbd822968914bb8def7de0a7fdfd3bf248241f8758101c
+    name: quay.io/centos/centos:stream9
 
 dependencies:
   ansible_core:
