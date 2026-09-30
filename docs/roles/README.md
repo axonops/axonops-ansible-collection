@@ -343,6 +343,40 @@ Deploy the AxonOps operator and a full AxonOps platform stack on Kubernetes. The
 
 **See**: [operator.md](operator.md)
 
+---
+
+### Pattern 9: Self-Hosted AxonOps Server with Local LDAP Authentication
+
+Add a local OpenLDAP directory when there's no corporate directory available yet, and wire
+axon-server to authenticate against it:
+
+```yaml
+- hosts: ldap
+  vars:
+    openldap_admin_password: "{{ vault_openldap_admin_password }}"
+  roles:
+    - role: axonops.axonops.openldap
+
+- hosts: axon-server
+  vars:
+    axon_server_license_key: "{{ vault_axon_server_license_key }}"  # required for LDAP
+    axon_server_ldap_enabled: true
+    axon_server_ldap_setting: >-
+      {{ hostvars[groups['ldap'][0]]['openldap_axon_server_ldap_setting']
+         | combine({'bindPassword': vault_openldap_admin_password}) }}
+  roles:
+    - role: axonops.axonops.server
+```
+
+The `openldap` role seeds groups matching `rolesMapping` (`axonops_super`, `axonops_admin`,
+`axonops_readonly`, `axonops_backup`) and publishes `openldap_axon_server_ldap_setting` — without
+`bindPassword`, which must be added from vault as shown above. axon-server ignores LDAP settings
+without a license key.
+
+**Roles needed**: `axonops.axonops.openldap`, `axonops.axonops.server`
+
+**See**: [openldap.md](openldap.md), [server.md](server.md#ldap-configuration), [openldap-axon-server.yml](../../examples/openldap-axon-server.yml)
+
 ## Getting Started
 
 1. **Choose your deployment pattern** from the list above

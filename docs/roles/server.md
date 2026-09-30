@@ -80,7 +80,12 @@ for new on-premises deployments. The same `axon_server_searchdb_*` variables are
 | `axon_server_ldap_enabled` | `false` | Enable LDAP authentication |
 | `axon_server_ldap_setting` | - | LDAP configuration object (see example below) |
 
-No directory yet? The [openldap](openldap.md) role installs a local OpenLDAP server, seeds groups that match `rolesMapping`, and publishes a ready-made `axon_server_ldap_setting`.
+No directory yet? The [openldap](openldap.md) role installs a local OpenLDAP server, seeds groups that match `rolesMapping`, and publishes a ready-made `openldap_axon_server_ldap_setting` fact. That fact never includes `bindPassword` — combine it with the password from vault before assigning it to `axon_server_ldap_setting`:
+
+```yaml
+axon_server_ldap_setting: >-
+  {{ openldap_axon_server_ldap_setting | combine({'bindPassword': vault_openldap_admin_password}) }}
+```
 
 ### Retention Configuration
 
