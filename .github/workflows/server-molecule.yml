@@ -62,3 +62,12 @@ jobs:
           MOLECULE_DISTRO: ${{ matrix.distro }}
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
           MOLECULE_INSTANCE_NAME: server-${{ matrix.distro }}
+
+      - name: Run Molecule verify
+        run: molecule -v verify
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: server-${{ matrix.distro }}
