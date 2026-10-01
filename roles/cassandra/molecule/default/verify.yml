@@ -89,6 +89,15 @@
           - verify_venv_cqlsh.stat.exists
         fail_msg: cqlsh was not installed into {{ cassandra_cqlsh_venv_path }}
 
+    - name: GIVEN — the installed OS packages
+      ansible.builtin.package_facts:
+
+    - name: THEN — python3-setuptools is installed (required by ansible.builtin.pip, issue #155)
+      ansible.builtin.assert:
+        that:
+          - "'python3-setuptools' in ansible_facts.packages"
+        fail_msg: python3-setuptools not installed; ansible.builtin.pip cannot run on a bare host
+
     - name: GIVEN — the wrapper was installed
       ansible.builtin.stat:
         path: "{{ cassandra_cqlsh_wrapper_path }}"

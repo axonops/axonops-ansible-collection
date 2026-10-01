@@ -1,0 +1,41 @@
+---
+# Reproduce a bare host without setuptools (issue #155: cqlsh venv fails on
+# Rocky Linux 10). The geerlingguy test images pre-install setuptools because they
+# install Ansible with pip, which masks the bug. Strip it so converge proves
+# the role installs python3-setuptools itself.
+- name: Prepare
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Remove the python3-setuptools RPM without touching dependents (RedHat)
+      when: ansible_os_family == "RedHat"
+      ansible.builtin.command: rpm -e --nodeps python3-setuptools  # noqa: command-instead-of-module
+      register: prepare_rpm_remove
+      changed_when: prepare_rpm_remove.rc == 0
+      failed_when: false
+
+    - name: Remove the python3-setuptools deb without touching dependents (Debian)
+      when: ansible_os_family == "Debian"
+      ansible.builtin.command: dpkg --remove --force-depends python3-setuptools
+      register: prepare_deb_remove
+      changed_when: prepare_deb_remove.rc == 0
+      failed_when: false
+
+    - name: Remove any pip-installed setuptools from the system Python
+      ansible.builtin.command: >-
+        {{ ansible_python.executable }} -m pip uninstall -y --break-system-packages setuptools
+      register: prepare_pip_remove
+      changed_when: "'Successfully uninstalled' in prepare_pip_remove.stdout"
+      failed_when: false
+
+    - name: Check whether pkg_resources is still importable
+      ansible.builtin.command: "{{ ansible_python.executable }} -c 'import pkg_resources'"
+      register: prepare_pkg_resources
+      changed_when: false
+      failed_when: false
+
+    - name: Assert the host no longer has setuptools
+      ansible.builtin.assert:
+        that:
+          - prepare_pkg_resources.rc != 0
+        fail_msg: setuptools still importable; prepare could not reproduce a bare host
