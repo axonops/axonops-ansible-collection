@@ -229,9 +229,40 @@ Two mechanisms are supported:
 
 The inter-broker/controller identity (`kafka_sasl_inter_broker_user`) is added to `super.users` automatically.
 
+#### Controller listener (KRaft)
+
+The KRaft `CONTROLLER` listener (port 9093) always uses SASL `PLAIN`, even when `kafka_sasl_mechanism` is `SCRAM-SHA-*`. Broker and client listeners (port 9092) keep the mechanism you chose.
+
+Why: SCRAM credentials are stored in the cluster metadata log. Controllers can only read that log after the quorum elects a leader, so controllers cannot authenticate each other's vote requests with SCRAM and a multi-controller cluster never starts.
+
+| Listener | Protocol (TLS + SASL) | Protocol (SASL only) | Mechanism | Accepted identity |
+|----------|-----------------------|----------------------|-----------|-------------------|
+| Broker (`9092`) | `SASL_SSL` | `SASL_PLAINTEXT` | `kafka_sasl_mechanism` | SCRAM users or `kafka_sasl_plain_users` |
+| Controller (`9093`) | `SASL_SSL` | `SASL_PLAINTEXT` | `PLAIN` | `kafka_sasl_inter_broker_user` only |
+
+Notes:
+
+- No extra variables. The controller listener reuses `kafka_sasl_inter_broker_user` / `kafka_sasl_inter_broker_password`.
+- Enable TLS (`kafka_tls_enabled: true`) in production. Without TLS, `PLAIN` sends the inter-broker password over the network in clear text.
+- For tools run with `--bootstrap-controller`, use `/opt/kafka/config/controller-admin.properties`. For tools run with `--bootstrap-server`, use `/opt/kafka/config/admin.properties`.
+
+```bash
+# Quorum status through a controller
+/opt/kafka/bin/kafka-metadata-quorum.sh \
+  --bootstrap-controller localhost:9093 \
+  --command-config /opt/kafka/config/controller-admin.properties \
+  describe --status
+
+# Quorum status through a broker
+/opt/kafka/bin/kafka-metadata-quorum.sh \
+  --bootstrap-server localhost:9092 \
+  --command-config /opt/kafka/config/admin.properties \
+  describe --status
+```
+
 ### ACLs
 
-ACLs use `StandardAuthorizer` (KRaft-native, no ZooKeeper dependency). The `kafka_acls` list is declarative — the role applies rules via `kafka-acls.sh` after the broker starts. Requires `kafka_start_on_install: true` on first run.
+ACLs use `StandardAuthorizer` (KRaft-native, no ZooKeeper dependency). The `kafka_acls` list is declarative — the role applies rules via `kafka-acls.sh` after the broker starts. Existing rules are listed first and only missing rules are added, so re-runs report no change. Rules removed from `kafka_acls` are not deleted from the cluster. Requires `kafka_start_on_install: true` on first run.
 
 ## Node Roles
 
@@ -330,7 +361,7 @@ Listeners and the controller quorum voter list are derived automatically from th
 |----------|---------|-------------|
 | `kafka_sasl_enabled` | `false` | Enable SASL authentication. Requires `kafka_security_enabled: true`. |
 | `kafka_sasl_mechanism` | `SCRAM-SHA-512` | SASL mechanism: `SCRAM-SHA-512` (recommended) or `PLAIN`. |
-| `kafka_sasl_inter_broker_user` | `kafka-admin` | Username for inter-broker and broker-to-controller traffic. Added to `super.users` automatically. |
+| `kafka_sasl_inter_broker_user` | `kafka-admin` | Username for inter-broker and broker-to-controller traffic. Added to `super.users` automatically. The controller listener authenticates this identity with `PLAIN` (see [Controller listener (KRaft)](#controller-listener-kraft)). |
 | `kafka_sasl_inter_broker_password` | `""` | Password for `kafka_sasl_inter_broker_user`. Store in Ansible Vault. |
 | `kafka_sasl_users` | `[]` | Additional SCRAM users created via `kafka-configs.sh` after first start. Each entry: `{name: str, password: str}`. Ignored for `PLAIN`. |
 | `kafka_sasl_plain_users` | `[]` | Static credentials for `PLAIN` mechanism embedded in JAAS config. Each entry: `{name: str, password: str}`. Must include the inter-broker user. Ignored for SCRAM. |

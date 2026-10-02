@@ -2,9 +2,10 @@
 # ============================================================================
 # Kafka Role - ACL management (post-start)
 # ============================================================================
-# Applies declarative ACLs via kafka-acls.sh. StandardAuthorizer dedupes
-# additions internally, so re-running is safe; rules are not removed if they
-# disappear from kafka_acls (intentional — out of scope for this iteration).
+# Applies declarative ACLs via kafka-acls.sh. Existing ACLs are listed first
+# and only missing rules are added, so re-runs report no change. Rules are not
+# removed if they disappear from kafka_acls (intentional — out of scope for
+# this iteration).
 
 - name: Ensure kafka user tmp dir exists
   become: true
@@ -16,6 +17,25 @@
   delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
   run_once: true
 
+- name: List existing ACL rules
+  become: true
+  become_user: "{{ kafka_user }}"
+  vars:
+    ansible_remote_tmp: /tmp/.ansible_kafka
+  ansible.builtin.command:
+    argv:
+      - "{{ kafka__home }}/bin/kafka-acls.sh"
+      - --bootstrap-server
+      - localhost:9092
+      - --command-config
+      - "{{ kafka__admin_props_file }}"
+      - --list
+  register: kafka__reg_existing_acls
+  changed_when: false
+  check_mode: false
+  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  run_once: true
+
 - name: Add ACL rules
   become: true
   become_user: "{{ kafka_user }}"
@@ -23,10 +43,29 @@
     ansible_remote_tmp: /tmp/.ansible_kafka
     _perm: "{{ item.permission | default('Allow') | lower }}"
     _rt: "{{ item.resource_type | lower }}"
+    # CLI flag is kebab-case: TransactionalId -> --transactional-id.
     _resource_args: >-
       {{ ['--cluster'] if _rt == 'cluster'
-         else (['--' ~ _rt, item.resource_name]) }}
+         else (['--' ~ (item.resource_type | regex_replace('([a-z])([A-Z])', '\1-\2') | lower),
+                item.resource_name]) }}
     _host_flag: "{{ '--allow-host' if _perm == 'allow' else '--deny-host' }}"
+    # kafka-acls.sh --list prints one block per resource pattern, e.g.
+    #   Current ACLs for resource `ResourcePattern(resourceType=TOPIC, name=events, patternType=LITERAL)`:
+    #   	(principal=User:app1, host=*, operation=READ, permissionType=ALLOW)
+    # Enum values are UPPER_SNAKE_CASE (IdempotentWrite -> IDEMPOTENT_WRITE).
+    _pattern: >-
+      ResourcePattern(resourceType={{ item.resource_type | regex_replace('([a-z])([A-Z])', '\1_\2') | upper }},
+      name={{ 'kafka-cluster' if _rt == 'cluster' else item.resource_name }},
+      patternType={{ item.pattern_type | default('LITERAL') | upper }})`
+    _entry: >-
+      (principal={{ item.principal }}, host={{ item.host | default('*') }},
+      operation={{ item.operation | regex_replace('([a-z])([A-Z])', '\1_\2') | upper }},
+      permissionType={{ _perm | upper }})
+    _exists: >-
+      {{ kafka__reg_existing_acls.stdout.split('Current ACLs for resource `')
+         | select('match', _pattern | regex_escape)
+         | select('search', _entry | regex_escape)
+         | list | length > 0 }}
   ansible.builtin.command:
     argv: >-
       {{
@@ -45,8 +84,7 @@
   loop: "{{ kafka_acls }}"
   loop_control:
     label: "{{ item.principal }} {{ item.operation }} {{ item.resource_type }}:{{ item.resource_name | default('cluster') }}"
-  # StandardAuthorizer dedupes server-side, but kafka-acls.sh does not surface
-  # whether the rule was new. Reporting changed=true is the honest default.
+  when: not (_exists | bool)
   changed_when: true
   delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
   run_once: true

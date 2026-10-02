@@ -19,8 +19,31 @@
           - "'inter.broker.listener.name=SASL_SSL' in kafka_props"
           - "'sasl.enabled.mechanisms=SCRAM-SHA-512' in kafka_props"
           - "'sasl.mechanism.inter.broker.protocol=SCRAM-SHA-512' in kafka_props"
-          - "'sasl.mechanism.controller.protocol=SCRAM-SHA-512' in kafka_props"
+          - "'sasl.mechanism.controller.protocol=PLAIN' in kafka_props"
         fail_msg: "SASL_SSL/SCRAM block missing or incorrect"
+
+    # KRaft controllers cannot authenticate each other with SCRAM, so the
+    # CONTROLLER listener must use PLAIN even when clients use SCRAM.
+    - name: Assert CONTROLLER listener uses PLAIN, not SCRAM
+      ansible.builtin.assert:
+        that:
+          - "'listener.name.controller.sasl.enabled.mechanisms=PLAIN' in kafka_props"
+          - "'listener.name.controller.plain.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule' in kafka_props"
+          - "'user_kafka-admin=' in kafka_props"
+          - "'listener.name.controller.scram-sha-512' not in kafka_props"
+        fail_msg: "CONTROLLER listener must use SASL PLAIN"
+
+    - name: Read controller-admin.properties
+      ansible.builtin.slurp:
+        src: /opt/kafka/config/controller-admin.properties
+      register: kafka_ctrl_admin_content
+
+    - name: Assert controller-admin.properties matches the CONTROLLER listener
+      ansible.builtin.assert:
+        that:
+          - "'security.protocol=SASL_SSL' in (kafka_ctrl_admin_content.content | b64decode)"
+          - "'sasl.mechanism=PLAIN' in (kafka_ctrl_admin_content.content | b64decode)"
+        fail_msg: "controller-admin.properties must use SASL_SSL + PLAIN"
 
     - name: Assert inter-broker JAAS rendered
       ansible.builtin.assert:
