@@ -19,7 +19,11 @@
     - name: Remove the python3-setuptools OS package and its dependents (Debian)
       when: ansible_os_family == "Debian"
       ansible.builtin.apt:
-        name: python3-setuptools
+        # Debian/Ubuntu ship pkg_resources in its own package, which apt keeps
+        # when only python3-setuptools is removed
+        name:
+          - python3-setuptools
+          - python3-pkg-resources
         state: absent
 
     # --break-system-packages needs pip >= 23.0.1; on older pip this fails
