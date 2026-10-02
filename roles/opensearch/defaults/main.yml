@@ -62,6 +62,16 @@ opensearch_auth_type: internal
 opensearch_tls_mode: generate
 
 # --- TLS generate mode settings (opensearch_tls_mode == 'generate') ---
+# searchguard-tlstool archive downloaded on the control node. Override the URL
+# to use an internal mirror; keep the checksum in sync with the archive.
+# Checksum format: '<algorithm>:<hex digest>' (e.g. sha256:...).
+opensearch_tlstool_url: https://repo1.maven.org/maven2/com/floragunn/search-guard-tlstool/1.5/search-guard-tlstool-1.5.tar.gz
+opensearch_tlstool_checksum: sha256:97efc3cbc560a99e59bfdab3d896749a124d1945ce9c92d40bbfdbb10568aa70
+# Absolute path on the control node to a pre-downloaded tlstool archive. When set, the
+# role copies it instead of downloading opensearch_tlstool_url (still verified
+# against opensearch_tlstool_checksum). Use for air-gapped control nodes or
+# when Python downloads from Maven Central are unreliable.
+opensearch_tlstool_local_archive: ""
 # Certificate validity (days)
 opensearch_cert_valid_days: 730
 # Domain name used in certificate DNs

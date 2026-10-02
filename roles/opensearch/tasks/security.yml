@@ -93,15 +93,60 @@
           become: false
 
         - name: Download TLS certificate generation tool
+          when: opensearch_tlstool_local_archive | default('', true) | length == 0
           ansible.builtin.get_url:
-            url: https://search.maven.org/remotecontent?filepath=com/floragunn/search-guard-tlstool/1.5/search-guard-tlstool-1.5.tar.gz
+            url: "{{ opensearch_tlstool_url }}"
+            dest: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
+            # checksum makes get_url fail on a truncated download instead of
+            # keeping a partial archive that unarchive then cannot read
+            checksum: "{{ opensearch_tlstool_checksum }}"
+            timeout: 60
+            mode: "0644"
+          register: _tlstool_download
+          until: _tlstool_download is succeeded
+          retries: 3
+          delay: 5
+          delegate_to: localhost
+          run_once: true
+          become: false
+
+        - name: Copy pre-downloaded TLS certificate generation tool
+          when: opensearch_tlstool_local_archive | default('', true) | length > 0
+          ansible.builtin.copy:
+            src: "{{ opensearch_tlstool_local_archive }}"
             dest: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
             mode: "0644"
           delegate_to: localhost
           run_once: true
           become: false
 
+        - name: Checksum pre-downloaded TLS certificate generation tool
+          when: opensearch_tlstool_local_archive | default('', true) | length > 0
+          ansible.builtin.stat:
+            path: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
+            checksum_algorithm: "{{ opensearch_tlstool_checksum.split(':', 1)[0] | lower }}"
+          register: _tlstool_local
+          delegate_to: localhost
+          run_once: true
+          become: false
+
+        - name: Verify pre-downloaded TLS certificate generation tool
+          when: opensearch_tlstool_local_archive | default('', true) | length > 0
+          ansible.builtin.assert:
+            that:
+              - opensearch_tlstool_checksum is match('^(md5|sha1|sha224|sha256|sha384|sha512):[0-9a-fA-F]+$')
+              - _tlstool_local.stat.checksum | lower == opensearch_tlstool_checksum.split(':', 1)[1] | lower
+            fail_msg: >-
+              opensearch_tlstool_checksum must be '<algorithm>:<hex digest>', and
+              {{ opensearch_tlstool_local_archive }} must match
+              opensearch_tlstool_checksum ({{ opensearch_tlstool_checksum }});
+              the archive is truncated or a different version
+          run_once: true
+
         - name: Extract TLS tool
+          tags:
+            - opensearch
+            - ssl
           ansible.builtin.unarchive:
             src: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
             dest: /tmp/opensearch-nodecerts/

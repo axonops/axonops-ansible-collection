@@ -81,6 +81,9 @@ the distribution defaults. No directory is created in that case.
 |----------|---------|-------------|
 | `opensearch_cert_valid_days` | `730` | Certificate validity in days |
 | `opensearch_domain_name` | — | Domain name for certificate DNs |
+| `opensearch_tlstool_url` | Maven Central `search-guard-tlstool-1.5.tar.gz` | Download URL for `searchguard-tlstool` (override for an internal mirror) |
+| `opensearch_tlstool_checksum` | `sha256:97efc3cb…` | Checksum of the tlstool archive; truncated downloads fail and are retried |
+| `opensearch_tlstool_local_archive` | `""` | Pre-downloaded tlstool archive on the control node; skips the download, still checksum-verified |
 
 ### TLS Custom Mode (`opensearch_tls_mode: custom`)
 
