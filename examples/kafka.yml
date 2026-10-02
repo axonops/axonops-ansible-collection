@@ -1,0 +1,60 @@
+- name: Deploy Apache Kafka (KRaft) with AxonOps Agent
+  hosts: "{{ target | default('kafka') }}"
+  become: true
+  vars:
+    install_kafka: true
+    kafka_version: "4.0.0"
+    kafka_heap_size: 1G
+    # kafka_node_id is mandatory and must be unique per host: set it in the
+    # inventory (see examples/inventory). Every host in the play runs as a
+    # combined broker + controller and joins the KRaft quorum.
+    # Replication factors: use 1 for a single node, 3 for three or more nodes.
+    kafka_replication_factor: "{{ [ansible_play_hosts | length, 3] | min }}"
+    kafka_offsets_topic_replication_factor: "{{ [ansible_play_hosts | length, 3] | min }}"
+    kafka_transaction_state_log_replication_factor: "{{ [ansible_play_hosts | length, 3] | min }}"
+    kafka_transaction_state_log_min_isr: "{{ [[ansible_play_hosts | length - 1, 2] | min, 1] | max }}"
+    kafka_data_dirs:
+      - /var/lib/kafka/data
+    kafka_start_on_install: true
+    kafka_start_on_boot: true
+    kafka_topics:
+      - name: events
+        partitions: 3
+        replication_factor: "{{ [ansible_play_hosts | length, 3] | min }}"
+        config:
+          retention.ms: 604800000   # 7 days
+
+    # --- AxonOps agent ---
+    # The kafka role installs axon-agent and the Kafka Java agent itself; do
+    # not add the axonops.axonops.agent role separately.
+    kafka_axonops_agent_enabled: true
+    kafka_axonops_org: "mycompany"
+    kafka_axonops_cluster_name: "kafka-demo"
+    # Self-hosted AxonOps Server (see axon-server.yml). Port 1888 is used
+    # automatically for any host other than agents.axonops.cloud.
+    kafka_axonops_server_host: "{{ groups['axon-server'] | first }}"
+    # For AxonOps SaaS instead, remove kafka_axonops_server_host and set the
+    # agent key (store it in Ansible Vault):
+    # kafka_axonops_key: "{{ vault_axonops_api_key }}"
+
+  pre_tasks:
+    # This is only for this example to work, please review your firewall settings and requirements
+    - name: "Stop firewalld"
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: false
+        state: stopped
+      when: ansible_os_family == 'RedHat'
+      failed_when: false
+
+  roles:
+    - role: axonops.axonops.chrony
+      tags: ntp,chrony
+    - role: axonops.axonops.preflight
+      tags: preflight
+    # Java 17 is installed by the kafka role (kafka_java_install: true).
+    - role: axonops.axonops.kafka
+      tags: kafka
+      when: install_kafka is defined and install_kafka
+
+# code: language=ansible

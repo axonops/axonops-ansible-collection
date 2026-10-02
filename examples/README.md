@@ -99,6 +99,25 @@ Deploys Apache Cassandra 5.0 with AxonOps Agent (requires JDK 17).
 - `java_pkg`: Java package (e.g., `openjdk-17-jre-headless`)
 - `axon_java_agent`: Use `axon-cassandra5.0-agent-jdk17`
 
+### Kafka Deployments
+
+#### [kafka.yml](kafka.yml)
+Deploys Apache Kafka 4.0 in KRaft mode (no ZooKeeper) with the AxonOps Agent.
+
+**Features:**
+- Every host is a combined broker + controller; works for 1 or 3+ nodes
+- Replication factors scale with the number of hosts (capped at 3)
+- Java 17 installed by the kafka role
+- AxonOps Agent pointed at the self-hosted AxonOps Server (SaaS option commented)
+
+**Key Variables:**
+- `kafka_node_id`: Unique per host, set in the inventory (`kafka1 kafka_node_id=1`)
+- `kafka_axonops_org`: AxonOps organisation name (must match `axon_server_org_name`)
+- `kafka_axonops_cluster_name`: Cluster name shown in AxonOps
+- `kafka_axonops_server_host`: AxonOps Server host, or remove it and set `kafka_axonops_key` for SaaS
+
+See [docs/roles/kafka.md](../docs/roles/kafka.md) for TLS, SASL/SCRAM and ACL settings.
+
 ### Operations
 
 #### [cassandra-rolling-start.yml](cassandra-rolling-start.yml)
