@@ -52,6 +52,9 @@ platforms:
       - name: kafka-secured
 provisioner:
   name: ansible
+  connection_options:
+    ansible_user: root
+    ansible_become_method: su
   playbooks:
     prepare: prepare.yml
     converge: converge.yml
