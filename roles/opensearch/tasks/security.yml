@@ -93,7 +93,7 @@
           become: false
 
         - name: Download TLS certificate generation tool
-          when: not (opensearch_tlstool_local_archive | default('', true))
+          when: opensearch_tlstool_local_archive | default('', true) | length == 0
           ansible.builtin.get_url:
             url: "{{ opensearch_tlstool_url }}"
             dest: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
@@ -111,7 +111,7 @@
           become: false
 
         - name: Copy pre-downloaded TLS certificate generation tool
-          when: opensearch_tlstool_local_archive | default('', true)
+          when: opensearch_tlstool_local_archive | default('', true) | length > 0
           ansible.builtin.copy:
             src: "{{ opensearch_tlstool_local_archive }}"
             dest: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
@@ -121,22 +121,24 @@
           become: false
 
         - name: Checksum pre-downloaded TLS certificate generation tool
-          when: opensearch_tlstool_local_archive | default('', true)
+          when: opensearch_tlstool_local_archive | default('', true) | length > 0
           ansible.builtin.stat:
             path: /tmp/opensearch-nodecerts/search-guard-tlstool.tar.gz
-            checksum_algorithm: "{{ opensearch_tlstool_checksum.split(':', 1)[0] }}"
+            checksum_algorithm: "{{ opensearch_tlstool_checksum.split(':', 1)[0] | lower }}"
           register: _tlstool_local
           delegate_to: localhost
           run_once: true
           become: false
 
         - name: Verify pre-downloaded TLS certificate generation tool
-          when: opensearch_tlstool_local_archive | default('', true)
+          when: opensearch_tlstool_local_archive | default('', true) | length > 0
           ansible.builtin.assert:
             that:
-              - _tlstool_local.stat.checksum == opensearch_tlstool_checksum.split(':', 1)[1]
+              - opensearch_tlstool_checksum is match('^(md5|sha1|sha224|sha256|sha384|sha512):[0-9a-fA-F]+$')
+              - _tlstool_local.stat.checksum | lower == opensearch_tlstool_checksum.split(':', 1)[1] | lower
             fail_msg: >-
-              {{ opensearch_tlstool_local_archive }} does not match
+              opensearch_tlstool_checksum must be '<algorithm>:<hex digest>', and
+              {{ opensearch_tlstool_local_archive }} must match
               opensearch_tlstool_checksum ({{ opensearch_tlstool_checksum }});
               the archive is truncated or a different version
           run_once: true

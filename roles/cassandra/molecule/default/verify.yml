@@ -98,6 +98,18 @@
           - "'python3-setuptools' in ansible_facts.packages"
         fail_msg: python3-setuptools not installed; ansible.builtin.pip cannot run on a bare host
 
+    - name: WHEN — pkg_resources is imported by the system Python
+      ansible.builtin.command: "{{ ansible_python_interpreter | default('/usr/bin/python3') }} -c 'import pkg_resources'"
+      register: verify_pkg_resources
+      changed_when: false
+      failed_when: false
+
+    - name: THEN — pkg_resources imports (what ansible.builtin.pip actually needs)
+      ansible.builtin.assert:
+        that:
+          - verify_pkg_resources.rc == 0
+        fail_msg: "import pkg_resources failed: {{ verify_pkg_resources.stderr }}"
+
     - name: GIVEN — the wrapper was installed
       ansible.builtin.stat:
         path: "{{ cassandra_cqlsh_wrapper_path }}"

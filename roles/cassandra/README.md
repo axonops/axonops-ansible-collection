@@ -98,7 +98,7 @@ environments without a PyPI mirror.
 > host** needs network access (or an internal PyPI mirror) at provision time.
 > The venv is built with the target host's own `python3`; no additional Python
 > version is required. The role installs `python3-pip` and `python3-setuptools`
-> (plus `python3-venv` on Debian/Ubuntu) because `ansible.builtin.pip` needs
+> on all targets, plus `python3-venv` on Debian/Ubuntu, because `ansible.builtin.pip` needs
 > setuptools on the target.
 
 ## TLS

@@ -7,20 +7,23 @@
   hosts: all
   gather_facts: true
   tasks:
-    - name: Remove the python3-setuptools RPM without touching dependents (RedHat)
+    # Ansible in the test images runs from a pip install, so removing the OS
+    # package (and dependents such as python3-pip) is safe and leaves package
+    # manager state consistent. The role must reinstall them.
+    - name: Remove the python3-setuptools OS package and its dependents (RedHat)
       when: ansible_os_family == "RedHat"
-      ansible.builtin.command: rpm -e --nodeps python3-setuptools  # noqa: command-instead-of-module
-      register: prepare_rpm_remove
-      changed_when: prepare_rpm_remove.rc == 0
-      failed_when: false
+      ansible.builtin.dnf:
+        name: python3-setuptools
+        state: absent
 
-    - name: Remove the python3-setuptools deb without touching dependents (Debian)
+    - name: Remove the python3-setuptools OS package and its dependents (Debian)
       when: ansible_os_family == "Debian"
-      ansible.builtin.command: dpkg --remove --force-depends python3-setuptools
-      register: prepare_deb_remove
-      changed_when: prepare_deb_remove.rc == 0
-      failed_when: false
+      ansible.builtin.apt:
+        name: python3-setuptools
+        state: absent
 
+    # --break-system-packages needs pip >= 23.0.1; on older pip this fails
+    # silently, but the pkg_resources assertion below still catches leftovers.
     - name: Remove any pip-installed setuptools from the system Python
       ansible.builtin.command: >-
         {{ ansible_python.executable }} -m pip uninstall -y --break-system-packages setuptools

@@ -30,7 +30,8 @@
     kafka_axonops_agent_enabled: true
     kafka_axonops_org: "mycompany"
     kafka_axonops_cluster_name: "kafka-demo"
-    # Self-hosted AxonOps Server (see axon-server.yml). Port 1888 is used
+    # Self-hosted AxonOps Server (see axon-server.yml); requires an
+    # [axon-server] group in the inventory. Port 1888 is used
     # automatically for any host other than agents.axonops.cloud.
     kafka_axonops_server_host: "{{ groups['axon-server'] | first }}"
     # For AxonOps SaaS instead, remove kafka_axonops_server_host and set the

@@ -79,8 +79,8 @@ In `generate` mode, the role downloads and runs the `searchguard-tlstool` on the
 | `opensearch_cert_valid_days` | `730` | Number of days the generated certificates remain valid |
 | `opensearch_domain_name` | _(not set)_ | Domain suffix used in certificate Distinguished Names and DNS SANs (e.g. `example.com`). Required in generate mode |
 | `opensearch_tlstool_url` | Maven Central `search-guard-tlstool-1.5.tar.gz` | Where the control node downloads `searchguard-tlstool`. Point at an internal mirror for air-gapped control nodes |
-| `opensearch_tlstool_checksum` | `sha256:97efc3cb…` (tlstool 1.5) | Checksum of the archive; the download is retried and fails on mismatch (e.g. a truncated download). Update it if you change the URL to a different version |
-| `opensearch_tlstool_local_archive` | `""` | Path on the control node to a pre-downloaded tlstool archive (e.g. `~/Downloads/search-guard-tlstool-1.5.tar.gz`). When set, the role uses it instead of downloading; it must still match `opensearch_tlstool_checksum` |
+| `opensearch_tlstool_checksum` | `sha256:97efc3cb…` (tlstool 1.5) | Checksum of the archive as `<algorithm>:<hex digest>`; the download is retried and fails on mismatch (e.g. a truncated download). Update it if you change the URL to a different version |
+| `opensearch_tlstool_local_archive` | `""` | Absolute path on the control node to a pre-downloaded tlstool archive (e.g. `~/Downloads/search-guard-tlstool-1.5.tar.gz`). When set, the role uses it instead of downloading; it must still match `opensearch_tlstool_checksum` |
 
 #### TLS: `custom` mode
 
