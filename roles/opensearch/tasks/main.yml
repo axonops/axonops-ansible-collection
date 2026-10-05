@@ -31,6 +31,36 @@
   when: opensearch_security_enabled
   tags: always
 
+- name: Validate snapshot repository settings
+  ansible.builtin.assert:
+    that:
+      - opensearch_snapshot_type in ['s3', 'gcs']
+      - opensearch_snapshot_bucket | length > 0
+      - opensearch_snapshot_client | length > 0
+      - opensearch_snapshot_repository_name | length > 0
+      - (opensearch_snapshot_s3_access_key | length > 0) == (opensearch_snapshot_s3_secret_key | length > 0)
+      - opensearch_snapshot_s3_session_token | length == 0 or opensearch_snapshot_s3_access_key | length > 0
+      - opensearch_snapshot_s3_protocol in ['', 'http', 'https']
+      - opensearch_snapshot_client is match('^[A-Za-z0-9_-]+$')
+      - opensearch_snapshot_repository_name is match('^[a-z0-9_.-]+$')
+      - opensearch_snapshot_s3_extra_settings is mapping
+      - opensearch_snapshot_s3_extra_settings.keys() | reject('match', '^[a-z0-9_]+$') | list | length == 0
+      - opensearch_snapshot_s3_extra_settings.keys() | intersect(['access_key', 'secret_key', 'session_token']) | length == 0
+      - opensearch_snapshot_policy is mapping
+      - opensearch_snapshot_policy | length == 0 or opensearch_snapshot_policy.name | default('') is match('^[A-Za-z0-9_.-]+$')
+    fail_msg: >-
+      Invalid snapshot settings: opensearch_snapshot_type must be 's3' or 'gcs',
+      opensearch_snapshot_bucket must not be empty, opensearch_snapshot_client
+      and opensearch_snapshot_repository_name must be plain names (letters,
+      digits, '_', '-', and '.' for the repository),
+      opensearch_snapshot_s3_access_key and opensearch_snapshot_s3_secret_key must be
+      set together (a session token needs both), opensearch_snapshot_s3_protocol must be 'http' or 'https',
+      opensearch_snapshot_s3_extra_settings must be a mapping of plain setting names without credential keys,
+      and opensearch_snapshot_policy needs a plain 'name' when set.
+    quiet: true
+  when: opensearch_snapshot_enabled
+  tags: always
+
 - name: Populate /etc/hosts
   ansible.builtin.import_tasks: etchosts.yml
   when: opensearch_populate_etc_hosts
@@ -43,6 +73,16 @@
 - name: Install OpenSearch
   ansible.builtin.import_tasks: opensearch.yml
   tags: install
+
+# Before security.yml: it starts OpenSearch, which fails on s3.*/gcs.* settings
+# in opensearch.yml when the repository plugin is not yet installed.
+- name: Install snapshot repository plugin and credentials
+  ansible.builtin.import_tasks: snapshot.yml
+  when: opensearch_snapshot_enabled
+  # install renders s3.*/gcs.* settings into opensearch.yml, so it needs the plugin too
+  tags:
+    - install
+    - snapshot
 
 - name: Configure security plugin
   ansible.builtin.import_tasks: security.yml
@@ -95,5 +135,14 @@
     msg: "{{ _opensearch_health.json }}"
   when: _opensearch_health is defined and _opensearch_health.json is defined
   tags: health
+
+# include_tasks so the handler flush inside runs only when snapshots are enabled
+- name: Register snapshot repository and policy
+  ansible.builtin.include_tasks:
+    file: snapshot_repository.yml
+    apply:
+      tags: snapshot
+  when: opensearch_snapshot_enabled and opensearch_start_on_install
+  tags: snapshot
 
 # code: language=ansible

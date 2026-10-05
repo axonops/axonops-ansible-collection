@@ -35,6 +35,7 @@ jobs:
         scenario:
           - default
           - noexec-tmp
+          - snapshot
 
     steps:
       - name: Check out the codebase.
@@ -60,6 +61,16 @@ jobs:
 
       - name: Run Molecule converge
         run: molecule -v converge -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule idempotence
+        if: matrix.scenario == 'snapshot'
+        run: molecule -v idempotence -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'
           ANSIBLE_FORCE_COLOR: '1'
