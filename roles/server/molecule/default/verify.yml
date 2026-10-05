@@ -21,3 +21,30 @@
         fail_msg: >-
           Expected axon_reporting_url (Reports v2), not legacy axon_dash_url, for
           axon_server_version=latest.
+
+    - name: Assert LDAP port is rendered as an integer
+      ansible.builtin.assert:
+        that:
+          - (axon_server_config_text | from_yaml).auth.settings.port is integer
+          - (axon_server_config_text | from_yaml).auth.settings.port == 636
+        fail_msg: "auth.settings.port must be rendered as the integer 636."
+
+    - name: Run LDAP preflight with an invalid port
+      block:
+        - name: Include LDAP preflight with port "ldaps"  # noqa: var-naming[no-role-prefix]
+          ansible.builtin.include_role:
+            name: server
+            tasks_from: ldap_preflight.yml
+          vars:
+            axon_server_ldap_setting:
+              host: "ldap.example.com"
+              port: "ldaps"
+
+        - name: Fail if invalid port was accepted
+          ansible.builtin.fail:
+            msg: "ldap_preflight.yml accepted port 'ldaps'."
+      rescue:
+        - name: Assert invalid LDAP port is rejected
+          ansible.builtin.assert:
+            that:
+              - "'must be an integer between 1 and 65535' in ansible_failed_result.msg"

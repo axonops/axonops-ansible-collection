@@ -91,3 +91,20 @@
         that:
           # userPassword is base64 in LDIF; "{SSHA}" encodes to "e1NTSEF9".
           - "'userPassword:: e1NTSEF9' in openldap_verify_hash.stdout"
+
+    - name: Re-publish axon-server LDAP setting
+      # set_fact values from converge do not survive into the verify play.
+      ansible.builtin.include_role:
+        name: openldap
+        tasks_from: facts.yml
+      vars:
+        openldap_axon_server_host: localhost
+
+    - name: Assert published LDAP port is an integer
+      ansible.builtin.assert:
+        that:
+          - openldap_axon_server_ldap_setting.port is integer
+          - openldap_axon_server_ldap_setting.port == 389
+          - openldap_axon_server_ldap_setting.useSSL is boolean
+          - openldap_axon_server_ldap_setting.startTLS is boolean
+          - openldap_axon_server_ldap_setting.insecureSkipVerify is boolean

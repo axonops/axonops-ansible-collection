@@ -1,0 +1,14 @@
+---
+# axon-server fails with "LDAP: invalid port" unless port is an integer.
+# The template converts numeric strings; anything else is rejected here.
+- name: Validate LDAP port
+  ansible.builtin.assert:
+    that:
+      - axon_server_ldap_setting is mapping
+      - "'port' in axon_server_ldap_setting"
+      - axon_server_ldap_setting.port | string is match('^[0-9]+$')
+      - axon_server_ldap_setting.port | int >= 1
+      - axon_server_ldap_setting.port | int <= 65535
+    fail_msg: >-
+      axon_server_ldap_setting.port must be an integer between 1 and 65535
+      (got: {{ axon_server_ldap_setting.port | default('undefined') }}).

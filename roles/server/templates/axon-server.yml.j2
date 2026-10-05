@@ -39,7 +39,9 @@ auth:
   enabled: true
   type: "LDAP"
   settings:
-    {{ axon_server_ldap_setting | to_nice_yaml(indent=2) | indent(4) }}
+{# axon-server rejects a quoted port, so force it to an integer. #}
+{% set _ldap_setting = axon_server_ldap_setting | combine({'port': axon_server_ldap_setting.port | int} if 'port' in axon_server_ldap_setting else {}) %}
+    {{ _ldap_setting | to_nice_yaml(indent=2) | indent(4) }}
 {% else %}
 auth:
   enabled: false
