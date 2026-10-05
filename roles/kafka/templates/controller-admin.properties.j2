@@ -1,0 +1,22 @@
+# {{ ansible_managed }}
+# Admin client properties for tools run with --bootstrap-controller, e.g.
+#   kafka-metadata-quorum.sh --bootstrap-controller <host>:9093 \
+#     --command-config {{ kafka__controller_admin_props_file }} describe --status
+# Mirrors the CONTROLLER listener security. SASL uses PLAIN here even when
+# kafka_sasl_mechanism is SCRAM, because KRaft controllers do not accept SCRAM.
+security.protocol={{ kafka__controller_protocol }}
+
+{% if kafka__tls_on | bool %}
+ssl.keystore.type=PEM
+ssl.keystore.location={{ kafka__tls_keystore_file }}
+
+ssl.truststore.type=PEM
+ssl.truststore.location={{ kafka__tls_truststore_file }}
+
+ssl.endpoint.identification.algorithm=
+{% endif %}
+
+{% if kafka__sasl_on | bool %}
+sasl.mechanism={{ kafka__sasl_controller_mechanism }}
+sasl.jaas.config={{ kafka__sasl_controller_login_module }} required username="{{ kafka_sasl_inter_broker_user }}" password="{{ kafka_sasl_inter_broker_password }}";
+{% endif %}

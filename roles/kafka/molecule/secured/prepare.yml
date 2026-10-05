@@ -1,0 +1,14 @@
+---
+# The containers boot systemd. On newer images a daemon-reload during package
+# installs activates tmp.mount, which hides /tmp (and Ansible's module
+# payloads) under a fresh tmpfs. Mask it before converge.
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Mask tmp.mount
+      ansible.builtin.systemd_service:
+        name: tmp.mount
+        masked: true
+
+# code: language=ansible

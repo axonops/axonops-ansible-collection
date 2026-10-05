@@ -58,7 +58,12 @@
   loop: "{{ kafka_sasl_users }}"
   loop_control:
     label: "{{ item.name }}"
-  when: ('SCRAM credentials for user-principal ' ~ "'" ~ item.name ~ "'") not in kafka__reg_scram_users.stdout
+  # Kafka 4.x prints one line per user, e.g.
+  #   SCRAM credential configs for user-principal 'app1' are SCRAM-SHA-512=iterations=4096
+  when: >-
+    kafka__reg_scram_users.stdout is not search(
+      "user-principal '" ~ (item.name | regex_escape) ~ "' are .*" ~ (kafka_sasl_mechanism | regex_escape) ~ "=",
+      multiline=True)
   changed_when: true
   no_log: true
   delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"

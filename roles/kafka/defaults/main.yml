@@ -131,6 +131,8 @@ kafka_sasl_mechanism: SCRAM-SHA-512
 
 # Inter-broker / controller credentials. The same identity is used for
 # broker↔broker and broker↔controller traffic and is added to super.users.
+# The CONTROLLER listener always authenticates it with SASL PLAIN, because
+# KRaft controllers cannot authenticate each other with SCRAM.
 kafka_sasl_inter_broker_user: kafka-admin
 kafka_sasl_inter_broker_password: ""
 

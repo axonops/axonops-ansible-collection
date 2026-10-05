@@ -1,0 +1,63 @@
+---
+- name: Converge (secured cluster — TLS + SASL/SCRAM + ACLs, started)
+  hosts: all
+  become: true
+  vars:
+    kafka_version: "4.0.0"
+    # Instance names end in -1..-4; the suffix is the node id.
+    kafka_node_id: "{{ inventory_hostname.split('-') | last | int }}"
+    kafka_node_roles: >-
+      {{ ['broker'] if kafka_node_id | int == 4 else ['broker', 'controller'] }}
+    kafka_heap_size: "384m"
+    kafka_opts:
+      - "-XX:NewSize=64m"
+      - "-XX:MaxNewSize=64m"
+    kafka_data_dirs:
+      - /var/lib/kafka
+    kafka_start_on_install: true
+    kafka_start_on_boot: true
+    kafka_replication_factor: 3
+    kafka_offsets_topic_replication_factor: 3
+    kafka_transaction_state_log_replication_factor: 3
+    kafka_transaction_state_log_min_isr: 2
+    # Security — mirrors the setup reported in issue #157.
+    kafka_security_enabled: true
+    kafka_tls_enabled: true
+    kafka_tls_mode: generate
+    kafka_tls_client_auth: none
+    kafka_tls_generate_local_dir: /tmp/molecule-kafka-secured
+    kafka_tls_generate_validity_days: 365
+    kafka_sasl_enabled: true
+    kafka_sasl_mechanism: SCRAM-SHA-512
+    kafka_sasl_inter_broker_user: kafka-admin
+    kafka_sasl_inter_broker_password: "molecule-admin-secret"
+    kafka_sasl_users:
+      - name: app1
+        password: "molecule-app1-secret"
+    kafka_acl_enabled: true
+    kafka_acls:
+      - principal: "User:app1"
+        operation: Write
+        resource_type: Topic
+        resource_name: events
+      - principal: "User:app1"
+        operation: Read
+        resource_type: Topic
+        resource_name: events
+      - principal: "User:app1"
+        operation: Describe
+        resource_type: Topic
+        resource_name: events
+      - principal: "User:app1"
+        operation: Read
+        resource_type: Group
+        resource_name: molecule-verify
+    kafka_topics:
+      - name: events
+        partitions: 3
+        replication_factor: 3
+
+  roles:
+    - role: kafka
+
+# code: language=ansible

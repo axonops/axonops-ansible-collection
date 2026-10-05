@@ -235,6 +235,24 @@ The role renders `/opt/kafka/config/admin.properties` (mode `0600`) so
 `kafka-topics.sh` / `kafka-configs.sh` / `kafka-acls.sh` can run with the
 inter-broker credentials via `--command-config`.
 
+**Controller listener.** The KRaft `CONTROLLER` listener (port 9093) always
+uses SASL `PLAIN`, even when `kafka_sasl_mechanism` is SCRAM. SCRAM credentials
+live in the metadata log, which controllers can only read once the quorum has a
+leader, so controllers cannot authenticate each other with SCRAM. The
+controller listener accepts only `kafka_sasl_inter_broker_user`. Broker and
+client listeners (port 9092) keep `kafka_sasl_mechanism`. Enable TLS so the
+`PLAIN` password is encrypted in transit.
+
+For tools run with `--bootstrap-controller`, the role also renders
+`/opt/kafka/config/controller-admin.properties` (mode `0600`):
+
+```bash
+/opt/kafka/bin/kafka-metadata-quorum.sh \
+  --bootstrap-controller localhost:9093 \
+  --command-config /opt/kafka/config/controller-admin.properties \
+  describe --status
+```
+
 **Production example — SASL_SSL with user-supplied PEM material**:
 
 ```yaml
