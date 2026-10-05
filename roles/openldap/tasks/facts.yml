@@ -15,20 +15,23 @@
     label: "{{ item.name }}"
 
 - name: Publish openldap_axon_server_ldap_setting
+  # Built as one expression: per-key templates in a YAML mapping render as
+  # strings, which would turn port into '389' and break axon-server.
   ansible.builtin.set_fact:
-    openldap_axon_server_ldap_setting:
-      host: "{{ openldap_axon_server_host }}"
-      port: "{{ (openldap_ldaps_port if openldap_listen_ldaps else openldap_ldap_port) | int }}"
-      useSSL: "{{ openldap_listen_ldaps | bool }}"
-      startTLS: "{{ (not openldap_listen_ldaps) and openldap_tls_mode != 'disabled' }}"
-      insecureSkipVerify: "{{ openldap_axon_server_insecure_skip_verify | bool }}"
-      base: "{{ openldap_base_dn }}"
-      bindDN: "{{ openldap_admin_dn }}"
-      userFilter: "(uid=%s)"
-      rolesAttribute: memberOf
-      callAttempts: 3
-      rolesMapping:
-        _global_: "{{ _openldap_roles_mapping | default({}) }}"
+    openldap_axon_server_ldap_setting: >-
+      {{ {
+           'host': openldap_axon_server_host,
+           'port': (openldap_ldaps_port if openldap_listen_ldaps | bool else openldap_ldap_port) | int,
+           'useSSL': openldap_listen_ldaps | bool,
+           'startTLS': (not openldap_listen_ldaps | bool) and openldap_tls_mode != 'disabled',
+           'insecureSkipVerify': openldap_axon_server_insecure_skip_verify | bool,
+           'base': openldap_base_dn,
+           'bindDN': openldap_admin_dn,
+           'userFilter': '(uid=%s)',
+           'rolesAttribute': 'memberOf',
+           'callAttempts': 3,
+           'rolesMapping': {'_global_': _openldap_roles_mapping | default({})}
+         } }}
 
 - name: Warn that axon-server will not verify the LDAP certificate
   ansible.builtin.debug:

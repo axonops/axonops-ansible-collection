@@ -3,6 +3,20 @@
   hosts: all
   vars:
     axon_server_org_name: "test-org"
+    axon_server_ldap_enabled: true
+    axon_server_ldap_setting:
+      host: "ldap.example.com"
+      # String on purpose: the role must render it as an integer (#159).
+      port: "636"
+      useSSL: true
+      startTLS: false
+      insecureSkipVerify: false
+      base: "dc=axonops,dc=io"
+      bindDN: "cn=admin,dc=axonops,dc=io"
+      bindPassword: "molecule-only"
+      userFilter: "(uid=%s)"
+      rolesAttribute: memberOf
+      callAttempts: 3
 
   roles:
     - role: server

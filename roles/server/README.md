@@ -49,6 +49,7 @@ still templated when set.
 
 To enable LDAP, set `axon_server_ldap_enabled: true` and supply `axon_server_ldap_setting`.
 **Key names are camelCase** — `bindDN` and `bindPassword`, not `bind_dn` / `bind_password`.
+When `axon_server_ldap_enabled` is true, `axon_server_ldap_setting.port` is required and must be an integer between 1 and 65535. A numeric string such as `"636"` is converted to an integer when rendered; anything else fails the preflight check.
 
 ```yaml
 axon_server_ldap_enabled: true

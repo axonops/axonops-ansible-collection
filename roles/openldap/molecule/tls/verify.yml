@@ -51,3 +51,23 @@
       ansible.builtin.assert:
         that:
           - "'DNS:localhost' in openldap_verify_san.stdout"
+
+    - name: Re-publish axon-server LDAP setting
+      # set_fact values from converge do not survive into the verify play.
+      ansible.builtin.include_role:
+        name: openldap
+        tasks_from: facts.yml
+      vars:
+        openldap_axon_server_host: localhost
+        openldap_tls_mode: generate
+        openldap_listen_ldaps: true
+
+    - name: Assert published LDAP port is an integer
+      ansible.builtin.assert:
+        that:
+          - openldap_axon_server_ldap_setting.port is integer
+          - openldap_axon_server_ldap_setting.port == 636
+          - openldap_axon_server_ldap_setting.useSSL is boolean
+          - openldap_axon_server_ldap_setting.startTLS is boolean
+          - openldap_axon_server_ldap_setting.insecureSkipVerify is boolean
+          - openldap_axon_server_ldap_setting.useSSL

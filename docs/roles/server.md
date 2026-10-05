@@ -80,6 +80,8 @@ for new on-premises deployments. The same `axon_server_searchdb_*` variables are
 | `axon_server_ldap_enabled` | `false` | Enable LDAP authentication |
 | `axon_server_ldap_setting` | - | LDAP configuration object (see example below) |
 
+When `axon_server_ldap_enabled` is true, `axon_server_ldap_setting.port` is required and must be an integer between 1 and 65535. A numeric string such as `"636"` is converted to an integer when rendered; anything else fails the preflight check.
+
 No directory yet? The [openldap](openldap.md) role installs a local OpenLDAP server, seeds groups that match `rolesMapping`, and publishes a ready-made `openldap_axon_server_ldap_setting` fact. That fact never includes `bindPassword` — combine it with the password from vault before assigning it to `axon_server_ldap_setting`:
 
 ```yaml

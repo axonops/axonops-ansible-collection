@@ -136,7 +136,7 @@ The role sets the fact `openldap_axon_server_ldap_setting` on the LDAP host:
 
 ```yaml
 host: ldap1.example.com
-port: 636                 # 389 unless openldap_listen_ldaps is true
+port: 636                 # integer; 389 unless openldap_listen_ldaps is true
 useSSL: true              # openldap_listen_ldaps
 startTLS: false           # true when TLS is on and LDAPS is off
 insecureSkipVerify: true  # openldap_axon_server_insecure_skip_verify
