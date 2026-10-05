@@ -112,6 +112,12 @@
           - "'Environment=OPENSEARCH_TMPDIR=/var/lib/opensearch/tmp' in (_os_unit_content.content | b64decode)"
         fail_msg: "opensearch.service does not set OPENSEARCH_TMPDIR"
 
+    - name: THEN — jvm.options carries the Performance Analyzer block the tar startup script expects
+      ansible.builtin.assert:
+        that:
+          - "'## OpenSearch Performance Analyzer' in (_jvm_content.content | b64decode)"
+        fail_msg: "jvm.options lacks the Performance Analyzer marker; every service start would rewrite it"
+
     - name: WHEN — the plugins directory is checked for snapshot repository plugins
       ansible.builtin.find:
         paths: /usr/share/opensearch/plugins

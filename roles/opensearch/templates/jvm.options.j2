@@ -92,3 +92,11 @@
 ## Custom temp directory (avoid /tmp with noexec issue)
 -Djava.io.tmpdir={{ opensearch_tmp_dir }}
 {% endif %}
+
+# opensearch-tar-install.sh appends this block on every start when the marker
+# line is missing; keeping it here stops each run from rewriting the file.
+## OpenSearch Performance Analyzer
+-Dclk.tck=100
+-Djdk.attach.allowAttachSelf=true
+-Djava.security.policy={{ opensearch_install_root }}/config/opensearch-performance-analyzer/opensearch_security.policy
+--add-opens=jdk.attach/sun.tools.attach=ALL-UNNAMED
