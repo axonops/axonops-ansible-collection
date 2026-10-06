@@ -1,0 +1,19 @@
+---
+- name: Converge — OpenSearch with S3 and GCS snapshot repositories
+  hosts: all
+  vars:
+    opensearch_version: "3.8.0"
+    opensearch_cluster_name: molecule-snapshot
+    opensearch_cluster_type: single-node
+    opensearch_heap_size: "512m"
+    opensearch_security_enabled: false
+    opensearch_populate_etc_hosts: false
+    opensearch_start_on_boot: false
+    opensearch_start_on_install: false
+    opensearch_snapshot_enabled: true
+    opensearch_snapshot_gcs_credentials_json: "{{ lookup('ansible.builtin.file', 'files/gcs-credentials.json') }}"
+
+  roles:
+    - role: opensearch
+
+# code: language=ansible

@@ -109,6 +109,40 @@ All paths are on the **control node** and will be copied to each OpenSearch node
 | `opensearch_vm_max_map_count` | `262144` | `vm.max_map_count` sysctl value |
 | `opensearch_fs_file_max` | `65536` | `fs.file-max` sysctl value |
 
+### Snapshot Repositories (S3/GCS)
+
+| Variable | Type | Default | Example | Description |
+|----------|------|---------|---------|-------------|
+| `opensearch_snapshot_enabled` | bool | `false` | `true` | Install the repository plugin, load credentials and register the repository |
+| `opensearch_snapshot_type` | string | `s3` | `gcs` | Backend: `s3` (AWS S3 or any S3-compatible store) or `gcs` |
+| `opensearch_snapshot_client` | string | `default` | `backups` | Client name used in the `s3.client.<client>.*` / `gcs.client.<client>.*` settings |
+| `opensearch_snapshot_repository_name` | string | `<type>-snapshots` | `nightly` | Snapshot repository name |
+| `opensearch_snapshot_bucket` | string | `""` | `opensearch-backups` | Bucket name. Required |
+| `opensearch_snapshot_base_path` | string | `""` | `prod/cluster1` | Path prefix inside the bucket |
+| `opensearch_snapshot_plugin_local_archive` | string | `""` | `/srv/plugins/repository-s3-3.8.0.zip` | Plugin zip on the control node, for hosts that cannot reach `artifacts.opensearch.org`. Must match `opensearch_version` |
+| `opensearch_snapshot_s3_access_key` | string | `""` | `"{{ vault_s3_access_key }}"` | Static access key. Set together with the secret key |
+| `opensearch_snapshot_s3_secret_key` | string | `""` | `"{{ vault_s3_secret_key }}"` | Static secret key |
+| `opensearch_snapshot_s3_session_token` | string | `""` | `"{{ vault_s3_session_token }}"` | Optional session token for temporary credentials |
+| `opensearch_snapshot_s3_region` | string | `""` | `eu-west-1`, `fsn1` | Signing region |
+| `opensearch_snapshot_s3_endpoint` | string | `""` | `fsn1.your-objectstorage.com` | Endpoint for S3-compatible stores (Hetzner Object Storage, MinIO, Ceph RGW) |
+| `opensearch_snapshot_s3_protocol` | string | `""` | `http` | `http` or `https`. Empty keeps the plugin default (`https`) |
+| `opensearch_snapshot_s3_path_style_access` | bool | `false` | `true` | Use path-style URLs (`https://endpoint/bucket`) instead of virtual-hosted style |
+| `opensearch_snapshot_s3_extra_settings` | dict | `{}` | `{disable_chunked_encoding: true}` | Other non-secret `s3.client.<client>.*` settings, for S3-compatible stores that need them (`signer_override`, `disable_chunked_encoding`, `legacy_md5_checksum_calculation`, timeouts) |
+| `opensearch_snapshot_gcs_credentials_json` | string or mapping | `""` | `"{{ vault_gcs_sa_json }}"` | Service-account JSON |
+| `opensearch_snapshot_gcs_project_id` | string | `""` | `my-project` | GCP project ID |
+| `opensearch_snapshot_gcs_endpoint` | string | `""` | `https://storage.example.com` | Custom GCS endpoint |
+| `opensearch_snapshot_policy` | dict | `{}` | see below | Snapshot Management policy. `name` is the policy name; the other keys are the `_plugins/_sm/policies` request body. `snapshot_config.repository` defaults to the repository name |
+
+Credentials are written only to `opensearch.keystore` (owner `opensearch_user`, mode `0640`); they never appear in `opensearch.yml` or the Ansible output. Region, endpoint, protocol, path-style and project settings go into `opensearch.yml`.
+
+The keystore is created without a password, so it is obfuscated rather than encrypted: protect it with file permissions and keep the source credentials in ansible-vault.
+
+Leave the static credentials empty to use the instance identity instead: an EC2 instance profile or IRSA for S3, or GCE/GKE workload identity for GCS. The role then removes any credentials it previously stored for that client.
+
+Installing the plugin or changing credentials restarts OpenSearch on every node at the same time. The repository and policy are registered once per cluster, and only when `opensearch_start_on_install` is `true`. Restoring snapshots is not automated.
+
+Setting `opensearch_snapshot_enabled: false` later does not remove the plugin, the repository or the keystore credentials. Removing a key from `opensearch_snapshot_policy` does not remove it from an existing policy; delete the policy (`DELETE _plugins/_sm/policies/<name>`) and re-run the role.
+
 ### Service
 
 | Variable | Default | Description |
@@ -236,6 +270,56 @@ accepts the self-signed certificates.
     - axonops.axonops.dash
 ```
 
+### S3 Snapshot Backups
+
+Works with AWS S3 and with S3-compatible stores. The example below uses Hetzner Object Storage; for AWS, drop the endpoint and path-style settings and set the AWS region.
+
+```yaml
+- name: Deploy OpenSearch with S3 snapshots
+  hosts: opensearch
+  become: true
+
+  vars:
+    opensearch_cluster_name: axonops-production
+    opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+    opensearch_domain_name: example.com
+    opensearch_snapshot_enabled: true
+    opensearch_snapshot_type: s3
+    opensearch_snapshot_bucket: opensearch-backups
+    opensearch_snapshot_base_path: axonops-production
+    opensearch_snapshot_s3_access_key: "{{ vault_s3_access_key }}"
+    opensearch_snapshot_s3_secret_key: "{{ vault_s3_secret_key }}"
+    opensearch_snapshot_s3_region: fsn1
+    opensearch_snapshot_s3_endpoint: fsn1.your-objectstorage.com
+    opensearch_snapshot_s3_path_style_access: true
+    opensearch_snapshot_policy:
+      name: daily
+      creation:
+        schedule:
+          cron:
+            expression: "0 2 * * *"
+            timezone: UTC
+      deletion:
+        schedule:
+          cron:
+            expression: "0 3 * * *"
+            timezone: UTC
+        condition:
+          max_age: 14d
+          min_count: 1
+      snapshot_config:
+        indices: "*"
+
+  roles:
+    - axonops.axonops.opensearch
+```
+
+Check the repository after the run:
+
+```bash
+curl -k -u admin:<password> -X POST https://<node>:9200/_snapshot/s3-snapshots/_verify
+```
+
 ## Tags
 
 | Tag | Description |
@@ -245,6 +329,7 @@ accepts the self-signed certificates.
 | `install` | OpenSearch download and installation |
 | `security` | Security plugin configuration |
 | `health` | Cluster health check |
+| `snapshot` | Snapshot plugin, keystore credentials, repository and policy |
 
 ## Notes
 

@@ -112,4 +112,25 @@
           - "'Environment=OPENSEARCH_TMPDIR=/var/lib/opensearch/tmp' in (_os_unit_content.content | b64decode)"
         fail_msg: "opensearch.service does not set OPENSEARCH_TMPDIR"
 
+    - name: THEN — jvm.options carries the Performance Analyzer block the tar startup script expects
+      ansible.builtin.assert:
+        that:
+          - "'## OpenSearch Performance Analyzer' in (_jvm_content.content | b64decode)"
+        fail_msg: "jvm.options lacks the Performance Analyzer marker; every service start would rewrite it"
+
+    - name: WHEN — the plugins directory is checked for snapshot repository plugins
+      ansible.builtin.find:
+        paths: /usr/share/opensearch/plugins
+        patterns: "repository-s3,repository-gcs"
+        file_type: directory
+      register: _os_snapshot_plugins
+
+    - name: THEN — no snapshot plugin or client settings exist with default variables
+      ansible.builtin.assert:
+        that:
+          - _os_snapshot_plugins.matched == 0
+          - "'s3.client.' not in (_os_config_content.content | b64decode)"
+          - "'gcs.client.' not in (_os_config_content.content | b64decode)"
+        fail_msg: "Snapshot artefacts found although opensearch_snapshot_enabled is false"
+
 # code: language=ansible

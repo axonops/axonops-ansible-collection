@@ -148,6 +148,71 @@ opensearch_copy_custom_security_configs: false
 #   connect_url: https://idp.example.com/.well-known/openid-configuration
 #   dashboards_url: https://dashboards.example.com
 
+# --- Snapshot Repositories (S3/GCS) -------------------------------------------
+
+# Install a repository plugin, load its credentials into opensearch.keystore and
+# register a snapshot repository. Installing the plugin restarts OpenSearch.
+opensearch_snapshot_enabled: false
+# Backend: 's3' or 'gcs'
+opensearch_snapshot_type: s3
+# Client name used in the s3.client.<name>.* / gcs.client.<name>.* settings
+opensearch_snapshot_client: default
+opensearch_snapshot_repository_name: "{{ opensearch_snapshot_type }}-snapshots"
+opensearch_snapshot_bucket: ""
+opensearch_snapshot_base_path: ""
+# Absolute path on the control node to a pre-downloaded repository-s3 or
+# repository-gcs plugin zip matching opensearch_version. When set, the role copies
+# it to the nodes instead of downloading the plugin from artifacts.opensearch.org.
+opensearch_snapshot_plugin_local_archive: ""
+
+# S3 (opensearch_snapshot_type == 's3')
+# Leave the access and secret keys empty to use the instance identity
+# (EC2 instance profile or IRSA). Keep real keys in ansible-vault.
+opensearch_snapshot_s3_access_key: ""
+opensearch_snapshot_s3_secret_key: ""
+opensearch_snapshot_s3_session_token: ""
+opensearch_snapshot_s3_region: ""
+# Set for S3-compatible stores (Hetzner Object Storage, MinIO, Ceph RGW, ...),
+# e.g. fsn1.your-objectstorage.com with opensearch_snapshot_s3_region: fsn1
+opensearch_snapshot_s3_endpoint: ""
+# 'https' or 'http'; empty keeps the plugin default (https)
+opensearch_snapshot_s3_protocol: ""
+opensearch_snapshot_s3_path_style_access: false
+# Other non-secret s3.client.<client>.* settings, e.g.
+# {disable_chunked_encoding: true, legacy_md5_checksum_calculation: true}
+opensearch_snapshot_s3_extra_settings: {}
+
+# GCS (opensearch_snapshot_type == 'gcs')
+# Service-account JSON, as a string or a mapping. Leave empty to use the
+# GCE/GKE workload identity. Keep it in ansible-vault.
+opensearch_snapshot_gcs_credentials_json: ""
+opensearch_snapshot_gcs_project_id: ""
+opensearch_snapshot_gcs_endpoint: ""
+
+# Snapshot Management policy, created or updated when not empty. 'name' is the
+# policy name; the remaining keys are the _plugins/_sm/policies request body.
+# snapshot_config.repository defaults to opensearch_snapshot_repository_name.
+opensearch_snapshot_policy: {}
+# Example:
+# opensearch_snapshot_policy:
+#   name: daily
+#   description: Daily snapshots, kept for 14 days
+#   creation:
+#     schedule:
+#       cron:
+#         expression: "0 2 * * *"
+#         timezone: UTC
+#   deletion:
+#     schedule:
+#       cron:
+#         expression: "0 3 * * *"
+#         timezone: UTC
+#     condition:
+#       max_age: 14d
+#       min_count: 1
+#   snapshot_config:
+#     indices: "*"
+
 # --- /etc/hosts Management --------------------------------------------------
 
 opensearch_populate_etc_hosts: true
