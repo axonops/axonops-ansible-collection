@@ -15,11 +15,11 @@ All preflight checks are enabled by default and can be individually disabled by 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `preflight_check_memory` | `true` | Check if system has sufficient memory |
-| `preflight_check_ntp` | `true` | Check if NTP/time synchronization is configured |
+| `preflight_check_memory` | `true` | Report system memory (informational, never fails) |
+| `preflight_check_ntp` | `true` | Check that `chronyd` or `ntpd` is installed |
 | `preflight_check_os` | `true` | Check if operating system is supported |
-| `preflight_check_cassandra_data_directory` | `true` | Check if Cassandra data directories have sufficient space |
-| `preflight_check_swap` | `true` | Check swap configuration (swap should be disabled for Cassandra) |
+| `preflight_check_cassandra_data_directory` | `true` | Check that `cassandra_data_directory` is not on NFS/CIFS/GlusterFS |
+| `preflight_check_swap` | `true` | Fail if swap is enabled |
 
 ## Dependencies
 
@@ -28,28 +28,25 @@ None
 ## What the Role Checks
 
 ### Memory Check
-- Verifies the system has sufficient RAM for running Cassandra
-- Ensures available memory meets minimum requirements
+- Runs `free -m` and reads total memory
+- Never fails the play: it only prints a debug message and does not enforce a minimum (8 GB is the recommended minimum for Cassandra)
 
 ### NTP Check
-- Verifies time synchronization is configured and running
-- Checks for `chronyd`, `ntpd`, or `systemd-timesyncd`
-- Ensures clocks are synchronized across cluster nodes
+- Fails unless `chronyd` or `ntpd` is installed (`chronyd -v` or `ntpd -v` succeeds)
+- Checks installation only, not that the service is running or synchronised
 
 ### OS Check
-- Verifies the operating system is supported
-- Checks OS version compatibility
-- Validates distribution-specific requirements
+- Fails unless `ansible_distribution` is one of Ubuntu, Debian, CentOS, RedHat, Rocky or Amazon
+- Does not check the OS version
 
 ### Cassandra Data Directory Check
-- Verifies data directories exist or can be created
-- Checks available disk space in data directories
-- Ensures sufficient storage for Cassandra operations
+- Runs only when `cassandra_data_directory` is set and not empty
+- Fails if the directory is on `nfs`, `cifs` or `glusterfs`
+- Does not check free space or create the directory
 
 ### Swap Check
-- Verifies swap is disabled or minimal
-- Warns if swap is enabled (swap can degrade Cassandra performance)
-- Checks `vm.swappiness` kernel parameter
+- Fails if `swapon --show` returns any output (swap enabled)
+- Does not check `vm.swappiness`
 
 ## Example Playbooks
 
@@ -178,9 +175,9 @@ ansible-playbook playbook.yml --skip-tags preflight
 
 ## Common Preflight Failures and Solutions
 
-### Memory Check Failure
+### Memory Check Output
 
-**Problem**: System has insufficient memory for Cassandra.
+**Problem**: The memory check prints a message (it does not fail) when the host has insufficient memory for Cassandra.
 
 **Solution**:
 - Increase system RAM
@@ -205,9 +202,9 @@ ansible-playbook playbook.yml --skip-tags preflight
     enabled: true
 ```
 
-### Swap Check Warning
+### Swap Check Failure
 
-**Problem**: Swap is enabled and may impact Cassandra performance.
+**Problem**: Swap is enabled, which degrades Cassandra performance. The check fails the play.
 
 **Solution**:
 ```yaml
@@ -230,12 +227,10 @@ ansible-playbook playbook.yml --skip-tags preflight
 
 ### Data Directory Check Failure
 
-**Problem**: Insufficient disk space or directory doesn't exist.
+**Problem**: `cassandra_data_directory` is on NFS, CIFS or GlusterFS.
 
 **Solution**:
-- Add more storage to the system
-- Mount additional volumes for Cassandra data directories
-- Clean up existing data if this is a test environment
+- Point `cassandra_data_directory` at local or block storage
 
 ## Best Practices
 
@@ -251,7 +246,7 @@ ansible-playbook playbook.yml --skip-tags preflight
 
 ## Tags
 
-- `preflight`: Apply all preflight check tasks
+The role defines no tags of its own. Tag the role in your play (for example `tags: preflight`) to select or skip it.
 
 ## Integration Example
 
@@ -277,10 +272,10 @@ ansible-playbook playbook.yml --skip-tags preflight
 
 ## Notes
 
-- **Non-blocking**: By default, preflight checks warn about issues but don't necessarily block installation
+- **Blocking**: The NTP, OS, swap and data directory checks fail the play when they do not pass. The memory check is informational only
 - **Best Effort**: Some checks may not apply to all environments (e.g., containerized deployments)
 - **Customization**: You can extend this role with your own checks by adding tasks
-- **Idempotent**: The role is safe to run multiple times and won't make changes to the system
+- **Read-only**: The role makes no changes to the system
 - **Early Detection**: Running preflight checks before installation saves time by catching issues early
 
 ## License

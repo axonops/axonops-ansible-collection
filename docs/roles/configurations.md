@@ -307,10 +307,11 @@ Set `cluster_type` to `kafka` to skip Cassandra-specific tasks and apply Kafka-a
     adaptive_repair:
       enabled: true
     agent_disconnection_tolerance:
-      key: enabled
-      value: true
+      value:
+        warn_timeout: 30s
+        error_timeout: 1m
     human_readableid:
-      enabled: true
+      id: axon_agent_hostname
 
   roles:
     - role: axonops.axonops.configurations
@@ -386,8 +387,9 @@ This allows you to enable or disable adaptive repair settings for your cluster.
 | `excludedtables`      | List of tables to exclude from adaptive repair.                                  | List    | `[]`    |
 | `gc_grace`            | Set the GC grace period.                                                         | integer | `86400` |
 | `maxsegmentspertable` | Set the maximum number of segments per table to repair in a single repair cycle. | integer | `0`     |
-| `segmentretries`      | Set the number of retries for each segment in case of failure.                   | integer | `5`     |
-| `segmenttargetsizemb` | Set the target size in MB for each segment repaired at time.                     | integer | `omit`  |
+| `segmentretries`      | Set the number of retries for each segment in case of failure.                   | integer | `3`     |
+| `segmenttargetsizemb` | Set the target size in MB for each segment repaired at time (`0` lets AxonOps decide). | integer | `0`     |
+| `filter_twcs`         | Ignore TWCS tables.                                                              | boolean | `true`  |
 | `segmenttimeout`      | Set the timeout in seconds for each segment repair operation.                    | String  | `2h`    |
 | `tableparallelism`    | Set the number of tables processed in parallel.                                  | integer | `10`    |
 | `cluster_type`        | Override the role-level `cluster_type` for this task only.                      | String  | (unset) |
@@ -425,8 +427,8 @@ environment variables when left unset.
     adaptive_repair:
       enabled: false
 
-    roles:
-      - role: axonops.axonops.configurations
+  roles:
+    - role: axonops.axonops.configurations
 ```
 
 #### Set GC Grace Threshold
@@ -618,7 +620,7 @@ axonops_alert_rules:
     warning_value: 1
     duration: 15m
     description: my example metric alert
-    enabled: true
+    present: true
 ```
 
 The variable `axonops_alert_rules` is a list of metric alert definitions. The variable is optional.
@@ -635,7 +637,8 @@ The variable `axonops_alert_rules` is a list of metric alert definitions. The va
 | `critical_value` | Value to trigger a critical alert                                                              | Float   |         |
 | `warning_value`  | Value to trigger a warning alert                                                               | Float   |         |
 | `duration`       | Duration for which the condition must be met before triggering the alert                       | String  |         |
-| `enabled`        | Whether the alert is enabled or not                                                            | Boolean | True    |
+| `present`        | Whether the alert should exist (`false` removes it)                                            | Boolean | True    |
+| `scope`, `group_by`, `routing`, `percentile`, `consistency`, `metric`, `keyspace`, `dc`, `rack`, `host_id` | Optional filters and routing, passed through to the `alert_rule` module | List / String | |
 
 #### Check for DOWN nodes
 
@@ -698,7 +701,7 @@ axonops_shell_check: [ ]
 axonops_tcp_check: [ ]
 ```
 
-both `axonops_shell_check` and `axonops_tcp_checks` are optionals.
+both `axonops_shell_check` and `axonops_tcp_check` are optional.
 
 #### list of parameters for axonops_shell_check
 
@@ -730,7 +733,7 @@ axonops_shell_check:
     script: |
       #!/bin/bash
       echo "This is a dummy check"
-      exit 2"
+      exit 2
 ```
 
 #### Example of a shell check to monitor if a Debian/Ubuntu host needs a reboot
@@ -845,14 +848,14 @@ allow alert routing rules to reference integration names.
   tasks:
     - name: Configure alerts for cluster 1
       include_role:
-        name: axonops.axonops.alerts
+        name: axonops.axonops.configurations
       vars:
         org: mycompany
         cluster: cluster-1
 
     - name: Configure alerts for cluster 2
       include_role:
-        name: axonops.axonops.alerts
+        name: axonops.axonops.configurations
       vars:
         org: mycompany
         cluster: cluster-2

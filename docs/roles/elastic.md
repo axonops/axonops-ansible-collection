@@ -25,7 +25,7 @@ The `elastic` role installs and configures Elasticsearch for use with AxonOps Se
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `es_version` | `7.17.0` | Version of Elasticsearch to install |
+| `es_version` | `7.17.16` | Version of Elasticsearch to install |
 | `es_use_repository` | `true` | Use official Elastic package repositories |
 | `es_add_repository` | `true` | Add Elastic repositories (if not already present) |
 | `oss_version` | `false` | Install OSS distribution (only for versions < 7.11.0) |
@@ -60,15 +60,15 @@ The `elastic` role installs and configures Elasticsearch for use with AxonOps Se
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `es_heap_size` | - | JVM heap size (e.g., "1g", "4g") |
+| `es_heap_size` | `512M` | JVM heap size (e.g., "1g", "4g") |
 | `es_config['bootstrap.memory_lock']` | - | Lock process memory to prevent swapping |
 
 ### Data and Log Directories
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `es_data_dirs` | - | Array of data directory paths |
-| `es_log_dir` | - | Log directory path |
+| `es_data_dirs` | `[/var/lib/elasticsearch]` | Array of data directory paths |
+| `es_log_dir` | `/var/log/elasticsearch` | Log directory path |
 | `es_tmp_dir` | `/tmp` | Temp directory used for `ES_TMPDIR` and `-Djava.io.tmpdir`. When set to anything other than `/tmp`, the role creates it as `elasticsearch:elasticsearch` with mode `0750` |
 
 Set `es_tmp_dir` to a directory on an `exec`-capable filesystem when `/tmp` is
@@ -89,7 +89,7 @@ directory task runs.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `es_plugins` | - | Array of plugins to install |
+| `es_plugins` | - | List of plugins to install, each an entry like `- plugin: ingest-attachment` |
 | `es_plugins_reinstall` | `false` | Reinstall all plugins |
 
 ## Dependencies

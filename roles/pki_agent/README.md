@@ -104,12 +104,14 @@ Each item in `pki_agent_certificates` is a map. The role generates one pair of `
 | `cert_path` | string | Yes | — | Absolute path on the target host where the certificate PEM (including the issuing CA chain) is written |
 | `key_path` | string | Yes | — | Absolute path on the target host where the private key PEM is written |
 | `ca_path` | string | No | `""` | Absolute path on the target host where the issuing CA certificate is written alone. No CA template block is rendered when empty |
-| `cert_owner` | string | No | `"root"` | Owner of `cert_path` and `ca_path` |
-| `cert_group` | string | No | `"root"` | Group of `cert_path` and `ca_path` |
+| `cert_owner` | string | No | `"root"` | Not applied. The template does not set file ownership; files are written as `pki_agent_user` |
+| `cert_group` | string | No | `"root"` | Not applied. See `cert_owner` |
 | `cert_mode` | string | No | `"0640"` | File mode for `cert_path` and `ca_path` |
 | `key_mode` | string | No | `"0600"` | File mode for `key_path`. SHOULD remain `0600` — the private key MUST NOT be world-readable |
 | `reload_command` | string | No | `""` | Shell command the agent runs after writing a new certificate. Executed via `sh -c`. No `exec {}` block is written when empty |
 | `reload_timeout` | string | No | `"5s"` | Timeout for `reload_command`. Ignored when `reload_command` is empty |
+
+> **Note:** Files are written by the agent as `pki_agent_user`. The `cert_owner` and `cert_group` keys are accepted but not applied by the current `agent.hcl` template.
 
 The `cert_path` file contains both the leaf certificate and the issuing CA certificate, concatenated — suitable for services that expect a full chain. Use `ca_path` in addition if the consuming service requires the CA separately.
 

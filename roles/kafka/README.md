@@ -360,7 +360,7 @@ Listeners and the controller quorum voter list are derived automatically from th
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `kafka_sasl_enabled` | `false` | Enable SASL authentication. Requires `kafka_security_enabled: true`. |
-| `kafka_sasl_mechanism` | `SCRAM-SHA-512` | SASL mechanism: `SCRAM-SHA-512` (recommended) or `PLAIN`. |
+| `kafka_sasl_mechanism` | `SCRAM-SHA-512` | SASL mechanism: `SCRAM-SHA-512` (recommended), `SCRAM-SHA-256` or `PLAIN`. |
 | `kafka_sasl_inter_broker_user` | `kafka-admin` | Username for inter-broker and broker-to-controller traffic. Added to `super.users` automatically. The controller listener authenticates this identity with `PLAIN` (see [Controller listener (KRaft)](#controller-listener-kraft)). |
 | `kafka_sasl_inter_broker_password` | `""` | Password for `kafka_sasl_inter_broker_user`. Store in Ansible Vault. |
 | `kafka_sasl_users` | `[]` | Additional SCRAM users created via `kafka-configs.sh` after first start. Each entry: `{name: str, password: str}`. Ignored for `PLAIN`. |

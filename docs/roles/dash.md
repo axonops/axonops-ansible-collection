@@ -20,6 +20,7 @@ The `dash` role installs and configures the AxonOps Dashboard (axon-dash), which
 | `axon_dash_state` | `present` | State of the dashboard: `present` or `absent` |
 | `axon_dash_start_at_boot` | `true` | Enable the dashboard to start at boot |
 | `axon_dash_version` | `""` (latest) | Specific version to install, or empty for latest |
+| `axon_dash_download_path` | _unset_ | Offline install (`has_internet_access: false`): path on the control node to the `axon-dash` `.rpm`. Requires `axon_dash_version` |
 
 ### Network Configuration
 
@@ -62,6 +63,8 @@ packages manually once Reports v2 is confirmed working.
 | `axon_dash_nginx.ssl_csr` | `/etc/nginx/axon_dash.csr` | Path to SSL certificate signing request |
 | `axon_dash_nginx.ssl_create` | `true` | Automatically create self-signed certificates |
 | `axon_dash_nginx.upstream` | `http://localhost:3000` | Upstream backend URL |
+
+`axon_dash_nginx` is a single dictionary variable: setting it in your inventory or play replaces the whole default, it is not merged. Always set every key you need (`ssl_csr` is required when `ssl_create` is `true`, and `ssl_cert`, `ssl_key`, `listen` and `upstream` are always required). The role installs nginx itself.
 
 ### Repository Configuration
 
@@ -133,6 +136,7 @@ packages manually once Reports v2 is confirmed working.
       listen: "{{ ansible_default_ipv4.address }}:443"
       ssl_cert: /etc/nginx/ssl/axonops.crt
       ssl_key: /etc/nginx/ssl/axonops.key
+      ssl_csr: /etc/nginx/ssl/axonops.csr
       ssl_create: true
       upstream: http://localhost:3000
 
@@ -230,8 +234,7 @@ Default credentials are configured during the AxonOps Server setup.
 
 ## Tags
 
-- `dash`: Apply all dashboard tasks
-- `axonops-dashboard`: Alias for dash tag
+The role defines no `dash` tag. Add a tag to the role in your playbook (for example `tags: axonops-dashboard`) to run it selectively. The repository tasks carry the `axon_dash_repo` tag.
 
 ## Notes
 

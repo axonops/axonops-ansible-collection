@@ -32,9 +32,12 @@ Steps 1 and 2 can be skipped if cert-manager or the operator are already install
 | `k8ssandra_install_cert_manager` | `true` | Install cert-manager via Helm |
 | `k8ssandra_cert_manager_version` | `v1.20.1` | cert-manager Helm chart version |
 | `k8ssandra_cert_manager_namespace` | `cert-manager` | Namespace for cert-manager |
+| `k8ssandra_cert_manager_chart` | `oci://quay.io/jetstack/charts/cert-manager` | cert-manager Helm chart reference |
 | `k8ssandra_install_operator` | `true` | Install k8ssandra-operator via Helm |
 | `k8ssandra_operator_version` | `v1.29.0` | k8ssandra-operator image tag |
 | `k8ssandra_operator_namespace` | `k8ssandra-operator` | Namespace for the operator |
+| `k8ssandra_operator_helm_repo` | `https://helm.k8ssandra.io/stable` | Helm repository URL for the operator chart |
+| `k8ssandra_operator_helm_repo_name` | `k8ssandra` | Local Helm repository name |
 | `k8ssandra_operator_cluster_scoped` | `true` | Enable cluster-scoped operator |
 | `k8ssandra_wait_for_operator` | `true` | Wait for operator readiness before deploying clusters |
 | `k8ssandra_operator_wait_timeout` | `300` | Timeout in seconds for operator readiness |
@@ -47,6 +50,7 @@ These defaults apply to all clusters unless overridden per-cluster.
 |----------|---------|-------------|
 | `k8ssandra_cassandra_version` | `5.0.9` | Cassandra version (must be 5.x) |
 | `k8ssandra_image` | `ghcr.io/axonops/k8ssandra/cassandra` | AxonOps container image |
+| `k8ssandra_image_tag` | `5.0.9` | Image tag. Does not follow `cassandra_version`; set it when you change the version |
 | `k8ssandra_dc_name` | `dc1` | Default datacenter name |
 | `k8ssandra_dc_size` | `3` | Default number of nodes per datacenter |
 | `k8ssandra_storage_class` | `""` | Kubernetes StorageClass (empty = cluster default) |
@@ -82,7 +86,7 @@ Provide basic settings and the role generates the full CR:
 | `namespace` | `k8ssandra_operator_namespace` | Kubernetes namespace |
 | `cassandra_version` | `k8ssandra_cassandra_version` | Cassandra version |
 | `image` | `k8ssandra_image` | Container image |
-| `image_tag` | Cassandra version | Image tag |
+| `image_tag` | `k8ssandra_image_tag` | Image tag (does not follow `cassandra_version`) |
 | `dc_name` | `k8ssandra_dc_name` | Datacenter name |
 | `dc_size` | `k8ssandra_dc_size` | Number of nodes |
 | `storage_class` | `k8ssandra_storage_class` | StorageClass |
@@ -93,6 +97,7 @@ Provide basic settings and the role generates the full CR:
 | `memory_limit` | `k8ssandra_memory_limit` | Memory limit |
 | `memory_request` | `k8ssandra_memory_request` | Memory request |
 | `heap_size` | `k8ssandra_heap_size` | JVM heap size |
+| `soft_pod_anti_affinity` | `k8ssandra_soft_pod_anti_affinity` | Soft pod anti-affinity |
 | `axon_agent_org` | `k8ssandra_axon_agent_org` | AxonOps org |
 | `axon_agent_key` | `k8ssandra_axon_agent_key` | AxonOps API key |
 | `axon_agent_server_host` | `k8ssandra_axon_agent_server_host` | AxonOps server host |
@@ -337,7 +342,7 @@ If cert-manager and k8ssandra-operator are already installed:
 
 ## Notes
 
-- **Cassandra 5.x only**: This role validates that `cassandra_version` starts with `5.`. Cassandra 4.x is not supported on k8ssandra with AxonOps containers.
+- **Cassandra 5.x only**: This role validates that `cassandra_version` is at least 5.0 and below 6.0. Cassandra 4.x is not supported on k8ssandra with AxonOps containers.
 - **AxonOps containers**: All clusters use the AxonOps k8ssandra container image (`ghcr.io/axonops/k8ssandra/cassandra`), which includes the AxonOps agent, Java agent, and cqlai pre-installed.
 - **AxonOps data volume**: An extra PVC (`axonops-data`) is always mounted at `/var/lib/axonops` for agent data persistence.
 - **StorageClass**: Leave `k8ssandra_storage_class` empty to use the cluster's default StorageClass.

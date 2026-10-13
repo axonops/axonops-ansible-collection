@@ -25,7 +25,7 @@ The `agent` role installs and configures the AxonOps Agent on Cassandra nodes. T
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `axon_java_agent` | `axon-cassandra5.0-agent-jdk17` | Java agent version to install. Options: `axon-cassandra3.11-agent`, `axon-cassandra4.1-agent`, `axon-cassandra5.0-agent-jdk17`, `axon-dse6.0-agent`, `axon-dse6.7-agent`, `axon-dse5.1-agent`, or empty string to skip |
-| `axon_agent_version` | `2.0.21` | Version of the AxonOps agent to install |
+| `axon_agent_version` | `""` (latest) | Version of the AxonOps agent to install. Required for offline installation |
 | `axon_java_agent_version` | `1.0.10` | Version of the Java agent to install |
 
 ### Network Configuration
@@ -39,17 +39,18 @@ The `agent` role installs and configures the AxonOps Agent on Cassandra nodes. T
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `axon_agent_tls_mode` | `disabled` | TLS mode: `disabled`, `TLS`, or `mTLS` |
-| `axon_agent_tls_certfile` | - | Path to TLS certificate file (required for TLS/mTLS) |
-| `axon_agent_tls_keyfile` | - | Path to TLS key file (required for TLS/mTLS) |
-| `axon_agent_tls_cafile` | - | Path to CA certificate file (required for mTLS) |
+| `axon_agent_tls_mode` | undefined | TLS mode: `disabled`, `TLS`, or `mTLS`. Leave undefined for the SaaS or the default server settings |
+| `axon_agent_tls_certfile` | - | Path to TLS certificate file (the role asserts it is set for TLS/mTLS; written to `axon-agent.yml` for mTLS only) |
+| `axon_agent_tls_keyfile` | - | Path to TLS key file (the role asserts it is set for TLS/mTLS; written to `axon-agent.yml` for mTLS only) |
+| `axon_agent_tls_cafile` | - | Path to CA certificate file |
+| `axon_agent_tls_skipverify` | `false` | Skip server certificate verification (TLS/mTLS) |
 
 ### Cassandra Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `axon_agent_cassandra_config_directory` | - | Path to Cassandra configuration directory (e.g., `/opt/cassandra/conf`) to enable automatic agent configuration in `cassandra-env.sh` |
-| `axon_agent_cassandra_config` | - | Configuration line to add to `cassandra-env.sh`. For Cassandra < 5: `JVM_OPTS="$JVM_OPTS -javaagent:/usr/share/axonops/axon-cassandra4.0-agent.jar=/etc/axonops/axon-agent.yml"`. For Cassandra >= 5: `. /usr/share/axonops/axonops-jvm.options` |
+| `axon_agent_cassandra_config` | - | Configuration line to add to `cassandra-env.sh`. Preferred for agents >= 1.1.0 (Cassandra 3.11/4.0/4.1/5.0): `. /usr/share/axonops/axonops-jvm.options`. Older agents: `JVM_OPTS="$JVM_OPTS -javaagent:/usr/share/axonops/axon-cassandra4.0-agent.jar=/etc/axonops/axon-agent.yml"` |
 
 ### Other Variables
 
@@ -57,7 +58,16 @@ The `agent` role installs and configures the AxonOps Agent on Cassandra nodes. T
 |----------|---------|-------------|
 | `axon_agent_start_at_boot` | `true` | Enable the agent to start at boot |
 | `axon_agent_state` | `present` | State of the agent: `present` or `absent` |
-| `axon_agent_ntp_server` | `pool.ntp.org` | NTP server for time synchronization |
+| `axon_agent_ntp_server` | undefined | NTP server written to `axon-agent.yml`. Not set by default |
+| `axon_agent_key` | - | Agent key for the AxonOps server or SaaS organisation |
+| `axon_agent_cluster_name` | - | Cluster name reported by the agent |
+| `axon_agent_limitnofile` | - | If set, adds a systemd drop-in with `LimitNOFILE` for `axon-agent` |
+| `axon_agent_hostid` | - | If set, writes `/var/lib/axonops/hostId` |
+| `axon_agent_kafka_config_directory` | - | Kafka `bin` directory; when set, adds `axon_agent_kafka_config` to `kafka-server-start.sh` |
+| `axon_agent_kafka_config` | - | Line added to `kafka-server-start.sh` (e.g. `. /usr/share/axonops/axonops-jvm.options`) |
+| `axon_agent_kafka_client_properties` | `""` | Path to a Kafka `client.properties` file used by the AxonOps Kafka admin client |
+| `axon_agent_jvm_options` | - | If set, replaces the content of `/usr/share/axonops/axonops-jvm.options` |
+| `axon_agent_install` / `axon_agent_configure` | `true` | Run the install and configure task files |
 
 ## Dependencies
 
@@ -173,8 +183,7 @@ None
 
 ## Tags
 
-- `agent`: Apply all agent tasks
-- `axonops-agent`: Alias for agent tag
+The role defines no tags of its own. Apply a tag to the role in your playbook (for example `tags: axonops-agent`) to run it selectively.
 
 ## License
 

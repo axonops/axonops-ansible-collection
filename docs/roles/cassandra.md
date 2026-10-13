@@ -63,7 +63,13 @@ complete playbook including AxonOps agent.
 | `cassandra_cluster_name` | `default` | Name of the Cassandra cluster |
 | `cassandra_dc` | `default` | Datacenter name |
 | `cassandra_rack` | `rack1` | Rack name |
-| `cassandra_install_format` | `pkg` | Installation format: `pkg` or `tar` |
+| `cassandra_install_format` | `tar` | Installation format: `tar` or `pkg` |
+| `cassandra_install_root` | `/opt` | Install root for the tar format |
+| `cassandra_download_url` | Apache mirror URL for `cassandra_version` | Tarball URL (tar format) |
+| `cassandra_archive_url` | `archive.apache.org` URL for `cassandra_version` | Fallback URL used when the primary download fails (any error) |
+| `cassandra_cqlsh_venv_enabled` | `true` | Install `cqlsh` into a Python venv and expose it through a wrapper |
+| `cassandra_cqlsh_venv_path` | `/opt/cassandra-cqlsh-venv` | cqlsh venv location |
+| `cassandra_cqlsh_wrapper_path` | `/usr/local/bin/cqlsh` | cqlsh wrapper script path |
 | `cassandra_start_on_boot` | `false` | Enable Cassandra to start on boot |
 
 ### Memory Configuration
@@ -177,32 +183,19 @@ Read-ahead is **not** configured by this role. If you tune it, note that
 | `cassandra_ssl_truststore_file` | `conf/.truststore` | Truststore file path |
 | `cassandra_ssl_truststore_pass` | `cassandra` | Truststore password |
 
-##### Password files (default)
+##### Password files (not supported on Cassandra 4.1 / 5.0)
 
-> **⚠ Behaviour change in this release.** Previously, JKS passwords were written
-> inline into `cassandra.yaml`. By default the role now externalises them to
-> `*_password_file:` references. Running the role on an existing node will
-> rewrite `cassandra.yaml` and notify the `Restart Cassandra` handler. No data
-> is lost. To keep the legacy inline behaviour, set
-> `cassandra_use_password_files: false`.
+The `keystore_password_file` / `truststore_password_file` keys were added in Apache Cassandra 6.0 and do not exist in 4.1.x or 5.0.x, the only versions this role supports. Emitting them makes `cassandra.yaml` invalid and Cassandra refuses to start.
 
-By default the role keeps JKS keystore/truststore passwords out of `cassandra.yaml`. Each password is written to a separate mode `0600` file owned by the cassandra user, and `cassandra.yaml` references it via `keystore_password_file:` / `truststore_password_file:` keys (a stock Cassandra feature, not a third-party extension). This applies to both `server_encryption_options` and `client_encryption_options`.
-
-Files are written only when (a) the relevant TLS path is enabled and (b) the configured password is non-empty.
+`cassandra_use_password_files` therefore defaults to `false`. If you set it to `true`, the role prints a warning and forces it back to `false`, so passwords are always written inline as `keystore_password` / `truststore_password`. Keep the keystore passwords in Ansible Vault.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `cassandra_use_password_files` | `true` | Externalise keystore/truststore passwords to `*_password_file` references. Set to `false` to inline passwords in `cassandra.yaml` (legacy behaviour). |
-| `cassandra_ssl_keystore_password_file` | `{{ cassandra_conf_dir }}/server_keystore_passwordfile.txt` | Path to the server keystore password file. |
-| `cassandra_ssl_truststore_password_file` | `{{ cassandra_conf_dir }}/server_truststore_passwordfile.txt` | Path to the server truststore password file. |
-| `cassandra_ssl_client_keystore_password_file` | `{{ cassandra_conf_dir }}/client_keystore_passwordfile.txt` | Path to the client keystore password file. |
-| `cassandra_ssl_client_truststore_password_file` | `{{ cassandra_conf_dir }}/client_truststore_passwordfile.txt` | Path to the client truststore password file. |
-
-To opt out for a host or group:
-
-```yaml
-cassandra_use_password_files: false
-```
+| `cassandra_use_password_files` | `false` | Reserved for Cassandra 6.0+. Forced to `false` on supported versions |
+| `cassandra_ssl_keystore_password_file` | `{{ cassandra_conf_dir }}/server_keystore_passwordfile.txt` | Server keystore password file path (unused while the feature is off) |
+| `cassandra_ssl_truststore_password_file` | `{{ cassandra_conf_dir }}/server_truststore_passwordfile.txt` | Server truststore password file path |
+| `cassandra_ssl_client_keystore_password_file` | `{{ cassandra_conf_dir }}/client_keystore_passwordfile.txt` | Client keystore password file path |
+| `cassandra_ssl_client_truststore_password_file` | `{{ cassandra_conf_dir }}/client_truststore_passwordfile.txt` | Client truststore password file path |
 
 #### PEM-based TLS (Cassandra 4.1+)
 
@@ -475,10 +468,13 @@ cassandra_jmx_access_file: "/opt/cassandra/conf/jmxremote.access"
 
 ## Tags
 
-- `cassandra`: Apply all Cassandra installation and configuration tasks
+- `cassandra`: OS tuning tasks (sysctl, swap, THP)
 - `performance`: OS tuning only (sysctl, swap, THP)
+- `sysctl`: sysctl settings only
 - `swap`: Disable swap only
 - `thp`: Disable Transparent Huge Pages only
+
+Validation, install and data-directory guard tasks are tagged `always` and run even when you select a tag.
 
 ## Notes
 

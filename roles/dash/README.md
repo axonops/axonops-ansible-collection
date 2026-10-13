@@ -76,6 +76,8 @@ axon_dash_nginx:
   upstream: http://localhost:3000
 ```
 
+`axon_dash_nginx` is replaced as a whole, not merged with the defaults, so set every key shown above (`ssl_csr` is required when `ssl_create` is `true`).
+
 ## Running
 
 ```yaml

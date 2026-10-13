@@ -20,9 +20,21 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 | `opensearch_arch` | derived from `ansible_architecture` | Bundle architecture: `x64` on x86_64 hosts, `arm64` on aarch64. Override only to force a specific bundle. |
 | `opensearch_cluster_name` | `opensearch` | Cluster name |
 | `opensearch_cluster_type` | `multi-node` | `single-node` or `multi-node` |
+| `opensearch_download_url` | `https://artifacts.opensearch.org/releases/bundle/opensearch` | Base URL for the OpenSearch tar.gz download |
 | `opensearch_install_root` | `/usr/share/opensearch` | Installation directory |
+| `opensearch_conf_dir` | `{{ opensearch_install_root }}/config` | Configuration directory |
 | `opensearch_user` | `opensearch` | System user |
 | `opensearch_group` | `opensearch` | System group |
+
+### Node Discovery (multi-node)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `opensearch_seed_hosts` | All hosts in the current play | Hostnames or IPs for `discovery.seed_hosts` |
+| `opensearch_initial_cluster_manager_nodes` | All hosts in the current play | Node names for `cluster.initial_cluster_manager_nodes` |
+| `opensearch_node_roles` | not set | Comma-separated node roles (for example `cluster_manager, data, ingest`). Set per host in inventory. When unset, the node takes all roles |
+
+For plays that mix OpenSearch hosts with other hosts, set both lists explicitly.
 
 ### Network
 
@@ -75,6 +87,18 @@ the distribution defaults. No directory is created in that case.
 | `opensearch_auth_type` | `internal` | Auth type: `internal` or `oidc` |
 | `opensearch_tls_mode` | `generate` | TLS mode: `generate` (self-signed) or `custom` (user-supplied) |
 
+### Users, Roles and Role Mappings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `opensearch_users` | `[]` | Extra internal users next to `admin` and `kibanaserver`. Each entry needs `name` and `password`. Optional: `backend_roles`, `opendistro_security_roles`, `attributes`, `description`, `reserved` |
+| `opensearch_roles` | `{}` | Custom roles (`cluster_permissions`, `index_permissions`, `tenant_permissions`) |
+| `opensearch_roles_mapping` | `{}` | Custom role mappings (`backend_roles`, `users`, `hosts`, `description`, `reserved`) |
+| `opensearch_security_force_init` | `false` | Re-apply the security configuration on an existing cluster. Set to `true` after changing any of the variables above |
+| `opensearch_custom_security_configs` | `[]` | Template paths deployed into the `opensearch-security` config directory |
+| `opensearch_copy_custom_security_configs` | `false` | Deploy `opensearch_custom_security_configs` and re-initialise the security index |
+| `opensearch_oidc` | not set | OIDC settings when `opensearch_auth_type: oidc`: `subject_key`, `roles_key`, `connect_url`, `dashboards_url` |
+
 ### TLS Generate Mode (`opensearch_tls_mode: generate`)
 
 | Variable | Default | Description |
@@ -108,6 +132,9 @@ All paths are on the **control node** and will be copied to each OpenSearch node
 |----------|---------|-------------|
 | `opensearch_vm_max_map_count` | `262144` | `vm.max_map_count` sysctl value |
 | `opensearch_fs_file_max` | `65536` | `fs.file-max` sysctl value |
+| `opensearch_vm_swappiness` | `1` | `vm.swappiness` sysctl value |
+| `opensearch_tcp_retries2` | `5` | `net.ipv4.tcp_retries2` sysctl value |
+| `opensearch_disable_thp` | `true` | Disable Transparent Huge Pages and persist it with a systemd service |
 
 ### Snapshot Repositories (S3/GCS)
 
@@ -329,12 +356,13 @@ curl -k -u admin:<password> -X POST https://<node>:9200/_snapshot/s3-snapshots/_
 | `install` | OpenSearch download and installation |
 | `security` | Security plugin configuration |
 | `health` | Cluster health check |
+| `service` | Service start and enable |
 | `snapshot` | Snapshot plugin, keystore credentials, repository and policy |
 
 ## Notes
 
 - **Security plugin**: When enabled, the role generates self-signed TLS certificates using the searchguard-tlstool on the control node and distributes them to cluster nodes.
-- **Inventory group**: Multi-node clusters expect hosts to be in the `opensearch` inventory group.
+- **Play hosts**: Multi-node discovery defaults to every host in the current play. Override `opensearch_seed_hosts` and `opensearch_initial_cluster_manager_nodes` when the play includes other hosts.
 - **Memory lock**: `opensearch_bootstrap_memory_lock` is enabled by default to prevent JVM heap swapping. Ensure the systemd service has `LimitMEMLOCK=infinity`.
 - **IaC mode**: Set `opensearch_iac_enable: true` for idempotent re-runs that check certificate state and regenerate if needed.
 
