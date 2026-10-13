@@ -176,7 +176,7 @@ Defines the `axonops_cassandra` nodes plus an `axonops_server` group so agents k
 | `cassandra_cluster_name` | Cassandra cluster name |
 | `cassandra_dc` / `cassandra_rack` | Topology. `cassandra_dc` must match `axon_server_local_dc` |
 | `cassandra_seeds` | Derived from the `axonops_cassandra` group |
-| `axon_agent_server_host` | Derived from the `axonops_server` group. Leave empty to use the SaaS environment |
+| `axon_agent_server_host` | Derived from the `axonops_server` group. Remove it to use the SaaS environment (role default `agents.axonops.cloud`) |
 | `axon_agent_customer_name` | Must match `axon_server_org_name` on the AxonOps Server |
 | `axon_java_agent` | Agent JAR matching your Cassandra and JDK version |
 

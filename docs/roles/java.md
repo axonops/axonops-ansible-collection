@@ -16,9 +16,11 @@ The `java` role installs Java (JDK or JRE) on target systems. This is a prerequi
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `java_use_zulu` | `false` | Use Azul Zulu Java instead of OpenJDK (Debian-based systems only) |
-| `java_install_epel` | `false` | Install EPEL repository before installing Java (RHEL-based systems) |
-| `java_pkg` | - | Specific Java package to install (defined in playbook) |
+| `java_use_zulu` | `false` | Use Azul Zulu Java instead of OpenJDK (RedHat and Debian families). Zulu is used automatically on RHEL-family 10+ and Debian 13+, where the base repositories no longer ship the required OpenJDK |
+| `java_install_epel` | `false` | Declared in the role defaults but not used by any task; the role does not install EPEL |
+| `java_pkg` | derived from `cassandra_version` | OpenJDK package to install. When unset, the role picks Java 17 for Cassandra 5.x, Java 8 for 3.11.x, otherwise Java 11. Ignored when Zulu is installed |
+| `java_zulu_version` | derived from `cassandra_version` | Zulu major version to install (e.g. `17`). Defaults to 17 for Cassandra 5.x, 8 for 3.11.x, otherwise 11 |
+| `zulu_version` | - | Optional exact Zulu package version to pin |
 
 ## Supported Java Distributions
 
@@ -28,7 +30,7 @@ The role installs OpenJDK by default, which is available on all supported platfo
 
 ### Azul Zulu (Optional)
 
-Azul Zulu OpenJDK builds can be installed on Debian-based systems by setting `java_use_zulu: true`.
+Azul Zulu OpenJDK builds can be installed on RedHat- and Debian-family systems by setting `java_use_zulu: true`. The role adds the Azul repository, installs the `zulu<major>-ca-jre-headless` and `zulu<major>-jre-headless` packages, and selects Zulu as the default `java` through `alternatives`. Zulu is also selected automatically on RHEL-family 10+ and Debian 13+.
 
 ## Dependencies
 
@@ -62,7 +64,7 @@ None
     - role: axonops.axonops.java
 ```
 
-### Using Azul Zulu Java (Debian/Ubuntu)
+### Using Azul Zulu Java
 
 ```yaml
 - name: Install Zulu Java 11
@@ -70,7 +72,7 @@ None
   become: true
   vars:
     java_use_zulu: true
-    java_pkg: zulu-11
+    java_zulu_version: 11
 
   roles:
     - role: axonops.axonops.java
@@ -223,7 +225,7 @@ If you need multiple Java versions, you can use alternatives:
 
 ## Tags
 
-- `java`: Apply all Java installation tasks
+The role defines no tags. Apply a tag to the role in your playbook (for example `tags: java`) to run it selectively.
 
 ## Notes
 
@@ -232,7 +234,7 @@ If you need multiple Java versions, you can use alternatives:
 - **Cross-Platform Support**: The role uses the generic `package` module for improved compatibility across different Linux distributions (RHEL, Debian, Ubuntu, etc.)
 - **JAVA_HOME**: Most modern installations automatically set JAVA_HOME, but verify if your application requires it
 - **Updates**: The role installs the latest available version of the specified Java package. Use package pinning if you need a specific minor version
-- **Zulu Java**: Only available on Debian-based systems through this role
+- **Zulu Java**: Set `java_use_zulu: true` on RedHat or Debian family hosts; it is selected automatically on RHEL-family 10+ and Debian 13+
 
 ## Verification
 

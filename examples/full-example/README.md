@@ -77,18 +77,19 @@ The project is organized to support multiple environments with a clear separatio
 │   ├── stg-01/ssl/
 │   └── prd-01/ssl/
 ├── alerts-config/          # Data-driven configuration for AxonOps
-│   └── example/            # AxonOps organization name ('example' in this case)
-│       ├── alert_endpoints.yml
-│       ├── log_alert_rules.yml
-│       ├── metric_alert_rules.yml
-│       └── dev-001/        # Cluster-specific overrides ('dev-001' cluster)
-│           └── alert_routes.yml
+│   ├── REPLACE_WITH_ORG_NAME/       # Rename to your AxonOps organization name
+│   │   ├── alert_endpoints.yml
+│   │   ├── log_alert_rules.yml
+│   │   ├── metric_alert_rules.yml
+│   │   ├── service_checks.yml
+│   │   └── REPLACE_WITH_CLUSTER_NAME/   # Cluster-specific overrides
+│   └── ...
 └── *.yml                   # Main Ansible playbooks
 ```
 
 ## 🚀 Quick Start
 
-This example is pre-configured for a `dev-01` environment. To deploy it:
+This example is pre-configured for a `dev-001` environment. To deploy it:
 
 1.  **Install Dependencies**:
     ```bash
@@ -103,9 +104,9 @@ This example is pre-configured for a `dev-01` environment. To deploy it:
     ```
 
 3.  **Deploy**:
-    The `Makefile` defaults to the `dev-01` environment and the `root` user. You
+    The `Makefile` defaults to the `dev-001` environment and the `root` user.
     ```bash
-    export ENVIRONMENT=dev-01 # change environment if you need
+    export ENVIRONMENT=dev-001 # change environment if you need
     export INVENTORY=inventories/${ENVIRONMENT}/hosts.ini
 
     # Apply OS hardening and common settings
@@ -252,7 +253,7 @@ The `make alerts` command executes the [alerts.yml](alerts.yml) playbook. This p
 4.  Passes these configurations as variables to the `axonops.axonops.configurations` role, which communicates with the AxonOps API to apply the settings.
 
 > [!IMPORTANT]
-> Before you can use this playbook, you will need to create the directories `alerts-config/<org_name>/` and `alerts-config/<org_name>/<cluster_name>/` using the examples provided **
+> Before you can use this playbook, rename `alerts-config/REPLACE_WITH_ORG_NAME/` to your organization name and its `REPLACE_WITH_CLUSTER_NAME/` subdirectory to your cluster name (`cassandra_cluster_name`).
 
 ### Configuration Structure (`alerts-config`)
 

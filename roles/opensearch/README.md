@@ -37,7 +37,7 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 | `opensearch_cluster_name` | `opensearch` | Name of the OpenSearch cluster. Change this for every deployment — the role warns if you leave the default |
 | `opensearch_cluster_type` | `multi-node` | Topology mode: `single-node` or `multi-node` |
 | `opensearch_seed_hosts` | All hosts in the current play | List of hostnames or IPs used for node discovery (multi-node only). Defaults to all hosts in the current play |
-| `opensearch_initial_master_nodes` | All hosts in the current play | List of master-eligible node names for initial cluster bootstrap (multi-node only). Removed automatically after the cluster forms |
+| `opensearch_initial_cluster_manager_nodes` | All hosts in the current play | List of cluster-manager-eligible node names, written to `cluster.initial_cluster_manager_nodes` (multi-node only) |
 | `opensearch_node_roles` | _(not set)_ | Comma-separated list of node roles (e.g. `cluster_manager, data, ingest`). When not set, the node takes all roles. Set per host in inventory |
 
 ### Network
@@ -100,6 +100,33 @@ Certificate path values support Jinja2 expressions, which lets you reference per
 | `opensearch_tls_node_http_key` | Path on the control node to each node's HTTP private key. Supports `{{ inventory_hostname }}` |
 | `opensearch_tls_admin_dn` | Full Distinguished Name of the admin certificate, written to `plugins.security.authcz.admin_dn` in `opensearch.yml`. Example: `CN=admin,OU=Ops,O=Example Inc.,DC=example,DC=com` |
 | `opensearch_tls_node_dn` | DN pattern that matches all node certificates, written to `plugins.security.nodes_dn`. Example: `CN=*.example.com,OU=Ops,O=Example Inc.,DC=example,DC=com` |
+
+### Users, Roles and Role Mappings
+
+Applied when the security plugin is enabled. Security configuration is written only on first initialisation, when certificates change, or when `opensearch_security_force_init` is `true`. Set it to `true` after changing any variable in this table on an existing cluster.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `opensearch_users` | `[]` | Extra internal users, added next to the built-in `admin` and `kibanaserver`. Each entry needs `name` and `password` (hashed with `hash.sh`; never written in plain text). Optional keys: `backend_roles`, `opendistro_security_roles`, `attributes`, `description`, `reserved` |
+| `opensearch_roles` | `{}` | Custom roles. Keys are role names; values use `cluster_permissions`, `index_permissions` (`index_patterns`, `allowed_actions`, `dls`, `fls`) and `tenant_permissions` (`tenant_patterns`, `allowed_actions`) |
+| `opensearch_roles_mapping` | `{}` | Custom role mappings. Keys are role names; values use `backend_roles`, `users`, `hosts`, `description`, `reserved`. Mappings for `all_access`, `own_index`, `logstash`, `kibana_user`, `readall`, `manage_snapshots` and `kibana_server` are always included |
+| `opensearch_security_force_init` | `false` | Re-apply the security configuration on an existing cluster |
+
+Example:
+
+```yaml
+opensearch_security_force_init: true
+opensearch_users:
+  - name: reporting
+    password: "{{ vault_reporting_password }}"
+    opendistro_security_roles: [my_app_role]
+opensearch_roles:
+  my_app_role:
+    cluster_permissions: [cluster_monitor]
+    index_permissions:
+      - index_patterns: ["my_app_*"]
+        allowed_actions: [read]
+```
 
 ### Custom Security Configuration
 
@@ -598,11 +625,11 @@ curl -k -u admin:your_password \
 
 - **Memory lock**: `opensearch_bootstrap_memory_lock` is enabled by default. The systemd service unit sets `LimitMEMLOCK=infinity` automatically, so no additional configuration is needed on the host.
 
-- **Multi-node bootstrap**: The role adds `cluster.initial_master_nodes` to `opensearch.yml` during initial bootstrap and then removes it once the cluster has formed. This follows the OpenSearch recommendation to avoid split-brain during restarts after the cluster is established.
+- **Multi-node bootstrap**: The role writes `cluster.initial_cluster_manager_nodes` to `opensearch.yml` from `opensearch_initial_cluster_manager_nodes` (default: all hosts in the play). It does not remove the setting after the cluster forms. When you add nodes to an existing cluster, set the variable explicitly to the original cluster-manager nodes.
 
 - **Password hashing**: The role hashes `opensearch_admin_password` and `opensearch_dashboards_password` using the `hash.sh` utility bundled with OpenSearch. Plain-text passwords are never written to configuration files.
 
-- **Custom internal users**: If a `files/internal_users.yml` file exists relative to your playbook, the role detects it and hashes passwords for any additional users defined there. Each user must have a corresponding `<username>_password` variable in scope.
+- **Custom internal users**: Define them with `opensearch_users` (see Users, Roles and Role Mappings). The role renders `internal_users.yml` from the variables; a `files/internal_users.yml` next to your playbook is not read.
 
 - **Security index initialisation**: The `securityadmin.sh` script runs with `-nhnv` (no hostname verification) and `-icl` (ignore cluster leader). It runs on one node only (`run_once`). If the cluster is not yet fully formed when this runs, OpenSearch retries internally. Allow up to two minutes for the cluster to become available.
 

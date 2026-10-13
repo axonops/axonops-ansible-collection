@@ -22,6 +22,8 @@ AXONOPS_PASSWORD: secret
 ```yaml
 - hosts: localhost
   vars:
+    org: mycompany            # required (or AXONOPS_ORG)
+    cluster: my-cluster       # required (or AXONOPS_CLUSTER)
     axonops_alert_rules:
       - name: High CPU
         dashboard: System

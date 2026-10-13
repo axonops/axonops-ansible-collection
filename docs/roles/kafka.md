@@ -311,10 +311,16 @@ defaults to `LITERAL`; use `PREFIXED` for prefix matches.
 | `kafka_axonops_org` | — | **Required when enabled.** Your AxonOps organisation name |
 | `kafka_axonops_key` | — | SaaS API key (required for `axonops.cloud`) |
 | `kafka_axonops_server_host` | `agents.axonops.cloud` | AxonOps server host |
+| `kafka_axonops_agent_server_port` | auto | `443` for SaaS, `1888` for self-hosted. Derived from `kafka_axonops_server_host` |
 | `kafka_axonops_java_agent` | `axon-kafka4-agent` | Kafka Java agent package name |
 | `kafka_axonops_agent_version` | latest | Pin the `axon-agent` package version |
 | `kafka_axonops_java_agent_version` | latest | Pin the Java agent JAR version |
-| `kafka_axonops_cluster_name` | — | Override the cluster name shown in AxonOps |
+| `kafka_axonops_cluster_name` | — | **Required when enabled.** Cluster name shown in AxonOps. The Kafka Java agent fails without it |
+| `kafka_axonops_sasl_user` | inter-broker user | SASL user the agent's Kafka client uses when security is enabled. Override for a dedicated, lower-privileged user |
+| `kafka_axonops_sasl_password` | inter-broker password | Password for `kafka_axonops_sasl_user` |
+| `kafka_axonops_client_properties_path` | `/etc/axonops/kafka_client.properties` | Path of the client properties file the role writes for the agent |
+| `kafka_kconduit_enabled` | `false` | Install the [Kconduit](https://github.com/digitalis-io/kconduit) Kafka CLI client |
+| `kafka_kconduit_version` | `0.0.4` | Kconduit release to install |
 
 When enabled, the role invokes `axonops.axonops.agent` with the Kafka-specific package and injects the agent JVM options into `kafka-server-start.sh` before the `exec` line.
 

@@ -52,7 +52,7 @@ python3 <command.py>
 This CLI accepts both command-line parameters and environment variables.
 
 For easy of use; an environment configuration file was created to set the required environment variables for authentication and connection settings.
-You can find the template for this file in `cli/.env.axonops.example`. You can copy this file to `.env.example` and set the required values for your environment.
+You can find the template for this file in `cli/.env.axonops.example`. You can copy this file to `.env.axonops` and set the required values for your environment.
 
 You can load the environment variables from the file using the following command:
 
@@ -204,6 +204,7 @@ Manages **Adaptive Repair** in AxonOps.
 * `--segmentretries` Segment Retries.
 * `--maxsegmentspertable` Max Segments Per Table.
 * `--segmenttargetsizemb` Segment Target Size in MB.
+* `--segmenttimeout` Timeout per segment, e.g. `3h`.
 * `--tableparallelism` Concurrent Repair Processes.
 
 #### Examples:
@@ -408,13 +409,13 @@ $ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --tags
 Run a scheduled paxos-only repair with a cron expression:
 
 ```shell
-$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --skippaxos
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --paxosonly
 ```
 
 Run a scheduled repair skipping paxos repair with a cron expression:
 
 ```shell
-$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --paxosonly
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --skippaxos
 ```
 
 Delete a scheduled repair job with specific tags:
@@ -460,7 +461,7 @@ $ pipenv run python axonops.py dashboard --list
 Export a dashboard by its name to the current directory:
 
 ```shell
-$ pipenv run python axonops.py dashboard -h --exportpath . --dashboardname Table
+$ pipenv run python axonops.py dashboard --exportpath . --dashboardname Table
 ```
 
 Export all dashboards to the current directory:

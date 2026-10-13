@@ -16,7 +16,7 @@ Deploys AxonOps Agent alongside Apache Cassandra on target hosts.
 - Connects to AxonOps Server or SaaS
 
 **Key Variables:**
-- `axon_agent_version`: AxonOps Agent version (default: 2.0.21)
+- `axon_agent_version`: AxonOps Agent version (role default is empty, which installs the latest)
 - `axon_java_agent`: Java agent package (e.g., `axon-cassandra4.1-agent`)
 - `axon_agent_server_host`: AxonOps Server endpoint
 - `axon_agent_customer_name`: Organization identifier
@@ -217,12 +217,12 @@ Notes:
 
 ### Using AxonOps SaaS
 
-Leave `axon_agent_server_host` empty or set it to the default SaaS endpoint:
+Leave `axon_agent_server_host` unset (the role default is `agents.axonops.cloud`):
 
 ```yaml
 vars:
-  axon_agent_server_host: ""  # Uses agents.axonops.cloud
   axon_agent_customer_name: "your-company-name"
+  axon_agent_key: "your-agent-key"
 ```
 
 ### Using Self-Hosted AxonOps Server

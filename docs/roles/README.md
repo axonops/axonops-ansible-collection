@@ -90,12 +90,31 @@ Installs a local OpenLDAP directory, seeds it with users and groups, and publish
 
 **Use when**: You want AxonOps LDAP authentication and role mapping without an existing corporate directory, for demos, CI or small installs.
 
+### Security Roles (continued)
+
+#### [pki_agent](pki_agent.md)
+Automated PKI certificate management using OpenBao Agent.
+
+**Use when**: You want certificates for Cassandra, OpenSearch or other services issued and renewed from OpenBao.
+
 ### Utility Roles
 
 #### [preflight](preflight.md)
 Performs pre-installation checks to ensure systems meet requirements.
 
 **Use when**: Before deploying Cassandra or AxonOps components to validate system readiness.
+
+#### [docker](../../roles/docker/README.md)
+Installs Docker CE and the Compose plugin on Linux.
+
+**Use when**: You use `devcluster`, or need Docker on the target host. Has no page in this directory; see the role README.
+
+### Development and Demo
+
+#### [devcluster](../../roles/devcluster/README.md)
+Deploys an AxonOps stack (OpenSearch, axon-server, axon-dash, one to three Cassandra nodes) as Docker Compose services. Has no page in this directory; see the role README.
+
+**Use when**: You want a throwaway dev or demo environment. Not suitable for production.
 
 ## Quick Reference
 
@@ -116,7 +135,10 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **elastic** | Elasticsearch installation (legacy / existing deployments) | Server |
 | **java** | Java installation | Cassandra, Elastic |
 | **openldap** | Local LDAP directory for AxonOps auth | Server |
+| **pki_agent** | OpenBao-managed certificates | Cassandra, OpenSearch nodes |
 | **preflight** | System validation | Before any installation |
+| **docker** | Docker CE and Compose plugin | Devcluster |
+| **devcluster** | Docker Compose dev/demo stack (not for production) | Docker |
 
 ## Common Deployment Patterns
 
@@ -168,6 +190,7 @@ OpenSearch is preferred for new on-premises deployments:
     opensearch_cluster_type: single-node
     opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
     opensearch_domain_name: example.com
+    axon_server_org_name: example
     axon_server_searchdb_hosts:
       - "https://127.0.0.1:9200"
     axon_server_searchdb_username: admin
@@ -192,6 +215,8 @@ For existing deployments using Elasticsearch:
 
 ```yaml
 - hosts: axon-server
+  vars:
+    axon_server_org_name: example
   roles:
     - role: axonops.axonops.java
     - role: axonops.axonops.elastic
@@ -218,6 +243,7 @@ Deploy both AxonOps Server and a monitored Cassandra cluster. OpenSearch is the 
     opensearch_cluster_type: single-node
     opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
     opensearch_domain_name: example.com
+    axon_server_org_name: example
     axon_server_searchdb_hosts:
       - "https://127.0.0.1:9200"
     axon_server_searchdb_username: admin
@@ -359,6 +385,7 @@ axon-server to authenticate against it:
 
 - hosts: axon-server
   vars:
+    axon_server_org_name: example
     axon_server_license_key: "{{ vault_axon_server_license_key }}"  # required for LDAP
     axon_server_ldap_enabled: true
     axon_server_ldap_setting: >-

@@ -62,13 +62,13 @@ This role uses the json_query filter which [requires jmespath](https://github.co
 
 ## Usage
 
-Create your Ansible playbook with your own tasks, and include the role elasticsearch. You will have to have this repository accessible within the context of playbook.
+Create your Ansible playbook with your own tasks, and include the `axonops.axonops.elastic` role.
 
 ```sh
-ansible-galaxy install elastic.elasticsearch,v7.17.0
+ansible-galaxy collection install axonops.axonops
 ```
 
-Then create your playbook yaml adding the role elasticsearch.
+Then create your playbook yaml adding the `axonops.axonops.elastic` role.
 The application of the elasticsearch role results in the installation of a node on a host.
 
 The simplest configuration therefore consists of:
@@ -77,7 +77,7 @@ The simplest configuration therefore consists of:
 - name: Simple Example
   hosts: localhost
   roles:
-    - role: elastic.elasticsearch
+    - role: axonops.axonops.elastic
   vars:
     es_version: 7.17.0
 ```
@@ -85,7 +85,7 @@ The simplest configuration therefore consists of:
 The above installs Elasticsearch 7.17.0 in a single node 'node1' on the hosts 'localhost'.
 
 **Note**:
-Elasticsearch default version is described in [`es_version`](https://github.com/elastic/ansible-elasticsearch/blob/main/defaults/main.yml#L2). You can override this variable in your playbook to install another version.
+The Elasticsearch default version is set by `es_version` in `defaults/main.yml` (currently `7.17.16`). You can override this variable in your playbook to install another version.
 While we are testing this role only with one 7.x and one 6.x version (respectively [7.17.0](https://github.com/elastic/ansible-elasticsearch/blob/main/defaults/main.yml#L2) and [6.8.23](https://github.com/elastic/ansible-elasticsearch/blob/main/.kitchen.yml#L22) at the time of writing), this role should work with other versions also in most cases.
 
 This role also uses [Ansible tags](https://docs.ansible.com/ansible/2.9/user_guide/playbooks_tags.html). Run your playbook with the `--list-tasks` flag for more information.
@@ -166,7 +166,7 @@ The following illustrates applying configuration parameters to an Elasticsearch 
 - name: Elasticsearch with custom configuration
   hosts: localhost
   roles:
-    - role: elastic.elasticsearch
+    - role: axonops.axonops.elastic
   vars:
     es_data_dirs:
       - "/opt/elasticsearch/data"
@@ -203,7 +203,7 @@ A more complex example:
 - name: Elasticsearch with custom configuration
   hosts: localhost
   roles:
-    - role: elastic.elasticsearch
+    - role: axonops.axonops.elastic
   vars:
     es_data_dirs:
       - "/opt/elasticsearch/data"
@@ -242,7 +242,7 @@ An example of a three server deployment is shown below.  The first server holds 
 ```yaml
 - hosts: master_node
   roles:
-    - role: elastic.elasticsearch
+    - role: axonops.axonops.elastic
   vars:
     es_heap_size: "1g"
     es_config:
@@ -261,7 +261,7 @@ An example of a three server deployment is shown below.  The first server holds 
 
 - hosts: data_node_1
   roles:
-    - role: elastic.elasticsearch
+    - role: axonops.axonops.elastic
   vars:
     es_data_dirs:
       - "/opt/elasticsearch"
@@ -281,7 +281,7 @@ An example of a three server deployment is shown below.  The first server holds 
 
 - hosts: data_node_2
   roles:
-    - role: elastic.elasticsearch
+    - role: axonops.axonops.elastic
   vars:
     es_config:
       cluster.name: "test-cluster"

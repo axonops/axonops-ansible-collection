@@ -76,6 +76,11 @@ This collection provides the following Ansible roles. Click on each role for det
 ### Utilities
 
 - **[preflight](docs/roles/preflight.md)** - Run pre-installation system checks
+- **[docker](roles/docker/README.md)** - Install Docker CE and the Compose plugin (used by `devcluster`)
+
+### Development and demo
+
+- **[devcluster](roles/devcluster/README.md)** - Docker Compose-based AxonOps dev/demo stack (OpenSearch, axon-server, axon-dash, Cassandra). Not for production
 
 For a complete guide including deployment patterns and quick references, see the [Role Documentation Index](docs/roles/README.md).
 
@@ -156,7 +161,7 @@ the `*_redhat_repository` URLs.
   become: true
   vars:
     axon_java_agent: "axon-cassandra4.1-agent"
-    customer_name: example
+    axon_agent_customer_name: example
     java_pkg: java-11-openjdk-headless
     # Set to false if you already have Apache Cassandra running
     install_cassandra: true
@@ -203,6 +208,7 @@ OpenSearch and Elasticsearch endpoints.
     opensearch_domain_name: example.com
 
     # AxonOps Server
+    axon_server_org_name: example
     axon_server_license_key: "{{ vault_axonops_license_key }}"
     axon_server_cql_hosts:
       - localhost:9042
@@ -234,6 +240,7 @@ OpenSearch and Elasticsearch endpoints.
     install_cassandra: true
     install_elastic: true
     java_pkg: java-17-openjdk-headless
+    axon_server_org_name: example
     axon_server_cql_hosts:
       - localhost:9042
     axon_server_searchdb_hosts:
