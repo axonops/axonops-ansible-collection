@@ -84,7 +84,7 @@ To build a different release of the collection, change `version:` in [`requireme
 
 ## Cutting a release
 
-Cutting a release is just pushing a `v*` git tag — no version bump is prepared by hand. The tag build bakes in the collection at that same tag, and the release workflow commits the matching `version:` in [`requirements.yml`](requirements.yml) and `galaxy.yml` back to the default branch, so what is committed always names the last release.
+Before pushing a `v*` git tag, open a pull request that sets the new version in `galaxy.yml` and the matching `version:` in [`requirements.yml`](requirements.yml), so what is committed names the release. The default branch only accepts signed commits through pull requests, so the release workflow does not commit anything back. The tag build bakes in the collection at that same tag, and the Galaxy build takes its version from the tag.
 
 An image published under a release tag therefore contains that tag of the collection by construction: the pin the build uses is the tag being built, not whatever happened to be committed when the tag was cut. Manual `workflow_dispatch` builds override the pin with the ref they are given — that is what they are for — and in exchange they are refused an image tag starting `v` followed by a digit, so a hand-built image can never occupy a release tag.
 
