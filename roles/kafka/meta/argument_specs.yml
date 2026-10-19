@@ -1,0 +1,410 @@
+---
+argument_specs:
+  main:
+    short_description: Install and configure Apache Kafka in KRaft mode
+    description:
+    - Installs Apache Kafka from the Apache archive and configures it in KRaft mode (no ZooKeeper).
+    - Supports combined, broker-only and controller-only nodes, TLS, SASL (SCRAM and PLAIN), ACLs, topic management and the AxonOps agent.
+    author:
+    - AxonOps Limited
+    options:
+      kafka_node_id:
+        type: int
+        required: true
+        description: Unique integer ID for this node. Required, the role fails without it. Set per host in inventory.
+      kafka_version:
+        type: str
+        default: 4.0.0
+        description: Kafka version to install.
+      kafka_scala_version:
+        type: str
+        default: '2.13'
+        description: Scala version used in the download URL.
+      kafka_java_version:
+        type: int
+        default: 17
+        description: Java major version passed to the M(axonops.axonops.java) role. Kafka 4.x requires Java 17.
+      kafka_java_install:
+        type: bool
+        default: true
+        description: When V(true), the M(axonops.axonops.java) role installs Java. Set V(false) if Java is managed separately.
+      kafka_install_root:
+        type: str
+        default: /opt
+        description: Parent directory for the Kafka installation (C(/opt/kafka-<version>)).
+      kafka_user:
+        type: str
+        default: kafka
+        description: System user that owns the Kafka process.
+      kafka_group:
+        type: str
+        default: kafka
+        description: System group for the Kafka user.
+      kafka_log_dir:
+        type: str
+        default: /var/log/kafka
+        description: JVM and service stdout log directory (not Kafka partition data).
+      kafka_data_dirs:
+        type: list
+        elements: str
+        default:
+        - /var/lib/kafka
+        description: Directories for Kafka topic/partition data. Multiple paths spread data across disks.
+      kafka_heap_size:
+        type: str
+        default: 1G
+        description: JVM heap size, used for both C(-Xms) and C(-Xmx). Set to 50-75% of available RAM.
+      kafka_opts:
+        type: raw
+        default: []
+        description: Additional JVM flags. Accepts a list of strings or a single string.
+      kafka_node_roles:
+        type: list
+        elements: str
+        default:
+        - broker
+        - controller
+        choices:
+        - broker
+        - controller
+        description: Roles this node runs. V(broker) and V(controller) together make a combined node, either one alone makes a dedicated node. At least one host in the play must be a controller.
+      kafka_listeners:
+        type: list
+        elements: str
+        default: []
+        description: Override the auto-derived listener list. Empty means the role generates listeners from the node roles and security state (broker C(9092), controller C(9093)).
+      kafka_inter_broker_listener_name:
+        type: str
+        default: ''
+        description: Override the inter-broker listener name. Auto-derived from the security state when empty (C(PLAINTEXT) or C(SSL)).
+      kafka_num_network_threads:
+        type: int
+        default: 3
+        description: Number of threads for network requests. Increase for high-throughput clusters.
+      kafka_num_io_threads:
+        type: int
+        default: 8
+        description: Number of threads for I/O operations.
+      kafka_socket_send_buffer_bytes:
+        type: int
+        default: 102400
+        description: Socket send buffer size in bytes.
+      kafka_socket_receive_buffer_bytes:
+        type: int
+        default: 102400
+        description: Socket receive buffer size in bytes.
+      kafka_socket_request_max_bytes:
+        type: int
+        default: 104857600
+        description: Maximum allowed request size in bytes (100 MiB by default).
+      kafka_security_enabled:
+        type: bool
+        default: false
+        description: Master switch. When V(false), all listeners use C(PLAINTEXT) and neither TLS nor SASL tasks run.
+      kafka_tls_enabled:
+        type: bool
+        default: false
+        description: Enable TLS on broker and controller listeners. Requires O(kafka_security_enabled=true).
+      kafka_tls_mode:
+        type: str
+        default: custom
+        choices:
+        - custom
+        - pki_agent
+        - generate
+        description: How PEM material reaches the broker hosts. V(custom) copies files supplied on the control node, V(pki_agent) reads files written locally by the M(axonops.axonops.pki_agent) role, V(generate) creates a self-signed CA and per-host certificates (development only).
+      kafka_tls_client_auth:
+        type: str
+        default: required
+        choices:
+        - required
+        - requested
+        - none
+        description: Client authentication on TLS listeners. V(required) is mTLS, V(requested) validates a client certificate if one is presented, V(none) is server authentication only.
+      kafka_tls_cert:
+        type: str
+        default: ''
+        description: (O(kafka_tls_mode=custom)) Path to the PEM certificate on the control node.
+      kafka_tls_key:
+        type: str
+        default: ''
+        description: (O(kafka_tls_mode=custom)) Path to the PEM private key on the control node.
+      kafka_tls_ca:
+        type: str
+        default: ''
+        description: (O(kafka_tls_mode=custom)) Path to the PEM CA certificate on the control node.
+      kafka_tls_key_password:
+        type: str
+        default: ''
+        no_log: true
+        description: (O(kafka_tls_mode=custom)) Password for the private key, if encrypted. Leave empty for unencrypted keys.
+      kafka_tls_pki_cert_path:
+        type: str
+        default: /opt/tls/kafka/cert.pem
+        description: (O(kafka_tls_mode=pki_agent)) Path on the broker host where C(pki_agent) wrote the certificate PEM file.
+      kafka_tls_pki_key_path:
+        type: str
+        default: /opt/tls/kafka/key.pem
+        description: (O(kafka_tls_mode=pki_agent)) Path on the broker host where C(pki_agent) wrote the key PEM file.
+      kafka_tls_pki_ca_path:
+        type: str
+        default: /opt/tls/kafka/ca.pem
+        description: (O(kafka_tls_mode=pki_agent)) Path on the broker host where C(pki_agent) wrote the CA PEM file.
+      kafka_tls_generate_ca_cn:
+        type: str
+        default: Kafka Dev CA
+        description: (O(kafka_tls_mode=generate)) Common name for the generated CA certificate. Development only.
+      kafka_tls_generate_validity_days:
+        type: int
+        default: 3650
+        description: (O(kafka_tls_mode=generate)) Validity of the generated certificates in days.
+      kafka_tls_generate_local_dir:
+        type: str
+        default: "/tmp/kafka-tls-{{ kafka_axonops_cluster_name | default('dev') }}"
+        description: (O(kafka_tls_mode=generate)) Control-node directory used to stage the generated CA between hosts. Defaults to C(/tmp/kafka-tls-<cluster>), where the cluster is O(kafka_axonops_cluster_name) or C(dev).
+      kafka_tls_remote_dir:
+        type: str
+        default: /etc/kafka/tls
+        description: Directory on the broker hosts the PEM files are read from. For V(custom) and V(generate) modes the role places the files here; V(pki_agent) mode reads the O(kafka_tls_pki_cert_path), O(kafka_tls_pki_key_path) and O(kafka_tls_pki_ca_path) paths directly.
+      kafka_sasl_enabled:
+        type: bool
+        default: false
+        description: Enable SASL authentication. Requires O(kafka_security_enabled=true).
+      kafka_sasl_mechanism:
+        type: str
+        default: SCRAM-SHA-512
+        choices:
+        - SCRAM-SHA-512
+        - SCRAM-SHA-256
+        - PLAIN
+        description: SASL mechanism for client and inter-broker authentication. V(SCRAM-SHA-512) and V(SCRAM-SHA-256) are bootstrapped at format time. V(PLAIN) keeps credentials in the JAAS config and should only be used with TLS. The CONTROLLER listener always uses PLAIN.
+      kafka_sasl_inter_broker_user:
+        type: str
+        default: kafka-admin
+        description: Username for inter-broker and broker-to-controller traffic. Added to C(super.users) automatically.
+      kafka_sasl_inter_broker_password:
+        type: str
+        default: ''
+        no_log: true
+        description: Password for O(kafka_sasl_inter_broker_user). Store in Ansible Vault.
+      kafka_sasl_users:
+        type: list
+        elements: dict
+        default: []
+        description: Additional SCRAM users created with C(kafka-configs.sh) after first start. Ignored when O(kafka_sasl_mechanism=PLAIN).
+        options:
+          name:
+            type: str
+            required: true
+            description: Username.
+          password:
+            type: str
+            required: true
+            no_log: true
+            description: Password for the SCRAM user.
+      kafka_sasl_plain_users:
+        type: list
+        elements: dict
+        default: []
+        description: Static credentials for the PLAIN mechanism, embedded in the JAAS config. Must include the inter-broker user. Ignored when a SCRAM mechanism is used.
+        options:
+          name:
+            type: str
+            required: true
+            description: Username.
+          password:
+            type: str
+            required: true
+            no_log: true
+            description: Password for the PLAIN user.
+      kafka_acl_enabled:
+        type: bool
+        default: false
+        description: Enable the C(StandardAuthorizer). Requires O(kafka_security_enabled=true). The inter-broker user is always a super user.
+      kafka_acl_super_users:
+        type: list
+        elements: str
+        default: []
+        description: Additional principals granted super-user privileges, for example C(User:admin). The inter-broker user is appended automatically, do not list it again.
+      kafka_acl_allow_everyone_if_no_acl:
+        type: bool
+        default: false
+        description: When V(false), access is denied when no matching ACL exists. Set V(true) only for development.
+      kafka_acls:
+        type: list
+        elements: dict
+        default: []
+        description: Declarative ACL rules applied with C(kafka-acls.sh) after the broker starts.
+        options:
+          principal:
+            type: str
+            required: true
+            description: Principal, for example C(User:app1).
+          operation:
+            type: str
+            required: true
+            description: 'Operation the rule applies to, case-insensitive. One of: Read, Write, Create, Delete, Alter, Describe, ClusterAction, AlterConfigs, DescribeConfigs, IdempotentWrite, All.'
+          resource_type:
+            type: str
+            required: true
+            description: 'Type of resource the rule applies to, case-insensitive. One of: Topic, Group, Cluster, TransactionalId, DelegationToken.'
+          resource_name:
+            type: str
+            description: Resource name, or C(*) for all. Required for every resource type except V(Cluster).
+          permission:
+            type: str
+            default: Allow
+            description: 'Whether the rule allows or denies the operation, case-insensitive. One of: Allow, Deny.'
+          host:
+            type: str
+            default: '*'
+            description: Client host the rule applies to.
+          pattern_type:
+            type: str
+            default: LITERAL
+            description: 'How O(kafka_acls[].resource_name) is matched, case-insensitive. One of: LITERAL, PREFIXED.'
+      kafka_num_partitions:
+        type: int
+        default: 1
+        description: Default number of partitions for auto-created topics.
+      kafka_replication_factor:
+        type: int
+        default: 1
+        description: Default replication factor. Set to V(3) for production clusters.
+      kafka_offsets_topic_replication_factor:
+        type: int
+        default: 1
+        description: Replication factor for C(__consumer_offsets). Set to V(3) for production.
+      kafka_transaction_state_log_replication_factor:
+        type: int
+        default: 1
+        description: Replication factor for C(__transaction_state). Set to V(3) for production.
+      kafka_transaction_state_log_min_isr:
+        type: int
+        default: 1
+        description: Minimum in-sync replicas for C(__transaction_state). Set to V(2) for production.
+      kafka_log_retention_hours:
+        type: int
+        default: 168
+        description: Retain topic data for this many hours (168 is 7 days).
+      kafka_log_retention_bytes:
+        type: int
+        default: -1
+        description: Maximum retained bytes per partition. V(-1) disables the byte-based limit.
+      kafka_log_segment_bytes:
+        type: int
+        default: 1073741824
+        description: Maximum size of a single log segment file in bytes (1 GiB by default).
+      kafka_log_retention_check_interval_ms:
+        type: int
+        default: 300000
+        description: How often the log cleaner checks for segments to delete, in milliseconds.
+      kafka_start_on_install:
+        type: bool
+        default: false
+        description: Start the Kafka service during the play. Leaving this V(false) and starting Kafka manually after validating the cluster is recommended. SCRAM users, ACLs and topics are only applied when this is V(true).
+      kafka_start_on_boot:
+        type: bool
+        default: false
+        description: Enable the Kafka service at boot.
+      kafka_configure_firewall:
+        type: bool
+        default: true
+        description: Open Kafka ports in C(firewalld) or C(ufw) if either is active. Opens 9092 (broker) and 9093 (controller) only for the roles this node runs.
+      kafka_topics:
+        type: list
+        elements: dict
+        default: []
+        description: Topics to create if they do not already exist. Requires O(kafka_start_on_install=true) or a running broker.
+        options:
+          name:
+            type: str
+            required: true
+            description: Topic name.
+          partitions:
+            type: int
+            description: Number of partitions. Defaults to O(kafka_num_partitions).
+          replication_factor:
+            type: int
+            description: Replication factor. Defaults to O(kafka_replication_factor).
+          config:
+            type: dict
+            description: Topic-level configuration, for example C(retention_ms).
+      kafka_additional_config:
+        type: dict
+        default: {}
+        description: Key/value pairs appended verbatim to C(server.properties). Use for any Kafka property not exposed as a dedicated variable. Do not put secrets here, the values are not hidden from logs.
+      kafka_axonops_agent_enabled:
+        type: bool
+        default: false
+        description: Install and configure the AxonOps agent on Kafka nodes. Requires O(kafka_axonops_org) and O(kafka_axonops_cluster_name).
+      kafka_axonops_server_host:
+        type: str
+        default: agents.axonops.cloud
+        description: AxonOps server host. Defaults to the SaaS endpoint. Override for self-hosted AxonOps server deployments.
+      kafka_axonops_agent_server_port:
+        type: str
+        default: "{% if kafka_axonops_server_host == 'agents.axonops.cloud' %}443{% else %}1888{% endif %}"
+        description: 'AxonOps server port. Auto-derived from O(kafka_axonops_server_host): C(443) for SaaS, C(1888) otherwise.'
+      kafka_axonops_java_agent:
+        type: str
+        default: axon-kafka4-agent
+        description: Kafka Java agent package name.
+      kafka_axonops_sasl_user:
+        type: str
+        default: "{{ kafka_sasl_inter_broker_user }}"
+        description: SASL username the AxonOps agent uses for its Kafka admin client. Defaults to O(kafka_sasl_inter_broker_user). Override to use a dedicated lower-privileged identity.
+      kafka_axonops_sasl_password:
+        type: str
+        default: "{{ kafka_sasl_inter_broker_password }}"
+        no_log: true
+        description: SASL password for O(kafka_axonops_sasl_user). Defaults to O(kafka_sasl_inter_broker_password).
+      kafka_axonops_client_properties_path:
+        type: str
+        default: /etc/axonops/kafka_client.properties
+        description: Path on the broker where the agent client properties file is written when security is enabled.
+      kafka_kconduit_enabled:
+        type: bool
+        default: false
+        description: Install the Kconduit Kafka CLI client (U(https://github.com/digitalis-io/kconduit)).
+      kafka_kconduit_version:
+        type: str
+        default: 0.0.4
+        description: Kconduit release version to install.
+      kafka_kconduit_arch:
+        type: str
+        default: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+        description: 'Kconduit release architecture, derived from C(ansible_architecture): C(arm64) on aarch64, C(amd64) otherwise.'
+      kafka_kconduit_pkg_ext:
+        type: str
+        default: "{{ 'rpm' if ansible_os_family == 'RedHat' else 'deb' }}"
+        description: 'Kconduit package extension, derived from C(ansible_os_family): C(rpm) on RedHat, C(deb) otherwise.'
+      kafka_kconduit_download_url:
+        type: str
+        default: "https://github.com/digitalis-io/kconduit/releases/download/v{{ kafka_kconduit_version }}/kconduit_{{ kafka_kconduit_version }}_linux_{{ kafka_kconduit_arch }}.{{ kafka_kconduit_pkg_ext }}"
+        description: Kconduit package download URL, built from the version, architecture and extension.
+      kafka_node_ip:
+        type: str
+        description: IP this node advertises in C(advertised.listeners). Defaults to C(ansible_default_ipv4.address). Override for multi-homed hosts.
+      kafka_cluster_id:
+        type: str
+        description: KRaft cluster UUID. Auto-generated and persisted to disk on first format when unset. Set to force a specific UUID.
+      kafka_checksum:
+        type: str
+        description: Checksum of the Kafka archive in C(algorithm:value) form. Fetched from the Apache download site when unset.
+      kafka_axonops_org:
+        type: str
+        description: Organisation name in AxonOps. Required when O(kafka_axonops_agent_enabled=true).
+      kafka_axonops_key:
+        type: str
+        no_log: true
+        description: AxonOps SaaS API key. Required when connecting to C(agents.axonops.cloud).
+      kafka_axonops_cluster_name:
+        type: str
+        description: Cluster name shown in AxonOps. Required when O(kafka_axonops_agent_enabled=true), the Kafka Java agent fails without it.
+      kafka_axonops_agent_version:
+        type: str
+        description: Pin the AxonOps agent version. Leave unset to install the latest available.
+      kafka_axonops_java_agent_version:
+        type: str
+        description: Pin the Kafka Java agent version. Leave unset to install the latest available.

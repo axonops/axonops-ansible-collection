@@ -3,17 +3,6 @@
 # Kafka Role - Main Tasks
 # ============================================================================
 
-- name: Assert kafka_node_id is defined
-  ansible.builtin.assert:
-    that:
-      - kafka_node_id is defined
-    fail_msg: >-
-      kafka_node_id must be set for every Kafka host. Add it to your inventory:
-        [kafka]
-        broker1 kafka_node_id=1
-        broker2 kafka_node_id=2
-  tags: always
-
 - name: Assert kafka_opts type
   ansible.builtin.assert:
     that:
@@ -73,13 +62,13 @@
     - name: Gather group information
       ansible.builtin.getent:
         database: group
-      register: kafka__reg_group_info
+      register: _kafka_reg_group_info
 
     - name: Gather axonops user information
       ansible.builtin.getent:
         database: passwd
         key: axonops
-      register: kafka__reg_axonops_user
+      register: _kafka_reg_axonops_user
       failed_when: false
 
     - name: Populate service facts
@@ -90,19 +79,19 @@
       ansible.builtin.systemd:
         name: axon-agent
         state: stopped
-      register: kafka__reg_stop_agent
+      register: _kafka_reg_stop_agent
       failed_when:
-        - kafka__reg_stop_agent.failed
-        - '"Could not find the requested service" not in kafka__reg_stop_agent.msg'
+        - _kafka_reg_stop_agent.failed
+        - '"Could not find the requested service" not in _kafka_reg_stop_agent.msg'
       when:
         - ansible_facts.services['axon-agent.service'] is defined
         - ansible_facts.services['axon-agent.service'].status | default('not-found') != 'not-found'
-        - kafka__reg_axonops_user.ansible_facts.getent_passwd.axonops is defined
+        - _kafka_reg_axonops_user.ansible_facts.getent_passwd.axonops is defined
         - >-
           'kafka' not in (
-            kafka__reg_group_info.ansible_facts.getent_group
+            _kafka_reg_group_info.ansible_facts.getent_group
             | dict2items
-            | selectattr('value.2', 'search', kafka__reg_axonops_user.ansible_facts.getent_passwd.axonops.1)
+            | selectattr('value.2', 'search', _kafka_reg_axonops_user.ansible_facts.getent_passwd.axonops.1)
             | map(attribute='key')
             | list
           )
@@ -132,7 +121,7 @@
 - name: Add controller nodes to dynamic group
   ansible.builtin.add_host:
     name: "{{ hostvars[item]['inventory_hostname'] }}"
-    group: kafka__group_controller_nodes
+    group: _kafka_group_controller_nodes
   when: "'controller' in hostvars[item]['kafka_node_roles'] | default(kafka_node_roles)"
   loop: "{{ ansible_play_hosts }}"
   changed_when: false
@@ -143,7 +132,7 @@
 - name: Add broker nodes to dynamic group
   ansible.builtin.add_host:
     name: "{{ hostvars[item]['inventory_hostname'] }}"
-    group: kafka__group_broker_nodes
+    group: _kafka_group_broker_nodes
   when: "'broker' in hostvars[item]['kafka_node_roles'] | default(kafka_node_roles)"
   loop: "{{ ansible_play_hosts }}"
   changed_when: false
@@ -154,7 +143,7 @@
 - name: Assert at least one controller node is in the play
   ansible.builtin.assert:
     that:
-      - groups['kafka__group_controller_nodes'] | default([]) | length > 0
+      - groups['_kafka_group_controller_nodes'] | default([]) | length > 0
     fail_msg: >-
       No controller nodes found. At least one host must have 'controller' in kafka_node_roles.
   run_once: true
