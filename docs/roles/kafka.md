@@ -6,7 +6,7 @@ Installs and configures Apache Kafka in **KRaft mode** (no ZooKeeper) on RHEL/De
 
 | Item | Value |
 |------|-------|
-| Default version | 4.0.0 |
+| Default version | 4.4.0 |
 | Mode | KRaft only (no ZooKeeper) |
 | Installation | Tar archive from Apache mirrors |
 | Topologies | Combined broker+controller, broker-only, controller-only |
@@ -36,7 +36,7 @@ Installs and configures Apache Kafka in **KRaft mode** (no ZooKeeper) on RHEL/De
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `kafka_version` | `"4.0.0"` | Kafka version to install |
+| `kafka_version` | `"4.4.0"` | Kafka version to install |
 | `kafka_scala_version` | `"2.13"` | Scala version for tarball selection |
 | `kafka_java_version` | `17` | OpenJDK version to install |
 | `kafka_java_install` | `true` | Set to `false` to skip Java installation if it is already managed separately |
