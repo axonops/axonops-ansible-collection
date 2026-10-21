@@ -1,6 +1,6 @@
 # AxonOps Configuration Exporter
 
-This python script allows you to export your AxonOps configuration, including alert rules, dashboards, and integrations, into a structured YAML format. 
+This python script allows you to export your AxonOps configuration, including alert rules, dashboards, and integrations, into a structured YAML format.
 This can be useful for backup purposes or for migrating configurations between different AxonOps instances.
 
 ## Requirements
@@ -16,7 +16,7 @@ This can be useful for backup purposes or for migrating configurations between d
 
 ### Install Python dependencies
 
-This project provides multiple ways to install Python dependencies.  
+This project provides multiple ways to install Python dependencies.
 Choose the method that best fits your workflow.
 
 The dependencies are declared at the root of the project (where `requirements.txt`,
@@ -26,7 +26,7 @@ The dependencies are declared at the root of the project (where `requirements.tx
 
 #### Option 1: Using pipenv (recommended)
 
-Pipenv is a popular tool for managing Python dependencies and virtual environments. 
+Pipenv is a popular tool for managing Python dependencies and virtual environments.
 It provides an easy way to create isolated environments and manage dependencies.
 
 ```shell
