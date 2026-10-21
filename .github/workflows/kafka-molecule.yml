@@ -37,6 +37,7 @@ jobs:
           - tls
           - sasl
           - secured
+          - argspec
 
     steps:
       - name: Check out the codebase.

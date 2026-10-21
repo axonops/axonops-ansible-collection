@@ -30,7 +30,7 @@
     state: present
     system: true
     group: "{{ kafka_group }}"
-    home: "{{ kafka__home }}"
+    home: "{{ _kafka_home }}"
     create_home: false
     shell: /bin/bash
 
@@ -38,7 +38,7 @@
   ansible.builtin.include_role:
     name: axonops.axonops.java
   vars:
-    java_pkg: "{{ kafka__java_pkg }}"
+    java_pkg: "{{ _kafka_java_pkg }}"
     java_zulu_version: "{{ kafka_java_version }}"
   when: kafka_java_install | default(true)
 
@@ -48,7 +48,7 @@
     return_content: true
   retries: 3
   delay: 3
-  register: kafka__reg_checksum
+  register: _kafka_reg_checksum
   run_once: true
   when: kafka_checksum is not defined
 
@@ -56,7 +56,7 @@
   ansible.builtin.set_fact:
     kafka_checksum: >-
       {{
-        kafka__reg_checksum.content
+        _kafka_reg_checksum.content
         | replace('\n', '')
         | regex_replace('\s{2,}', ' ')
         | replace('kafka_' ~ kafka_scala_version ~ '-' ~ kafka_version ~ '.tgz: ', 'sha512:')
@@ -65,17 +65,17 @@
 
 - name: Check if Kafka is already installed
   ansible.builtin.stat:
-    path: "{{ kafka__install_path }}"
-  register: kafka__reg_install_check
+    path: "{{ _kafka_install_path }}"
+  register: _kafka_reg_install_check
 
 - name: Download and install Kafka
-  when: not kafka__reg_install_check.stat.exists
+  when: not _kafka_reg_install_check.stat.exists
   block:
     - name: Download Kafka
       ansible.builtin.get_url:
-        url: "{{ kafka__download_url }}"
+        url: "{{ _kafka_download_url }}"
         checksum: "{{ kafka_checksum }}"
-        dest: "{{ kafka__download_destination }}"
+        dest: "{{ _kafka_download_destination }}"
         mode: "0644"
         timeout: 60
       retries: 3
@@ -83,22 +83,22 @@
 
     - name: Extract Kafka
       ansible.builtin.unarchive:
-        src: "{{ kafka__download_destination }}"
+        src: "{{ _kafka_download_destination }}"
         dest: "{{ kafka_install_root }}"
         remote_src: true
         owner: "{{ kafka_user }}"
         group: "{{ kafka_group }}"
-        creates: "{{ kafka__install_path }}"
+        creates: "{{ _kafka_install_path }}"
 
     - name: Remove downloaded tarball
       ansible.builtin.file:
-        path: "{{ kafka__download_destination }}"
+        path: "{{ _kafka_download_destination }}"
         state: absent
 
 - name: Create Kafka home symlink
   ansible.builtin.file:
-    path: "{{ kafka__home }}"
-    src: "{{ kafka__install_path }}"
+    path: "{{ _kafka_home }}"
+    src: "{{ _kafka_install_path }}"
     state: link
     force: true
     follow: false
@@ -122,7 +122,7 @@
 
 - name: Redirect Kafka service logs to /var/log
   ansible.builtin.file:
-    path: "{{ kafka__home }}/logs"
+    path: "{{ _kafka_home }}/logs"
     src: "{{ kafka_log_dir }}"
     state: link
     force: true
@@ -176,7 +176,7 @@
     axon_agent_cluster_name: "{{ kafka_axonops_cluster_name | default(omit) }}"
     # axon_agent_version: "{{ kafka_axonops_agent_version | default(omit) }}"
     # axon_java_agent_version: "{{ kafka_axonops_java_agent_version | default(omit) }}"
-    axon_agent_kafka_config_directory: "{{ kafka__home }}/bin"
+    axon_agent_kafka_config_directory: "{{ _kafka_home }}/bin"
     axon_agent_kafka_config: ". /usr/share/axonops/axonops-jvm.options"
     axon_agent_kafka_client_properties: >-
       {{ kafka_axonops_client_properties_path if (kafka_security_enabled | bool) else '' }}

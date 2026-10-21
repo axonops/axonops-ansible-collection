@@ -1,0 +1,34 @@
+<!-- BEGIN_ANSIBLE_DOCS -->
+{%- for entrypoint in argument_specs.keys() %}
+{%- if entrypoint_options[entrypoint] %}
+{%- set path, options = entrypoint_options[entrypoint][0] %}
+
+|Option|Description|Type|Required|Default|
+|---|---|---|---|---|
+{%- for name, details in options.items() %}
+| `{{ name }}` | {{ details.display_description | ansible_doc_markup }} | {{ details.display_type }} | {{ details.display_required }} | {{ "derived, see description" if ("{{" in details.display_default | string or "{%" in details.display_default | string) else (details.display_default | string | replace("|", "\\|")) }} |
+{%- endfor %}
+{%- for path, options in entrypoint_options[entrypoint][1:] %}
+
+#### Options for `{{ path | join(" > ") }}`
+
+|Option|Description|Type|Required|Default|
+|---|---|---|---|---|
+{%- for name, details in options.items() %}
+| `{{ name }}` | {{ details.display_description | ansible_doc_markup }} | {{ details.display_type }} | {{ details.display_required }} | {{ "derived, see description" if ("{{" in details.display_default | string or "{%" in details.display_default | string) else (details.display_default | string | replace("|", "\\|")) }} |
+{%- endfor %}
+{%- endfor %}
+{%- if entrypoint in entrypoint_choices %}
+{%- for path, choices in entrypoint_choices[entrypoint] %}
+
+#### Choices for `{{ path | join(" > ") }}`
+
+{%- for item in choices %}
+{{ "\n" if loop.first else "" }}- `{{ item }}`
+{%- endfor %}
+{%- endfor %}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+
+<!-- END_ANSIBLE_DOCS -->

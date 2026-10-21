@@ -14,7 +14,7 @@
     state: directory
     owner: "{{ kafka_user }}"
     mode: "0700"
-  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  delegate_to: "{{ groups['_kafka_group_broker_nodes'] | first }}"
   run_once: true
 
 - name: List existing ACL rules
@@ -24,16 +24,16 @@
     ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.command:
     argv:
-      - "{{ kafka__home }}/bin/kafka-acls.sh"
+      - "{{ _kafka_home }}/bin/kafka-acls.sh"
       - --bootstrap-server
       - localhost:9092
       - --command-config
-      - "{{ kafka__admin_props_file }}"
+      - "{{ _kafka_admin_props_file }}"
       - --list
-  register: kafka__reg_existing_acls
+  register: _kafka_reg_existing_acls
   changed_when: false
   check_mode: false
-  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  delegate_to: "{{ groups['_kafka_group_broker_nodes'] | first }}"
   run_once: true
 
 - name: Add ACL rules
@@ -62,7 +62,7 @@
       operation={{ item.operation | regex_replace('([a-z])([A-Z])', '\1_\2') | upper }},
       permissionType={{ _perm | upper }})
     _exists: >-
-      {{ kafka__reg_existing_acls.stdout.split('Current ACLs for resource `')
+      {{ _kafka_reg_existing_acls.stdout.split('Current ACLs for resource `')
          | select('match', _pattern | regex_escape)
          | select('search', _entry | regex_escape)
          | list | length > 0 }}
@@ -70,9 +70,9 @@
     argv: >-
       {{
         [
-          kafka__home ~ '/bin/kafka-acls.sh',
+          _kafka_home ~ '/bin/kafka-acls.sh',
           '--bootstrap-server', 'localhost:9092',
-          '--command-config', kafka__admin_props_file,
+          '--command-config', _kafka_admin_props_file,
           '--add',
           '--' ~ _perm ~ '-principal', item.principal,
           '--operation', item.operation,
@@ -86,5 +86,5 @@
     label: "{{ item.principal }} {{ item.operation }} {{ item.resource_type }}:{{ item.resource_name | default('cluster') }}"
   when: not (_exists | bool)
   changed_when: true
-  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  delegate_to: "{{ groups['_kafka_group_broker_nodes'] | first }}"
   run_once: true

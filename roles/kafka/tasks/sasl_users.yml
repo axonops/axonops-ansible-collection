@@ -12,7 +12,7 @@
     state: directory
     owner: "{{ kafka_user }}"
     mode: "0700"
-  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  delegate_to: "{{ groups['_kafka_group_broker_nodes'] | first }}"
   run_once: true
 
 - name: List existing SCRAM users
@@ -22,18 +22,18 @@
     ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.command:
     argv:
-      - "{{ kafka__home }}/bin/kafka-configs.sh"
+      - "{{ _kafka_home }}/bin/kafka-configs.sh"
       - --bootstrap-server
       - localhost:9092
       - --command-config
-      - "{{ kafka__admin_props_file }}"
+      - "{{ _kafka_admin_props_file }}"
       - --describe
       - --entity-type
       - users
-  register: kafka__reg_scram_users
+  register: _kafka_reg_scram_users
   changed_when: false
   check_mode: false
-  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  delegate_to: "{{ groups['_kafka_group_broker_nodes'] | first }}"
   run_once: true
 
 - name: Create missing SCRAM users
@@ -43,11 +43,11 @@
     ansible_remote_tmp: /tmp/.ansible_kafka
   ansible.builtin.command:
     argv:
-      - "{{ kafka__home }}/bin/kafka-configs.sh"
+      - "{{ _kafka_home }}/bin/kafka-configs.sh"
       - --bootstrap-server
       - localhost:9092
       - --command-config
-      - "{{ kafka__admin_props_file }}"
+      - "{{ _kafka_admin_props_file }}"
       - --alter
       - --add-config
       - "{{ kafka_sasl_mechanism }}=[password={{ item.password }}]"
@@ -61,10 +61,10 @@
   # Kafka 4.x prints one line per user, e.g.
   #   SCRAM credential configs for user-principal 'app1' are SCRAM-SHA-512=iterations=4096
   when: >-
-    kafka__reg_scram_users.stdout is not search(
+    _kafka_reg_scram_users.stdout is not search(
       "user-principal '" ~ (item.name | regex_escape) ~ "' are .*" ~ (kafka_sasl_mechanism | regex_escape) ~ "=",
       multiline=True)
   changed_when: true
   no_log: true
-  delegate_to: "{{ groups['kafka__group_broker_nodes'] | first }}"
+  delegate_to: "{{ groups['_kafka_group_broker_nodes'] | first }}"
   run_once: true

@@ -7,9 +7,9 @@ set -eu
 CERT_SRC="{{ kafka_tls_pki_cert_path }}"
 KEY_SRC="{{ kafka_tls_pki_key_path }}"
 CA_SRC="{{ kafka_tls_pki_ca_path }}"
-KEYSTORE="{{ kafka__tls_keystore_file }}"
-TRUSTSTORE="{{ kafka__tls_truststore_file }}"
-NORMALISED_KEY="{{ kafka__tls_normalised_key }}"
+KEYSTORE="{{ _kafka_tls_keystore_file }}"
+TRUSTSTORE="{{ _kafka_tls_truststore_file }}"
+NORMALISED_KEY="{{ _kafka_tls_normalised_key }}"
 
 umask 077
 TMPDIR="$(dirname "$KEYSTORE")"
