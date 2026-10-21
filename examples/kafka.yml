@@ -3,7 +3,7 @@
   become: true
   vars:
     install_kafka: true
-    kafka_version: "4.0.0"
+    kafka_version: "4.4.0"
     kafka_heap_size: 1G
     # kafka_node_id is mandatory and must be unique per host: set it in the
     # inventory (see examples/inventory). Every host in the play runs as a

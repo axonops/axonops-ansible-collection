@@ -82,7 +82,7 @@ kafka3.example.com kafka_node_id=3
 - hosts: kafka
   become: true
   vars:
-    kafka_version: "4.0.0"
+    kafka_version: "4.4.0"
     kafka_heap_size: 4G
     kafka_replication_factor: 3
     kafka_offsets_topic_replication_factor: 3
@@ -283,7 +283,7 @@ Listeners and the controller quorum voter list are derived automatically from th
 |Option|Description|Type|Required|Default|
 |---|---|---|---|---|
 | `kafka_node_id` | Unique integer ID for this node. Required, the role fails without it. Set per host in inventory. | int | yes |  |
-| `kafka_version` | Kafka version to install. | str | no | 4.0.0 |
+| `kafka_version` | Kafka version to install. | str | no | 4.4.0 |
 | `kafka_scala_version` | Scala version used in the download URL. | str | no | 2.13 |
 | `kafka_java_version` | Java major version passed to the `axonops.axonops.java` role. Kafka 4.x requires Java 17. | int | no | 17 |
 | `kafka_java_install` | When `true`, the `axonops.axonops.java` role installs Java. Set `false` if Java is managed separately. | bool | no | True |
