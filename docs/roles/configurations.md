@@ -388,7 +388,7 @@ This allows you to enable or disable adaptive repair settings for your cluster.
 | `gc_grace`            | Set the GC grace period.                                                         | integer | `86400` |
 | `maxsegmentspertable` | Set the maximum number of segments per table to repair in a single repair cycle. | integer | `0`     |
 | `segmentretries`      | Set the number of retries for each segment in case of failure.                   | integer | `3`     |
-| `segmenttargetsizemb` | Set the target size in MB for each segment repaired at time.                    | integer | `1024`  |
+| `segmenttargetsizemb` | Set the target size in MB for each segment repaired at a time.                  | integer | `1024`  |
 | `filter_twcs`         | Ignore TWCS tables.                                                              | boolean | `true`  |
 | `segmenttimeout`      | Set the timeout in seconds for each segment repair operation.                    | String  | `2h`    |
 | `maxconcurrentsegments` | Maximum number of repair segments running at the same time across the cluster. `-1` calculates it from the cluster topology. | integer | `-1`    |

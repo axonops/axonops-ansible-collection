@@ -212,6 +212,10 @@ def run_module():
     if not saas_settings or not isinstance(saas_settings, dict) or 'Active' not in saas_settings:
         module.fail_json(msg='Adaptive Repair settings not found for the cluster.', **result)
 
+    missing = [k for k in ('MaxConcurrentSegments', 'RepairAheadOfSchedule') if k not in saas_settings]
+    if missing:
+        module.fail_json(msg=f"axon-server >= 2.0.41 required (missing {', '.join(missing)})", **result)
+
     current_setting = {
         'active': saas_settings['Active'],
         'excludedtables': saas_settings['BlacklistedTables'] if saas_settings['BlacklistedTables'] is not None else [],

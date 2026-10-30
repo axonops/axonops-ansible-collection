@@ -94,7 +94,7 @@ adaptive_repair:
   enabled: true
   gc_grace: 86400
   maxconcurrentsegments: -1     # -1 = auto-calculate from cluster topology
-  repairaheadofschedule: false  # enable to run repairs faster than strictly needed
+  repairaheadofschedule: false  # normally leave disabled; allows tables ahead of schedule to use spare slots
   segmenttargetsizemb: 1024
   segmentretries: 3
   segmenttimeout: 2h
@@ -112,6 +112,6 @@ adaptive_repair:
 | `segmenttargetsizemb` | int | `1024` | Target segment size in MB |
 | `segmentretries` | int | `3` | Max retries before failing a segment |
 | `segmenttimeout` | str | `2h` | Timeout per segment |
-| `maxsegmentspertable` | int | `0` | Max segments per table (0 = no limit) |
+| `maxsegmentspertable` | int | `0` | Max segments per table (0 = let AxonOps decide) |
 | `filter_twcs` | bool | `true` | Skip TimeWindowCompactionStrategy tables |
 | `excludedtables` | list | `[]` | Tables to exclude from repair |
