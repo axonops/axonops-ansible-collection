@@ -388,10 +388,11 @@ This allows you to enable or disable adaptive repair settings for your cluster.
 | `gc_grace`            | Set the GC grace period.                                                         | integer | `86400` |
 | `maxsegmentspertable` | Set the maximum number of segments per table to repair in a single repair cycle. | integer | `0`     |
 | `segmentretries`      | Set the number of retries for each segment in case of failure.                   | integer | `3`     |
-| `segmenttargetsizemb` | Set the target size in MB for each segment repaired at time (`0` lets AxonOps decide). | integer | `0`     |
+| `segmenttargetsizemb` | Set the target size in MB for each segment repaired at time.                    | integer | `1024`  |
 | `filter_twcs`         | Ignore TWCS tables.                                                              | boolean | `true`  |
 | `segmenttimeout`      | Set the timeout in seconds for each segment repair operation.                    | String  | `2h`    |
-| `tableparallelism`    | Set the number of tables processed in parallel.                                  | integer | `10`    |
+| `maxconcurrentsegments` | Maximum number of repair segments running at the same time across the cluster. `-1` calculates it from the cluster topology. | integer | `-1`    |
+| `repairaheadofschedule` | Let tables that are ahead of schedule use spare repair slots while cluster health is green. Normally leave disabled. | boolean | `false` |
 | `cluster_type`        | Override the role-level `cluster_type` for this task only.                      | String  | (unset) |
 | `auth_token`          | Override the role-level `auth_token` for this task only.                        | String  | (unset) |
 | `api_token`           | Override the role-level `api_token` for this task only.                         | String  | (unset) |
@@ -451,19 +452,20 @@ The default is `86400` seconds (1 day).
     - role: axonops.axonops.configurations
 ```
 
-#### Set Table Parallelism
+#### Set Max Concurrent Segments
 
-It is suggested to keep this value at least as the number of table in the cluster.
+Set this to a value that fits the capacity of the cluster. Leave it unset (or `-1`) to let AxonOps calculate it from
+the cluster topology. It replaces `tableparallelism`, which is no longer supported. Requires axon-server 2.0.41 or later.
 
 ```yaml
-- name: Set Table Parallelism for Adaptive Repair
+- name: Set Max Concurrent Segments for Adaptive Repair
   hosts: localhost
   vars:
     org: mycompany
     cluster: production-cluster
     adaptive_repair:
       enabled: true
-      tableparallelism: 100
+      maxconcurrentsegments: 8
 
   roles:
     - role: axonops.axonops.configurations

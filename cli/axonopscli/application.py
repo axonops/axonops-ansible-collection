@@ -82,8 +82,14 @@ class Application:
         adaptive_repair_parser.add_argument('--gcgrace', type=int, required=False,
                                             help='GG Grace Threshold in Seconds')
 
-        adaptive_repair_parser.add_argument('--tableparallelism', type=int, required=False,
-                                            help='Concurrent Repair Processes')
+        adaptive_repair_parser.add_argument('--maxconcurrentsegments', type=int, required=False,
+                                            help='Max repair segments running at once across the cluster. '
+                                                 '-1 calculates it from the cluster topology')
+
+        adaptive_repair_parser.add_argument('--repairaheadofschedule', type=str.lower, required=False,
+                                            choices=['true', 'false'],
+                                            help='Let tables ahead of schedule use spare repair slots. '
+                                                 'true/false, default false')
 
         adaptive_repair_parser.add_argument('--maxsegmentspertable', type=int, required=False,
                                             help='Max Segments per Table')
