@@ -61,9 +61,14 @@ class AdaptiveRepair:
             print("Setting MaxSegmentsPerTable to", self.args.maxsegmentspertable)
             self.repair_data['MaxSegmentsPerTable'] = self.args.maxsegmentspertable
 
-        if getattr(self.args, 'tableparallelism', None) is not None:
-            print("Setting TableParallelism to", self.args.tableparallelism)
-            self.repair_data['TableParallelism'] = self.args.tableparallelism
+        if getattr(self.args, 'maxconcurrentsegments', None) is not None:
+            print("Setting MaxConcurrentSegments to", self.args.maxconcurrentsegments)
+            self.repair_data['MaxConcurrentSegments'] = self.args.maxconcurrentsegments
+
+        if getattr(self.args, 'repairaheadofschedule', None) is not None:
+            repair_ahead = self.args.repairaheadofschedule == 'true'
+            print("Setting RepairAheadOfSchedule to", repair_ahead)
+            self.repair_data['RepairAheadOfSchedule'] = repair_ahead
 
         if getattr(self.args, 'segmentretries', None) is not None:
             print("Setting SegmentRetries to", self.args.segmentretries)

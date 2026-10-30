@@ -265,7 +265,7 @@ AXONOPS_CLI="${AXONOPS_CLI:-python3 axonops.py}"
 
 # adaptive_repair
 $AXONOPS_CLI --cluster prod-cassandra repair --disabled --gcgrace 86400 \
-  --tableparallelism 10 --segmentretries 3 --excludetwcstables true
+  --maxconcurrentsegments -1 --segmentretries 3 --excludetwcstables true
 ```
 
 Replay it against the target environment with:

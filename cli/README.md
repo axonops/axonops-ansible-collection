@@ -205,7 +205,12 @@ Manages **Adaptive Repair** in AxonOps.
 * `--maxsegmentspertable` Max Segments Per Table.
 * `--segmenttargetsizemb` Segment Target Size in MB.
 * `--segmenttimeout` Timeout per segment, e.g. `3h`.
-* `--tableparallelism` Concurrent Repair Processes.
+* `--maxconcurrentsegments` Maximum number of repair segments running at once across the cluster. `-1` calculates it
+  from the cluster topology.
+* `--repairaheadofschedule` Let tables that are ahead of schedule use spare repair slots (`true`/`false`). Normally
+  leave disabled.
+
+The `--maxconcurrentsegments` and `--repairaheadofschedule` options require axon-server 2.0.41 or later.
 
 #### Examples:
 
@@ -234,10 +239,10 @@ gc_grace_seconds value lower than the specified threshold):
 $ pipenv run python axonops.py repair --enable --gcgrace 86400
 ```
 
-Enable the repair and set the table parallelism to 100 (number of tables processed in parallel):
+Enable the repair and allow at most 8 repair segments to run at the same time:
 
 ```shell
-$ pipenv run python axonops.py repair --enable --tableparallelism 100
+$ pipenv run python axonops.py repair --enable --maxconcurrentsegments 8
 ```
 
 Enable the repair and set the segment retry limit to 10 (number of times a segment can fail before raising an alert and

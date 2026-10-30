@@ -82,3 +82,36 @@ AXONOPS_TOKEN=<your-token> ansible-playbook kafka-alerts.yml \
 ```
 
 Thresholds are starting points calibrated for typical production workloads. Re-evaluate per-cluster against observed steady-state behaviour, especially consumer lag (`Consumer Lag High`, default warning at 10,000 messages).
+
+## Adaptive Repair
+
+> **Requires axon-server ≥ 2.0.41.**
+
+Configure Adaptive Repair via the `adaptive_repair` variable:
+
+```yaml
+adaptive_repair:
+  enabled: true
+  gc_grace: 86400
+  maxconcurrentsegments: -1     # -1 = auto-calculate from cluster topology
+  repairaheadofschedule: false  # normally leave disabled; allows tables ahead of schedule to use spare slots
+  segmenttargetsizemb: 1024
+  segmentretries: 3
+  segmenttimeout: 2h
+  maxsegmentspertable: 0
+  filter_twcs: true
+  excludedtables: []
+```
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | bool | `true` | Enable or disable Adaptive Repair |
+| `gc_grace` | int | `86400` | Skip tables whose `gc_grace_seconds` is below this value |
+| `maxconcurrentsegments` | int | `-1` | Max repair segments in flight across the cluster. `-1` = auto-calculated from cluster topology |
+| `repairaheadofschedule` | bool | `false` | Allow tables ahead of schedule to use spare slots when cluster health is green |
+| `segmenttargetsizemb` | int | `1024` | Target segment size in MB |
+| `segmentretries` | int | `3` | Max retries before failing a segment |
+| `segmenttimeout` | str | `2h` | Timeout per segment |
+| `maxsegmentspertable` | int | `0` | Max segments per table (0 = let AxonOps decide) |
+| `filter_twcs` | bool | `true` | Skip TimeWindowCompactionStrategy tables |
+| `excludedtables` | list | `[]` | Tables to exclude from repair |
