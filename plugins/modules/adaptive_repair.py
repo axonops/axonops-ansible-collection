@@ -74,12 +74,19 @@ options:
             - The default is 86400.
         required: false
         type: int
-    tableparallelism:
+    maxconcurrentsegments:
         description:
-            - Table Parallelism. How many tables will be repaired at the same time.
-            - The default is 10.
+            - Maximum number of adaptive repair segments in flight across the cluster at the same time.
+            - Set to -1 (the default) to let AxonOps auto-calculate based on cluster topology.
         required: false
         type: int
+    repairaheadofschedule:
+        description:
+            - Allow tables that are ahead of schedule to use spare repair slots when cluster health is green.
+            - Should normally be left disabled. Enable only to make repairs run faster than strictly needed.
+            - The default is false.
+        required: false
+        type: bool
     excludedtables:
         description:
             - The table to exclude.
@@ -101,7 +108,7 @@ options:
     segmenttargetsizemb:
         description:
             - The target size in MB for each segment.
-            - The default is 0 (let AxonOps decide the best size).
+            - The default is 1024.
         required: false
         type: int
     segmenttimeout:
@@ -126,12 +133,13 @@ EXAMPLES = r'''
     cluster: my-cluster
     active: true
     maxsegmentspertable: 4
+    maxconcurrentsegments: -1
+    repairaheadofschedule: false
     excludedtables: []
     filter_twcs: false
     segmentretries: 3
-    tableparallelism: 2
     gc_grace: 86400
-    segmenttargetsizemb: 64
+    segmenttargetsizemb: 1024
     override_saas: false
 
 - name: Disable adaptive repair
@@ -172,11 +180,12 @@ def run_module():
         'excludedtables': {'type': 'list', 'required': False, 'default': []},
         'filter_twcs': {'type': 'bool', 'required': False, 'default': True},
         'gc_grace': {'type': 'int', 'required': False, 'default': '86400'},
+        'maxconcurrentsegments': {'type': 'int', 'required': False, 'default': -1},
         'maxsegmentspertable': {'type': 'int', 'required': False, 'default': 0},
+        'repairaheadofschedule': {'type': 'bool', 'required': False, 'default': False},
         'segmentretries': {'type': 'int', 'required': False, 'default': 3},
-        'segmenttargetsizemb': {'type': 'int', 'required': False, 'default': 0},
+        'segmenttargetsizemb': {'type': 'int', 'required': False, 'default': 1024},
         'segmenttimeout': {'type': 'str', 'required': False, 'default': '2h'},
-        'tableparallelism': {'type': 'int', 'required': False, 'default': 10},
     })
 
     module = AnsibleModule(
@@ -208,11 +217,12 @@ def run_module():
         'excludedtables': saas_settings['BlacklistedTables'] if saas_settings['BlacklistedTables'] is not None else [],
         'filter_twcs': saas_settings['FilterTWCSTables'],
         'gc_grace': saas_settings['GcGraceThreshold'],
+        'maxconcurrentsegments': saas_settings['MaxConcurrentSegments'],
         'maxsegmentspertable': saas_settings['MaxSegmentsPerTable'],
+        'repairaheadofschedule': saas_settings['RepairAheadOfSchedule'],
         'segmentretries': saas_settings['SegmentRetries'],
         'segmenttargetsizemb': saas_settings['SegmentTargetSizeMB'],
         'segmenttimeout': saas_settings['SegmentTimeout'],
-        'tableparallelism': saas_settings['TableParallelism'],
     }
 
     requested_setting = {
@@ -220,11 +230,12 @@ def run_module():
         'excludedtables': module.params['excludedtables'],
         'filter_twcs': module.params['filter_twcs'],
         'gc_grace': module.params['gc_grace'],
+        'maxconcurrentsegments': module.params['maxconcurrentsegments'],
         'maxsegmentspertable': module.params['maxsegmentspertable'],
+        'repairaheadofschedule': module.params['repairaheadofschedule'],
         'segmentretries': module.params['segmentretries'],
         'segmenttargetsizemb': module.params['segmenttargetsizemb'],
         'segmenttimeout': module.params['segmenttimeout'],
-        'tableparallelism': module.params['tableparallelism'],
     }
 
     payload = {
@@ -232,11 +243,12 @@ def run_module():
         'BlacklistedTables': requested_setting['excludedtables'],
         'FilterTWCSTables': requested_setting['filter_twcs'],
         'GcGraceThreshold': requested_setting['gc_grace'],
+        'MaxConcurrentSegments': requested_setting['maxconcurrentsegments'],
         'MaxSegmentsPerTable': requested_setting['maxsegmentspertable'],
+        'RepairAheadOfSchedule': requested_setting['repairaheadofschedule'],
         'SegmentRetries': requested_setting['segmentretries'],
         'SegmentTargetSizeMB': requested_setting['segmenttargetsizemb'],
         'SegmentTimeout': requested_setting['segmenttimeout'],
-        'TableParallelism': requested_setting['tableparallelism'],
     }
 
     result['payload'] = payload
