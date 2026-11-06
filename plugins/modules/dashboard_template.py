@@ -127,12 +127,20 @@ def run_module():
             'panels': None,
         }
 
-    new_data = {
-        'present': module.params['present'],
-        'name': module.params['name'],
-        'filters': module.params['filters'],
-        'panels': module.params['panels'],
-    }
+    if module.params['present']:
+        new_data = {
+            'present': True,
+            'name': module.params['name'],
+            'filters': module.params['filters'],
+            'panels': module.params['panels'],
+        }
+    else:
+        new_data = {
+            'present': False,
+            'name': None,
+            'filters': None,
+            'panels': None,
+        }
 
     changed = dicts_are_different(new_data, old_data)
     result['changed'] = changed
@@ -144,10 +152,13 @@ def run_module():
 
     result['test'] = len(old_templates['dashboards'])
     # if we have the position of the old index, we use it to keep the order
-    if old_template_position:
-        dashboards_to_send.insert(old_template_position, new_data)
-    else:
-        dashboards_to_send.append(new_data)
+    # when removing, the dashboard is simply left out of the payload
+    if module.params['present']:
+        to_send = {k: v for k, v in new_data.items() if k != 'present'}
+        if old_template_position is not None:
+            dashboards_to_send.insert(old_template_position, to_send)
+        else:
+            dashboards_to_send.append(to_send)
     payload = {
         'type': module.params['cluster_type'],
         'dashboards': dashboards_to_send
