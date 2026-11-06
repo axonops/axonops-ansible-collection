@@ -40,7 +40,7 @@
     severity: "{{ alert_item.severity }}"
     integration_type: "{{ alert_item.integration_type }}"
     integration_name: "{{ alert_item.integration_name }}"
-    enable_override: "{{ alert_item.enable_override }}"
+    enable_override: "{{ alert_item.enable_override | default(omit) }}"
     present: "{{ alert_item.present|default(true) }}"
     base_url: "{{ base_url | default(omit) }}"
     auth_token: "{{ alert_item.auth_token | default(auth_token | default(omit)) }}"
