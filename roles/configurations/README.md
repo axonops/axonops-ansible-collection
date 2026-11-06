@@ -37,6 +37,10 @@ AXONOPS_PASSWORD: secret
     - role: axonops.axonops.configurations
 ```
 
+## Integrations, routes and dashboards
+
+`axonops_slack_integrations`, `axonops_alert_routes` and `axonops_dashboard_templates` are documented, with all item keys and examples, in [docs/roles/configurations.md](../../docs/roles/configurations.md). Every item accepts `present: false` to remove it.
+
 ## Kafka Alert Pack
 
 A comprehensive set of default Kafka alert rules is provided in `examples/configurations/kafka/`. The pack is split into two files per scope level:

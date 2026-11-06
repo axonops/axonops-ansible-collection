@@ -15,6 +15,8 @@
   - [Using Environment Variables](#using-environment-variables)
   - [Configure Specific Configs Types](#configure-specific-configs-types)
   - [Configure Slack Integration](#configure-slack-integration)
+  - [Configure Alert Routes](#configure-alert-routes)
+  - [Configure Dashboards](#configure-dashboards)
   - [Configure PagerDuty Integration](#configure-pagerduty-integration)
   - [Configure Microsoft Teams Integration](#configure-microsoft-teams-integration)
   - [Configure a Kafka Cluster](#configure-a-kafka-cluster)
@@ -243,12 +245,82 @@ is not — set per-item overrides in lowercase explicitly.
   vars:
     org: mycompany
     cluster: production-cluster
+    axonops_slack_integrations:
+      - name: ops-alerts
+        webhook_url: "{{ lookup('env', 'SLACK_WEBHOOK_URL') }}"
+        channel: "#ops-alerts"
 
   roles:
     - role: axonops.axonops.configurations
       tags:
         - slack
 ```
+
+| Key           | Description                                           | Type   | Required | Default |
+|---------------|-------------------------------------------------------|--------|----------|---------|
+| `name`        | Integration name                                      | String | Yes      |         |
+| `webhook_url` | Slack incoming webhook URL (hidden from logs)         | String | Yes      |         |
+| `channel`     | Slack channel                                         | String | No       | `""`    |
+| `present`     | `false` removes the integration                       | Bool   | No       | `true`  |
+| `cluster_type`| Per-item override of the cluster type                 | String | No       | role    |
+
+### Configure Alert Routes
+
+Routes send alerts of a given severity to an integration. The integration must already exist.
+
+```yaml
+axonops_alert_routes:
+  - type: global
+    severity: error
+    integration_type: slack
+    integration_name: ops-alerts
+    enable_override: false
+```
+
+| Key                | Description                                                        | Type   | Required | Default |
+|--------------------|--------------------------------------------------------------------|--------|----------|---------|
+| `type`             | Route type, e.g. `global`                                          | String | Yes      |         |
+| `severity`         | Alert severity, e.g. `info`, `warning`, `error`                    | String | Yes      |         |
+| `integration_type` | Integration type, e.g. `slack`                                     | String | Yes      |         |
+| `integration_name` | Name of the integration                                            | String | Yes      |         |
+| `enable_override`  | Allow per-rule overrides                                           | Bool   | No       | `true`  |
+| `present`          | `false` removes the route                                          | Bool   | No       | `true`  |
+
+### Configure Dashboards
+
+```yaml
+axonops_dashboard_templates:
+  - name: Free space
+    filters:
+      - name: dc
+        label: Data center
+        type: dc
+    panels:
+      - type: line-chart
+        title: Disk free
+        details:
+          queries:
+            - query: "sum(cas_disk_free{dc=~'$dc'})"
+        layout:
+          x: 0
+          y: 1
+          w: 6
+          h: 4
+          i: disk-free
+  - name: Old dashboard
+    present: false
+```
+
+| Key       | Description                                                      | Type   | Required | Default |
+|-----------|------------------------------------------------------------------|--------|----------|---------|
+| `name`    | Dashboard name                                                   | String | Yes      |         |
+| `filters` | List of dashboard filters (`name`, `label`, `type`, ...)         | List   | No       |         |
+| `panels`  | List of panels (`type`, `title`, `details`, `layout`)            | List   | No       |         |
+| `present` | `false` removes the dashboard                                    | Bool   | No       | `true`  |
+
+Each panel `layout` is a grid position: `x`, `y`, `w`, `h` and a unique `i`. `details` is a plain YAML mapping whose
+content depends on the panel `type`. To see the exact shape for a type, export an existing dashboard from the AxonOps
+UI or fetch `/api/v1/dashboardtemplate/<org>/<cluster_type>/<cluster>?dashver=2.0`.
 
 ### Configure PagerDuty Integration
 

@@ -24,6 +24,7 @@
     org: "{{ org }}"
     cluster: "{{ cluster }}"
     cluster_type: "{{ dashboard_item.cluster_type | default(cluster_type | default(omit)) }}"
+    present: "{{ dashboard_item.present | default(true) }}"
     name: "{{ dashboard_item.name }}"
     filters: "{{ dashboard_item.filters | default(omit) }}"
     panels: "{{ dashboard_item.panels | default(omit) }}"
@@ -35,8 +36,7 @@
     override_saas: "{{ override_saas | default(omit) }}"
     use_saml: "{{ use_saml | default(omit) }}"
     validate_certs: "{{ validate_certs | default(omit) }}"
-  with_items:
-    "{{ axonops_dashboard_templates }}"
+  loop: "{{ axonops_dashboard_templates }}"
   no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
   loop_control:
     loop_var: dashboard_item

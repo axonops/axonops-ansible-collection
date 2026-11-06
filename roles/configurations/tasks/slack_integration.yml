@@ -26,6 +26,7 @@
     cluster_type: "{{ slack_item.cluster_type | default(cluster_type | default(omit)) }}"
     present: "{{ slack_item.present | default(true) }}"
     name: "{{ slack_item.name }}"
+    channel: "{{ slack_item.channel | default(omit) }}"
     webhook_url: "{{ slack_item.webhook_url }}"
     base_url: "{{ base_url | default(omit) }}"
     auth_token: "{{ slack_item.auth_token | default(auth_token | default(omit)) }}"
