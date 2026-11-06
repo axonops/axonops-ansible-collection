@@ -259,7 +259,7 @@ is not — set per-item overrides in lowercase explicitly.
 | Key           | Description                                           | Type   | Required | Default |
 |---------------|-------------------------------------------------------|--------|----------|---------|
 | `name`        | Integration name                                      | String | Yes      |         |
-| `webhook_url` | Slack incoming webhook URL (hidden from logs)         | String | Yes      |         |
+| `webhook_url` | Slack incoming webhook URL (hidden from task output unless `enable_logging` is set)| String | Yes      |         |
 | `channel`     | Slack channel                                         | String | No       | `""`    |
 | `present`     | `false` removes the integration                       | Bool   | No       | `true`  |
 | `cluster_type`| Per-item override of the cluster type                 | String | No       | role    |
@@ -279,8 +279,8 @@ axonops_alert_routes:
 
 | Key                | Description                                                        | Type   | Required | Default |
 |--------------------|--------------------------------------------------------------------|--------|----------|---------|
-| `type`             | Route type, e.g. `global`                                          | String | Yes      |         |
-| `severity`         | Alert severity, e.g. `info`, `warning`, `error`                    | String | Yes      |         |
+| `type`             | One of `global`, `metrics`, `backups`, `servicechecks`, `nodes`, `commands`, `repairs`, `rollingrestart` | String | Yes      |         |
+| `severity`         | One of `info`, `warning`, `error`                                  | String | Yes      |         |
 | `integration_type` | Integration type, e.g. `slack`                                     | String | Yes      |         |
 | `integration_name` | Name of the integration                                            | String | Yes      |         |
 | `enable_override`  | Allow per-rule overrides                                           | Bool   | No       | `true`  |
