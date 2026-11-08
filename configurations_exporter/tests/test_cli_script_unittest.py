@@ -7,8 +7,9 @@ CASSANDRA = Cluster("demo", "cassandra", "demo-cluster")
 
 ADAPTIVE_REPAIR = {
     "Ready": True, "Active": True, "GcGraceThreshold": 86400, "SegmentsPerVnode": 1,
-    "TableParallelism": 10, "SegmentRetries": 3, "BlacklistedTables": ["ks.big", "ks.old"],
-    "FilterTWCSTables": True, "SegmentTargetSizeMB": 0, "MaxSegmentsPerTable": 0,
+    "MaxConcurrentSegments": -1, "RepairAheadOfSchedule": False, "SegmentRetries": 3,
+    "BlacklistedTables": ["ks.big", "ks.old"],
+    "FilterTWCSTables": True, "SegmentTargetSizeMB": 1024, "MaxSegmentsPerTable": 0,
     "SegmentTimeout": "30m",
 }
 
@@ -106,10 +107,22 @@ class TestAdaptiveRepair(ScriptTestCase):
         self.render({"adaptive_repair": ADAPTIVE_REPAIR})
         self.assertEqual(self.commands(), [
             "$AXONOPS_CLI --cluster demo-cluster repair --enabled --gcgrace 86400 "
-            "--tableparallelism 10 --maxsegmentspertable 0 --segmentretries 3 "
-            "--segmenttargetsizemb 0 --excludedtables ks.big,ks.old "
+            "--maxconcurrentsegments -1 --maxsegmentspertable 0 --segmentretries 3 "
+            "--segmenttargetsizemb 1024 --repairaheadofschedule false "
+            "--excludedtables ks.big,ks.old "
             "--excludetwcstables true --segmenttimeout 30m"
         ])
+
+    def test_repair_ahead_of_schedule_is_exported_when_enabled(self):
+        self.render({"adaptive_repair": dict(ADAPTIVE_REPAIR, RepairAheadOfSchedule=True)})
+        self.assertIn("--repairaheadofschedule true", self.commands()[0])
+
+    def test_settings_from_an_older_server_are_left_out(self):
+        legacy = {k: v for k, v in ADAPTIVE_REPAIR.items()
+                  if k not in ("MaxConcurrentSegments", "RepairAheadOfSchedule")}
+        self.render({"adaptive_repair": legacy})
+        self.assertNotIn("--maxconcurrentsegments", self.commands()[0])
+        self.assertNotIn("--repairaheadofschedule", self.commands()[0])
 
     def test_an_inactive_repair_is_disabled(self):
         self.render({"adaptive_repair": dict(ADAPTIVE_REPAIR, Active=False)})

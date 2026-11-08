@@ -16,11 +16,12 @@
     excludedtables: "{{ adaptive_repair.excludedtables | default([]) }}"
     filter_twcs: "{{ adaptive_repair.filter_twcs | default(True) }}"
     gc_grace: "{{ adaptive_repair.gc_grace | default(omit) }}"
+    maxconcurrentsegments: "{{ adaptive_repair.maxconcurrentsegments | default(omit) }}"
     maxsegmentspertable: "{{ adaptive_repair.maxsegmentspertable | default(omit) }}"
+    repairaheadofschedule: "{{ adaptive_repair.repairaheadofschedule | default(false) }}"
     segmentretries: "{{ adaptive_repair.segmentretries | default(omit) }}"
     segmenttargetsizemb: "{{ adaptive_repair.segmenttargetsizemb | default(omit) }}"
     segmenttimeout: "{{ adaptive_repair.segmenttimeout | default(omit) }}"
-    tableparallelism: "{{ adaptive_repair.tableparallelism | default(omit) }}"
   no_log: "{{ false if enable_logging is defined and enable_logging else true }}"
   tags:
   - axonops_adaptive_repair

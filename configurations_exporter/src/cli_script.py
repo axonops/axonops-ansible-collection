@@ -167,12 +167,15 @@ def render_adaptive_repair(cluster: Cluster, payload: Any) -> List[str]:
     options = ['--enabled' if payload.get('Active') else '--disabled']
 
     for key, flag in (('GcGraceThreshold', '--gcgrace'),
-                      ('TableParallelism', '--tableparallelism'),
+                      ('MaxConcurrentSegments', '--maxconcurrentsegments'),
                       ('MaxSegmentsPerTable', '--maxsegmentspertable'),
                       ('SegmentRetries', '--segmentretries'),
                       ('SegmentTargetSizeMB', '--segmenttargetsizemb')):
         if payload.get(key) is not None:
             options += [flag, str(payload[key])]
+
+    if payload.get('RepairAheadOfSchedule') is not None:
+        options += ['--repairaheadofschedule', str(payload['RepairAheadOfSchedule']).lower()]
 
     if payload.get('BlacklistedTables'):
         options += ['--excludedtables', ','.join(payload['BlacklistedTables'])]
