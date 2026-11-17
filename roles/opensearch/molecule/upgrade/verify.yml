@@ -1,0 +1,74 @@
+---
+- name: Verify the upgrade preserved the deployment
+  hosts: all
+  vars:
+    opensearch_install_root: /usr/share/opensearch
+  tasks:
+    - name: Query the running node
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:9200/"
+        return_content: true
+      register: _node
+      retries: 12
+      delay: 5
+      until: _node.status | default(0) == 200
+
+    - name: Running node reports the target version
+      ansible.builtin.assert:
+        that:
+          - _node.json.version.number == '3.9.0'
+        fail_msg: "Node still reports {{ _node.json.version.number | default('unknown') }} after upgrade"
+
+    - name: Find core jars in the install
+      ansible.builtin.find:
+        paths: "{{ opensearch_install_root }}/lib"
+        patterns: '^opensearch-.*\.jar$'
+        use_regex: true
+      register: _jars
+
+    - name: Only target-version jars remain
+      ansible.builtin.assert:
+        that:
+          - _jars.files | map(attribute='path') | select('search', '-3[.]8[.]0') | list | length == 0
+          - _jars.files | map(attribute='path') | select('search', 'opensearch-3[.]9[.]0[.]jar') | list | length == 1
+        fail_msg: "lib/ still holds jars from the previous version"
+
+    - name: Configuration backup was kept
+      ansible.builtin.stat:
+        path: "{{ opensearch_install_root }}/config.pre-upgrade-3.8.0"
+      register: _backup
+      failed_when: not _backup.stat.exists
+
+    - name: Read the document indexed before the upgrade
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:9200/upgrade-test/_doc/1"
+        return_content: true
+      register: _doc
+
+    - name: Data survived the upgrade
+      ansible.builtin.assert:
+        that:
+          - _doc.json._source.marker == 'survives-upgrade'
+
+    - name: Check cluster health
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:9200/_cluster/health"
+        return_content: true
+      register: _health
+
+    - name: Cluster is not red
+      ansible.builtin.assert:
+        that:
+          - _health.json.status in ['green', 'yellow']
+
+    - name: Read opensearch.yml
+      ansible.builtin.slurp:
+        src: "{{ opensearch_install_root }}/config/opensearch.yml"
+      register: _conf
+
+    - name: Configuration preserved
+      ansible.builtin.assert:
+        that:
+          - "'cluster.name: upgrade-test' in (_conf.content | b64decode)"
+
+# code: language=ansible

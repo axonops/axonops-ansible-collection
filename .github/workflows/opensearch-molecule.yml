@@ -36,6 +36,7 @@ jobs:
           - default
           - noexec-tmp
           - snapshot
+          - upgrade
 
     steps:
       - name: Check out the codebase.

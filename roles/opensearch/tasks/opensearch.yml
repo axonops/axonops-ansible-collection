@@ -6,6 +6,9 @@
     mode: "0644"
   register: _opensearch_download
 
+- name: Upgrade existing install when the version changed
+  ansible.builtin.import_tasks: upgrade.yml
+
 - name: Create OpenSearch user
   ansible.builtin.user:
     name: "{{ opensearch_user }}"

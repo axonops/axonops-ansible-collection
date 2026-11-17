@@ -2,7 +2,7 @@
 - name: Converge — OpenSearch with S3 and GCS snapshot repositories
   hosts: all
   vars:
-    opensearch_version: "3.8.0"
+    opensearch_version: "3.9.0"
     opensearch_cluster_name: molecule-snapshot
     opensearch_cluster_type: single-node
     opensearch_heap_size: "512m"

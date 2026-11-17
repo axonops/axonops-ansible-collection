@@ -1,0 +1,43 @@
+---
+- name: Install the previous OpenSearch version
+  hosts: all
+  vars:
+    opensearch_version: "3.8.0"
+    opensearch_cluster_name: upgrade-test
+    opensearch_cluster_type: single-node
+    opensearch_heap_size: "512m"
+    opensearch_security_enabled: false
+    opensearch_populate_etc_hosts: false
+    opensearch_start_on_boot: false
+    opensearch_start_on_install: true
+  roles:
+    - role: opensearch
+
+- name: Index a document before the upgrade
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Create test document
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:9200/upgrade-test/_doc/1?refresh=true"
+        method: PUT
+        body_format: json
+        body:
+          marker: survives-upgrade
+        status_code: [200, 201]
+
+- name: Upgrade to the target OpenSearch version
+  hosts: all
+  vars:
+    opensearch_version: "3.9.0"
+    opensearch_cluster_name: upgrade-test
+    opensearch_cluster_type: single-node
+    opensearch_heap_size: "512m"
+    opensearch_security_enabled: false
+    opensearch_populate_etc_hosts: false
+    opensearch_start_on_boot: false
+    opensearch_start_on_install: true
+  roles:
+    - role: opensearch
+
+# code: language=ansible

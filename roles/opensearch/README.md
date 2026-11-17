@@ -22,7 +22,7 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `opensearch_version` | `3.8.0` | OpenSearch version to install |
+| `opensearch_version` | `3.9.0` | OpenSearch version to install |
 | `opensearch_download_url` | `https://artifacts.opensearch.org/releases/bundle/opensearch` | Base URL for the OpenSearch tar.gz download |
 | `opensearch_arch` | derived from `ansible_architecture` | Bundle architecture: `x64` on x86_64 hosts, `arm64` on aarch64. Override only to force a specific bundle. |
 | `opensearch_install_root` | `/usr/share/opensearch` | Directory where OpenSearch is extracted |
@@ -186,7 +186,7 @@ The systemd service unit also sets these resource limits regardless of tuning va
 | `opensearch_snapshot_repository_name` | string | `<type>-snapshots` | `nightly` | Snapshot repository name |
 | `opensearch_snapshot_bucket` | string | `""` | `opensearch-backups` | Bucket name. Required |
 | `opensearch_snapshot_base_path` | string | `""` | `prod/cluster1` | Path prefix inside the bucket |
-| `opensearch_snapshot_plugin_local_archive` | string | `""` | `/srv/plugins/repository-s3-3.8.0.zip` | Plugin zip on the control node, for hosts that cannot reach `artifacts.opensearch.org`. Must match `opensearch_version` |
+| `opensearch_snapshot_plugin_local_archive` | string | `""` | `/srv/plugins/repository-s3-3.9.0.zip` | Plugin zip on the control node, for hosts that cannot reach `artifacts.opensearch.org`. Must match `opensearch_version` |
 | `opensearch_snapshot_s3_access_key` | string | `""` | `"{{ vault_s3_access_key }}"` | Static access key. Set together with the secret key |
 | `opensearch_snapshot_s3_secret_key` | string | `""` | `"{{ vault_s3_secret_key }}"` | Static secret key |
 | `opensearch_snapshot_s3_session_token` | string | `""` | `"{{ vault_s3_session_token }}"` | Optional session token for temporary credentials |
@@ -229,6 +229,29 @@ Setting `opensearch_snapshot_enabled: false` later does not remove the plugin, t
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `opensearch_iac_enable` | `false` | Enable Infrastructure-as-Code mode. When `true`, the role checks whether certificates exist on each node and regenerates them if any are missing. Also forces security index reinitialisation. Use this for pipelines that run the role repeatedly against existing clusters |
+
+### Upgrading
+
+Change `opensearch_version` and re-run the role. When the installed version is older, the role downloads the new release, stops the service, backs up `config/` to `<opensearch_install_root>/config.pre-upgrade-<old version>/` (mode `0700`, kept after the upgrade), replaces everything in the install directory except `config`, `data` and `logs`, and starts the service. Downgrades fail with a message naming both versions.
+
+- The new release's default configuration files are not applied. Compare the backup with the release notes and merge changes by hand.
+- If a step fails, the role restores the previous distribution and restarts the service if it was running. The backup directory holds TLS keys when security is enabled, and one is kept per upgrade; remove old ones when no longer needed.
+- Third-party plugins are removed with `plugins/` and must be reinstalled. The snapshot repository plugin is reinstalled when `opensearch_snapshot_enabled` is `true`; `opensearch_snapshot_plugin_local_archive` must match the new `opensearch_version`.
+- A service that was stopped before the upgrade stays stopped when `opensearch_start_on_install` is `false`.
+- The upgrade is in place and the node is offline while it runs. The role does not disable shard allocation or wait for green cluster health. On multi-node clusters, upgrade one node at a time (`serial: 1`) and check health between nodes.
+- Skipping major versions is not supported by OpenSearch. Check the release notes before upgrading across a major version.
+
+```yaml
+- name: Upgrade OpenSearch one node at a time
+  hosts: opensearch
+  become: true
+  serial: 1
+  roles:
+    - role: axonops.axonops.opensearch
+      vars:
+        opensearch_version: "3.9.0"
+        # plus your existing variables
+```
 
 ## Tags
 

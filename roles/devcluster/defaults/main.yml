@@ -6,7 +6,7 @@ devcluster_state: present
 devcluster_compose_dir: /opt/axonops-devcluster
 
 # --- OpenSearch (metrics backend) -------------------------------------------
-devcluster_opensearch_version: "2.19.1"
+devcluster_opensearch_version: "3.9.0"
 devcluster_opensearch_java_opts: "-Xms512m -Xmx512m"
 
 # --- AxonOps server ----------------------------------------------------------
