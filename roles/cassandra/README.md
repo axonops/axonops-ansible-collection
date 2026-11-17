@@ -172,6 +172,8 @@ See `defaults/main.yml` for the full list of PEM variables (`cassandra_ssl_inter
 
 ## Upgrade Notes
 
+For a rolling version upgrade without an outage, see [Upgrading Existing Deployments](../../docs/upgrading.md).
+
 ### 0.6.0 — `cassandra_data_directory` default changed (breaking)
 
 `cassandra_data_directory` now defaults to `/var/lib/cassandra/data` (previously

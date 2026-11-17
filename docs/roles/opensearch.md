@@ -181,6 +181,8 @@ Setting `opensearch_snapshot_enabled: false` later does not remove the plugin, t
 
 ### Upgrading
 
+For a rolling upgrade without an outage, including shard allocation and health checks, see [Upgrading Existing Deployments](../upgrading.md).
+
 Change `opensearch_version` and re-run the role. When the installed version is older, the role downloads the new release, stops the service, backs up `config/` to `<opensearch_install_root>/config.pre-upgrade-<old version>/` (mode `0700`, kept after the upgrade), replaces everything in the install directory except `config`, `data` and `logs`, and starts the service. Downgrades fail with a message naming both versions.
 
 - The new release's default configuration files are not applied. Compare the backup with the release notes and merge changes by hand.
