@@ -9,55 +9,6 @@
 # Old entries are moved aside, not deleted, until every new entry is in place.
 # ============================================================================
 
-- name: Check for existing OpenSearch lib directory
-  ansible.builtin.stat:
-    path: "{{ opensearch_install_root }}/lib"
-    get_attributes: false
-    get_checksum: false
-    get_mime: false
-  register: _opensearch_lib_stat
-
-- name: Check for existing OpenSearch config directory
-  ansible.builtin.stat:
-    path: "{{ opensearch_conf_dir }}"
-    get_attributes: false
-    get_checksum: false
-    get_mime: false
-  register: _opensearch_conf_stat
-
-- name: Find installed OpenSearch core jar
-  ansible.builtin.find:
-    paths: "{{ opensearch_install_root }}/lib"
-    patterns: '^opensearch-[0-9][0-9.]*\.jar$'
-    use_regex: true
-  register: _opensearch_core_jar
-  when: _opensearch_lib_stat.stat.exists
-
-- name: Determine installed OpenSearch version
-  ansible.builtin.set_fact:
-    _opensearch_installed_version: >-
-      {{ (_opensearch_core_jar.files | map(attribute='path') | first | basename
-          | regex_replace('^opensearch-([0-9.]+)\.jar$', '\1'))
-         if _opensearch_core_jar.files | default([]) | length > 0 else '' }}
-
-- name: Refuse to continue on a broken install
-  ansible.builtin.assert:
-    that:
-      - _opensearch_installed_version | length > 0 or not _opensearch_conf_stat.stat.exists
-    fail_msg: >-
-      {{ opensearch_conf_dir }} exists but no OpenSearch core jar was found in
-      {{ opensearch_install_root }}/lib. A previous upgrade may have been
-      interrupted. Restore the distribution from {{ opensearch_install_root }}/.old-*
-      (move its entries back into {{ opensearch_install_root }}) and re-run.
-
-- name: Refuse to downgrade OpenSearch
-  ansible.builtin.assert:
-    that:
-      - _opensearch_installed_version == '' or _opensearch_installed_version is version(opensearch_version, '<=')
-    fail_msg: >-
-      Installed OpenSearch {{ _opensearch_installed_version }} is newer than
-      opensearch_version {{ opensearch_version }}. Downgrades are not supported.
-
 - name: Upgrade existing OpenSearch install
   when:
     - _opensearch_installed_version | length > 0
@@ -67,15 +18,12 @@
     _old: "{{ opensearch_install_root }}/.old-{{ _opensearch_installed_version }}"
     _preserved: [config, data, logs]
   block:
-    - name: Check whether the OpenSearch service is running
-      ansible.builtin.systemd:
-        name: opensearch
-      register: _opensearch_unit
-      failed_when: false
+    - name: Gather service state before upgrade
+      ansible.builtin.service_facts:
 
     - name: Record service state before upgrade
       ansible.builtin.set_fact:
-        _opensearch_unit_live: "{{ _opensearch_unit.status.ActiveState | default('inactive') in ['active', 'activating', 'reloading', 'deactivating'] }}"
+        _opensearch_unit_live: "{{ ansible_facts.services['opensearch.service'].state | default('stopped') == 'running' }}"
 
     - name: Stop OpenSearch
       ansible.builtin.systemd:
@@ -151,22 +99,6 @@
         label: "{{ item.path | basename }}"
       changed_when: true
 
-    - name: Remove staging and old-distribution directories
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - "{{ _staging }}"
-        - "{{ _old }}"
-
-    # The Restart OpenSearch handler starts the stopped service when the role
-    # does not start it itself (opensearch_start_on_install: false).
-    - name: Restart OpenSearch after upgrade
-      ansible.builtin.debug:
-        msg: "OpenSearch upgraded from {{ _opensearch_installed_version }} to {{ opensearch_version }}"
-      changed_when: _opensearch_unit_live and not opensearch_start_on_install
-      notify: Restart OpenSearch
-
   rescue:
     - name: List entries moved aside
       ansible.builtin.find:
@@ -175,6 +107,7 @@
         hidden: true
       register: _opensearch_moved_aside
 
+    # Only names already moved aside: an entry not yet moved aside is still the old one.
     - name: Remove partially placed new entries
       ansible.builtin.file:
         path: "{{ opensearch_install_root }}/{{ item.path | basename }}"
@@ -200,11 +133,40 @@
         state: started
       when: _opensearch_unit_live | default(false)
 
+    - name: Remove upgrade working directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ _staging }}"
+        - "{{ _old }}"
+
     - name: Fail after restoring previous distribution
       ansible.builtin.fail:
         msg: >-
           Upgrade from {{ _opensearch_installed_version }} to {{ opensearch_version }}
           failed. The previous distribution was restored. Configuration backup:
           {{ opensearch_install_root }}/config.pre-upgrade-{{ _opensearch_installed_version }}.
+
+- name: Remove staging and old-distribution directories
+  when: _opensearch_installed_version | length > 0 and _opensearch_installed_version != opensearch_version
+  vars:
+    _staging: "{{ opensearch_install_root }}/.upgrade-{{ opensearch_version }}"
+    _old: "{{ opensearch_install_root }}/.old-{{ _opensearch_installed_version }}"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ _staging }}"
+    - "{{ _old }}"
+
+# The Restart OpenSearch handler starts the stopped service when the role
+# does not start it itself (opensearch_start_on_install: false).
+- name: Report upgrade and schedule restart
+  when: _opensearch_installed_version | length > 0 and _opensearch_installed_version != opensearch_version
+  ansible.builtin.debug:
+    msg: "OpenSearch upgraded from {{ _opensearch_installed_version }} to {{ opensearch_version }}"
+  changed_when: _opensearch_unit_live and not opensearch_start_on_install
+  notify: Restart OpenSearch
 
 # code: language=ansible

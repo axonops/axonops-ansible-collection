@@ -37,7 +37,20 @@
       ansible.builtin.stat:
         path: "{{ opensearch_install_root }}/config.pre-upgrade-3.8.0"
       register: _backup
-      failed_when: not _backup.stat.exists
+      failed_when: not _backup.stat.exists or _backup.stat.mode != '0700'
+
+    - name: Find upgrade working directories
+      ansible.builtin.find:
+        paths: "{{ opensearch_install_root }}"
+        patterns: ['.old-*', '.upgrade-*']
+        file_type: directory
+        hidden: true
+      register: _leftovers
+
+    - name: No upgrade working directories remain
+      ansible.builtin.assert:
+        that:
+          - _leftovers.files | length == 0
 
     - name: Read the document indexed before the upgrade
       ansible.builtin.uri:
