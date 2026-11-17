@@ -17,9 +17,18 @@
   hosts: all
   gather_facts: false
   tasks:
+    # The role's restart handler runs at the end of the previous play.
+    - name: Wait for the node to accept requests
+      ansible.builtin.uri:
+        url: "http://{{ ansible_facts['default_ipv4']['address'] }}:9200/_cluster/health?wait_for_status=yellow&timeout=30s"
+      register: _ready
+      retries: 24
+      delay: 5
+      until: _ready.status | default(0) == 200
+
     - name: Create test document
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:9200/upgrade-test/_doc/1?refresh=true"
+        url: "http://{{ ansible_facts['default_ipv4']['address'] }}:9200/upgrade-test/_doc/1?refresh=true"
         method: PUT
         body_format: json
         body:

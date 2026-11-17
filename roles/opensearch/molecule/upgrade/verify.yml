@@ -6,7 +6,7 @@
   tasks:
     - name: Query the running node
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:9200/"
+        url: "http://{{ ansible_facts['default_ipv4']['address'] }}:9200/"
         return_content: true
       register: _node
       retries: 12
@@ -54,7 +54,7 @@
 
     - name: Read the document indexed before the upgrade
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:9200/upgrade-test/_doc/1"
+        url: "http://{{ ansible_facts['default_ipv4']['address'] }}:9200/upgrade-test/_doc/1"
         return_content: true
       register: _doc
 
@@ -65,7 +65,7 @@
 
     - name: Check cluster health
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:9200/_cluster/health"
+        url: "http://{{ ansible_facts['default_ipv4']['address'] }}:9200/_cluster/health"
         return_content: true
       register: _health
 
