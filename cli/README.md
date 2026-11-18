@@ -52,7 +52,7 @@ python3 <command.py>
 This CLI accepts both command-line parameters and environment variables.
 
 For easy of use; an environment configuration file was created to set the required environment variables for authentication and connection settings.
-You can find the template for this file in `cli/.env.axonops.example`. You can copy this file to `.env.example` and set the required values for your environment.
+You can find the template for this file in `cli/.env.axonops.example`. You can copy this file to `.env.axonops` and set the required values for your environment.
 
 You can load the environment variables from the file using the following command:
 
@@ -95,10 +95,12 @@ All commands accept those attributes
 
 * `--org` Name of your organisation (environment variable `AXONOPS_ORG`).
 * `--cluster` Name of your cluster (environment variable `AXONOPS_CLUSTER`).
+* `--cluster-type` Type of your cluster: `cassandra` (default), `dse`, or `kafka` (environment variable `AXONOPS_CLUSTER_TYPE`).
 * `--token` AUTH_TOKEN used to authenticate with the API in AxonOps Cloud (environment variable `AXONOPS_TOKEN`).
 * `--username` Username used for AxonOps Self-Hosted when authentication is enabled (environment variable `AXONOPS_USERNAME`).
 * `--password` Password used for AxonOps Self-Hosted when authentication is enabled (environment variable `AXONOPS_PASSWORD`).
 * `--url` Specify the AxonOps URL if not using the AxonOps Cloud environment (environment variable `AXONOPS_URL`).
+* `-v` Verbosity. Prints the resolved URLs and every API request the CLI makes. Repeat to increase the level.
 
 ### Connections
 
@@ -116,13 +118,75 @@ export AXONOPS_CLUSTER="thingscluster"
 export AXONOPS_TOKEN='aaaaabbbbccccddddeeee'
 ```
 
-### `info` Subcommand
-Prints general information about the cluster.
-This can be used to verify that the connection to the cluster is working and to get some basic information about the cluster.
+### `health` Subcommand
+
+Reports the health of every cluster visible to your organisation. By default it prints
+only what is wrong: either `All clusters are healthy`, or the list of clusters that are
+not OK. This makes it usable as a check in a script or a CI job.
+
+Each failing cluster is printed as `type/name: status`. Statuses are:
+
+| Status | Meaning |
+| --- | --- |
+| `OK` | The cluster is healthy. Not printed unless `--show-healthy` is given. |
+| `Warning` | The cluster has raised a warning. |
+| `Error` | The cluster is in an error state. |
+| `Unknown` | The server reported a status this CLI does not recognise. |
+
+**Exit code**: `0` when every cluster is OK (or none were found), `1` when at least one
+cluster is not OK.
+
+| Option | Description |
+| --- | --- |
+| `--show-healthy` | Also list the healthy clusters, followed by the nodes registered for `--cluster`. |
+| `--show-orgs` | Also list the organisations visible to your credentials. |
+| `-v` | Also print the resolved settings — org, cluster, cluster type, connection URL, and the authentication method. The token is masked; only its first character is shown. |
+
+> **Note**: the AxonOps API reports a status per *cluster*, not per node. The node list
+> shown by `--show-healthy` is the registered node inventory for the cluster, not a
+> per-node health verdict.
+
 #### Examples:
 
+Check whether anything is wrong:
+
 ```shell
-$ pipenv run python axonops.py info
+$ pipenv run python axonops.py health
+```
+
+```text
+Unhealthy clusters:
+cassandra/warn-cluster: Warning
+```
+
+Show everything, healthy clusters and orgs included:
+
+```shell
+$ pipenv run python axonops.py health --show-healthy --show-orgs
+```
+
+```text
+Unhealthy clusters:
+cassandra/warn-cluster: Warning
+
+Healthy clusters:
+- demo/cassandra/demo-cluster
+- demo/kafka/k1
+
+Nodes:
+- 172.18.0.2 (ID: b167aca6-b6b1-4bd5-bc45-3e27632e844d)
+
+Orgs:
+- demo
+```
+
+Use it as a gate in a script:
+
+```shell
+if ! pipenv run python axonops.py health; then
+  echo "AxonOps reports an unhealthy cluster"
+  exit 1
+fi
 ```
 
 ### `adaptiverepair` Subcommand
@@ -140,6 +204,7 @@ Manages **Adaptive Repair** in AxonOps.
 * `--segmentretries` Segment Retries.
 * `--maxsegmentspertable` Max Segments Per Table.
 * `--segmenttargetsizemb` Segment Target Size in MB.
+* `--segmenttimeout` Timeout per segment, e.g. `3h`.
 * `--tableparallelism` Concurrent Repair Processes.
 
 #### Examples:
@@ -344,13 +409,13 @@ $ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --tags
 Run a scheduled paxos-only repair with a cron expression:
 
 ```shell
-$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --skippaxos
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --paxosonly
 ```
 
 Run a scheduled repair skipping paxos repair with a cron expression:
 
 ```shell
-$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --paxosonly
+$ pipenv run python axonops.py scheduledrepair --scheduleexpr '0 0 * * 0' --skippaxos
 ```
 
 Delete a scheduled repair job with specific tags:
@@ -396,7 +461,7 @@ $ pipenv run python axonops.py dashboard --list
 Export a dashboard by its name to the current directory:
 
 ```shell
-$ pipenv run python axonops.py dashboard -h --exportpath . --dashboardname Table
+$ pipenv run python axonops.py dashboard --exportpath . --dashboardname Table
 ```
 
 Export all dashboards to the current directory:

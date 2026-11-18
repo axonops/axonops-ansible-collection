@@ -1,0 +1,26 @@
+{% if opensearch_snapshot_enabled %}
+
+{% set _client = opensearch_snapshot_client %}
+{% if opensearch_snapshot_type == 's3' %}
+{% if opensearch_snapshot_s3_region | length > 0 %}
+s3.client.{{ _client }}.region: {{ opensearch_snapshot_s3_region | to_json }}
+{% endif %}
+{% if opensearch_snapshot_s3_endpoint | length > 0 %}
+s3.client.{{ _client }}.endpoint: {{ opensearch_snapshot_s3_endpoint | to_json }}
+{% endif %}
+{% if opensearch_snapshot_s3_protocol | length > 0 %}
+s3.client.{{ _client }}.protocol: {{ opensearch_snapshot_s3_protocol | to_json }}
+{% endif %}
+s3.client.{{ _client }}.path_style_access: {{ opensearch_snapshot_s3_path_style_access | bool | lower }}
+{% for _key, _value in opensearch_snapshot_s3_extra_settings.items() %}
+s3.client.{{ _client }}.{{ _key }}: {{ _value | to_json }}
+{% endfor %}
+{% elif opensearch_snapshot_type == 'gcs' %}
+{% if opensearch_snapshot_gcs_project_id | length > 0 %}
+gcs.client.{{ _client }}.project_id: {{ opensearch_snapshot_gcs_project_id | to_json }}
+{% endif %}
+{% if opensearch_snapshot_gcs_endpoint | length > 0 %}
+gcs.client.{{ _client }}.endpoint: {{ opensearch_snapshot_gcs_endpoint | to_json }}
+{% endif %}
+{% endif %}
+{% endif %}

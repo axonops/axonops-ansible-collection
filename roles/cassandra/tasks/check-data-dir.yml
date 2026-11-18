@@ -1,0 +1,49 @@
+---
+# Safety guard for the 0.6.0 cassandra_data_directory default change
+# (/var/lib/cassandra -> /var/lib/cassandra/data).
+#
+# An initialized Cassandra data directory always contains a 'system' keyspace
+# directory. If the configured data directory has none but its parent does,
+# the node was deployed with the pre-0.6 default and the data has not been
+# migrated: templating the new path and restarting would boot Cassandra
+# against an empty directory (new host ID, empty node, possible cluster-wide
+# outage). Refuse to continue instead.
+#
+# Disable with cassandra_data_directory_check: false (after migrating, or for
+# a deliberate fresh start).
+
+- name: Cassandra data directory migration guard
+  when: cassandra_data_directory_check | bool
+  tags: always
+  block:
+    - name: Check for system keyspace in configured data directory
+      ansible.builtin.stat:
+        path: "{{ cassandra_data_directory }}/system"
+      register: cassandra_data_dir_system
+
+    - name: Check for system keyspace in parent of configured data directory
+      ansible.builtin.stat:
+        path: "{{ cassandra_data_directory | dirname }}/system"
+      register: cassandra_data_dir_parent_system
+
+    - name: Fail when Cassandra data has not been migrated to cassandra_data_directory
+      ansible.builtin.fail:
+        msg: >-
+          REFUSING TO PROCEED: cassandra_data_directory is set to
+          '{{ cassandra_data_directory }}', which contains no 'system' keyspace
+          directory, but '{{ cassandra_data_directory | dirname }}/system'
+          exists. This host appears to hold Cassandra data laid out with the
+          pre-0.6.0 default ('{{ cassandra_data_directory | dirname }}') that
+          has not been migrated. Continuing would rewrite cassandra.yaml to
+          point at an empty data directory and restart Cassandra, bringing the
+          node up empty with a new host ID. Either follow the migration steps
+          in the cassandra role README ("Upgrade Notes"), or pin
+          'cassandra_data_directory: {{ cassandra_data_directory | dirname }}'
+          to keep the old layout. Set 'cassandra_data_directory_check: false'
+          to bypass this guard once the data location has been confirmed.
+      when:
+        - not cassandra_data_dir_system.stat.exists
+        - cassandra_data_dir_parent_system.stat.exists
+        - cassandra_data_dir_parent_system.stat.isdir | default(false)
+
+# code: language=ansible

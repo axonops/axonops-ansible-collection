@@ -36,6 +36,7 @@ Step 1 can be skipped if the Strimzi operator is already installed.
 | `strimzi_operator_version` | `0.51.0` | Strimzi operator Helm chart version |
 | `strimzi_operator_namespace` | `strimzi-system` | Namespace for the operator |
 | `strimzi_operator_helm_repo` | `https://strimzi.io/charts/` | Helm repo URL |
+| `strimzi_operator_helm_repo_name` | `strimzi` | Local Helm repository name |
 | `strimzi_operator_helm_values` | `{}` | Extra Helm values for the operator chart |
 | `strimzi_wait_for_operator` | `true` | Wait for operator readiness |
 | `strimzi_operator_wait_timeout` | `300` | Timeout in seconds |
@@ -57,7 +58,11 @@ These defaults apply to all clusters unless overridden per-cluster.
 | `strimzi_controller_storage_class` | `""` | Controller StorageClass (empty = default) |
 | `strimzi_default_replication_factor` | `3` | Default topic replication factor |
 | `strimzi_min_insync_replicas` | `2` | Minimum in-sync replicas |
+| `strimzi_offsets_topic_replication_factor` | `3` | `offsets.topic.replication.factor` |
+| `strimzi_transaction_state_log_replication_factor` | `3` | `transaction.state.log.replication.factor` |
+| `strimzi_transaction_state_log_min_isr` | `2` | `transaction.state.log.min.isr` |
 | `strimzi_rack_topology_key` | `topology.kubernetes.io/zone` | Topology key for rack awareness |
+| `strimzi_listeners` | `plain` (9092, no TLS) and `tls` (9093), both internal | Kafka listener list (`name`, `port`, `type`, `tls`) |
 | `strimzi_kafka_connect_enabled` | `false` | Deploy Kafka Connect |
 | `strimzi_kafka_connect_replicas` | `2` | Kafka Connect worker replicas |
 
@@ -92,6 +97,9 @@ These defaults apply to all clusters unless overridden per-cluster.
 | `controller_storage_class` | `strimzi_controller_storage_class` | Controller StorageClass |
 | `default_replication_factor` | `strimzi_default_replication_factor` | Replication factor |
 | `min_insync_replicas` | `strimzi_min_insync_replicas` | Min ISR |
+| `offsets_topic_replication_factor` | `strimzi_offsets_topic_replication_factor` | Offsets topic replication factor |
+| `transaction_state_log_replication_factor` | `strimzi_transaction_state_log_replication_factor` | Transaction state log replication factor |
+| `transaction_state_log_min_isr` | `strimzi_transaction_state_log_min_isr` | Transaction state log min ISR |
 | `rack_topology_key` | `strimzi_rack_topology_key` | Rack awareness key |
 | `listeners` | `strimzi_listeners` | Kafka listener configuration |
 | `kafka_config` | — | Additional Kafka broker config (dict) |
@@ -103,6 +111,10 @@ These defaults apply to all clusters unless overridden per-cluster.
 | `axon_agent_cluster_name` | `name` | AxonOps cluster name (defaults to Kafka cluster name) |
 | `kafka_connect_enabled` | `strimzi_kafka_connect_enabled` | Enable Kafka Connect |
 | `kafka_connect_replicas` | `strimzi_kafka_connect_replicas` | Connect worker replicas |
+| `kafka_connect_image_tag` | `image_tag` | Image tag for Connect |
+| `kafka_connect_config` | — | Additional Kafka Connect worker config (dict) |
+| `labels` | — | Labels for the Kafka CR |
+| `annotations` | — | Annotations for the Kafka CR |
 | `broker_extra_env` | — | Extra env vars for broker containers |
 | `controller_extra_env` | — | Extra env vars for controller containers |
 

@@ -1,0 +1,46 @@
+- name: Deploy Cassandra 3.11 with AxonOps Agent
+  hosts: cassandra
+  become: true
+  vars:
+    install_cassandra: true
+    # Use the Cassandra 3.11-specific AxonOps agent JAR
+    axon_java_agent: "axon-cassandra3.11-agent"
+    axon_agent_version: "2.0.21"
+    axon_java_agent_version: "1.0.14"
+    # Cassandra 3.11 — legacy cassandra.yaml schema, requires Java 8.
+    cassandra_version: 3.11.17
+    cassandra_cluster_name: axonops
+    cassandra_dc: default
+    cassandra_rack: rack1
+    # This is the AxonOps Server host, it can be localhost or the IP of the AxonOps Server.
+    # Leave empty if you want to use the SaaS environment.
+    axon_agent_server_host: "{{ groups['axon-server'] | first }}"
+    axon_agent_tls_mode: "disabled"
+    axon_agent_customer_name: "mycompany"
+    cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | join(',') }}"
+
+  pre_tasks:
+    # This is only for this example to work, please review your firewall settings and requirements
+    - name: "Stop firewalld"
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: false
+        state: stopped
+      when: ansible_os_family == 'RedHat'
+      failed_when: false
+
+  roles:
+    - role: axonops.axonops.preflight
+      tags: preflight
+    - role: axonops.axonops.java
+      # cassandra_version starts with '3.11', so the java role automatically
+      # picks Java 8. Set java_use_zulu: true on EL10+/Debian13+ where the
+      # base repos no longer ship OpenJDK 8.
+      tags: java
+    - role: axonops.axonops.agent
+      tags: agent
+    - role: axonops.axonops.cassandra
+      tags: cassandra
+      when: install_cassandra is defined and install_cassandra
+
+# code: language=ansible

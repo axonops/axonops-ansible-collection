@@ -2,7 +2,7 @@
 - name: Converge — OpenSearch with security, custom users, roles, and role mappings
   hosts: all
   vars:
-    opensearch_version: "3.6.0"
+    opensearch_version: "3.8.0"
     opensearch_cluster_name: security-test
     opensearch_cluster_type: single-node
     opensearch_heap_size: "512m"

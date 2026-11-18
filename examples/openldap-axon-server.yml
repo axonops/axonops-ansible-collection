@@ -1,0 +1,69 @@
+---
+# ============================================================================
+# OpenLDAP + AxonOps Server - Example Playbook
+# ============================================================================
+#
+# Installs a local OpenLDAP directory, seeds it with users and groups, and
+# configures axon-server to authenticate against it. Each seeded group maps to
+# an AxonOps role through rolesMapping.
+#
+# Prerequisites:
+#   - Inventory groups 'ldap' (one host) and 'axon-server'
+#   - An AxonOps license key. axon-server ignores LDAP without one.
+#   - Secrets in an ansible-vault file:
+#       vault_openldap_admin_password, vault_alice_password, vault_bob_password,
+#       vault_axon_server_license_key
+#   - community.general collection:
+#       ansible-galaxy collection install community.general
+#
+# Usage:
+#   ansible-playbook -i inventory examples/openldap-axon-server.yml --ask-vault-pass
+#
+# ============================================================================
+
+- name: Deploy OpenLDAP directory
+  hosts: ldap
+  become: true
+
+  vars:
+    openldap_admin_password: "{{ vault_openldap_admin_password }}"
+    openldap_tls_mode: generate
+    openldap_listen_ldaps: true
+    openldap_users:
+      - uid: alice
+        cn: Alice Smith
+        sn: Smith
+        mail: alice@example.com
+        password: "{{ vault_alice_password }}"
+        groups: [axonops_super]
+      - uid: bob
+        cn: Bob Jones
+        sn: Jones
+        mail: bob@example.com
+        password: "{{ vault_bob_password }}"
+        groups: [axonops_readonly]
+
+  roles:
+    - axonops.axonops.openldap
+
+- name: Deploy AxonOps Server with LDAP authentication
+  hosts: axon-server
+  become: true
+
+  vars:
+    axon_server_org_name: "mycompany"
+    axon_server_license_key: "{{ vault_axon_server_license_key }}"
+    axon_server_cql_hosts:
+      - localhost:9042
+    axon_server_searchdb_hosts:
+      - https://127.0.0.1:9200
+    axon_server_ldap_enabled: true
+    # Published by the openldap role on the LDAP host. It carries host, port,
+    # TLS flags, bind DN, base DN and rolesMapping for the seeded groups. It
+    # has no bindPassword, so add it here from vault.
+    axon_server_ldap_setting: >-
+      {{ hostvars[groups['ldap'][0]]['openldap_axon_server_ldap_setting']
+         | combine({'bindPassword': vault_openldap_admin_password}) }}
+
+  roles:
+    - axonops.axonops.server

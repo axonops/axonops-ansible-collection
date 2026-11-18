@@ -48,15 +48,16 @@ class Application:
 
     def run(self, argv: Sequence):
 
-        parser = argparse.ArgumentParser(description='AxonOps Adaptive Repair CLI')
+        parser = argparse.ArgumentParser(description='AxonOps CLI')
 
         parser.add_argument('--org', type=str, required=False, default=os.getenv('AXONOPS_ORG'),
                             help='Name of your organisation')
         parser.add_argument('--cluster', type=str, required=False, default=os.getenv('AXONOPS_CLUSTER'),
                             help='Name of your cluster')
         parser.add_argument('--cluster-type', type=str, required=False,
+                            choices=['cassandra', 'dse', 'kafka'],
                             default=os.getenv('AXONOPS_CLUSTER_TYPE', 'cassandra'),
-                            help='Cluster type (e.g. cassandra, kafka). Defaults to cassandra.')
+                            help='Type of your cluster: cassandra (default), dse, or kafka')
         parser.add_argument('--token', type=str, required=False, default=os.getenv('AXONOPS_TOKEN'),
                             help='AUTH_TOKEN used to authenticate with the API in SaaS')
         parser.add_argument('--username', type=str, required=False, default=os.getenv('AXONOPS_USERNAME'),
@@ -70,9 +71,15 @@ class Application:
 
         commands_subparser = parser.add_subparsers(help="commands")
 
-        info_parser = commands_subparser.add_parser("info",
-                                                    help="Print information about the cluster and the AxonOps environment")
-        info_parser.set_defaults(func=self.run_info)
+        health_parser = commands_subparser.add_parser("health",
+                                                     help="Report the health of the clusters in the AxonOps environment")
+        health_parser.set_defaults(func=self.run_health)
+
+        health_parser.add_argument('--show-healthy', action='store_true',
+                                   help='Also list the healthy clusters and the nodes of the current cluster')
+
+        health_parser.add_argument('--show-orgs', action='store_true',
+                                   help='Also list the organisations visible to the current credentials')
 
         adaptive_repair_parser = commands_subparser.add_parser(
             "repair", aliases=['adaptiverepair'],
@@ -362,17 +369,18 @@ class Application:
                 print(f"Org: {args.org}")
                 print(f"Cluster: {args.cluster}")
 
-    def run_info(self, args: argparse.Namespace):
-        """ Run the info command """
+    def run_health(self, args: argparse.Namespace):
+        """ Run the health command """
         if args.v:
-            print(f"Running info on {args.org}")
+            print(f"Running health on {args.org}")
             print(args)
 
         axonops = self.get_axonops(args)
 
-        from .info import Info
-        info = Info(axonops, args)
-        info.print_info()
+        from .health import Health
+        health = Health(axonops, args)
+        if not health.print_health():
+            sys.exit(1)
 
     def run_dashboard(self, args: argparse.Namespace):
         """ Run the dashboard management """

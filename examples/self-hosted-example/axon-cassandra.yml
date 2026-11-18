@@ -1,20 +1,8 @@
 - name: Installs the Apache Cassandra database where AxonOps stores metrics
-  hosts: axonops-cassandra
+  hosts: axonops_cassandra
   become: true
-  vars:
-    cassandra_cluster_name: axonops
-    cassandra_dc: default
-    cassandra_rack: rack1
-    axon_java_agent: "axon-cassandra5.0-agent-jdk17"
-    axon_agent_server_host: localhost
-    axon_agent_tls_mode: "disabled"
-    axon_agent_customer_name: "mycompany"
-    cassandra_start_on_boot: true
-    # This example auto-discover the IP address, in production you might want to set this to a static IP
-    cassandra_listen_address: "{{ ansible_default_ipv4.address }}"
-    cassandra_rpc_address: "{{ ansible_default_ipv4.address }}"
-    cassandra_seeds: "{{ groups['cassandra'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list | first }}"
-
+  # All Cassandra and agent variables live in inventories/cassandra.yml so that
+  # they are not silently overridden by play vars.
 
   pre_tasks:
     # This is only for this example to work, please review your firewall settings and requirements
@@ -27,9 +15,10 @@
       failed_when: false
 
   roles:
-    - name: java
-      role: axonops.axonops.java
+    - role: axonops.axonops.java
       tags: java
+    - role: axonops.axonops.agent
+      tags: agent
     - role: axonops.axonops.cassandra
       tags: cassandra
 

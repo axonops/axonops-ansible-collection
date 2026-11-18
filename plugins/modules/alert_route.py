@@ -35,7 +35,7 @@ options:
             - api-token for authenticate to AxonOps SaaS.
             - It can be read from the environment variable AXONOPS_TOKEN.
         required: false
-        type: srt
+        type: str
     api_token:
         description:
             - api-token to authenticate with AxonOps Server

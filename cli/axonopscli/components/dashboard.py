@@ -1,13 +1,14 @@
 import json
 
+from ..urls import DASHBOARD_TEMPLATE_URL
+
 
 class Dashboard:
-    dashboardtemplate_url = "/api/v1/dashboardtemplate"
 
     def __init__(self, axonops, args):
         self.axonops = axonops
         self.args = args
-        self.full_dashboard_url = f"{self.dashboardtemplate_url}/{args.org}/{axonops.get_cluster_type()}/{args.cluster}?dashver=2.0"
+        self.full_dashboard_url = f"{DASHBOARD_TEMPLATE_URL}/{args.org}/{args.cluster_type}/{args.cluster}?dashver=2.0"
         self.dashboard_data = None
 
     def get_actual_dashboards(self):
@@ -124,7 +125,7 @@ class Dashboard:
 
             # Update AxonOps with the new list of dashboards
             update_payload = {
-                'type': self.axonops.get_cluster_type(),
+                'type': self.args.cluster_type,
                 'dashboards': self.dashboard_data
             }
             response = self.axonops.do_request(
@@ -152,7 +153,7 @@ class Dashboard:
 
         # Update AxonOps with the new list of dashboards
         update_payload = {
-            'type': self.axonops.get_cluster_type(),
+            'type': self.args.cluster_type,
             'dashboards': self.dashboard_data
         }
         response = self.axonops.do_request(

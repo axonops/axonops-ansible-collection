@@ -1,0 +1,67 @@
+# ============================================================================
+# OpenSearch - S3 Snapshot Backups Example Playbook
+# ============================================================================
+#
+# Deploys OpenSearch with an S3 snapshot repository and a daily Snapshot
+# Management policy. Works with AWS S3 and S3-compatible stores; this example
+# targets Hetzner Object Storage.
+#
+# Prerequisites:
+#   - Target hosts in the 'opensearch' inventory group
+#   - ansible.posix collection: ansible-galaxy collection install ansible.posix
+#   - An existing bucket and an access key pair with read/write access to it
+#   - vault_opensearch_admin_password, vault_s3_access_key and
+#     vault_s3_secret_key defined in an ansible-vault encrypted vars file
+#
+# Usage:
+#   ansible-playbook examples/opensearch-snapshot-s3.yml --ask-vault-pass
+#
+# For AWS S3, remove opensearch_snapshot_s3_endpoint and
+# opensearch_snapshot_s3_path_style_access and set the bucket's AWS region.
+# To use an EC2 instance profile or IRSA, also remove the access and secret keys.
+#
+# ============================================================================
+
+- name: Deploy OpenSearch with S3 snapshot backups
+  hosts: opensearch
+  become: true
+
+  vars:
+    opensearch_version: "3.8.0"
+    opensearch_cluster_name: axonops-production
+    opensearch_cluster_type: multi-node
+    opensearch_heap_size: "4g"
+    opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+    opensearch_domain_name: example.com
+
+    opensearch_snapshot_enabled: true
+    opensearch_snapshot_type: s3
+    opensearch_snapshot_bucket: opensearch-backups
+    opensearch_snapshot_base_path: axonops-production
+    opensearch_snapshot_s3_access_key: "{{ vault_s3_access_key }}"
+    opensearch_snapshot_s3_secret_key: "{{ vault_s3_secret_key }}"
+    opensearch_snapshot_s3_region: fsn1
+    opensearch_snapshot_s3_endpoint: fsn1.your-objectstorage.com
+    opensearch_snapshot_s3_path_style_access: true
+
+    opensearch_snapshot_policy:
+      name: daily
+      description: Daily snapshots, kept for 14 days
+      creation:
+        schedule:
+          cron:
+            expression: "0 2 * * *"
+            timezone: UTC
+      deletion:
+        schedule:
+          cron:
+            expression: "0 3 * * *"
+            timezone: UTC
+        condition:
+          max_age: 14d
+          min_count: 1
+      snapshot_config:
+        indices: "*"
+
+  roles:
+    - axonops.axonops.opensearch

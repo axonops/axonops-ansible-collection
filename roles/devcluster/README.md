@@ -12,7 +12,7 @@ The stack runs OpenSearch (metrics backend), axon-server, axon-dash, and one to 
 - Set `devcluster_install_docker: true` to install Docker automatically using the `axonops.axonops.docker` role. See [Dependencies](#dependencies).
 - The target host MUST be `amd64` / `x86_64`. Container images are not published for ARM or other architectures. The role warns when a non-`x86_64` architecture is detected but does not abort.
 - The role manages the systemd service unit as `root`. The connecting user MUST have `become: true` privileges on the target host.
-- Ansible 2.12 or higher.
+- Ansible 2.14 or higher.
 - The `community.docker` collection is required when `devcluster_registry_auth` is set (used for `docker login`). Install it with `ansible-galaxy collection install community.docker`.
 
 ## Role Variables

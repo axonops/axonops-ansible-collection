@@ -31,6 +31,17 @@
     - "{{ es_log_dir }}"
     - "{{ es_data_dirs }}"
 
+#Create the temp directory when it is not the system /tmp. ES_TMPDIR and
+#-Djava.io.tmpdir point here, so it must exist and be executable.
+- name: Create Temp Directory
+  ansible.builtin.file:
+    path: "{{ es_tmp_dir }}"
+    state: directory
+    owner: "{{ es_user }}"
+    group: "{{ es_group }}"
+    mode: "0750"
+  when: es_tmp_dir is defined and es_tmp_dir != '' and es_tmp_dir != "/tmp"
+
 #Copy the config template
 - name: Copy Configuration File
   template:

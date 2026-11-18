@@ -1,0 +1,185 @@
+---
+# Cassandra 3.11 uses legacy _in_ms / _in_kb / _in_mb keys in cassandra.yaml,
+# whereas the role's shared defaults (used by 4.1.x / 5.0.x) carry friendly
+# values with unit suffixes ("2s", "10MiB", "64MiB/s"). Strip the suffix and
+# multiply by the unit's base count so user overrides in either form land on
+# the correct integer 3.11 expects. A plain integer / numeric string (no
+# unit) is treated as already being in the target unit.
+#
+# The lookup tables below are private helpers (prefix `_`). The
+# `regex_replace('/s$', '')` step lets throughput vars like "64MiB/s" pass
+# through the same size table as "64MiB".
+
+_ms_units:
+  ms: 1
+  s: 1000
+  m: 60000
+  h: 3600000
+  d: 86400000
+  "": 1
+_secs_units:
+  s: 1
+  m: 60
+  h: 3600
+  d: 86400
+  "": 1
+_kb_units:
+  KiB: 1
+  MiB: 1024
+  GiB: 1048576
+  KB: 1
+  MB: 1024
+  GB: 1048576
+  K: 1
+  M: 1024
+  G: 1048576
+  "": 1
+_mb_units:
+  KiB: 0
+  MiB: 1
+  GiB: 1024
+  KB: 0
+  MB: 1
+  GB: 1024
+  K: 0
+  M: 1
+  G: 1024
+  "": 1
+# Stream throughput: 3.11 expresses these in megabits per second. The shared
+# defaults use MiB/s ("24MiB/s"); convert MiB/s to Mb/s (* 8). A plain int
+# (no unit) is treated as megabits already so the user can override directly
+# with the 3.11 unit.
+_megabit_factor:
+  KiB: 0.008
+  MiB: 8
+  GiB: 8192
+  KB: 0.008
+  MB: 8
+  GB: 8000
+  K: 0.008
+  M: 8
+  G: 8000
+  "": 1
+
+# ----- _in_ms conversions -----
+cassandra_max_hint_window_in_ms: "{{ (cassandra_max_hint_window | default(10800000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_max_hint_window | default(10800000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_hints_flush_period_in_ms: "{{ (cassandra_hints_flush_period | default(10000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_hints_flush_period | default(10000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_roles_validity_in_ms: "{{ (cassandra_roles_validity | default(120000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_roles_validity | default(120000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_roles_update_interval_in_ms: "{{ (cassandra_roles_update_interval | default(10000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_roles_update_interval | default(10000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_permissions_validity_in_ms: "{{ (cassandra_permissions_validity | default(60000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_permissions_validity | default(60000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_permissions_update_interval_in_ms: "{{ (cassandra_permissions_update_interval | default(10000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_permissions_update_interval | default(10000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_credentials_validity_in_ms: "{{ (cassandra_credentials_validity | default(120000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_credentials_validity | default(120000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_credentials_update_interval_in_ms: "{{ (cassandra_credentials_update_interval | default(10000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_credentials_update_interval | default(10000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_commitlog_sync_period_in_ms: "{{ (cassandra_commitlog_sync_period | default(10000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_commitlog_sync_period | default(10000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_read_request_timeout_in_ms: "{{ (cassandra_read_request_timeout | default(5000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_read_request_timeout | default(5000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_range_request_timeout_in_ms: "{{ (cassandra_range_request_timeout | default(10000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_range_request_timeout | default(10000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_write_request_timeout_in_ms: "{{ (cassandra_write_request_timeout | default(2000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_write_request_timeout | default(2000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_counter_write_request_timeout_in_ms: "{{ (cassandra_counter_write_request_timeout | default(5000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_counter_write_request_timeout | default(5000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_cas_contention_timeout_in_ms: "{{ (cassandra_cas_contention_timeout | default(1000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_cas_contention_timeout | default(1000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_truncate_request_timeout_in_ms: "{{ (cassandra_truncate_request_timeout | default(60000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_truncate_request_timeout | default(60000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_request_timeout_in_ms: "{{ (cassandra_request_timeout | default(10000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_request_timeout | default(10000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_streaming_socket_timeout_in_ms: "{{ (cassandra_streaming_socket_timeout | default(86400000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_streaming_socket_timeout | default(86400000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_dynamic_snitch_update_interval_in_ms: "{{ (cassandra_dynamic_snitch_update_interval | default(100) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_dynamic_snitch_update_interval | default(100) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_dynamic_snitch_reset_interval_in_ms: "{{ (cassandra_dynamic_snitch_reset_interval | default(600000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_dynamic_snitch_reset_interval | default(600000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_gc_log_threshold_in_ms: "{{ (cassandra_gc_log_threshold | default(200) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_gc_log_threshold | default(200) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_gc_warn_threshold_in_ms: "{{ (cassandra_gc_warn_threshold | default(1000) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_gc_warn_threshold | default(1000) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_slow_query_log_timeout_in_ms: "{{ (cassandra_slow_query_log_timeout | default(500) | string | regex_replace('[^0-9.]', '') | float * (_ms_units[cassandra_slow_query_log_timeout | default(500) | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+
+# ----- _in_kb / _in_mb conversions -----
+cassandra_hinted_handoff_throttle_in_kb: "{{ (cassandra_hinted_handoff_throttle | default(1024) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_kb_units[cassandra_hinted_handoff_throttle | default(1024) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_max_hints_file_size_in_mb: "{{ (cassandra_max_hints_file_size | default(128) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_max_hints_file_size | default(128) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_batchlog_replay_throttle_in_kb: "{{ (cassandra_batchlog_replay_throttle | default(1024) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_kb_units[cassandra_batchlog_replay_throttle | default(1024) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_key_cache_size_in_mb: "{{ (cassandra_key_cache_size | default(100) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_key_cache_size | default(100) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_row_cache_size_in_mb: "{{ (cassandra_row_cache_size | default(0) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_row_cache_size | default(0) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_counter_cache_size_in_mb: "{{ (cassandra_counter_cache_size | default(50) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_counter_cache_size | default(50) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_commitlog_segment_size_in_mb: "{{ (cassandra_commitlog_segment_size | default(32) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_commitlog_segment_size | default(32) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_file_cache_size_in_mb: "{{ (cassandra_file_cache_size | default(512) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_file_cache_size | default(512) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_memtable_heap_space_in_mb: "{{ (cassandra_memtable_heap_space | default(2048) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_memtable_heap_space | default(2048) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_memtable_offheap_space_in_mb: "{{ (cassandra_memtable_offheap_space | default(2048) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_memtable_offheap_space | default(2048) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_commitlog_total_space_in_mb: "{{ (cassandra_commitlog_total_space | default(8192) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_commitlog_total_space | default(8192) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_index_summary_resize_interval_in_minutes: "{{ cassandra_index_summary_resize_interval | default(60) | string | regex_replace('[^0-9]', '') | int }}"
+cassandra_trickle_fsync_interval_in_kb: "{{ (cassandra_trickle_fsync_interval | default(10240) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_kb_units[cassandra_trickle_fsync_interval | default(10240) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_native_transport_max_frame_size_in_mb: "{{ (cassandra_native_transport_max_frame_size | default(256) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_native_transport_max_frame_size | default(256) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_thrift_framed_transport_size_in_mb: "{{ (cassandra_thrift_framed_transport_size | default(15) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_thrift_framed_transport_size | default(15) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_column_index_size_in_kb: "{{ (cassandra_column_index_size | default(64) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_kb_units[cassandra_column_index_size | default(64) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_batch_size_warn_threshold_in_kb: "{{ (cassandra_batch_size_warn_threshold | default(5) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_kb_units[cassandra_batch_size_warn_threshold | default(5) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_batch_size_fail_threshold_in_kb: "{{ (cassandra_batch_size_fail_threshold | default(50) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_kb_units[cassandra_batch_size_fail_threshold | default(50) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_sstable_preemptive_open_interval_in_mb: "{{ (cassandra_sstable_preemptive_open_interval | default(50) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_sstable_preemptive_open_interval | default(50) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_max_value_size_in_mb: "{{ (cassandra_max_value_size | default(256) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_max_value_size | default(256) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_column_index_cache_size_in_kb: "{{ (cassandra_column_index_cache_size | default(2) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_kb_units[cassandra_column_index_cache_size | default(2) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_prepared_statements_cache_size_mb: "{{ (cassandra_prepared_statements_cache_size | default(20) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_prepared_statements_cache_size | default(20) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_thrift_prepared_statements_cache_size_mb: "{{ (cassandra_thrift_prepared_statements_cache_size | default(1) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_thrift_prepared_statements_cache_size | default(1) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_compaction_throughput_mb_per_sec: "{{ (cassandra_compaction_throughput | default(16) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_compaction_throughput | default(16) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_compaction_large_partition_warning_threshold_mb: "{{ (cassandra_compaction_large_partition_warning_threshold | default(100) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_compaction_large_partition_warning_threshold | default(100) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_jvm_gc_log_file_max_size_mb: "{{ (cassandra_jvm_gc_log_file_max_size | default(10) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_mb_units[cassandra_jvm_gc_log_file_max_size | default(10) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+
+cassandra_stream_throughput_outbound_megabits_per_sec: "{{ (cassandra_stream_throughput_outbound | default(200) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_megabit_factor[cassandra_stream_throughput_outbound | default(200) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+cassandra_inter_dc_stream_throughput_outbound_megabits_per_sec: "{{ (cassandra_inter_dc_stream_throughput_outbound | default(200) | string | regex_replace('/s$', '') | regex_replace('[^0-9.]', '') | float * (_megabit_factor[cassandra_inter_dc_stream_throughput_outbound | default(200) | string | regex_replace('/s$', '') | regex_replace('[0-9. ]', '')] | default(1))) | int }}"
+
+# Tracing
+cassandra_tracetype_query_ttl: 86400
+cassandra_tracetype_repair_ttl: 604800
+
+# UDF (3.11)
+cassandra_enable_user_defined_functions: false
+cassandra_enable_scripted_user_defined_functions: false
+cassandra_enable_materialized_views: "{{ cassandra_materialized_views_enabled | default(false) | bool }}"
+
+# Cache save periods — 3.11 expects integer seconds. Shared defaults are
+# duration strings ("4h" / "0s" / "2h"). Convert with the same _secs_units
+# table.
+cassandra_key_cache_save_period_in_secs: "{{ (cassandra_key_cache_save_period | default('4h') | string | regex_replace('[^0-9.]', '') | float * (_secs_units[cassandra_key_cache_save_period | default('4h') | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_row_cache_save_period_in_secs: "{{ (cassandra_row_cache_save_period | default('0s') | string | regex_replace('[^0-9.]', '') | float * (_secs_units[cassandra_row_cache_save_period | default('0s') | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+cassandra_counter_cache_save_period_in_secs: "{{ (cassandra_counter_cache_save_period | default('2h') | string | regex_replace('[^0-9.]', '') | float * (_secs_units[cassandra_counter_cache_save_period | default('2h') | string | regex_replace('[0-9. ]', '') | lower] | default(1))) | int }}"
+
+# Cache save behaviour (3.11 unconditional keys)
+cassandra_key_cache_keys_to_save: 100
+cassandra_row_cache_keys_to_save: 100
+cassandra_counter_cache_keys_to_save: 100
+
+# Memtable / buffer pool (3.11 only)
+cassandra_buffer_pool_use_heap_if_exhausted: true
+cassandra_memtable_cleanup_threshold: 0.11
+
+# Index summary, RPC / internode buffer sizes: intentionally left undefined.
+# The 3.11 cassandra.yaml template guards each with `is defined and length > 0`
+# so the JVM picks its native defaults (or values from net.ipv4.tcp_{r,w}mem
+# for the socket buffers). Override in your playbook to force a value.
+
+# Listen / broadcast / RPC (3.11 only)
+cassandra_listen_on_broadcast_address: false
+# native_transport_port_ssl is intentionally undefined. Cassandra 3.11 refuses
+# to start with it set unless client_encryption is enabled
+# ("Encryption must be enabled in client_encryption_options for
+# native_transport_port_ssl"). Override in your playbook (typically 9142)
+# when enabling TLS.
+cassandra_native_transport_max_threads: 128
+cassandra_native_transport_max_concurrent_connections: -1
+cassandra_native_transport_max_concurrent_connections_per_ip: -1
+cassandra_start_rpc: false
+cassandra_rpc_port: 9160
+cassandra_rpc_server_type: sync
+cassandra_rpc_min_threads: 16
+cassandra_rpc_max_threads: 2048
+
+# Misc 3.11-only unconditional keys
+cassandra_cross_node_timeout: false
+cassandra_streaming_keep_alive_period_in_secs: 300
+cassandra_windows_timer_interval: 1
+cassandra_back_pressure_enabled: false
+cassandra_otc_coalescing_strategy: DISABLED
+cassandra_cipher_suites_server_encryption:
+  - TLS_RSA_WITH_AES_128_CBC_SHA
+  - TLS_RSA_WITH_AES_256_CBC_SHA
+cassandra_cipher_suites_client_encryption:
+  - TLS_RSA_WITH_AES_128_CBC_SHA
+  - TLS_RSA_WITH_AES_256_CBC_SHA
+
+# Logback rotation (3.11 logback.xml.j2)
+cassandra_log_rotation_min: 1
+cassandra_log_rotation_max: 20
+
+# GC threads — 3.11 jvm.options.j2 references these unconditionally,
+# so provide neutral defaults (0 = let JVM decide).
+cassandra_jvm_parallel_gc_threads: 0
+cassandra_jvm_conc_gc_threads: 0

@@ -3,3 +3,6 @@
 
 [cassandra]
 2.2.2.2
+
+[kafka]
+3.3.3.3 kafka_node_id=1

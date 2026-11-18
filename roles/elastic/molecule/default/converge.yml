@@ -3,5 +3,7 @@
   hosts: all
   vars:
     molecule: true
+    # Exercise the temp-directory creation task (issue #146)
+    es_tmp_dir: /var/lib/elasticsearch/tmp
   roles:
     - role: elastic

@@ -1,0 +1,127 @@
+---
+- name: Verify — OpenSearch snapshot repository plugin, keystore and settings
+  hosts: all
+  gather_facts: false
+  vars:
+    opensearch_install_root: /usr/share/opensearch
+    opensearch_conf_dir: /usr/share/opensearch/config
+    opensearch_user: opensearch
+    _is_s3: "{{ 'snapshot_s3' in group_names }}"
+    _plugin: "{{ 'repository-s3' if _is_s3 else 'repository-gcs' }}"
+    _cli_env:
+      OPENSEARCH_JAVA_HOME: "{{ opensearch_install_root }}/jdk"
+      OPENSEARCH_PATH_CONF: "{{ opensearch_conf_dir }}"
+      OPENSEARCH_JAVA_OPTS: -Djava.io.tmpdir=/var/lib/opensearch/tmp
+  tasks:
+    # =========================================================================
+    # 1. Repository plugin is installed
+    # =========================================================================
+
+    - name: List installed plugins
+      ansible.builtin.command:
+        argv:
+          - "{{ opensearch_install_root }}/bin/opensearch-plugin"
+          - list
+      environment: "{{ _cli_env }}"
+      register: _plugins
+      changed_when: false
+
+    - name: Verify the repository plugin is installed
+      ansible.builtin.assert:
+        that:
+          - _plugin in _plugins.stdout_lines
+        fail_msg: "{{ _plugin }} missing from opensearch-plugin list: {{ _plugins.stdout_lines }}"
+
+    # =========================================================================
+    # 2. Credentials are in the keystore
+    # =========================================================================
+
+    - name: List keystore entries
+      ansible.builtin.command:
+        argv:
+          - "{{ opensearch_install_root }}/bin/opensearch-keystore"
+          - list
+      environment: "{{ _cli_env }}"
+      register: _keystore
+      changed_when: false
+
+    - name: Verify S3 keystore entries
+      ansible.builtin.assert:
+        that:
+          - "'s3.client.default.access_key' in _keystore.stdout_lines"
+          - "'s3.client.default.secret_key' in _keystore.stdout_lines"
+          - "'s3.client.default.session_token' not in _keystore.stdout_lines"
+          - _keystore.stdout_lines | select('match', '^gcs\\.') | list | length == 0
+        fail_msg: "Unexpected keystore entries: {{ _keystore.stdout_lines }}"
+      when: _is_s3
+
+    - name: Verify GCS keystore entries
+      ansible.builtin.assert:
+        that:
+          - "'gcs.client.default.credentials_file' in _keystore.stdout_lines"
+          - _keystore.stdout_lines | select('match', '^s3\\.') | list | length == 0
+        fail_msg: "Unexpected keystore entries: {{ _keystore.stdout_lines }}"
+      when: not _is_s3
+
+    - name: Check keystore file
+      ansible.builtin.stat:
+        path: "{{ opensearch_conf_dir }}/opensearch.keystore"
+      register: _keystore_file
+
+    - name: Verify keystore ownership and mode
+      ansible.builtin.assert:
+        that:
+          - _keystore_file.stat.pw_name == opensearch_user
+          - _keystore_file.stat.mode == '0640'
+        fail_msg: "opensearch.keystore has wrong ownership or mode"
+
+    - name: Check temporary GCS credentials file is removed
+      ansible.builtin.stat:
+        path: "{{ opensearch_conf_dir }}/.snapshot-gcs-credentials.json"
+      register: _gcs_tmp
+      failed_when: _gcs_tmp.stat.exists
+
+    # =========================================================================
+    # 3. opensearch.yml holds client settings but no secrets
+    # =========================================================================
+
+    - name: Read opensearch.yml
+      ansible.builtin.slurp:
+        src: "{{ opensearch_conf_dir }}/opensearch.yml"
+      register: _os_config
+
+    - name: Decode opensearch.yml
+      ansible.builtin.set_fact:
+        _os_config_text: "{{ _os_config.content | b64decode }}"
+
+    - name: Verify S3 client settings
+      ansible.builtin.assert:
+        that:
+          - "'s3.client.default.region: \"eu-west-1\"' in _os_config_text"
+          - "'s3.client.default.endpoint: \"minio.molecule.test:9000\"' in _os_config_text"
+          - "'s3.client.default.protocol: \"http\"' in _os_config_text"
+          - "'s3.client.default.path_style_access: true' in _os_config_text"
+          - "'s3.client.default.disable_chunked_encoding: true' in _os_config_text"
+        fail_msg: "opensearch.yml is missing S3 client settings"
+      when: _is_s3
+
+    - name: Verify GCS client settings
+      ansible.builtin.assert:
+        that:
+          - "'gcs.client.default.project_id: \"molecule-project\"' in _os_config_text"
+          - "'gcs.client.default.endpoint: \"https://gcs.molecule.test\"' in _os_config_text"
+        fail_msg: "opensearch.yml is missing GCS client settings"
+      when: not _is_s3
+
+    - name: Verify no secrets in opensearch.yml
+      ansible.builtin.assert:
+        that:
+          - "'MOLECULEDUMMYACCESSKEY' not in _os_config_text"
+          - "'molecule-dummy-secret-key-value' not in _os_config_text"
+          - "'molecule-dummy-private-key' not in _os_config_text"
+          - "'access_key' not in _os_config_text"
+          - "'secret_key' not in _os_config_text"
+          - "'credentials_file' not in _os_config_text"
+        fail_msg: "opensearch.yml contains snapshot credentials"
+
+# code: language=ansible

@@ -7,7 +7,7 @@
 
   vars:
     # Load role defaults
-    k8ssandra_cassandra_version: "5.0.6"
+    k8ssandra_cassandra_version: "5.0.9"
     k8ssandra_image: "ghcr.io/axonops/k8ssandra/cassandra"
     k8ssandra_dc_name: dc1
     k8ssandra_dc_size: 3
@@ -38,8 +38,8 @@
     - name: "TEST 2 - Accept Cassandra 5.x"
       ansible.builtin.assert:
         that:
-          - "'5.0.6' is version('5.0', '>=')"
-          - "'5.0.6' is version('6.0', '<')"
+          - "'5.0.9' is version('5.0', '>=')"
+          - "'5.0.9' is version('6.0', '<')"
         success_msg: "PASS: Cassandra 5.x correctly accepted"
 
     # --- Test 3: Template renders valid YAML --------------------------------
@@ -48,7 +48,7 @@
         cluster:
           name: template-test
           namespace: k8ssandra-operator
-          cassandra_version: "5.0.6"
+          cassandra_version: "5.0.9"
           dc_name: dc1
           dc_size: 3
       ansible.builtin.set_fact:
@@ -65,8 +65,8 @@
           - _parsed.kind == "K8ssandraCluster"
           - _parsed.metadata.name == "template-test"
           - _parsed.metadata.namespace == "k8ssandra-operator"
-          - _parsed.spec.cassandra.serverVersion == "5.0.6"
-          - _parsed.spec.cassandra.serverImage == "ghcr.io/axonops/k8ssandra/cassandra:5.0.6"
+          - _parsed.spec.cassandra.serverVersion == "5.0.9"
+          - _parsed.spec.cassandra.serverImage == "ghcr.io/axonops/k8ssandra/cassandra:5.0.9"
           - _parsed.spec.cassandra.datacenters | length == 1
           - _parsed.spec.cassandra.datacenters[0].metadata.name == "dc1"
           - _parsed.spec.cassandra.datacenters[0].size == 3

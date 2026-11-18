@@ -1,6 +1,11 @@
 axon-dash:
   host: {{ axon_dash_listen_address | default('127.0.0.1') }}
   port: {{ axon_dash_listen_port | default('3000') }}
+{% if axon_dash_reporting_url is defined and axon_dash_reporting_url %}
+  # Reports v2 (AXON_REPORTING_URL): where axon-dash reaches the reporting service.
+  # Required for report generation. axon-reporting runs on this same host.
+  reporting_url: "{{ axon_dash_reporting_url }}"
+{% endif %}
 
 axon-server:
   private_endpoints: "{{ axon_dash_server_endpoint | default('http://127.0.0.1:8080') }}"

@@ -1,0 +1,8 @@
+---
+- name: Install chrony package
+  ansible.builtin.package:
+    name: "{{ chrony_package_name | default(_chrony_package_name) }}"
+    state: present
+    update_cache: true
+
+# code: language=ansible

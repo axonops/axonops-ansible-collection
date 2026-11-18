@@ -3,6 +3,12 @@
   service: name=axon-dash state=restarted
   when: docker is not defined
 
+- name: Restart axon-reporting
+  ansible.builtin.service:
+    name: axon-reporting
+    state: restarted
+  when: docker is not defined
+
 - name: reload nginx
   service:
     name: nginx

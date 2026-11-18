@@ -1,0 +1,54 @@
+---
+# Disable Transparent Huge Pages entirely. THP causes stalls and latency
+# spikes under Cassandra's allocation pattern; the JVM options therefore do
+# not set -XX:+UseTransparentHugePages either.
+
+- name: Install the THP disabling script
+  ansible.builtin.copy:
+    dest: /usr/local/sbin/cassandra-disable-thp.sh
+    owner: root
+    group: root
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      # Managed by Ansible
+      for f in /sys/kernel/mm/transparent_hugepage/enabled \
+               /sys/kernel/mm/transparent_hugepage/defrag \
+               /sys/kernel/mm/redhat_transparent_hugepage/enabled \
+               /sys/kernel/mm/redhat_transparent_hugepage/defrag; do
+          [ -w "$f" ] && echo never > "$f"
+      done
+      exit 0
+
+- name: Install the THP disabling unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/cassandra-disable-thp.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible
+      [Unit]
+      Description=Disable Transparent Huge Pages for Cassandra
+      DefaultDependencies=no
+      After=sysinit.target local-fs.target
+      Before=cassandra.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/local/sbin/cassandra-disable-thp.sh
+
+      [Install]
+      WantedBy=basic.target
+
+# Skipped when the tasks are exercised outside a systemd host (molecule).
+- name: Enable and start the THP disabling unit
+  ansible.builtin.systemd:
+    name: cassandra-disable-thp.service
+    daemon_reload: true
+    enabled: true
+    state: started
+  when: cassandra_thp_service_manage | bool
+
+# code: language=ansible

@@ -1,0 +1,201 @@
+---
+# ============================================================================
+# OpenSearch Snapshot Repository - plugin and keystore credentials
+# Credentials only ever go into opensearch.keystore. Non-secret client settings
+# are rendered into opensearch.yml by templates/snapshot-settings.yml.j2.
+# ============================================================================
+
+- name: Set snapshot plugin facts
+  ansible.builtin.set_fact:
+    _snapshot_plugin: "repository-{{ opensearch_snapshot_type }}"
+    _snapshot_keystore: "{{ opensearch_conf_dir }}/opensearch.keystore"
+    _snapshot_plugin_zip: >-
+      {{ (opensearch_tmp_dir if opensearch_tmp_dir is defined and opensearch_tmp_dir | length > 0 else '/tmp')
+         ~ '/repository-' ~ opensearch_snapshot_type ~ '-' ~ opensearch_version ~ '.zip' }}
+    _snapshot_keystore_marker: "{{ opensearch_conf_dir }}/.snapshot_keystore.sha256"
+    _opensearch_cli_env:
+      OPENSEARCH_JAVA_HOME: "{{ opensearch_install_root }}/jdk"
+      OPENSEARCH_PATH_CONF: "{{ opensearch_conf_dir }}"
+      OPENSEARCH_JAVA_OPTS: >-
+        {{ ('-Djava.io.tmpdir=' ~ opensearch_tmp_dir)
+           if opensearch_tmp_dir is defined and opensearch_tmp_dir | length > 0 else '' }}
+
+# --- Plugin ------------------------------------------------------------------
+
+- name: Copy pre-downloaded snapshot repository plugin
+  ansible.builtin.copy:
+    src: "{{ opensearch_snapshot_plugin_local_archive }}"
+    dest: "{{ _snapshot_plugin_zip }}"
+    mode: "0640"
+  when: opensearch_snapshot_plugin_local_archive | default('', true) | length > 0
+
+- name: Install snapshot repository plugin
+  ansible.builtin.command:
+    argv:
+      - "{{ opensearch_install_root }}/bin/opensearch-plugin"
+      - install
+      - --batch
+      - >-
+        {{ ('file://' ~ _snapshot_plugin_zip)
+           if opensearch_snapshot_plugin_local_archive | default('', true) | length > 0
+           else _snapshot_plugin }}
+    creates: "{{ opensearch_install_root }}/plugins/{{ _snapshot_plugin }}"
+  environment: "{{ _opensearch_cli_env }}"
+  notify: Restart OpenSearch
+
+- name: Set snapshot repository plugin ownership
+  ansible.builtin.file:
+    path: "{{ opensearch_install_root }}/plugins/{{ _snapshot_plugin }}"
+    state: directory
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    recurse: true
+
+# --- Keystore credentials ----------------------------------------------------
+
+# Empty when no static credentials are set: the client then uses the instance
+# identity (EC2 instance profile / IRSA, GCE/GKE workload identity).
+- name: Build snapshot keystore entries
+  ansible.builtin.set_fact:
+    _snapshot_keystore_entries: >-
+      {{ {}
+         | combine({
+             's3.client.' ~ opensearch_snapshot_client ~ '.access_key': opensearch_snapshot_s3_access_key,
+             's3.client.' ~ opensearch_snapshot_client ~ '.secret_key': opensearch_snapshot_s3_secret_key
+           } if opensearch_snapshot_type == 's3' and opensearch_snapshot_s3_access_key | length > 0 else {})
+         | combine({
+             's3.client.' ~ opensearch_snapshot_client ~ '.session_token': opensearch_snapshot_s3_session_token
+           } if opensearch_snapshot_type == 's3' and opensearch_snapshot_s3_access_key | length > 0
+                and opensearch_snapshot_s3_session_token | length > 0 else {})
+         | combine({
+             'gcs.client.' ~ opensearch_snapshot_client ~ '.credentials_file':
+               (opensearch_snapshot_gcs_credentials_json is mapping)
+               | ternary(opensearch_snapshot_gcs_credentials_json | to_json, opensearch_snapshot_gcs_credentials_json)
+           } if opensearch_snapshot_type == 'gcs' and opensearch_snapshot_gcs_credentials_json | length > 0 else {}) }}
+  no_log: true
+
+# The keystore is re-encrypted on every write, so its checksum cannot show
+# whether the stored values match. A digest of the wanted entries is kept instead.
+- name: Compute snapshot keystore digest
+  ansible.builtin.set_fact:
+    _snapshot_keystore_digest: "{{ _snapshot_keystore_entries | to_json(sort_keys=true) | hash('sha256') }}"
+  no_log: true
+
+- name: Check for OpenSearch keystore
+  ansible.builtin.stat:
+    path: "{{ _snapshot_keystore }}"
+  register: _snapshot_keystore_stat
+
+- name: Create OpenSearch keystore
+  ansible.builtin.command:
+    argv:
+      - "{{ opensearch_install_root }}/bin/opensearch-keystore"
+      - create
+  environment: "{{ _opensearch_cli_env }}"
+  changed_when: true
+  when:
+    - _snapshot_keystore_entries | length > 0
+    - not _snapshot_keystore_stat.stat.exists
+
+- name: Manage keystore entries
+  when: _snapshot_keystore_entries | length > 0 or _snapshot_keystore_stat.stat.exists
+  block:
+    - name: List OpenSearch keystore entries
+      ansible.builtin.command:
+        argv:
+          - "{{ opensearch_install_root }}/bin/opensearch-keystore"
+          - list
+      environment: "{{ _opensearch_cli_env }}"
+      register: _snapshot_keystore_list
+      changed_when: false
+
+    - name: Read snapshot keystore digest
+      ansible.builtin.slurp:
+        src: "{{ _snapshot_keystore_marker }}"
+      register: _snapshot_keystore_marker_content
+      failed_when: false
+
+    - name: Remove unwanted snapshot keystore entries
+      ansible.builtin.command:
+        argv:
+          - "{{ opensearch_install_root }}/bin/opensearch-keystore"
+          - remove
+          - "{{ item }}"
+      environment: "{{ _opensearch_cli_env }}"
+      # Any snapshot client credential not wanted now, including those left by a
+      # renamed client or a switch between s3 and gcs.
+      loop: >-
+        {{ _snapshot_keystore_list.stdout_lines
+           | select('match', '^(s3|gcs)[.]client[.][^.]+[.](access_key|secret_key|session_token|credentials_file)$')
+           | reject('in', _snapshot_keystore_entries.keys() | list)
+           | list }}
+      changed_when: true
+      notify: Restart OpenSearch
+
+    - name: Update snapshot keystore entries
+      when: >-
+        (_snapshot_keystore_marker_content.content | default('') | b64decode | trim) != _snapshot_keystore_digest
+        or (_snapshot_keystore_entries.keys() | difference(_snapshot_keystore_list.stdout_lines) | length > 0)
+      block:
+        - name: Add S3 credentials to keystore
+          ansible.builtin.command:
+            argv:
+              - "{{ opensearch_install_root }}/bin/opensearch-keystore"
+              - add
+              - --stdin
+              - --force
+              - "{{ item.key }}"
+            stdin: "{{ item.value }}"
+            stdin_add_newline: false
+          environment: "{{ _opensearch_cli_env }}"
+          loop: "{{ _snapshot_keystore_entries | dict2items | selectattr('key', 'match', '^s3\\.') }}"
+          changed_when: true
+          notify: Restart OpenSearch
+          no_log: true
+
+        - name: Add GCS credentials file to keystore
+          when: opensearch_snapshot_type == 'gcs' and _snapshot_keystore_entries | length > 0
+          block:
+            - name: Write temporary GCS credentials file
+              ansible.builtin.copy:
+                content: "{{ _snapshot_keystore_entries['gcs.client.' ~ opensearch_snapshot_client ~ '.credentials_file'] }}"
+                dest: "{{ opensearch_conf_dir }}/.snapshot-gcs-credentials.json"
+                owner: root
+                group: root
+                mode: "0600"
+              no_log: true
+
+            - name: Add GCS credentials file to keystore
+              ansible.builtin.command:
+                argv:
+                  - "{{ opensearch_install_root }}/bin/opensearch-keystore"
+                  - add-file
+                  - --force
+                  - "gcs.client.{{ opensearch_snapshot_client }}.credentials_file"
+                  - "{{ opensearch_conf_dir }}/.snapshot-gcs-credentials.json"
+              environment: "{{ _opensearch_cli_env }}"
+              changed_when: true
+              notify: Restart OpenSearch
+              no_log: true
+          always:
+            - name: Remove temporary GCS credentials file
+              ansible.builtin.file:
+                path: "{{ opensearch_conf_dir }}/.snapshot-gcs-credentials.json"
+                state: absent
+
+        - name: Record snapshot keystore digest
+          ansible.builtin.copy:
+            content: "{{ _snapshot_keystore_digest }}\n"
+            dest: "{{ _snapshot_keystore_marker }}"
+            owner: "{{ opensearch_user }}"
+            group: "{{ opensearch_group }}"
+            mode: "0600"
+
+    - name: Set OpenSearch keystore ownership
+      ansible.builtin.file:
+        path: "{{ _snapshot_keystore }}"
+        owner: "{{ opensearch_user }}"
+        group: "{{ opensearch_group }}"
+        mode: "0640"
+
+# code: language=ansible

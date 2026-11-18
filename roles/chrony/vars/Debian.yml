@@ -1,0 +1,5 @@
+---
+_chrony_package_name: chrony
+_chrony_service_name: chrony
+_chrony_config_path: /etc/chrony/chrony.conf
+_chrony_driftfile: /var/lib/chrony/chrony.drift

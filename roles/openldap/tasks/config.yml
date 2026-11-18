@@ -1,0 +1,117 @@
+---
+# Online cn=config changes over ldapi:/// as root (SASL EXTERNAL).
+
+- name: Set global log level
+  community.general.ldap_attrs:
+    dn: cn=config
+    server_uri: ldapi:///
+    state: exact
+    attributes:
+      olcLogLevel: "{{ openldap_log_level }}"
+
+- name: Configure TLS
+  community.general.ldap_attrs:
+    dn: cn=config
+    server_uri: ldapi:///
+    state: exact
+    attributes: "{{ _openldap_tls_attrs }}"
+  vars:
+    _openldap_tls_attrs: >-
+      {{ {
+           'olcTLSCertificateFile': _openldap_config_root ~ '/tls/server.crt',
+           'olcTLSCertificateKeyFile': _openldap_config_root ~ '/tls/server.key',
+           'olcTLSProtocolMin': openldap_tls_protocol_min | string
+         } | combine(
+           {'olcTLSCACertificateFile': _openldap_config_root ~ '/tls/ca.crt'}
+           if (openldap_tls_mode == 'generate' or openldap_tls_ca | length > 0) else {}
+         ) }}
+  when: openldap_tls_mode != 'disabled'
+  notify: Restart slapd
+
+- name: Allow anonymous reads of the root DSE and schema only
+  community.general.ldap_attrs:
+    dn: olcDatabase={-1}frontend,cn=config
+    server_uri: ldapi:///
+    state: exact
+    ordered: true
+    attributes:
+      olcAccess:
+        - 'to dn.base="" by * read'
+        - 'to dn.base="cn=Subschema" by * read'
+
+- name: Restrict directory access to authenticated users
+  community.general.ldap_attrs:
+    dn: olcDatabase={1}mdb,cn=config
+    server_uri: ldapi:///
+    state: exact
+    ordered: true
+    attributes:
+      olcAccess:
+        - 'to attrs=userPassword by self write by anonymous auth by * none'
+        - 'to * by self read by users read by * none'
+
+- name: Configure memberof overlay
+  community.general.ldap_entry:
+    dn: olcOverlay={0}memberof,olcDatabase={1}mdb,cn=config
+    server_uri: ldapi:///
+    state: present
+    objectClass:
+      - olcOverlayConfig
+      - olcMemberOf
+    attributes:
+      olcOverlay: "{0}memberof"
+      olcMemberOfRefInt: "TRUE"
+      olcMemberOfGroupOC: groupOfNames
+      olcMemberOfMemberAD: member
+      olcMemberOfMemberOfAD: memberOf
+  when: openldap_enable_memberof
+
+- name: Configure refint overlay
+  community.general.ldap_entry:
+    dn: olcOverlay={1}refint,olcDatabase={1}mdb,cn=config
+    server_uri: ldapi:///
+    state: present
+    objectClass:
+      - olcOverlayConfig
+      - olcRefintConfig
+    attributes:
+      olcOverlay: "{1}refint"
+      olcRefintAttribute:
+        - memberof
+        - member
+  when: openldap_enable_memberof
+
+- name: Check the admin password
+  community.general.ldap_search:
+    dn: "{{ openldap_base_dn }}"
+    scope: base
+    server_uri: ldapi:///
+    bind_dn: "{{ openldap_admin_dn }}"
+    bind_pw: "{{ openldap_admin_password }}"
+  register: _openldap_admin_bind
+  failed_when: false
+  changed_when: false
+  no_log: true
+
+# A bind to an empty database fails with "No such object" once the password
+# is correct, so only "Invalid credentials" (49) means the password is wrong.
+- name: Set the admin password
+  when: "'Invalid credentials' in (_openldap_admin_bind.details | default(''))"
+  block:
+    - name: Hash the admin password
+      ansible.builtin.command:
+        argv: [slappasswd, -h, "{SSHA}", -T, /dev/stdin]
+        stdin: "{{ openldap_admin_password }}"
+        stdin_add_newline: false
+      register: _openldap_admin_hash
+      changed_when: false
+      no_log: true
+
+    - name: Store the admin password hash
+      community.general.ldap_attrs:
+        dn: olcDatabase={1}mdb,cn=config
+        server_uri: ldapi:///
+        state: exact
+        attributes:
+          olcRootPW: "{{ _openldap_admin_hash.stdout }}"
+      no_log: true

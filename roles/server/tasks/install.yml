@@ -39,39 +39,44 @@
   notify:
     - restart axon-server
 
-# When axon_server_version is 'latest', we need to determine the actual installed version
-- name: Get installed axon-server version
-  ansible.builtin.command: rpm -q --queryformat '%{VERSION}' axon-server
-  register: installed_server_version_rpm
-  changed_when: false
-  failed_when: false
+- name: Add systemd service override for axon-server when opensearch and cassandra are running on localhost
   when:
-    - ansible_os_family == 'RedHat'
-    - axon_server_version == 'latest'
+    - opensearch_network_host is defined and opensearch_network_host in ['localhost', '127.0.0.1']
+    - cassandra_rpc_address is defined and cassandra_rpc_address in ['localhost', '127.0.0.1']
+  block:
+    - name: Create systemd override directory for axon-server
+      ansible.builtin.file:
+        path: /etc/systemd/system/axon-server.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
 
-- name: Get installed axon-server version
-  ansible.builtin.shell: dpkg-query -W -f='${Version}' axon-server | cut -d'-' -f1
-  register: installed_server_version_deb
-  changed_when: false
-  failed_when: false
-  when:
-    - ansible_os_family == 'Debian'
-    - axon_server_version == 'latest'
+    - name: Add systemd service override for axon-server
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/axon-server.service.d/override.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          After=network-online.target cassandra.service opensearch.service
+          Wants=network-online.target
+      notify:
+        - Reload systemd
+
+- name: Gather installed package facts
+  ansible.builtin.package_facts:
+    manager: auto
 
 - name: Set axon_server_version fact from installed version
   ansible.builtin.set_fact:
-    axon_server_version: "{{ installed_server_version_rpm.stdout }}"
+    axon_server_version: >-
+      {{ ansible_facts.packages['axon-server'][0].version
+         if ansible_os_family == 'RedHat'
+         else (ansible_facts.packages['axon-server'][0].version | split('-') | first) }}
   when:
-    - ansible_os_family == 'RedHat'
     - axon_server_version == 'latest'
-    - installed_server_version_rpm.rc == 0
-
-- name: Set axon_server_version fact from installed version
-  ansible.builtin.set_fact:
-    axon_server_version: "{{ installed_server_version_deb.stdout }}"
-  when:
-    - ansible_os_family == 'Debian'
-    - axon_server_version == 'latest'
-    - installed_server_version_deb.rc == 0
+    - "'axon-server' in ansible_facts.packages"
 
 # code: language=ansible

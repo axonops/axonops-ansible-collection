@@ -25,17 +25,51 @@ dynamic_snitch_reset_interval: 600000ms
 
 Before running this playbook for Cassandra 5.0, review the variables in [roles/cassandra/defaults/main.yml](../../roles/cassandra/defaults/main.yml) and compare them against the appropriate template.
 
+## Cassandra 3.11 support
+
+Cassandra 3.11.x is supported via the dedicated `templates/3.11.x/` set and the
+`vars/cassandra-3.11.yml` variable file. The role uses the **legacy**
+`cassandra.yaml` schema (`_in_ms`, `_in_mb`, `_in_kb` suffixed keys) and a
+single `jvm.options` file (4.x/5.x split into `jvm-server.options` plus
+client/version files). The 4.x/5.x-only keys (`auto_optimise_*`,
+`commitlog_sync_group_window`, `repaired_data_tracking_*`,
+`corrupted_tombstone_strategy`, `full_query_logging_options`,
+`client_encryption_options.optional` is preserved but unused on 3.11) are
+**not emitted** for 3.11.
+
+Cassandra 3.11 requires Java 8. The `axonops.axonops.java` role detects
+`cassandra_version.startswith('3.11')` and selects the Java 8 package
+automatically. Set `java_use_zulu: true` on RHEL 10+ / Debian 13+ where the
+base repositories no longer ship OpenJDK 8.
+
+```yaml
+cassandra_version: 3.11.17
+cassandra_cluster_name: legacy-cluster
+cassandra_dc: dc1
+cassandra_rack: rack1
+cassandra_max_heap_size: 4G
+```
+
+See [examples/cassandra-3.11.yml](../../examples/cassandra-3.11.yml) for a
+complete playbook including AxonOps agent.
+
 ## Role Variables
 
 ### Basic Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `cassandra_version` | `5.0.5` | Version of Cassandra to install |
+| `cassandra_version` | `5.0.9` | Version of Cassandra to install |
 | `cassandra_cluster_name` | `default` | Name of the Cassandra cluster |
 | `cassandra_dc` | `default` | Datacenter name |
 | `cassandra_rack` | `rack1` | Rack name |
-| `cassandra_install_format` | `pkg` | Installation format: `pkg` or `tar` |
+| `cassandra_install_format` | `tar` | Installation format: `tar` or `pkg` |
+| `cassandra_install_root` | `/opt` | Install root for the tar format |
+| `cassandra_download_url` | Apache mirror URL for `cassandra_version` | Tarball URL (tar format) |
+| `cassandra_archive_url` | `archive.apache.org` URL for `cassandra_version` | Fallback URL used when the primary download fails (any error) |
+| `cassandra_cqlsh_venv_enabled` | `true` | Install `cqlsh` into a Python venv and expose it through a wrapper |
+| `cassandra_cqlsh_venv_path` | `/opt/cassandra-cqlsh-venv` | cqlsh venv location |
+| `cassandra_cqlsh_wrapper_path` | `/usr/local/bin/cqlsh` | cqlsh wrapper script path |
 | `cassandra_start_on_boot` | `false` | Enable Cassandra to start on boot |
 
 ### Memory Configuration
@@ -60,11 +94,24 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `cassandra_data_directory` | `/var/lib/cassandra` | Base data directory |
+| `cassandra_data_directory` | `/var/lib/cassandra/data` | Data (SSTable) directory |
+| `cassandra_data_directory_check` | `true` | Fail the play if `cassandra_data_directory` has no `system` keyspace but its parent does (unmigrated pre-0.6.0 layout) |
 | `cassandra_commitlog_directory` | `/var/lib/cassandra/commitlog` | Commit log directory |
 | `cassandra_saved_caches_directory` | `/var/lib/cassandra/saved_caches` | Saved caches directory |
 | `cassandra_hints_directory` | `/var/lib/cassandra/hints` | Hints directory |
 | `cassandra_log_dir` | `/var/log/cassandra` | Log directory |
+| `cassandra_java_tmp_dir` | `/tmp` | JVM temp directory (`-Djava.io.tmpdir`, `-Dio.netty.native.workdir`, `TMPDIR`). When set to anything other than `/tmp`, the role creates it as `cassandra:cassandra` with mode `0750` |
+| `cassandra_jna_tmp_dir` | `/tmp` | JNA temp directory (`-Djna.tmpdir`), where JNA unpacks its native library. When set to anything other than `/tmp`, the role creates it as `cassandra:cassandra` with mode `0750` |
+
+Point both at a directory on an `exec`-capable filesystem when `/tmp` is
+mounted `noexec` — Cassandra cannot unpack its native libraries otherwise.
+The role never touches `/tmp` itself: leave either variable at its default and
+no directory task runs for it.
+
+> **Behaviour change:** `cassandra_java_tmp_dir` was previously created with
+> mode `1777` (world-writable, sticky). It is now created with mode `0750`.
+> Any process outside the `cassandra` user and group that writes to that
+> directory loses access.
 
 ### Authentication and Authorization
 
@@ -85,6 +132,44 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
 | `cassandra_compaction_throughput` | `64MiB/s` | Compaction throughput limit |
 | `cassandra_stream_throughput_outbound` | `24MiB/s` | Stream throughput limit |
 
+### Operating System Tuning
+
+Applied by the role on non-container hosts (`os-config.yml`). Container guests are
+detected from `ansible_virtualization_type` / `ansible_virtualization_tech_guest` against
+`cassandra_container_virt_types` and skipped — inside a container the kernel belongs to the
+host, so `sysctl`, `swapoff` and THP writes would tune the host instead of the guest.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_disable_swap` | `true` | Disable swap entirely: `swapoff -a` and comment out every swap entry in fstab so it is not re-enabled after reboot |
+| `cassandra_swapoff_active` | `true` | Run `swapoff -a`. Set `false` to apply only the fstab rewrite |
+| `cassandra_fstab_path` | `/etc/fstab` | fstab file rewritten when disabling swap (override only for testing) |
+| `cassandra_disable_thp` | `true` | Disable Transparent Huge Pages via the `cassandra-disable-thp.service` systemd unit (writes `never` to both `transparent_hugepage/enabled` and `transparent_hugepage/defrag` at boot) |
+| `cassandra_thp_service_manage` | `true` | Enable and start that unit (set `false` only when exercising the tasks without systemd, e.g. in molecule) |
+
+Swap is disabled outright rather than tuned down with `vm.swappiness`. A swapped-out
+Cassandra node stays in the ring while answering too slowly to be useful, which is worse
+for the cluster than a node that is down. THP is likewise disabled entirely — the JVM
+options deliberately do **not** set `-XX:+UseTransparentHugePages`.
+
+The role also sets Cassandra's sysctl tunables in `/etc/sysctl.d/99-cassandra.conf`,
+`/etc/security/limits.d/cassandra.conf`, and disables `irqbalance`.
+
+Read-ahead is **not** configured by this role. If you tune it, note that
+`blockdev --setra` takes 512-byte sectors, so an 8 KiB read-ahead is `16` sectors.
+
+### Garbage Collector
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_jvm_use_shenandoah` | `false` | Use Shenandoah instead of G1. Shenandoah runs with its default `adaptive` heuristic; the role never sets the `compact` heuristic or a fixed young generation size (`-Xmn`) |
+
+### CQL Behavior
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_use_statements_enabled` | `true` | Allow CQL `USE <keyspace>` statements (Cassandra's default; set `false` to require fully-qualified `keyspace.table` names) |
+
 ### SSL/TLS Configuration
 
 #### JKS (default)
@@ -98,32 +183,19 @@ Before running this playbook for Cassandra 5.0, review the variables in [roles/c
 | `cassandra_ssl_truststore_file` | `conf/.truststore` | Truststore file path |
 | `cassandra_ssl_truststore_pass` | `cassandra` | Truststore password |
 
-##### Password files (default)
+##### Password files (not supported on Cassandra 4.1 / 5.0)
 
-> **⚠ Behaviour change in this release.** Previously, JKS passwords were written
-> inline into `cassandra.yaml`. By default the role now externalises them to
-> `*_password_file:` references. Running the role on an existing node will
-> rewrite `cassandra.yaml` and notify the `Restart Cassandra` handler. No data
-> is lost. To keep the legacy inline behaviour, set
-> `cassandra_use_password_files: false`.
+The `keystore_password_file` / `truststore_password_file` keys were added in Apache Cassandra 6.0 and do not exist in 4.1.x or 5.0.x, the only versions this role supports. Emitting them makes `cassandra.yaml` invalid and Cassandra refuses to start.
 
-By default the role keeps JKS keystore/truststore passwords out of `cassandra.yaml`. Each password is written to a separate mode `0600` file owned by the cassandra user, and `cassandra.yaml` references it via `keystore_password_file:` / `truststore_password_file:` keys (a stock Cassandra feature, not a third-party extension). This applies to both `server_encryption_options` and `client_encryption_options`.
-
-Files are written only when (a) the relevant TLS path is enabled and (b) the configured password is non-empty.
+`cassandra_use_password_files` therefore defaults to `false`. If you set it to `true`, the role prints a warning and forces it back to `false`, so passwords are always written inline as `keystore_password` / `truststore_password`. Keep the keystore passwords in Ansible Vault.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `cassandra_use_password_files` | `true` | Externalise keystore/truststore passwords to `*_password_file` references. Set to `false` to inline passwords in `cassandra.yaml` (legacy behaviour). |
-| `cassandra_ssl_keystore_password_file` | `{{ cassandra_conf_dir }}/server_keystore_passwordfile.txt` | Path to the server keystore password file. |
-| `cassandra_ssl_truststore_password_file` | `{{ cassandra_conf_dir }}/server_truststore_passwordfile.txt` | Path to the server truststore password file. |
-| `cassandra_ssl_client_keystore_password_file` | `{{ cassandra_conf_dir }}/client_keystore_passwordfile.txt` | Path to the client keystore password file. |
-| `cassandra_ssl_client_truststore_password_file` | `{{ cassandra_conf_dir }}/client_truststore_passwordfile.txt` | Path to the client truststore password file. |
-
-To opt out for a host or group:
-
-```yaml
-cassandra_use_password_files: false
-```
+| `cassandra_use_password_files` | `false` | Reserved for Cassandra 6.0+. Forced to `false` on supported versions |
+| `cassandra_ssl_keystore_password_file` | `{{ cassandra_conf_dir }}/server_keystore_passwordfile.txt` | Server keystore password file path (unused while the feature is off) |
+| `cassandra_ssl_truststore_password_file` | `{{ cassandra_conf_dir }}/server_truststore_passwordfile.txt` | Server truststore password file path |
+| `cassandra_ssl_client_keystore_password_file` | `{{ cassandra_conf_dir }}/client_keystore_passwordfile.txt` | Client keystore password file path |
+| `cassandra_ssl_client_truststore_password_file` | `{{ cassandra_conf_dir }}/client_truststore_passwordfile.txt` | Client truststore password file path |
 
 #### PEM-based TLS (Cassandra 4.1+)
 
@@ -185,7 +257,7 @@ Store the resulting PEM content in Ansible Vault.
   hosts: cassandra
   become: true
   vars:
-    cassandra_version: 5.0.5
+    cassandra_version: 5.0.9
     cassandra_cluster_name: test-cluster
     cassandra_dc: DC1
 
@@ -307,7 +379,7 @@ Store the resulting PEM content in Ansible Vault.
   become: true
   vars:
     # Cluster Configuration
-    cassandra_version: 5.0.5
+    cassandra_version: 5.0.9
     cassandra_cluster_name: production
     cassandra_dc: DC1
     cassandra_rack: "{{ ansible_hostname | regex_replace('^.*rack([0-9]+).*$', 'rack\\1') }}"
@@ -396,7 +468,13 @@ cassandra_jmx_access_file: "/opt/cassandra/conf/jmxremote.access"
 
 ## Tags
 
-- `cassandra`: Apply all Cassandra installation and configuration tasks
+- `cassandra`: OS tuning tasks (sysctl, swap, THP)
+- `performance`: OS tuning only (sysctl, swap, THP)
+- `sysctl`: sysctl settings only
+- `swap`: Disable swap only
+- `thp`: Disable Transparent Huge Pages only
+
+Validation, install and data-directory guard tasks are tagged `always` and run even when you select a tag.
 
 ## Notes
 

@@ -49,7 +49,11 @@
 {% if cassandra_jvm_use_shenandoah is defined and cassandra_jvm_use_shenandoah %}
 -XX:+UnlockExperimentalVMOptions
 -XX:+UseShenandoahGC
--XX:+UseTransparentHugePages
+## Shenandoah uses its default 'adaptive' heuristic. Do not set
+## -XX:ShenandoahGCHeuristics=compact or a fixed young generation
+## size (-Xmn) with Shenandoah.
+## Transparent Huge Pages are disabled at the OS level by this role,
+## so -XX:+UseTransparentHugePages is intentionally not set.
 {% else %}
 ### G1 Settings
 ## Use the Hotspot garbage-first collector.

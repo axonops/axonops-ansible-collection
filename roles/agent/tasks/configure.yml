@@ -13,6 +13,7 @@
   ansible.builtin.file:
     path: /etc/systemd/system/axon-agent.service.d/
     state: directory
+    mode: "0755"
   when: axon_agent_limitnofile is defined and axon_agent_limitnofile != ''
 
 - name: Copy set limit_nofile id needed
@@ -71,6 +72,10 @@
       ansible.builtin.lineinfile:
         path: "{{ axon_agent_cassandra_config_directory }}/cassandra-env.sh"
         line: "{{ axon_agent_cassandra_config }}"
+        # Match any existing AxonOps agent line (old raw -javaagent or new
+        # axonops-jvm.options) so switching methods replaces it rather than
+        # appending a second line and loading the agent twice.
+        regexp: '(-javaagent:/usr/share/axonops/|\. /usr/share/axonops/axonops-jvm\.options)'
         insertafter: EOF
 
 - name: Add AxonOps agent config to kafka-server-start.sh

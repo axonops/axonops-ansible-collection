@@ -1,0 +1,33 @@
+---
+- name: Verify temp directory management (BDD)
+  hosts: all
+  gather_facts: true
+  tasks:
+
+    - name: GIVEN — the role converged with es_tmp_dir off /tmp
+      ansible.builtin.stat:
+        path: /var/lib/elasticsearch/tmp
+      register: verify_es_tmp_dir
+
+    - name: THEN — the temp directory exists, is service-owned and mode 0750
+      ansible.builtin.assert:
+        that:
+          - verify_es_tmp_dir.stat.exists
+          - verify_es_tmp_dir.stat.isdir
+          - verify_es_tmp_dir.stat.pw_name == 'elasticsearch'
+          - verify_es_tmp_dir.stat.gr_name == 'elasticsearch'
+          - verify_es_tmp_dir.stat.mode == '0750'
+        fail_msg: "/var/lib/elasticsearch/tmp is missing or has the wrong ownership/mode"
+
+    - name: WHEN — the rendered Elasticsearch default file is read
+      ansible.builtin.slurp:
+        src: "{{ '/etc/default/elasticsearch' if ansible_os_family == 'Debian' else '/etc/sysconfig/elasticsearch' }}"
+      register: verify_es_default
+
+    - name: THEN — ES_TMPDIR points at the custom temp directory
+      ansible.builtin.assert:
+        that:
+          - "'ES_TMPDIR=/var/lib/elasticsearch/tmp' in (verify_es_default.content | b64decode)"
+        fail_msg: the Elasticsearch default file does not set ES_TMPDIR
+
+# code: language=ansible

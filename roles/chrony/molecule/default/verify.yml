@@ -1,0 +1,83 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Set OS-specific verification facts
+      ansible.builtin.set_fact:
+        _verify_config_path: "{{ '/etc/chrony.conf' if ansible_os_family == 'RedHat' else '/etc/chrony/chrony.conf' }}"
+        _verify_service_name: "{{ 'chronyd' if ansible_os_family == 'RedHat' else 'chrony' }}"
+
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Assert chrony package is installed
+      ansible.builtin.assert:
+        that:
+          - "'chrony' in ansible_facts.packages"
+        fail_msg: "chrony package is not installed"
+
+    - name: Check chrony config file exists
+      ansible.builtin.stat:
+        path: "{{ _verify_config_path }}"
+      register: _chrony_conf_stat
+      failed_when: not _chrony_conf_stat.stat.exists
+
+    - name: Verify config file mode
+      ansible.builtin.assert:
+        that:
+          - _chrony_conf_stat.stat.mode == '0644'
+        fail_msg: "chrony config file does not have expected mode 0644"
+
+    - name: Read chrony config
+      ansible.builtin.slurp:
+        src: "{{ _verify_config_path }}"
+      register: _chrony_conf_content
+
+    - name: Verify overridden preferred server is present
+      ansible.builtin.assert:
+        that:
+          - "'server time.cloudflare.com prefer iburst minpoll 4 maxpoll 6' in (_chrony_conf_content.content | b64decode)"
+        fail_msg: "chrony.conf does not contain the expected preferred server line"
+
+    - name: Verify default preferred server is not present
+      ansible.builtin.assert:
+        that:
+          - "'server pool.ntp.org prefer iburst' not in (_chrony_conf_content.content | b64decode)"
+        fail_msg: "chrony.conf still contains the default preferred server after override"
+
+    - name: Verify additional server is present
+      ansible.builtin.assert:
+        that:
+          - "'server time.google.com iburst' in (_chrony_conf_content.content | b64decode)"
+        fail_msg: "chrony.conf does not contain the expected additional server line"
+
+    - name: Verify pool host is present
+      ansible.builtin.assert:
+        that:
+          - "'pool 2.molecule.pool.ntp.org iburst' in (_chrony_conf_content.content | b64decode)"
+        fail_msg: "chrony.conf does not contain the expected pool host line"
+
+    - name: Verify allowed client is present
+      ansible.builtin.assert:
+        that:
+          - "'allow 10.0.0.0/8' in (_chrony_conf_content.content | b64decode)"
+        fail_msg: "chrony.conf does not contain the expected allow directive"
+
+    - name: Verify extra directive is present
+      ansible.builtin.assert:
+        that:
+          - "'leapsectz right/UTC' in (_chrony_conf_content.content | b64decode)"
+        fail_msg: "chrony.conf does not contain the expected extra directive"
+
+    # chrony_start_on_install is false in converge.yml (this test environment
+    # doesn't grant chronyd the CAP_SYS_TIME it needs to run), so only
+    # boot-time enablement is asserted here, not the running state.
+    - name: Check chrony service is enabled
+      ansible.builtin.systemd:
+        name: "{{ _verify_service_name }}"
+      register: _chrony_svc
+      failed_when: _chrony_svc.status.UnitFileState not in ['enabled', 'static']
+
+# code: language=ansible

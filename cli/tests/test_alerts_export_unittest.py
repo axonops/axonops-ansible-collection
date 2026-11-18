@@ -521,7 +521,7 @@ class TestDashboardClusterTypeInPayload(unittest.TestCase):
         from axonopscli.components.dashboard import Dashboard
         axonops = MagicMock()
         axonops.get_cluster_type.return_value = cluster_type
-        args = SimpleNamespace(org="acme", cluster="prod", v=0)
+        args = SimpleNamespace(org="acme", cluster="prod", cluster_type=cluster_type, v=0)
         d = Dashboard(axonops, args)
         d.dashboard_data = [{"name": "existing"}]
         return d, axonops

@@ -27,3 +27,12 @@
       With kafka_sasl_mechanism=PLAIN, kafka_sasl_plain_users must include an
       entry with name={{ kafka_sasl_inter_broker_user }}.
   when: kafka_sasl_mechanism == 'PLAIN'
+
+- name: Warn that SASL without TLS sends the controller password in clear text
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: kafka_sasl_enabled is true but kafka_tls_enabled is false. The
+      KRaft CONTROLLER listener always uses SASL PLAIN, so the inter-broker
+      password ({{ kafka_sasl_inter_broker_user }}) crosses the network
+      unencrypted. Set kafka_tls_enabled: true for production.
+  when: not (kafka_tls_enabled | bool)

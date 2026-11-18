@@ -5,8 +5,12 @@
 
 # --- Version and Installation -----------------------------------------------
 
-opensearch_version: "3.6.0"
+opensearch_version: "3.8.0"
 opensearch_download_url: "https://artifacts.opensearch.org/releases/bundle/opensearch"
+
+# Architecture of the OpenSearch bundle to download. Derived from the host's
+# ansible_architecture; override only to force a specific bundle.
+opensearch_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'x64' }}"
 
 # Installation format: tar
 opensearch_install_root: /usr/share/opensearch
@@ -37,8 +41,11 @@ opensearch_bootstrap_memory_lock: true
 
 opensearch_heap_size: "1g"
 
-# Custom temp directory (useful when /tmp is mounted noexec)
-# opensearch_tmp_dir:
+# Custom temp directory (useful when /tmp is mounted noexec, e.g. CIS-hardened
+# builds and Amazon Linux 2023). Used for both -Djava.io.tmpdir and the
+# OPENSEARCH_TMPDIR environment variable in the systemd unit. Set to an empty
+# string to leave the distribution defaults in place.
+opensearch_tmp_dir: /var/lib/opensearch/tmp
 
 # --- Security Plugin --------------------------------------------------------
 
@@ -55,6 +62,16 @@ opensearch_auth_type: internal
 opensearch_tls_mode: generate
 
 # --- TLS generate mode settings (opensearch_tls_mode == 'generate') ---
+# searchguard-tlstool archive downloaded on the control node. Override the URL
+# to use an internal mirror; keep the checksum in sync with the archive.
+# Checksum format: '<algorithm>:<hex digest>' (e.g. sha256:...).
+opensearch_tlstool_url: https://repo1.maven.org/maven2/com/floragunn/search-guard-tlstool/1.5/search-guard-tlstool-1.5.tar.gz
+opensearch_tlstool_checksum: sha256:97efc3cbc560a99e59bfdab3d896749a124d1945ce9c92d40bbfdbb10568aa70
+# Absolute path on the control node to a pre-downloaded tlstool archive. When set, the
+# role copies it instead of downloading opensearch_tlstool_url (still verified
+# against opensearch_tlstool_checksum). Use for air-gapped control nodes or
+# when Python downloads from Maven Central are unreliable.
+opensearch_tlstool_local_archive: ""
 # Certificate validity (days)
 opensearch_cert_valid_days: 730
 # Domain name used in certificate DNs
@@ -130,6 +147,71 @@ opensearch_copy_custom_security_configs: false
 #   roles_key: roles
 #   connect_url: https://idp.example.com/.well-known/openid-configuration
 #   dashboards_url: https://dashboards.example.com
+
+# --- Snapshot Repositories (S3/GCS) -------------------------------------------
+
+# Install a repository plugin, load its credentials into opensearch.keystore and
+# register a snapshot repository. Installing the plugin restarts OpenSearch.
+opensearch_snapshot_enabled: false
+# Backend: 's3' or 'gcs'
+opensearch_snapshot_type: s3
+# Client name used in the s3.client.<name>.* / gcs.client.<name>.* settings
+opensearch_snapshot_client: default
+opensearch_snapshot_repository_name: "{{ opensearch_snapshot_type }}-snapshots"
+opensearch_snapshot_bucket: ""
+opensearch_snapshot_base_path: ""
+# Absolute path on the control node to a pre-downloaded repository-s3 or
+# repository-gcs plugin zip matching opensearch_version. When set, the role copies
+# it to the nodes instead of downloading the plugin from artifacts.opensearch.org.
+opensearch_snapshot_plugin_local_archive: ""
+
+# S3 (opensearch_snapshot_type == 's3')
+# Leave the access and secret keys empty to use the instance identity
+# (EC2 instance profile or IRSA). Keep real keys in ansible-vault.
+opensearch_snapshot_s3_access_key: ""
+opensearch_snapshot_s3_secret_key: ""
+opensearch_snapshot_s3_session_token: ""
+opensearch_snapshot_s3_region: ""
+# Set for S3-compatible stores (Hetzner Object Storage, MinIO, Ceph RGW, ...),
+# e.g. fsn1.your-objectstorage.com with opensearch_snapshot_s3_region: fsn1
+opensearch_snapshot_s3_endpoint: ""
+# 'https' or 'http'; empty keeps the plugin default (https)
+opensearch_snapshot_s3_protocol: ""
+opensearch_snapshot_s3_path_style_access: false
+# Other non-secret s3.client.<client>.* settings, e.g.
+# {disable_chunked_encoding: true, legacy_md5_checksum_calculation: true}
+opensearch_snapshot_s3_extra_settings: {}
+
+# GCS (opensearch_snapshot_type == 'gcs')
+# Service-account JSON, as a string or a mapping. Leave empty to use the
+# GCE/GKE workload identity. Keep it in ansible-vault.
+opensearch_snapshot_gcs_credentials_json: ""
+opensearch_snapshot_gcs_project_id: ""
+opensearch_snapshot_gcs_endpoint: ""
+
+# Snapshot Management policy, created or updated when not empty. 'name' is the
+# policy name; the remaining keys are the _plugins/_sm/policies request body.
+# snapshot_config.repository defaults to opensearch_snapshot_repository_name.
+opensearch_snapshot_policy: {}
+# Example:
+# opensearch_snapshot_policy:
+#   name: daily
+#   description: Daily snapshots, kept for 14 days
+#   creation:
+#     schedule:
+#       cron:
+#         expression: "0 2 * * *"
+#         timezone: UTC
+#   deletion:
+#     schedule:
+#       cron:
+#         expression: "0 3 * * *"
+#         timezone: UTC
+#     condition:
+#       max_age: 14d
+#       min_count: 1
+#   snapshot_config:
+#     indices: "*"
 
 # --- /etc/hosts Management --------------------------------------------------
 

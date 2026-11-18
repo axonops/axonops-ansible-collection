@@ -1,0 +1,96 @@
+---
+- name: Install openssl
+  ansible.builtin.package:
+    name: openssl
+    state: present
+  when: openldap_tls_mode == 'generate'
+
+- name: Create TLS directory
+  ansible.builtin.file:
+    path: "{{ _openldap_config_root }}/tls"
+    state: directory
+    owner: root
+    group: "{{ _openldap_group }}"
+    mode: "0750"
+
+- name: Generate self-signed certificate
+  when: openldap_tls_mode == 'generate'
+  block:
+    - name: Build subjectAltName list
+      ansible.builtin.set_fact:
+        _openldap_tls_sans: >-
+          {{ (['DNS:' ~ openldap_tls_common_name, 'DNS:' ~ inventory_hostname, 'DNS:localhost', 'IP:127.0.0.1']
+              + openldap_tls_extra_sans) | unique }}
+
+    - name: Generate self-signed certificate and key
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - req
+          - -x509
+          - -newkey
+          - rsa:4096
+          - -sha256
+          - -nodes
+          - -days
+          - "{{ openldap_tls_generate_days | string }}"
+          - -subj
+          - "/CN={{ openldap_tls_common_name }}"
+          - -addext
+          - "subjectAltName={{ _openldap_tls_sans | join(',') }}"
+          - -keyout
+          - "{{ _openldap_config_root }}/tls/server.key"
+          - -out
+          - "{{ _openldap_config_root }}/tls/server.crt"
+        creates: "{{ _openldap_config_root }}/tls/server.crt"
+
+    - name: Use the self-signed certificate as the CA file
+      ansible.builtin.copy:
+        src: "{{ _openldap_config_root }}/tls/server.crt"
+        dest: "{{ _openldap_config_root }}/tls/ca.crt"
+        remote_src: true
+        owner: root
+        group: "{{ _openldap_group }}"
+        mode: "0644"
+
+- name: Copy custom certificate and CA
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ _openldap_config_root }}/tls/{{ item.dest }}"
+    owner: root
+    group: "{{ _openldap_group }}"
+    mode: "0644"
+  loop:
+    - {src: "{{ openldap_tls_cert }}", dest: server.crt}
+    - {src: "{{ openldap_tls_ca }}", dest: ca.crt}
+  loop_control:
+    label: "{{ item.dest }}"
+  when:
+    - openldap_tls_mode == 'custom'
+    - item.src | length > 0
+  notify: Restart slapd
+
+- name: Copy custom private key
+  ansible.builtin.copy:
+    src: "{{ openldap_tls_key }}"
+    dest: "{{ _openldap_config_root }}/tls/server.key"
+    owner: root
+    group: "{{ _openldap_group }}"
+    mode: "0640"
+  when: openldap_tls_mode == 'custom'
+  no_log: true
+  notify: Restart slapd
+
+- name: Set private key permissions
+  ansible.builtin.file:
+    path: "{{ _openldap_config_root }}/tls/server.key"
+    owner: root
+    group: "{{ _openldap_group }}"
+    mode: "0640"
+
+- name: Set certificate permissions
+  ansible.builtin.file:
+    path: "{{ _openldap_config_root }}/tls/server.crt"
+    owner: root
+    group: "{{ _openldap_group }}"
+    mode: "0644"

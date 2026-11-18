@@ -15,11 +15,14 @@
   - [Using Environment Variables](#using-environment-variables)
   - [Configure Specific Configs Types](#configure-specific-configs-types)
   - [Configure Slack Integration](#configure-slack-integration)
+  - [Configure Alert Routes](#configure-alert-routes)
+  - [Configure Dashboards](#configure-dashboards)
   - [Configure PagerDuty Integration](#configure-pagerduty-integration)
   - [Configure Microsoft Teams Integration](#configure-microsoft-teams-integration)
   - [Configure a Kafka Cluster](#configure-a-kafka-cluster)
   - [Full Alert Stack Configuration](#full-alert-stack-configuration)
 - [Details playbook](#details-playbook)
+  - [Health / Config Check (`info`)](#health--config-check-info)
   - [Adaptive Repair Configuration](#adaptive-repair-configuration)
     - [Enable Adaptive Repair](#enable-adaptive-repair)
     - [Disable Adaptive Repair](#disable-adaptive-repair)
@@ -85,10 +88,12 @@ ansible-galaxy collection install $LATEST
 **Note**: the tarball will be installed into the directory configured
 in [COLLECTIONS_PATHS](https://docs.ansible.com/ansible/latest/reference_appendices/config.html#collections-paths).
 
+
 **Verify installation:**
+
 To verify the installation you can use the command:
 `ansible-galaxy collection list | grep axonops`.
----
+
 
 ### Install directly from Git
 
@@ -148,8 +153,31 @@ ls -l ~/git/ansible_collections/axonops
 
 ## Authentication & Settings
 
-The ansible role accepts configuration via both environment variables and Ansible variables.
-The required variables are `org` and `cluster`, which can be set in either way.
+Every variable below can be set **either** as a playbook/role variable **or** as an environment variable on the
+control node (this role always runs against `hosts: localhost`, so the module reads the same shell environment you
+export before running `ansible-playbook`) — you don't need to pick one style for the whole play. The required
+variables are `org` and `cluster`, which can be set either way.
+
+For authentication settings and `cluster_type` (`auth_token`, `api_token`, `username`, `password`, `cluster_type`),
+the same variable can also be set **per item** inside any of the loop-based config blocks (`adaptive_repair`,
+`agent_disconnection_tolerance`, `human_readableid`, `logcollector`, `pagerduty_integration`, `slack_integration`,
+`teams_integration`, or entries in `axonops_alert_routes`, `axonops_alert_rules`, `axonops_log_alert_rule`,
+`axonops_dashboard_templates`, `axonops_backups`, `axonops_commitlog_archive`, `axonops_shell_check`). Resolution
+order, highest priority first:
+
+1. The value set on the item itself (e.g. `adaptive_repair.auth_token`)
+2. The role/playbook variable (e.g. `auth_token: "{{ vault_axonops_token }}"` in `vars:`)
+3. The environment variable (e.g. `export AXONOPS_TOKEN=...`)
+4. The module's built-in default, if any (e.g. `cluster_type` defaults to `cassandra`)
+
+This lets you, for example, set one `auth_token` for the whole play but override `cluster_type` per alert rule, or
+rely entirely on environment variables and skip `vars:` altogether.
+
+**Note on `cluster_type`:** the accepted values are lowercase — `cassandra`, `kafka`, or `dse` — matching how AxonOps
+registers the cluster's type server-side. Mismatched casing (e.g. `DSE`) will cause the role to skip Cassandra/DSE-only
+tasks and any explicit module call to fail with `non existing cluster type ...`. The role-level `cluster_type`
+variable is automatically lowercased for you; a **per-item** `cluster_type` override (e.g. `alert_item.cluster_type`)
+is not — set per-item overrides in lowercase explicitly.
 
 ### List of Variables
 
@@ -217,12 +245,82 @@ The required variables are `org` and `cluster`, which can be set in either way.
   vars:
     org: mycompany
     cluster: production-cluster
+    axonops_slack_integrations:
+      - name: ops-alerts
+        webhook_url: "{{ lookup('env', 'SLACK_WEBHOOK_URL') }}"
+        channel: "#ops-alerts"
 
   roles:
     - role: axonops.axonops.configurations
       tags:
         - slack
 ```
+
+| Key           | Description                                           | Type   | Required | Default |
+|---------------|-------------------------------------------------------|--------|----------|---------|
+| `name`        | Integration name                                      | String | Yes      |         |
+| `webhook_url` | Slack incoming webhook URL (hidden from task output unless `enable_logging` is set)| String | Yes      |         |
+| `channel`     | Slack channel                                         | String | No       | `""`    |
+| `present`     | `false` removes the integration                       | Bool   | No       | `true`  |
+| `cluster_type`| Per-item override of the cluster type                 | String | No       | role    |
+
+### Configure Alert Routes
+
+Routes send alerts of a given severity to an integration. The integration must already exist.
+
+```yaml
+axonops_alert_routes:
+  - type: global
+    severity: error
+    integration_type: slack
+    integration_name: ops-alerts
+    enable_override: false
+```
+
+| Key                | Description                                                        | Type   | Required | Default |
+|--------------------|--------------------------------------------------------------------|--------|----------|---------|
+| `type`             | One of `global`, `metrics`, `backups`, `servicechecks`, `nodes`, `commands`, `repairs`, `rollingrestart` | String | Yes      |         |
+| `severity`         | One of `info`, `warning`, `error`                                  | String | Yes      |         |
+| `integration_type` | Integration type, e.g. `slack`                                     | String | Yes      |         |
+| `integration_name` | Name of the integration                                            | String | Yes      |         |
+| `enable_override`  | Allow per-rule overrides                                           | Bool   | No       | `true`  |
+| `present`          | `false` removes the route                                          | Bool   | No       | `true`  |
+
+### Configure Dashboards
+
+```yaml
+axonops_dashboard_templates:
+  - name: Free space
+    filters:
+      - name: dc
+        label: Data center
+        type: dc
+    panels:
+      - type: line-chart
+        title: Disk free
+        details:
+          queries:
+            - query: "sum(cas_disk_free{dc=~'$dc'})"
+        layout:
+          x: 0
+          y: 1
+          w: 6
+          h: 4
+          i: disk-free
+  - name: Old dashboard
+    present: false
+```
+
+| Key       | Description                                                      | Type   | Required | Default |
+|-----------|------------------------------------------------------------------|--------|----------|---------|
+| `name`    | Dashboard name                                                   | String | Yes      |         |
+| `filters` | List of dashboard filters (`name`, `label`, `type`, ...)         | List   | No       |         |
+| `panels`  | List of panels (`type`, `title`, `details`, `layout`)            | List   | No       |         |
+| `present` | `false` removes the dashboard                                    | Bool   | No       | `true`  |
+
+Each panel `layout` is a grid position: `x`, `y`, `w`, `h` and a unique `i`. `details` is a plain YAML mapping whose
+content depends on the panel `type`. To see the exact shape for a type, export an existing dashboard from the AxonOps
+UI or fetch `/api/v1/dashboardtemplate/<org>/<cluster_type>/<cluster>?dashver=2.0`.
 
 ### Configure PagerDuty Integration
 
@@ -281,16 +379,70 @@ Set `cluster_type` to `kafka` to skip Cassandra-specific tasks and apply Kafka-a
     adaptive_repair:
       enabled: true
     agent_disconnection_tolerance:
-      key: enabled
-      value: true
+      value:
+        warn_timeout: 30s
+        error_timeout: 1m
     human_readableid:
-      enabled: true
+      id: axon_agent_hostname
 
   roles:
     - role: axonops.axonops.configurations
 ```
 
 ## Details playbook
+
+### Health / Config Check (`info`)
+
+The `info` task performs a health and configuration check against the AxonOps API
+for the target `org` and `cluster`. It is tagged `info` **and** `never`, so it is
+skipped during a normal role run and only executes when you request it explicitly
+with `--tags info`.
+
+The task does three things:
+
+1. **API connectivity** — queries the AxonOps API for the target `org` and
+   `cluster`.
+2. **SAML validation** — if the request fails, it is retried once with `use_saml`
+   flipped to the opposite value. If the flipped value succeeds, the play fails
+   with a message telling you that `use_saml` (or the `AXONOPS_USE_SAML`
+   environment variable) is set to the wrong value. If both values fail, the
+   original connection error is surfaced.
+3. **Status check** — walks every component reported by the API and fails the
+   play if any component has a non-zero `status`. Only non-zero statuses are
+   collected; they map to labels as follows (a `status` of `0` is healthy and is
+   never collected or labelled):
+
+   | Status | Label   |
+   |--------|---------|
+   | `1`    | Warning |
+   | `2`    | Error   |
+   | other  | Unknown |
+
+On failure the `info` task returns an `unhealthy` list; each entry contains
+`type`, `name`, `status`, `label`, and a formatted `message`
+(`"<type>/<name>: <label>"`), and the failure message aggregates them, for
+example:
+
+```text
+Unhealthy components detected: cassandra/demo-cluster: Warning; kafka/orders: Error
+```
+
+```yaml
+- name: Run the AxonOps health / config check
+  hosts: localhost
+  vars:
+    org: mycompany
+    cluster: production-cluster
+
+  roles:
+    - role: axonops.axonops.configurations
+```
+
+Invoke it explicitly (it will not run otherwise):
+
+```sh
+ansible-playbook <your-playbook>.yml --tags info
+```
 
 ### Adaptive Repair Configuration
 
@@ -307,10 +459,19 @@ This allows you to enable or disable adaptive repair settings for your cluster.
 | `excludedtables`      | List of tables to exclude from adaptive repair.                                  | List    | `[]`    |
 | `gc_grace`            | Set the GC grace period.                                                         | integer | `86400` |
 | `maxsegmentspertable` | Set the maximum number of segments per table to repair in a single repair cycle. | integer | `0`     |
-| `segmentretries`      | Set the number of retries for each segment in case of failure.                   | integer | `5`     |
-| `segmenttargetsizemb` | Set the target size in MB for each segment repaired at time.                     | integer | `omit`  |
+| `segmentretries`      | Set the number of retries for each segment in case of failure.                   | integer | `3`     |
+| `segmenttargetsizemb` | Set the target size in MB for each segment repaired at time (`0` lets AxonOps decide). | integer | `0`     |
+| `filter_twcs`         | Ignore TWCS tables.                                                              | boolean | `true`  |
 | `segmenttimeout`      | Set the timeout in seconds for each segment repair operation.                    | String  | `2h`    |
 | `tableparallelism`    | Set the number of tables processed in parallel.                                  | integer | `10`    |
+| `cluster_type`        | Override the role-level `cluster_type` for this task only.                      | String  | (unset) |
+| `auth_token`          | Override the role-level `auth_token` for this task only.                        | String  | (unset) |
+| `api_token`           | Override the role-level `api_token` for this task only.                         | String  | (unset) |
+| `username`            | Override the role-level `username` for this task only.                          | String  | (unset) |
+| `password`            | Override the role-level `password` for this task only.                          | String  | (unset) |
+
+See [Authentication & Settings](#authentication--settings) for how these fall back to role variables and then
+environment variables when left unset.
 
 #### Enable Adaptive Repair
 
@@ -338,8 +499,8 @@ This allows you to enable or disable adaptive repair settings for your cluster.
     adaptive_repair:
       enabled: false
 
-    roles:
-      - role: axonops.axonops.configurations
+  roles:
+    - role: axonops.axonops.configurations
 ```
 
 #### Set GC Grace Threshold
@@ -531,7 +692,7 @@ axonops_alert_rules:
     warning_value: 1
     duration: 15m
     description: my example metric alert
-    enabled: true
+    present: true
 ```
 
 The variable `axonops_alert_rules` is a list of metric alert definitions. The variable is optional.
@@ -548,7 +709,8 @@ The variable `axonops_alert_rules` is a list of metric alert definitions. The va
 | `critical_value` | Value to trigger a critical alert                                                              | Float   |         |
 | `warning_value`  | Value to trigger a warning alert                                                               | Float   |         |
 | `duration`       | Duration for which the condition must be met before triggering the alert                       | String  |         |
-| `enabled`        | Whether the alert is enabled or not                                                            | Boolean | True    |
+| `present`        | Whether the alert should exist (`false` removes it)                                            | Boolean | True    |
+| `scope`, `group_by`, `routing`, `percentile`, `consistency`, `metric`, `keyspace`, `dc`, `rack`, `host_id` | Optional filters and routing, passed through to the `alert_rule` module | List / String | |
 
 #### Check for DOWN nodes
 
@@ -611,7 +773,7 @@ axonops_shell_check: [ ]
 axonops_tcp_check: [ ]
 ```
 
-both `axonops_shell_check` and `axonops_tcp_checks` are optionals.
+both `axonops_shell_check` and `axonops_tcp_check` are optional.
 
 #### list of parameters for axonops_shell_check
 
@@ -643,7 +805,7 @@ axonops_shell_check:
     script: |
       #!/bin/bash
       echo "This is a dummy check"
-      exit 2"
+      exit 2
 ```
 
 #### Example of a shell check to monitor if a Debian/Ubuntu host needs a reboot
@@ -705,34 +867,44 @@ The role supports granular control through the following tags:
 
 | Tag                             | Description                             | Cluster Type   |
 |---------------------------------|-----------------------------------------|----------------|
+| `info`                          | Run health / config check (see note)    | All            |
 | `metrics`                       | Configure metric alerts                 | All            |
 | `backups`                       | Configure backup settings               | All            |
 | `service_checks`                | Configure service check alerts          | All            |
 | `slack`                         | Configure Slack integration             | All            |
 | `pagerduty_integration`         | Configure PagerDuty integration         | All            |
 | `teams`                         | Configure Microsoft Teams integration   | All            |
-| `adaptive_repair`               | Configure adaptive repair settings      | Cassandra only |
+| `adaptive_repair`               | Configure adaptive repair settings      | Cassandra, DSE  |
 | `agent_disconnection_tolerance` | Configure agent disconnection tolerance | All            |
-| `commitlogs_archive`            | Configure commit log archiving          | Cassandra only |
-| `human_readableid`              | Configure human-readable IDs            | Cassandra only |
+| `commitlogs_archive`            | Configure commit log archiving          | Cassandra, DSE  |
+| `human_readableid`              | Configure human-readable IDs            | Cassandra, DSE  |
 | `log_alerts`                    | Configure log-based alerts              | All            |
 | `logcollector`                  | Configure log collector                 | All            |
 | `dashboards`                    | Import custom dashboards                | All            |
 | `routes`                        | Configure alert routing rules           | All            |
+
+> **Note on the `info` tag:** the `info` task is tagged `info` **and** `never`, so
+> it is skipped during a normal role run and only executes when you request it
+> explicitly with `--tags info`. It performs a health / configuration check by
+> querying the AxonOps API for the target `org` and `cluster`, validating your
+> SAML setting, and failing the play if any component reports a non-zero `status`
+> (Warning, Error, or Unknown). See
+> [Health / Config Check (`info`)](#health--config-check-info) for details.
 
 ## Tasks Overview
 
 The role performs the following tasks based on the enabled tags. Integrations are configured before metric alerts to
 allow alert routing rules to reference integration names.
 
+0. **Health / Config Check** (`info` tag, opt-in via `--tags info`): Verify API connectivity, validate the `use_saml` setting, and fail if any monitored component reports an unhealthy status
 1. **Integrations**: Set up notification channels (Slack, PagerDuty, Microsoft Teams)
 2. **Metrics Alerts**: Configure threshold-based alerts for cluster metrics
 3. **Backup Configuration**: Set up backup schedules and retention policies
 4. **Service Checks**: Configure service availability monitoring
-5. **Adaptive Repair** (Cassandra only): Configure automated repair scheduling
+5. **Adaptive Repair** (Cassandra, DSE): Configure automated repair scheduling
 6. **Agent Disconnection Tolerance**: Configure tolerance for agent disconnections
-7. **Commit Log Archiving** (Cassandra only): Configure commit log archive settings
-8. **Human-Readable IDs** (Cassandra only): Configure human-readable node identifiers
+7. **Commit Log Archiving** (Cassandra, DSE): Configure commit log archive settings
+8. **Human-Readable IDs** (Cassandra, DSE): Configure human-readable node identifiers
 9. **Log Alerts**: Configure alerts based on log patterns
 10. **Log Collector**: Configure log collection settings
 11. **Dashboards**: Import and configure custom dashboards
@@ -748,14 +920,14 @@ allow alert routing rules to reference integration names.
   tasks:
     - name: Configure alerts for cluster 1
       include_role:
-        name: axonops.axonops.alerts
+        name: axonops.axonops.configurations
       vars:
         org: mycompany
         cluster: cluster-1
 
     - name: Configure alerts for cluster 2
       include_role:
-        name: axonops.axonops.alerts
+        name: axonops.axonops.configurations
       vars:
         org: mycompany
         cluster: cluster-2

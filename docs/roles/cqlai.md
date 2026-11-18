@@ -60,6 +60,16 @@ SSL is enabled by default. Set `cqlai_ssl_enabled` to `false` only if the target
 |----------|---------|-------------|
 | `cqlai_ai_provider` | `openai` | AI provider to use for query assistance |
 | `cqlai_ai_openai_api_key` | `""` | API key for the AI provider. MUST be set; MUST be stored in Ansible Vault — never in plaintext |
+| `cqlai_ai_openai_model` | `gpt-3.5-turbo` | Model name written to the configuration |
+| `cqlai_ai_url` | — | Optional API endpoint URL for an OpenAI-compatible provider |
+
+### Configuration file
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cqlai_config_global` | `true` | Write the configuration to `/root/.cqlai.json` (mode `0640`, owner `root`). Set to `false` to skip writing it |
+
+The configuration is written for the `root` user only, so run `cqlai` as root (or copy the file to the target user's home).
 
 ## Dependencies
 

@@ -1,5 +1,5 @@
 - name: Installs and configures OpenSearch as the search backend for AxonOps Server
-  hosts: axonops-searchdb
+  hosts: axonops_searchdb
   become: true
 
   pre_tasks:

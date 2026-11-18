@@ -1,0 +1,58 @@
+---
+- name: Build slapd listener URLs
+  ansible.builtin.set_fact:
+    _openldap_urls: >-
+      {{ (['ldap://:' ~ openldap_ldap_port ~ '/'] if openldap_listen_ldap else [])
+         + (['ldaps://:' ~ openldap_ldaps_port ~ '/'] if openldap_listen_ldaps else [])
+         + ['ldapi:///'] }}
+
+- name: Configure slapd listeners (RHEL family)
+  when: ansible_facts['os_family'] == 'RedHat'
+  block:
+    - name: Create slapd systemd drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/slapd.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Set slapd listeners in systemd drop-in
+      ansible.builtin.template:
+        src: slapd-override.conf.j2
+        dest: /etc/systemd/system/slapd.service.d/axonops.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart slapd
+
+- name: Set slapd listeners in /etc/default/slapd (Debian family)
+  ansible.builtin.lineinfile:
+    path: /etc/default/slapd
+    regexp: '^SLAPD_SERVICES='
+    line: "SLAPD_SERVICES=\"{{ _openldap_urls | join(' ') }}\""
+  when: ansible_facts['os_family'] == 'Debian'
+  notify: Restart slapd
+
+- name: Start slapd
+  ansible.builtin.systemd:
+    name: slapd
+    state: started
+    enabled: "{{ openldap_start_on_boot }}"
+    daemon_reload: true
+  when: openldap_start_on_install
+
+- name: Apply pending slapd restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for the ldapi socket
+  community.general.ldap_search:
+    dn: cn=config
+    scope: base
+    server_uri: ldapi:///
+  register: _openldap_ldapi
+  retries: 10
+  delay: 2
+  until: _openldap_ldapi is succeeded
+  changed_when: false
+  when: openldap_start_on_install

@@ -60,6 +60,22 @@ options:
             - It can be read from the environment variable AXONOPS_CLUSTER_TYPE.
         required: false
         type: str
+    chart_query_index:
+        description:
+            - Index into the referenced chart's details.queries[] array used to derive
+              the alert's metric expression. Defaults to 0, which matches the
+              long-standing implicit behaviour and is the right choice for the vast
+              majority of charts (a single query, or the first query being the one to
+              alert on).
+            - Set to 1 (or higher) when the chart has multiple queries and the one
+              you want to alert on is NOT the first. For example, a chart that
+              displays both "up" and "down" series side-by-side will have two
+              queries; only one is meaningful for a given alert.
+            - Out-of-range values fail the task with a clear message instead of
+              silently picking the wrong series.
+        required: false
+        type: int
+        default: 0
 
 '''
 
@@ -102,7 +118,8 @@ def run_module():
         'consistency': {'type': 'list', 'default': [],
                         'choices': ['', 'ALL', 'ANY', 'ONE', 'TWO', 'THREE', 'SERIAL', 'QUORUM', 'EACH_QUORUM',
                                     'LOCAL_ONE', 'LOCAL_QUORUM', 'LOCAL_SERIAL']},
-        'keyspace': {'type': 'list', 'default': []}
+        'keyspace': {'type': 'list', 'default': []},
+        'chart_query_index': {'type': 'int', 'default': 0}
     })
 
     module = AnsibleModule(
@@ -177,6 +194,20 @@ def run_module():
         # if it is not a list, we have a single element, we can use it directly
         new_chart = new_charts
 
+    # Validate chart_query_index once, here, while the chart is in hand.
+    # Both downstream uses (the metric-derivation branch below and the
+    # expression-build path further down) index into the same queries[] array,
+    # so checking once keeps the two paths consistent and the error message
+    # close to the YAML field that controls it.
+    chart_query_index = module.params['chart_query_index']
+    _chart_queries = (new_chart.get('details') or {}).get('queries') or []
+    if _chart_queries and not (0 <= chart_query_index < len(_chart_queries)):
+        module.fail_json(
+            msg=f"chart_query_index {chart_query_index} out of range for chart "
+                f"'{module.params['chart']}' (has {len(_chart_queries)} queries)"
+        )
+        return
+
     raw_query = None
     # check if it is an event base alert rather than metrics
     new_chart_filters = None
@@ -187,7 +218,7 @@ def run_module():
     # if it is not, get the chart query if not specified in the params
     elif not module.params['metric']:
         try:
-            raw_query = new_chart['details']['queries'][0]['query']
+            raw_query = new_chart['details']['queries'][chart_query_index]['query']
         except (TypeError, IndexError):
             module.fail_json(msg='Failed getting the metric query from the specified chart')
             return
@@ -343,7 +374,9 @@ def run_module():
     new_data_normalized = normalize_numbers(new_data)
     # Set up alert expression
     if new_chart['details']['queries']:
-        orig_query = new_chart['details']['queries'][0]['query']
+        # chart_query_index was bounds-checked once near the top, when new_chart
+        # was first finalized; safe to index directly.
+        orig_query = new_chart['details']['queries'][chart_query_index]['query']
         pattern = re.compile(r"\{([^}]*)\}")
         match = pattern.search(orig_query)
         label_filters_str = match.group(1)

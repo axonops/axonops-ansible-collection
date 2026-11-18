@@ -1,0 +1,7 @@
+---
+- name: Restart slapd
+  ansible.builtin.systemd:
+    name: slapd
+    state: restarted
+    daemon_reload: true
+  when: openldap_start_on_install

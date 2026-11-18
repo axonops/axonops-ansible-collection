@@ -1,0 +1,30 @@
+---
+- name: Install EPEL repository
+  ansible.builtin.package:
+    name: epel-release
+    state: present
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - openldap_install_epel
+
+- name: Preseed slapd so the package does not create its own directory
+  ansible.builtin.debconf:
+    name: slapd
+    question: slapd/no_configuration
+    value: "true"
+    vtype: boolean
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Install OpenLDAP packages (RHEL family)
+  ansible.builtin.dnf:
+    name: "{{ _openldap_packages }}"
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: Install OpenLDAP packages (Debian family)
+  ansible.builtin.apt:
+    name: "{{ _openldap_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == 'Debian'

@@ -50,6 +50,14 @@ Installs the AxonOps Kubernetes operator via its OCI Helm chart and deploys `Axo
 
 ### Infrastructure Components
 
+#### [chrony](chrony.md)
+Installs and configures chrony (`chronyd`) for NTP time synchronization.
+
+**Use when**: Deploying Cassandra, Kafka, or OpenSearch — accurate, synchronized clocks are
+critical for timestamp-based conflict resolution, log/retention timing, and cluster health.
+Standalone role with no dependencies; recommended on every Cassandra, Kafka, and OpenSearch
+host.
+
 #### [cassandra](cassandra.md)
 Installs and configures Apache Cassandra (versions 3.11, 4.x, and 5.x).
 
@@ -75,12 +83,38 @@ Installs Java (OpenJDK or Azul Zulu) on target systems.
 
 **Use when**: Deploying Cassandra, Elasticsearch, or any Java-dependent component.
 
+### Security Roles
+
+#### [openldap](openldap.md)
+Installs a local OpenLDAP directory, seeds it with users and groups, and publishes a ready-made `axon_server_ldap_setting` for the server role.
+
+**Use when**: You want AxonOps LDAP authentication and role mapping without an existing corporate directory, for demos, CI or small installs.
+
+### Security Roles (continued)
+
+#### [pki_agent](pki_agent.md)
+Automated PKI certificate management using OpenBao Agent.
+
+**Use when**: You want certificates for Cassandra, OpenSearch or other services issued and renewed from OpenBao.
+
 ### Utility Roles
 
 #### [preflight](preflight.md)
 Performs pre-installation checks to ensure systems meet requirements.
 
 **Use when**: Before deploying Cassandra or AxonOps components to validate system readiness.
+
+#### [docker](../../roles/docker/README.md)
+Installs Docker CE and the Compose plugin on Linux.
+
+**Use when**: You use `devcluster`, or need Docker on the target host. Has no page in this directory; see the role README.
+
+### Development and Demo
+
+#### [devcluster](../../roles/devcluster/README.md)
+Deploys an AxonOps stack (OpenSearch, axon-server, axon-dash, one to three Cassandra nodes) as Docker Compose services. Has no page in this directory; see the role README.
+
+**Use when**: You want a throwaway dev or demo environment. Not suitable for production.
 
 ## Quick Reference
 
@@ -94,12 +128,17 @@ Performs pre-installation checks to ensure systems meet requirements.
 | **operator** | AxonOps operator and platform on Kubernetes | Kubernetes cluster |
 | **k8ssandra** | Cassandra on Kubernetes | Kubernetes cluster |
 | **strimzi** | Kafka on Kubernetes | Kubernetes cluster |
-| **cassandra** | Apache Cassandra installation | Agent, Java |
-| **kafka** | Apache Kafka (KRaft) installation | Agent |
-| **opensearch** | OpenSearch installation (preferred for on-premises) | Server |
+| **chrony** | NTP time synchronization | Cassandra, Kafka, OpenSearch nodes |
+| **cassandra** | Apache Cassandra installation | Agent, Java, Chrony |
+| **kafka** | Apache Kafka (KRaft) installation | Agent, Chrony |
+| **opensearch** | OpenSearch installation (preferred for on-premises) | Server, Chrony |
 | **elastic** | Elasticsearch installation (legacy / existing deployments) | Server |
 | **java** | Java installation | Cassandra, Elastic |
+| **openldap** | Local LDAP directory for AxonOps auth | Server |
+| **pki_agent** | OpenBao-managed certificates | Cassandra, OpenSearch nodes |
 | **preflight** | System validation | Before any installation |
+| **docker** | Docker CE and Compose plugin | Devcluster |
+| **devcluster** | Docker Compose dev/demo stack (not for production) | Docker |
 
 ## Common Deployment Patterns
 
@@ -127,14 +166,15 @@ Deploy new Cassandra cluster with AxonOps monitoring:
 - hosts: cassandra
   roles:
     - role: axonops.axonops.preflight
+    - role: axonops.axonops.chrony
     - role: axonops.axonops.java
     - role: axonops.axonops.agent
     - role: axonops.axonops.cassandra
 ```
 
-**Roles needed**: `axonops.axonops.preflight`, `axonops.axonops.java`, `axonops.axonops.agent`, `axonops.axonops.cassandra`
+**Roles needed**: `axonops.axonops.preflight`, `axonops.axonops.chrony`, `axonops.axonops.java`, `axonops.axonops.agent`, `axonops.axonops.cassandra`
 
-**See**: [cassandra.md](cassandra.md), [agent.md](agent.md), [java.md](java.md), [preflight.md](preflight.md)
+**See**: [cassandra.md](cassandra.md), [agent.md](agent.md), [java.md](java.md), [chrony.md](chrony.md), [preflight.md](preflight.md)
 
 ---
 
@@ -150,6 +190,7 @@ OpenSearch is preferred for new on-premises deployments:
     opensearch_cluster_type: single-node
     opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
     opensearch_domain_name: example.com
+    axon_server_org_name: example
     axon_server_searchdb_hosts:
       - "https://127.0.0.1:9200"
     axon_server_searchdb_username: admin
@@ -174,6 +215,8 @@ For existing deployments using Elasticsearch:
 
 ```yaml
 - hosts: axon-server
+  vars:
+    axon_server_org_name: example
   roles:
     - role: axonops.axonops.java
     - role: axonops.axonops.elastic
@@ -200,6 +243,7 @@ Deploy both AxonOps Server and a monitored Cassandra cluster. OpenSearch is the 
     opensearch_cluster_type: single-node
     opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
     opensearch_domain_name: example.com
+    axon_server_org_name: example
     axon_server_searchdb_hosts:
       - "https://127.0.0.1:9200"
     axon_server_searchdb_username: admin
@@ -324,6 +368,41 @@ Deploy the AxonOps operator and a full AxonOps platform stack on Kubernetes. The
 **Roles needed**: `axonops.axonops.operator`
 
 **See**: [operator.md](operator.md)
+
+---
+
+### Pattern 9: Self-Hosted AxonOps Server with Local LDAP Authentication
+
+Add a local OpenLDAP directory when there's no corporate directory available yet, and wire
+axon-server to authenticate against it:
+
+```yaml
+- hosts: ldap
+  vars:
+    openldap_admin_password: "{{ vault_openldap_admin_password }}"
+  roles:
+    - role: axonops.axonops.openldap
+
+- hosts: axon-server
+  vars:
+    axon_server_org_name: example
+    axon_server_license_key: "{{ vault_axon_server_license_key }}"  # required for LDAP
+    axon_server_ldap_enabled: true
+    axon_server_ldap_setting: >-
+      {{ hostvars[groups['ldap'][0]]['openldap_axon_server_ldap_setting']
+         | combine({'bindPassword': vault_openldap_admin_password}) }}
+  roles:
+    - role: axonops.axonops.server
+```
+
+The `openldap` role seeds groups matching `rolesMapping` (`axonops_super`, `axonops_admin`,
+`axonops_readonly`, `axonops_backup`) and publishes `openldap_axon_server_ldap_setting` — without
+`bindPassword`, which must be added from vault as shown above. axon-server ignores LDAP settings
+without a license key.
+
+**Roles needed**: `axonops.axonops.openldap`, `axonops.axonops.server`
+
+**See**: [openldap.md](openldap.md), [server.md](server.md#ldap-configuration), [openldap-axon-server.yml](../../examples/openldap-axon-server.yml)
 
 ## Getting Started
 

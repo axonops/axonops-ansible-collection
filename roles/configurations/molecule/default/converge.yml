@@ -33,6 +33,7 @@
     axonops_slack_integrations:
       - name: example_slack_integration_developer
         webhook_url: https://hooks.slack.com/services/ADD/ME/HERE
+        channel: "#example"
         present: "{{ present | default(true) | bool }}"
     axonops_alert_routes:
       - integration_name: example_slack_integration_developer
@@ -41,6 +42,21 @@
         severity: error
         enable_override: false
         present: "{{ present | default(true) | bool }}"
+      - integration_name: example_slack_integration_developer
+        integration_type: slack
+        type: global
+        severity: warning
+        present: "{{ present | default(true) | bool }}"
+    axonops_dashboard_templates:
+      - name: example_dashboard
+        present: "{{ present | default(true) | bool }}"
+        panels:
+          - type: line-chart
+            title: Example
+            details:
+              queries:
+                - query: "sum(cas_disk_free)"
+            layout: {x: 0, y: 1, w: 6, h: 4, i: example-panel}
 
   roles:
     - role: axonops.axonops.configurations

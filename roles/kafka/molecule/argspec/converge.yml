@@ -1,0 +1,71 @@
+---
+# Negative tests: each block must fail argument validation before any task runs.
+- name: Converge
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Wrong type for kafka_node_id
+      block:
+        - name: Include the role with kafka_node_id as a string
+          ansible.builtin.include_role:
+            name: kafka
+          vars:
+            kafka_node_id: "one"
+        - name: Fail if validation passed
+          ansible.builtin.fail:
+            msg: "Role accepted kafka_node_id: one"
+      rescue:
+        - name: Record the failure message
+          ansible.builtin.set_fact:
+            argspec_wrong_type_msg: "{{ ansible_failed_result.msg | default('') }}"
+
+    - name: Assert wrong type was rejected
+      ansible.builtin.assert:
+        that:
+          - argspec_wrong_type_msg is defined
+          - "'Validation of arguments failed' in argspec_wrong_type_msg"
+
+    - name: Invalid choice for kafka_tls_mode
+      block:
+        - name: Include the role with an unknown TLS mode, an unknown SASL mechanism and a SCRAM user without a password
+          ansible.builtin.include_role:
+            name: kafka
+          vars:
+            kafka_node_id: 1
+            kafka_tls_mode: bogus
+            kafka_sasl_mechanism: bogus
+            kafka_sasl_users:
+              - name: app1
+        - name: Fail if validation passed
+          ansible.builtin.fail:
+            msg: "Role accepted kafka_tls_mode: bogus"
+      rescue:
+        - name: Record the failure message
+          ansible.builtin.set_fact:
+            argspec_bad_choice_msg: "{{ ansible_failed_result.msg | default('') }}"
+
+    - name: Assert invalid choice was rejected
+      ansible.builtin.assert:
+        that:
+          - argspec_bad_choice_msg is defined
+          - "'Validation of arguments failed' in argspec_bad_choice_msg"
+
+    - name: Missing required kafka_node_id
+      block:
+        - name: Include the role without kafka_node_id
+          ansible.builtin.include_role:
+            name: kafka
+        - name: Fail if validation passed
+          ansible.builtin.fail:
+            msg: "Role accepted a missing kafka_node_id"
+      rescue:
+        - name: Record the failure message
+          ansible.builtin.set_fact:
+            argspec_missing_msg: "{{ ansible_failed_result.msg | default('') }}"
+
+    - name: Assert missing required variable was rejected
+      ansible.builtin.assert:
+        that:
+          - argspec_missing_msg is defined
+          - "'Validation of arguments failed' in argspec_missing_msg"

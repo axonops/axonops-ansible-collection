@@ -39,3 +39,4 @@ urllib3==2.6.3; python_version >= '3.9'
 wcmatch==10.0; python_version >= '3.12'
 yamllint==1.35.1; python_version >= '3.8'
 zipp==3.21.0; python_version >= '3.9'
+aar-doc==2.3.0

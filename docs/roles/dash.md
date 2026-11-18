@@ -20,6 +20,7 @@ The `dash` role installs and configures the AxonOps Dashboard (axon-dash), which
 | `axon_dash_state` | `present` | State of the dashboard: `present` or `absent` |
 | `axon_dash_start_at_boot` | `true` | Enable the dashboard to start at boot |
 | `axon_dash_version` | `""` (latest) | Specific version to install, or empty for latest |
+| `axon_dash_download_path` | _unset_ | Offline install (`has_internet_access: false`): path on the control node to the `axon-dash` `.rpm`. Requires `axon_dash_version` |
 
 ### Network Configuration
 
@@ -28,6 +29,27 @@ The `dash` role installs and configures the AxonOps Dashboard (axon-dash), which
 | `axon_dash_listen_address` | `127.0.0.1` | IP address the dashboard listens on |
 | `axon_dash_listen_port` | `3000` | Port the dashboard listens on |
 | `axon_dash_server_endpoint` | `http://127.0.0.1:8080` | URL of the AxonOps Server |
+
+### Reporting Service Configuration (Reports v2)
+
+From Reports v2, the `axon-reporting` package replaces the deprecated `axon-dash-pdf` /
+`axon-dash-pdf2` packages. It installs the reporting service and the dependencies `axon-dash`
+needs to generate reports, and **must run on the same host as `axon-dash`** — so the `dash` role
+installs and starts it. The AxonOps Server reaches the reporting service via
+`axon_server_reporting_url` in the `server` role.
+
+When upgrading from Reports v1, the role installs `axon-reporting` alongside any existing
+`axon-dash-pdf` / `axon-dash-pdf2` packages; it does **not** remove them. Uninstall the old
+packages manually once Reports v2 is confirmed working.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `axon_dash_reporting_enabled` | `true` | Install and run the `axon-reporting` service alongside `axon-dash` |
+| `axon_dash_reporting_url` | `http://127.0.0.1:8081` | `AXON_REPORTING_URL`; where `axon-dash` reaches the reporting service. Required for reporting; written as `axon-dash.reporting_url` |
+| `axon_reporting_state` | `present` | State of the reporting package: `present` or `absent` |
+| `axon_reporting_version` | `""` (latest) | Specific `axon-reporting` version to install, or empty for latest |
+| `axon_reporting_start_at_boot` | `true` | Enable the reporting service to start at boot |
+| `axon_reporting_download_path` | _unset_ | Offline install: path on the control node to the `axon-reporting` `.rpm` |
 
 ### Nginx Reverse Proxy Configuration
 
@@ -41,6 +63,8 @@ The `dash` role installs and configures the AxonOps Dashboard (axon-dash), which
 | `axon_dash_nginx.ssl_csr` | `/etc/nginx/axon_dash.csr` | Path to SSL certificate signing request |
 | `axon_dash_nginx.ssl_create` | `true` | Automatically create self-signed certificates |
 | `axon_dash_nginx.upstream` | `http://localhost:3000` | Upstream backend URL |
+
+`axon_dash_nginx` is a single dictionary variable: setting it in your inventory or play replaces the whole default, it is not merged. Always set every key you need (`ssl_csr` is required when `ssl_create` is `true`, and `ssl_cert`, `ssl_key`, `listen` and `upstream` are always required). The role installs nginx itself.
 
 ### Repository Configuration
 
@@ -112,6 +136,7 @@ The `dash` role installs and configures the AxonOps Dashboard (axon-dash), which
       listen: "{{ ansible_default_ipv4.address }}:443"
       ssl_cert: /etc/nginx/ssl/axonops.crt
       ssl_key: /etc/nginx/ssl/axonops.key
+      ssl_csr: /etc/nginx/ssl/axonops.csr
       ssl_create: true
       upstream: http://localhost:3000
 
@@ -209,8 +234,7 @@ Default credentials are configured during the AxonOps Server setup.
 
 ## Tags
 
-- `dash`: Apply all dashboard tasks
-- `axonops-dashboard`: Alias for dash tag
+The role defines no `dash` tag. Add a tag to the role in your playbook (for example `tags: axonops-dashboard`) to run it selectively. The repository tasks carry the `axon_dash_repo` tag.
 
 ## Notes
 

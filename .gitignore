@@ -12,3 +12,18 @@ tuning/
 .claude/settings.local.json
 .ansible
 documents/
+
+# Everything the configurations exporter writes (exports/<org>/<cluster>/*.yaml,
+# .env.axonops and <org>.sh). It lands in whatever directory the tool is run from.
+exports/
+
+# Python bytecode and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Ansible Builder generated context
+ci/execution-environment/_context/
+
+# ansible-navigator run artifacts
+examples/artifacts/

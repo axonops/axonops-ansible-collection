@@ -1,0 +1,127 @@
+---
+# ============================================================================
+# OpenLDAP Role - Defaults
+# ============================================================================
+# Installs a local OpenLDAP (slapd) directory that axon-server can use for
+# LDAP authentication and role mapping. Configuration uses cn=config (OLC).
+
+# ----------------------------------------------------------------------------
+# Directory layout
+# ----------------------------------------------------------------------------
+
+# Directory suffix. Changing it after the first run is not supported: the
+# database is bootstrapped once and the suffix is fixed from then on.
+openldap_base_dn: "dc=axonops,dc=local"
+
+# Value of the "o" attribute on the base entry.
+openldap_organization: "AxonOps"
+
+# Root (admin) DN of the directory database.
+openldap_admin_dn: "cn=admin,{{ openldap_base_dn }}"
+
+# REQUIRED — must be set by the caller; no default value.
+# Store it with ansible-vault or inject it from a secrets manager.
+# openldap_admin_password: ""
+
+openldap_users_ou: "ou=People"
+openldap_groups_ou: "ou=Groups"
+
+# Groups created as groupOfNames under openldap_groups_ou.
+#   name:        group cn (required)
+#   description: free text (optional)
+#   axon_role:   axon-server rolesMapping key this group maps to (optional).
+#                One of superUserRole, adminRole, readOnlyRole, backupAdminRole.
+openldap_groups:
+  - name: axonops_super
+    description: AxonOps super users
+    axon_role: superUserRole
+  - name: axonops_admin
+    description: AxonOps administrators
+    axon_role: adminRole
+  - name: axonops_readonly
+    description: AxonOps read-only users
+    axon_role: readOnlyRole
+  - name: axonops_backup
+    description: AxonOps backup administrators
+    axon_role: backupAdminRole
+
+# Users created as inetOrgPerson under openldap_users_ou.
+#   uid:      login name (required)
+#   password: plaintext password, hashed before it is stored (required)
+#   cn, sn:   common name / surname (optional, default to uid)
+#   mail:     email address (optional)
+#   groups:   list of group names from openldap_groups (optional)
+# Example:
+#   openldap_users:
+#     - uid: alice
+#       cn: Alice Smith
+#       sn: Smith
+#       mail: alice@example.com
+#       password: "{{ vault_alice_password }}"
+#       groups: [axonops_admin]
+openldap_users: []
+
+# Load the memberof + refint overlays so users carry a memberOf attribute.
+# axon-server needs this when rolesAttribute is memberOf.
+# One-way switch: setting it to false after the first run does not remove
+# the overlays. The modules are always loaded so the overlays can be enabled
+# later.
+openldap_enable_memberof: true
+
+# ----------------------------------------------------------------------------
+# Listeners
+# ----------------------------------------------------------------------------
+
+openldap_listen_ldap: true
+openldap_ldap_port: 389
+openldap_listen_ldaps: false
+openldap_ldaps_port: 636
+
+# ----------------------------------------------------------------------------
+# TLS
+# ----------------------------------------------------------------------------
+
+# disabled | generate (self-signed certificate) | custom (files you supply)
+openldap_tls_mode: disabled
+
+# Control-node paths, used when openldap_tls_mode is custom.
+openldap_tls_cert: ""
+openldap_tls_key: ""
+openldap_tls_ca: ""
+
+# Settings for openldap_tls_mode: generate.
+openldap_tls_generate_days: 825
+openldap_tls_common_name: "{{ ansible_facts['fqdn'] | default(inventory_hostname) }}"
+# Extra subjectAltName entries, e.g. ["DNS:ldap.example.com", "IP:10.0.0.5"].
+# DNS entries for the common name and inventory_hostname are always added.
+openldap_tls_extra_sans: []
+
+# Minimum TLS version: "3.3" = TLS 1.2, "3.4" = TLS 1.3.
+openldap_tls_protocol_min: "3.3"
+
+# ----------------------------------------------------------------------------
+# Server
+# ----------------------------------------------------------------------------
+
+openldap_install_epel: true   # RHEL family: OpenLDAP server packages come from EPEL
+# false skips starting slapd AND all cn=config changes and seeding, because
+# those need a running slapd on ldapi:///. Only install and bootstrap run.
+openldap_start_on_install: true
+openldap_start_on_boot: true
+openldap_data_dir: /var/lib/ldap
+openldap_db_max_size: 1073741824   # 1 GiB
+openldap_log_level: stats
+
+# ----------------------------------------------------------------------------
+# axon-server integration
+# ----------------------------------------------------------------------------
+
+# Host name axon-server uses to reach this directory. It is written to the
+# openldap_axon_server_ldap_setting fact, which you can pass straight to
+# axon_server_ldap_setting in the server role.
+openldap_axon_server_host: "{{ openldap_tls_common_name }}"
+
+# insecureSkipVerify value in openldap_axon_server_ldap_setting. Defaults to
+# true only for openldap_tls_mode: generate, because axon-server does not trust
+# the self-signed certificate. Set it to false once the CA is trusted.
+openldap_axon_server_insecure_skip_verify: "{{ openldap_tls_mode == 'generate' }}"

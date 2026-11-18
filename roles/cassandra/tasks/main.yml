@@ -21,10 +21,10 @@
   ansible.builtin.assert:
     that:
       - cassandra_version is defined
-      - cassandra_version.startswith('4.1') or cassandra_version.startswith('5.')
+      - cassandra_version.startswith('3.11') or cassandra_version.startswith('4.1') or cassandra_version.startswith('5.')
     fail_msg: >-
       Unsupported cassandra_version '{{ cassandra_version }}'. This role supports versions
-      starting with '4.1' or '5.'. Please set cassandra_version to a supported value.
+      starting with '3.11', '4.1' or '5.'. Please set cassandra_version to a supported value.
   tags: always
 
 - name: Assert Cassandra version supports PEMBasedSslContextFactory
@@ -59,6 +59,11 @@
       ansible.builtin.set_fact:
         cassandra_use_password_files: false
 
+- name: Import vars for 3.11
+  ansible.builtin.include_vars: cassandra-3.11.yml
+  when: cassandra_version.startswith('3.11')
+  tags: always
+
 - name: Import vars for 4.1
   ansible.builtin.include_vars: cassandra-4.1.yml
   when: cassandra_version.startswith('4.1')
@@ -79,6 +84,9 @@
   when: ansible_os_family == "RedHat"
   tags: always
 
+- name: Data directory migration safety check
+  ansible.builtin.import_tasks: check-data-dir.yml
+
 - name: Install from pkg
   when: cassandra_install_format == "pkg"
   ansible.builtin.import_tasks: install-pkg.yml
@@ -97,11 +105,19 @@
   ansible.builtin.file:
     path: "{{ cassandra_java_tmp_dir }}"
     state: directory
-    mode: "1777"
+    mode: "0750"
     owner: "cassandra"
     group: "cassandra"
   when: cassandra_java_tmp_dir is defined and cassandra_java_tmp_dir != '' and cassandra_java_tmp_dir != "/tmp"
 
+- name: Create JNA tmp dir for Cassandra if it is not /tmp
+  ansible.builtin.file:
+    path: "{{ cassandra_jna_tmp_dir }}"
+    state: directory
+    mode: "0750"
+    owner: "cassandra"
+    group: "cassandra"
+  when: cassandra_jna_tmp_dir is defined and cassandra_jna_tmp_dir != '' and cassandra_jna_tmp_dir != "/tmp"
 
 - name: Create AxonOps User
   tags: axonops_user
@@ -206,6 +222,14 @@
         name: libjemalloc2
         state: present
 
+    - name: Install epel-release for jemalloc on RedHat
+      when:
+        - ansible_os_family == "RedHat"
+        - ansible_distribution != "Amazon"
+      ansible.builtin.yum:
+        name: epel-release
+        state: present
+
     - name: Install jemalloc package (RedHat)
       when: ansible_os_family == "RedHat"
       ansible.builtin.package:
@@ -249,7 +273,29 @@
         tmpl_dir: 4.1.x
       when: cassandra_version.startswith('4.1')
 
-    - name: Ensure Cassandra node configured
+    - name: Template directory
+      ansible.builtin.set_fact:
+        tmpl_dir: 3.11.x
+      when: cassandra_version.startswith('3.11')
+
+    - name: Ensure Cassandra node configured (3.11 only — legacy schema, single jvm.options)
+      when: cassandra_version.startswith('3.11')
+      ansible.builtin.template:
+        src: "{{ tmpl_dir }}/{{ item }}.j2"
+        dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
+        mode: "0640"
+        owner: cassandra
+        group: cassandra
+      loop:
+        - cassandra-env.sh
+        - cassandra-rackdc.properties
+        - cassandra.yaml
+        - logback.xml
+        - jvm.options
+      notify: Restart Cassandra
+
+    - name: Ensure Cassandra node configured (4.1.x / 5.x)
+      when: not cassandra_version.startswith('3.11')
       ansible.builtin.template:
         src: "{{ tmpl_dir }}/{{ item }}.j2"
         dest: "{{ cassandra_conf_dir | default('/etc/cassandra') }}/{{ item }}"
@@ -320,6 +366,11 @@
     disable_gpg_check: true
   when: cassandra_cqlai_binary is defined and ansible_os_family == "RedHat"
 
+- name: Provision cqlsh virtual environment
+  ansible.builtin.import_tasks: cqlsh-venv.yml
+  when: cassandra_cqlsh_venv_enabled | bool
+  tags: cqlsh
+
 - name: Systemd service for cassandra
   ansible.builtin.template:
     dest: /etc/systemd/system/cassandra.service
@@ -340,7 +391,9 @@
     daemon_reload: true
     name: "cassandra"
     enabled: "{{ cassandra_start_on_boot | default(true) | bool }}"
-    state: >-
-      {% if cassandra_start_on_install %}started{% elif ansible_facts.services['cassandra.service'].state == 'running' %}started{% elif ansible_facts.services['cassandra.service'].state == 'stopped' %}stopped{% else %}started{% endif %}
+    # Start only when explicitly requested, or when the node is already running
+    # (so a config change can restart it). Otherwise leave systemd state untouched
+    # — never auto-start on first install when cassandra_start_on_install is false.
+    state: "{{ 'started' if (cassandra_start_on_install | bool or (ansible_facts.services['cassandra.service'] | default({})).state | default('') == 'running') else omit }}"
 
 # code: language=ansible

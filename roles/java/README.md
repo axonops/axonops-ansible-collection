@@ -5,10 +5,15 @@ Installs Java (OpenJDK or Zulu) on the target hosts.
 ## Configuration
 
 ```yaml
-# Use Zulu Java instead of OpenJDK (Debian-based systems only)
+# Use Zulu Java instead of OpenJDK (RedHat and Debian families).
+# Selected automatically on RHEL-family 10+ and Debian 13+.
 java_use_zulu: false
 
-# Install EPEL repository on RHEL-based systems before installing Java
+# Java package to install (OpenJDK). Derived from cassandra_version when unset:
+# Java 17 for 5.x, Java 8 for 3.11.x, otherwise Java 11.
+# java_pkg: java-17-openjdk-headless
+
+# Declared but not used by any task; the role does not install EPEL
 java_install_epel: false
 ```
 

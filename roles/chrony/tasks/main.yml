@@ -1,0 +1,14 @@
+---
+- name: Import OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Install
+  ansible.builtin.import_tasks: install.yml
+
+- name: Configure
+  ansible.builtin.import_tasks: configure.yml
+
+- name: Service
+  ansible.builtin.import_tasks: service.yml
+
+# code: language=ansible

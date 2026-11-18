@@ -22,6 +22,8 @@ AXONOPS_PASSWORD: secret
 ```yaml
 - hosts: localhost
   vars:
+    org: mycompany            # required (or AXONOPS_ORG)
+    cluster: my-cluster       # required (or AXONOPS_CLUSTER)
     axonops_alert_rules:
       - name: High CPU
         dashboard: System
@@ -34,6 +36,10 @@ AXONOPS_PASSWORD: secret
   roles:
     - role: axonops.axonops.configurations
 ```
+
+## Integrations, routes and dashboards
+
+`axonops_slack_integrations`, `axonops_alert_routes` and `axonops_dashboard_templates` are documented, with all item keys and examples, in [docs/roles/configurations.md](../../docs/roles/configurations.md). Every item accepts `present: false` to remove it.
 
 ## Kafka Alert Pack
 

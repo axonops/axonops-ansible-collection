@@ -1,0 +1,14 @@
+---
+- name: Enable chrony service
+  ansible.builtin.systemd:
+    name: "{{ chrony_service_name | default(_chrony_service_name) }}"
+    enabled: "{{ chrony_service_enabled }}"
+    daemon_reload: true
+
+- name: Start chrony service
+  ansible.builtin.systemd:
+    name: "{{ chrony_service_name | default(_chrony_service_name) }}"
+    state: started
+  when: chrony_start_on_install | bool
+
+# code: language=ansible

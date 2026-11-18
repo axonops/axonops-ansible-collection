@@ -42,7 +42,11 @@ cqlai_ssl_insecure_skip_verify: true
 ```yaml
 cqlai_ai_provider: "openai"
 cqlai_ai_openai_api_key: ""   # set your OpenAI API key here (use Ansible Vault)
+# cqlai_ai_openai_model: "gpt-3.5-turbo"
+# cqlai_ai_url: ""            # optional OpenAI-compatible endpoint
 ```
+
+The configuration is written to `/root/.cqlai.json` (disable with `cqlai_config_global: false`).
 
 ### Package version
 

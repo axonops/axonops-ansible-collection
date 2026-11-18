@@ -22,6 +22,7 @@ jobs:
     name: Molecule Cassandra (${{ matrix.scenario }} / ${{ matrix.distro }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         distro:
           - rockylinux9
@@ -39,6 +40,21 @@ jobs:
           - jks-inline-password
           - jks-tls-disabled
           - jks-empty-passwords
+          - cassandra-3.11
+          - cassandra-3.11-pkg
+        exclude:
+          # cassandra-3.11-pkg exercises the RedHat yum pkg-install path only —
+          # Debian/Ubuntu don't have a 3.11 apt repo (tar install only, see README).
+          - scenario: cassandra-3.11-pkg
+            distro: ubuntu2204
+          - scenario: cassandra-3.11-pkg
+            distro: ubuntu2404
+          - scenario: cassandra-3.11-pkg
+            distro: ubuntu2604
+          - scenario: cassandra-3.11-pkg
+            distro: debian12
+          - scenario: cassandra-3.11-pkg
+            distro: debian13
 
     steps:
       - name: Check out the codebase.
@@ -72,7 +88,7 @@ jobs:
           MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
 
       - name: Run Molecule verify
-        if: contains(matrix.scenario, 'jks-')
+        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11' || matrix.scenario == 'cassandra-3.11-pkg' || matrix.scenario == 'default' || matrix.scenario == 'shenandoah' || matrix.scenario == 'g1'
         run: molecule -v verify -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'
@@ -82,7 +98,7 @@ jobs:
           MOLECULE_INSTANCE_NAME: cassandra-${{ matrix.scenario }}-${{ matrix.distro }}
 
       - name: Run Molecule idempotence
-        if: contains(matrix.scenario, 'jks-')
+        if: contains(matrix.scenario, 'jks-') || matrix.scenario == 'cassandra-3.11' || matrix.scenario == 'cassandra-3.11-pkg' || matrix.scenario == 'default'
         run: molecule -v idempotence -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'

@@ -16,7 +16,7 @@ Deploys AxonOps Agent alongside Apache Cassandra on target hosts.
 - Connects to AxonOps Server or SaaS
 
 **Key Variables:**
-- `axon_agent_version`: AxonOps Agent version (default: 2.0.21)
+- `axon_agent_version`: AxonOps Agent version (role default is empty, which installs the latest)
 - `axon_java_agent`: Java agent package (e.g., `axon-cassandra4.1-agent`)
 - `axon_agent_server_host`: AxonOps Server endpoint
 - `axon_agent_customer_name`: Organization identifier
@@ -40,6 +40,21 @@ Deploys a complete AxonOps Server stack including Cassandra, a search backend, a
 - `axon_server_searchdb_hosts`: Search backend endpoints (OpenSearch or Elasticsearch, server >= 2.0.4)
 - `axon_server_searchdb_username` / `axon_server_searchdb_password`: Credentials (required for OpenSearch with Security plugin)
 - `axon_server_searchdb_tls_skip_verify`: Set to `true` when using auto-generated OpenSearch TLS certificates
+- `install_openldap`: Set to `true` to also install a local OpenLDAP directory (via the `openldap` role) seeded with four sample users — `superuser`/`admin`/`readonly`/`backup` — mapped to the `axonops_super`/`axonops_admin`/`axonops_readonly`/`axonops_backup` groups. Requires `axon_server_license_key`; axon-server ignores LDAP settings without a license.
+
+#### [openldap-axon-server.yml](openldap-axon-server.yml)
+Deploys a local OpenLDAP directory on its own host, then configures AxonOps Server to authenticate against it.
+
+**Features:**
+- OpenLDAP with TLS (`openldap_tls_mode: generate`), two seeded users each in a different group
+- AxonOps Server LDAP login wired from the `openldap` role's published `openldap_axon_server_ldap_setting` fact, with `bindPassword` added from vault (the fact never carries it)
+- Separate `ldap` and `axon-server` inventory groups
+
+**Key Variables:**
+- `openldap_admin_password`: LDAP admin bind password (vault)
+- `openldap_users` / `openldap_groups`: Seeded directory content
+- `axon_server_license_key`: Required — axon-server only enables LDAP with a valid license key
+- `axon_server_ldap_setting`: Built from `openldap_axon_server_ldap_setting` combined with the vaulted `bindPassword`
 
 #### [opensearch.yml](opensearch.yml)
 Deploys an OpenSearch cluster for use as the AxonOps Server search backend. OpenSearch is the preferred
@@ -52,7 +67,7 @@ search backend for on-premises deployments.
 - System tuning (vm.max_map_count, THP, memory lock)
 
 **Key Variables:**
-- `opensearch_version`: OpenSearch version (default: `3.6.0`)
+- `opensearch_version`: OpenSearch version (default: `3.8.0`)
 - `opensearch_cluster_type`: `single-node` or `multi-node`
 - `opensearch_admin_password`: Admin password (use Ansible Vault)
 - `opensearch_domain_name`: Domain for certificate DNs
@@ -84,6 +99,25 @@ Deploys Apache Cassandra 5.0 with AxonOps Agent (requires JDK 17).
 - `java_pkg`: Java package (e.g., `openjdk-17-jre-headless`)
 - `axon_java_agent`: Use `axon-cassandra5.0-agent-jdk17`
 
+### Kafka Deployments
+
+#### [kafka.yml](kafka.yml)
+Deploys Apache Kafka 4.0 in KRaft mode (no ZooKeeper) with the AxonOps Agent.
+
+**Features:**
+- Every host is a combined broker + controller; works for 1 or 3+ nodes
+- Replication factors scale with the number of hosts (capped at 3)
+- Java 17 installed by the kafka role
+- AxonOps Agent pointed at the self-hosted AxonOps Server (SaaS option commented)
+
+**Key Variables:**
+- `kafka_node_id`: Unique per host, set in the inventory (`kafka1 kafka_node_id=1`)
+- `kafka_axonops_org`: AxonOps organisation name (must match `axon_server_org_name`)
+- `kafka_axonops_cluster_name`: Cluster name shown in AxonOps
+- `kafka_axonops_server_host`: AxonOps Server host, or remove it and set `kafka_axonops_key` for SaaS
+
+See [docs/roles/kafka.md](../docs/roles/kafka.md) for TLS, SASL/SCRAM and ACL settings.
+
 ### Operations
 
 #### [cassandra-rolling-start.yml](cassandra-rolling-start.yml)
@@ -105,12 +139,15 @@ ansible-playbook -i inventory cassandra-rolling-start.yml -e "state=restarted"
 
 ## Prerequisites
 
-1. **Ansible installed** on your control machine (version 2.10+)
+1. **Ansible installed** on your control machine (version 2.10+), or a container runtime plus
+   `ansible-navigator` — see [Running from a container with ansible-navigator](#running-from-a-container-with-ansible-navigator)
 2. **SSH access** to target hosts with sudo privileges
 3. **Inventory file** defining your host groups:
    - `cassandra`: Hosts for Cassandra nodes
    - `axon-server`: Hosts for AxonOps Server
+   - `ldap`: Host for the local OpenLDAP directory (only for [openldap-axon-server.yml](openldap-axon-server.yml))
 4. **Network connectivity** between nodes for Cassandra cluster formation
+5. **`community.general` collection** — required by the `openldap` role's LDAP modules (`ansible-galaxy collection install -r ../requirements.yml`). The role installs `python3-ldap` on the managed host itself.
 
 ## Quick Start
 
@@ -144,16 +181,48 @@ ansible-playbook -i inventory examples/axon-server.yml
 ansible-playbook -i inventory examples/cassandra-4.1.yml
 ```
 
+## Running from a container with ansible-navigator
+
+[ansible-navigator.yml](ansible-navigator.yml) runs these playbooks inside the AxonOps
+[Execution Environment](../ci/execution-environment/README.md), so the control node needs no
+Ansible install and no `ansible-galaxy` step — the collection and its dependencies are already in
+the image.
+
+```bash
+pip install ansible-navigator
+cd examples
+ansible-navigator run axon-agent.yml -i inventory
+```
+
+That starts navigator's interactive TUI: number keys drill into a play, then a task, then the task
+result; `Esc` goes back, `:q` quits, and `:doc <module>`, `:collections` and `:images` inspect the
+environment. For plain streaming output — in CI, or when piping to a log — add `--mode stdout`.
+
+Because `playbook-artifact` is enabled, each run is saved under `examples/artifacts/` and can be
+re-examined later without re-running anything:
+
+```bash
+ansible-navigator replay artifacts/axon-agent-<timestamp>.json
+```
+
+Notes:
+
+- Set `container-engine: podman` in the config if that is your runtime. This is also needed when
+  `docker` on the host is a podman shim, which navigator cannot detect for itself.
+- Navigator mounts `~/.ssh` into the container itself. Do not add your own volume mount for it —
+  the container then fails to start with `duplicate mount destination`.
+- Pin the image to a release tag rather than `:latest` so runs stay reproducible.
+
 ## Common Configuration Patterns
 
 ### Using AxonOps SaaS
 
-Leave `axon_agent_server_host` empty or set it to the default SaaS endpoint:
+Leave `axon_agent_server_host` unset (the role default is `agents.axonops.cloud`):
 
 ```yaml
 vars:
-  axon_agent_server_host: ""  # Uses agents.axonops.cloud
   axon_agent_customer_name: "your-company-name"
+  axon_agent_key: "your-agent-key"
 ```
 
 ### Using Self-Hosted AxonOps Server

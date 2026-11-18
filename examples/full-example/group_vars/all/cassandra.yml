@@ -2,7 +2,7 @@
 # Common configuration for all environments
 
 # Cassandra Configuration
-cassandra_version: 5.0.5
+cassandra_version: 5.0.9
 cassandra_install_format: tar
 cassandra_install_dir: /opt/cassandra
 

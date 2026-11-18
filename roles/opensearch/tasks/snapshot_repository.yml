@@ -1,0 +1,132 @@
+---
+# ============================================================================
+# OpenSearch Snapshot Repository - registration and Snapshot Management policy
+# Runs once per cluster against the first host in the play.
+# ============================================================================
+
+# A plugin installed or a keystore entry changed in this run is not loaded until
+# the node restarts, and registering an s3/gcs repository fails before then.
+- name: Apply pending OpenSearch restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Set snapshot API facts
+  ansible.builtin.set_fact:
+    _snapshot_api: "{{ 'https' if opensearch_security_enabled else 'http' }}://{{ opensearch_network_host }}:{{ opensearch_api_port }}"
+    _snapshot_repository_body:
+      type: "{{ opensearch_snapshot_type }}"
+      settings: >-
+        {{ {'bucket': opensearch_snapshot_bucket, 'client': opensearch_snapshot_client}
+           | combine({'base_path': opensearch_snapshot_base_path} if opensearch_snapshot_base_path | length > 0 else {}) }}
+
+- name: Wait for OpenSearch to be ready
+  ansible.builtin.wait_for:
+    host: "{{ opensearch_network_host }}"
+    port: "{{ opensearch_api_port }}"
+    delay: 5
+    connect_timeout: 1
+    timeout: 120
+
+- name: Wait for OpenSearch cluster to respond
+  ansible.builtin.uri:
+    url: "{{ _snapshot_api }}/_cluster/health"
+    url_username: "{{ 'admin' if opensearch_security_enabled else omit }}"
+    url_password: "{{ opensearch_admin_password if opensearch_security_enabled else omit }}"
+    force_basic_auth: "{{ opensearch_security_enabled }}"
+    validate_certs: false
+  register: _snapshot_health
+  retries: 10
+  delay: 5
+  until: _snapshot_health.status == 200
+  run_once: true
+
+# --- Repository --------------------------------------------------------------
+
+- name: Get snapshot repository {{ opensearch_snapshot_repository_name }}
+  ansible.builtin.uri:
+    url: "{{ _snapshot_api }}/_snapshot/{{ opensearch_snapshot_repository_name }}"
+    url_username: "{{ 'admin' if opensearch_security_enabled else omit }}"
+    url_password: "{{ opensearch_admin_password if opensearch_security_enabled else omit }}"
+    force_basic_auth: "{{ opensearch_security_enabled }}"
+    validate_certs: false
+    status_code: [200, 404]
+  register: _snapshot_repository_current
+  run_once: true
+
+- name: Register snapshot repository {{ opensearch_snapshot_repository_name }}
+  ansible.builtin.uri:
+    url: "{{ _snapshot_api }}/_snapshot/{{ opensearch_snapshot_repository_name }}"
+    method: PUT
+    body: "{{ _snapshot_repository_body }}"
+    body_format: json
+    url_username: "{{ 'admin' if opensearch_security_enabled else omit }}"
+    url_password: "{{ opensearch_admin_password if opensearch_security_enabled else omit }}"
+    force_basic_auth: "{{ opensearch_security_enabled }}"
+    validate_certs: false
+    status_code: 200
+  changed_when: true
+  run_once: true
+  when: >-
+    _snapshot_repository_current.status == 404
+    or _snapshot_repository_current.json[opensearch_snapshot_repository_name] != _snapshot_repository_body
+
+# --- Snapshot Management policy ----------------------------------------------
+
+- name: Manage snapshot policy
+  when: opensearch_snapshot_policy | length > 0
+  run_once: true
+  block:
+    - name: Build snapshot policy body
+      ansible.builtin.set_fact:
+        _snapshot_policy_body: >-
+          {{ {'snapshot_config': {'repository': opensearch_snapshot_repository_name}}
+             | combine(opensearch_snapshot_policy | dict2items | rejectattr('key', 'equalto', 'name') | items2dict,
+                       recursive=true) }}
+
+    - name: Get snapshot policy {{ opensearch_snapshot_policy.name }}
+      ansible.builtin.uri:
+        url: "{{ _snapshot_api }}/_plugins/_sm/policies/{{ opensearch_snapshot_policy.name }}"
+        url_username: "{{ 'admin' if opensearch_security_enabled else omit }}"
+        url_password: "{{ opensearch_admin_password if opensearch_security_enabled else omit }}"
+        force_basic_auth: "{{ opensearch_security_enabled }}"
+        validate_certs: false
+        status_code: [200, 404]
+      register: _snapshot_policy_current
+
+    - name: Create snapshot policy {{ opensearch_snapshot_policy.name }}
+      ansible.builtin.uri:
+        url: "{{ _snapshot_api }}/_plugins/_sm/policies/{{ opensearch_snapshot_policy.name }}"
+        method: POST
+        body: "{{ _snapshot_policy_body }}"
+        body_format: json
+        url_username: "{{ 'admin' if opensearch_security_enabled else omit }}"
+        url_password: "{{ opensearch_admin_password if opensearch_security_enabled else omit }}"
+        force_basic_auth: "{{ opensearch_security_enabled }}"
+        validate_certs: false
+        status_code: [200, 201]
+      changed_when: true
+      when: _snapshot_policy_current.status == 404
+
+    # The stored policy carries extra server-side fields, so it is only updated
+    # when the requested body is not already a subset of it.
+    - name: Update snapshot policy {{ opensearch_snapshot_policy.name }}
+      ansible.builtin.uri:
+        url: >-
+          {{ _snapshot_api }}/_plugins/_sm/policies/{{ opensearch_snapshot_policy.name
+          }}?if_seq_no={{ _snapshot_policy_current.json._seq_no
+          }}&if_primary_term={{ _snapshot_policy_current.json._primary_term }}
+        method: PUT
+        body: "{{ _snapshot_policy_body }}"
+        body_format: json
+        url_username: "{{ 'admin' if opensearch_security_enabled else omit }}"
+        url_password: "{{ opensearch_admin_password if opensearch_security_enabled else omit }}"
+        force_basic_auth: "{{ opensearch_security_enabled }}"
+        validate_certs: false
+        status_code: 200
+      changed_when: true
+      when:
+        - _snapshot_policy_current.status == 200
+        - >-
+          (_snapshot_policy_current.json.sm_policy | combine(_snapshot_policy_body, recursive=true))
+          != _snapshot_policy_current.json.sm_policy
+
+# code: language=ansible

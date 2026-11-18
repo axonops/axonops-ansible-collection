@@ -1,0 +1,343 @@
+---
+# BDD verification — data directory migration guard
+#
+# Behaviour under test: the role MUST refuse to run when the configured
+# cassandra_data_directory contains no 'system' keyspace directory while the
+# parent directory does (data laid out with the pre-0.6.0 default), MUST pass
+# on a fresh install, and MUST allow bypassing the guard with
+# cassandra_data_directory_check: false.
+
+- name: Verify data directory migration guard (BDD)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: GIVEN — a fresh install converged with the 0.6 default layout
+      ansible.builtin.stat:
+        path: /var/lib/cassandra/data
+      register: verify_data_dir
+
+    - name: THEN — the configured data directory exists
+      ansible.builtin.assert:
+        that:
+          - verify_data_dir.stat.exists
+          - verify_data_dir.stat.isdir
+
+    - name: WHEN — the guard runs against the fresh install layout
+      ansible.builtin.include_tasks: ../../tasks/check-data-dir.yml
+      vars:
+        cassandra_data_directory: /var/lib/cassandra/data
+        cassandra_data_directory_check: true
+
+    - name: GIVEN — an unmigrated pre-0.6 layout under a scratch directory
+      ansible.builtin.file:
+        path: /tmp/guard-test/system
+        state: directory
+        mode: "0750"
+
+    - name: WHEN — the guard runs against the unmigrated layout
+      block:
+        - name: Include the data directory guard against the unmigrated layout
+          ansible.builtin.include_tasks: ../../tasks/check-data-dir.yml
+          vars:
+            cassandra_data_directory: /tmp/guard-test/data
+            cassandra_data_directory_check: true
+      rescue:
+        - name: Record that the guard failed
+          ansible.builtin.set_fact:
+            guard_failed: true
+
+    - name: THEN — the guard fails the play on the unmigrated layout
+      ansible.builtin.assert:
+        that:
+          - guard_failed | default(false) | bool
+        fail_msg: data directory guard did not fail on an unmigrated layout
+
+    - name: WHEN — the guard is disabled on the unmigrated layout
+      ansible.builtin.include_tasks: ../../tasks/check-data-dir.yml
+      vars:
+        cassandra_data_directory: /tmp/guard-test/data
+        cassandra_data_directory_check: false
+
+    - name: Clean up scratch directory
+      ansible.builtin.file:
+        path: /tmp/guard-test
+        state: absent
+
+# BDD verification — cqlsh virtual environment
+#
+# Behaviour under test: with cassandra_cqlsh_venv_enabled (the default), the role
+# MUST provision an isolated venv containing a working cqlsh and a wrapper that
+# launches it, so cqlsh runs even where the system Python is >= 3.12 (Ubuntu
+# 24.04 / Debian 13).
+- name: Verify cqlsh virtual environment (BDD)
+  hosts: all
+  gather_facts: false
+  vars:
+    cassandra_cqlsh_venv_path: /opt/cassandra-cqlsh-venv
+    cassandra_cqlsh_wrapper_path: /usr/local/bin/cqlsh
+  tasks:
+
+    - name: GIVEN — the role converged with the cqlsh venv enabled
+      ansible.builtin.stat:
+        path: "{{ cassandra_cqlsh_venv_path }}/bin/cqlsh"
+      register: verify_venv_cqlsh
+
+    - name: THEN — the venv contains a cqlsh entry point
+      ansible.builtin.assert:
+        that:
+          - verify_venv_cqlsh.stat.exists
+        fail_msg: cqlsh was not installed into {{ cassandra_cqlsh_venv_path }}
+
+    - name: GIVEN — the installed OS packages
+      ansible.builtin.package_facts:
+
+    - name: THEN — python3-setuptools is installed (required by ansible.builtin.pip, issue #155)
+      ansible.builtin.assert:
+        that:
+          - "'python3-setuptools' in ansible_facts.packages"
+        fail_msg: python3-setuptools not installed; ansible.builtin.pip cannot run on a bare host
+
+    - name: WHEN — pkg_resources is imported by the system Python
+      ansible.builtin.command: "{{ ansible_python_interpreter | default('/usr/bin/python3') }} -c 'import pkg_resources'"
+      register: verify_pkg_resources
+      changed_when: false
+      failed_when: false
+
+    - name: THEN — pkg_resources imports (what ansible.builtin.pip actually needs)
+      ansible.builtin.assert:
+        that:
+          - verify_pkg_resources.rc == 0
+        fail_msg: "import pkg_resources failed: {{ verify_pkg_resources.stderr }}"
+
+    - name: GIVEN — the wrapper was installed
+      ansible.builtin.stat:
+        path: "{{ cassandra_cqlsh_wrapper_path }}"
+      register: verify_wrapper
+
+    - name: THEN — the wrapper exists and is executable
+      ansible.builtin.assert:
+        that:
+          - verify_wrapper.stat.exists
+          - verify_wrapper.stat.mode == '0755'
+        fail_msg: cqlsh wrapper missing or not executable at {{ cassandra_cqlsh_wrapper_path }}
+
+    - name: WHEN — cqlsh is launched through the wrapper on a modern-Python host
+      ansible.builtin.command: "{{ cassandra_cqlsh_wrapper_path }} --version"
+      register: verify_cqlsh_version
+      changed_when: false
+
+    - name: THEN — cqlsh starts without a Python import error and reports its version
+      ansible.builtin.assert:
+        that:
+          - verify_cqlsh_version.rc == 0
+          - "'cqlsh' in (verify_cqlsh_version.stdout + verify_cqlsh_version.stderr)"
+        fail_msg: >-
+          cqlsh failed to launch from the venv
+          (stdout={{ verify_cqlsh_version.stdout }},
+           stderr={{ verify_cqlsh_version.stderr | default('') }})
+
+# BDD verification — swap is disabled persistently and idempotently
+#
+# Behaviour under test: the swap-disabling tasks MUST comment out every active
+# swap entry in fstab so swap is not re-enabled after reboot, MUST leave
+# non-swap and already-commented entries untouched, and MUST be idempotent.
+
+- name: Verify swap disabling (BDD)
+  hosts: all
+  gather_facts: false
+  vars:
+    verify_fstab: /tmp/fstab-swap-test
+  tasks:
+
+    - name: GIVEN — an fstab with an active swap entry, a commented one and a data mount
+      ansible.builtin.copy:
+        dest: "{{ verify_fstab }}"
+        mode: "0644"
+        content: |
+          UUID=1111 /            ext4 defaults 0 1
+          UUID=2222 none         swap sw       0 0
+          /dev/sdb1 none         swap sw       0 0
+          # UUID=3333 none       swap sw       0 0
+          /dev/sdc1 /var/lib/cassandra xfs defaults 0 0
+
+    - name: WHEN — the swap disabling tasks run
+      ansible.builtin.include_tasks: ../../tasks/disable-swap.yml
+      vars:
+        cassandra_fstab_path: "{{ verify_fstab }}"
+        # never call swapoff here: the container shares the runner's kernel
+        cassandra_swapoff_active: false
+
+    - name: WHEN — the swap disabling tasks run a second time
+      ansible.builtin.include_tasks: ../../tasks/disable-swap.yml
+      vars:
+        cassandra_fstab_path: "{{ verify_fstab }}"
+        # never call swapoff here: the container shares the runner's kernel
+        cassandra_swapoff_active: false
+
+    - name: THEN — read back the resulting fstab
+      ansible.builtin.slurp:
+        src: "{{ verify_fstab }}"
+      register: verify_fstab_content
+
+    - name: THEN — no active swap entry remains and the other entries are untouched
+      ansible.builtin.assert:
+        that:
+          - fstab_lines | reject('match', '^\\s*#') | select('search', '\\sswap\\s') | list | length == 0
+          - fstab_lines | select('search', '^# UUID=2222') | list | length == 1
+          - fstab_lines | select('search', '^# /dev/sdb1') | list | length == 1
+          - fstab_lines | select('search', '^# UUID=3333') | list | length == 1
+          - fstab_lines | select('search', '^/dev/sdc1 /var/lib/cassandra') | list | length == 1
+          - fstab_lines | select('search', '^UUID=1111 /\\s') | list | length == 1
+        fail_msg: "swap entries were not disabled correctly in fstab"
+      vars:
+        fstab_lines: "{{ (verify_fstab_content.content | b64decode).splitlines() }}"
+
+# code: language=ansible
+
+# BDD verification — AxonOps agent loaded via axonops-jvm.options (ASB-4712)
+#
+# Behaviour under test: when axon_java_agent is set, the rendered cassandra-env.sh
+# MUST source /usr/share/axonops/axonops-jvm.options when that file is present and
+# fall back to the raw -javaagent line otherwise, all decided at runtime by a
+# single if/else block. The rendered script MUST be valid POSIX sh.
+
+- name: Verify AxonOps agent JVM options loading (BDD)
+  hosts: all
+  gather_facts: false
+  vars:
+    cassandra_version: "5.0.9"
+    cassandra_env_path: "/opt/apache-cassandra-5.0.9/conf/cassandra-env.sh"
+  tasks:
+
+    - name: GIVEN — the role converged with axon_java_agent set
+      ansible.builtin.slurp:
+        src: "{{ cassandra_env_path }}"
+      register: verify_cass_env
+
+    - name: THEN — the agent block renders the runtime fallback logic
+      ansible.builtin.assert:
+        that:
+          - "'if [ -f /usr/share/axonops/axonops-jvm.options ]; then' in _env"
+          - "'. /usr/share/axonops/axonops-jvm.options' in _env"
+          - "'-javaagent:/usr/share/axonops/axon-cassandra5.0-agent-jdk17.jar=/etc/axonops/axon-agent.yml' in _env"
+        fail_msg: cassandra-env.sh does not render the axonops-jvm.options fallback block
+      vars:
+        _env: "{{ verify_cass_env.content | b64decode }}"
+
+    - name: WHEN — the rendered cassandra-env.sh is checked for POSIX sh syntax
+      ansible.builtin.command: "sh -n {{ cassandra_env_path }}"
+      register: verify_cass_env_syntax
+      changed_when: false
+
+    - name: THEN — the rendered cassandra-env.sh is syntactically valid
+      ansible.builtin.assert:
+        that:
+          - verify_cass_env_syntax.rc == 0
+        fail_msg: "cassandra-env.sh failed sh -n: {{ verify_cass_env_syntax.stderr | default('') }}"
+
+# code: language=ansible
+
+# BDD verification — Transparent Huge Pages are disabled at the OS level
+#
+# Behaviour under test: the THP tasks MUST install an executable script that
+# writes 'never' to the THP sysfs knobs, and a oneshot systemd unit that runs
+# it before Cassandra starts. The unit is not enabled here — the molecule
+# container is not a systemd host.
+
+- name: Verify Transparent Huge Pages disabling (BDD)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: WHEN — the THP disabling tasks run
+      ansible.builtin.include_tasks: ../../tasks/disable-thp.yml
+      vars:
+        cassandra_thp_service_manage: false
+
+    - name: THEN — collect the installed script and unit
+      ansible.builtin.stat:
+        path: /usr/local/sbin/cassandra-disable-thp.sh
+      register: verify_thp_script
+
+    - name: THEN — the script is installed and executable
+      ansible.builtin.assert:
+        that:
+          - verify_thp_script.stat.exists
+          - verify_thp_script.stat.mode == '0755'
+        fail_msg: the THP disabling script was not installed
+
+    - name: THEN — read the script and the unit
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      loop:
+        - /usr/local/sbin/cassandra-disable-thp.sh
+        - /etc/systemd/system/cassandra-disable-thp.service
+      register: verify_thp_files
+
+    - name: THEN — the script disables THP on both sysfs paths
+      ansible.builtin.assert:
+        that:
+          - "'/sys/kernel/mm/transparent_hugepage/enabled' in script"
+          - "'/sys/kernel/mm/transparent_hugepage/defrag' in script"
+          - "'echo never' in script"
+        fail_msg: the THP disabling script does not turn THP off
+      vars:
+        script: "{{ verify_thp_files.results[0].content | b64decode }}"
+
+    - name: THEN — the unit is a oneshot ordered before Cassandra
+      ansible.builtin.assert:
+        that:
+          - "'Type=oneshot' in unit"
+          - "'RemainAfterExit=yes' in unit"
+          - "'Before=cassandra.service' in unit"
+          - "'ExecStart=/usr/local/sbin/cassandra-disable-thp.sh' in unit"
+          - "'WantedBy=basic.target' in unit"
+        fail_msg: the THP systemd unit is not ordered before Cassandra
+      vars:
+        unit: "{{ verify_thp_files.results[1].content | b64decode }}"
+
+- name: Verify temp directory management (BDD)
+  hosts: all
+  gather_facts: false
+  vars:
+    # Tar install: conf lives under the unpacked distribution, not /etc/cassandra
+    cassandra_env_path: "/opt/apache-cassandra-5.0.9/conf/cassandra-env.sh"
+  tasks:
+
+    - name: GIVEN — the role converged with both temp dirs off /tmp
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /var/lib/cassandra/tmp
+        - /var/lib/cassandra/jna-tmp
+      register: verify_tmp_dirs
+
+    - name: THEN — each temp directory exists, is service-owned and mode 0750
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isdir
+          - item.stat.pw_name == 'cassandra'
+          - item.stat.gr_name == 'cassandra'
+          - item.stat.mode == '0750'
+        fail_msg: "{{ item.item }} is missing or has the wrong ownership/mode"
+      loop: "{{ verify_tmp_dirs.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: WHEN — the rendered cassandra-env.sh is read
+      ansible.builtin.slurp:
+        src: "{{ cassandra_env_path }}"
+      register: verify_cassandra_env
+
+    - name: THEN — both temp directories are passed to the JVM
+      ansible.builtin.assert:
+        that:
+          - "'-Djna.tmpdir=/var/lib/cassandra/jna-tmp' in cassandra_env"
+          - "'-Djava.io.tmpdir=/var/lib/cassandra/tmp' in cassandra_env"
+        fail_msg: cassandra-env.sh does not point the JVM at the custom temp directories
+      vars:
+        cassandra_env: "{{ verify_cassandra_env.content | b64decode }}"
+
+# code: language=ansible

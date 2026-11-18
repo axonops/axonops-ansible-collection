@@ -1,0 +1,52 @@
+---
+# ============================================================================
+# OpenLDAP Role - Main Tasks
+# ============================================================================
+
+- name: Validate role variables
+  ansible.builtin.import_tasks: preflight.yml
+  tags: always
+
+- name: Load OS family variables
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}.yml"
+  tags: always
+
+- name: Install OpenLDAP
+  ansible.builtin.import_tasks: install.yml
+  tags: install
+
+- name: Bootstrap cn=config
+  ansible.builtin.import_tasks: bootstrap.yml
+  tags: install
+
+- name: Install TLS material
+  ansible.builtin.import_tasks: tls.yml
+  when: openldap_tls_mode != 'disabled'
+  tags: tls
+
+- name: Configure and start slapd
+  ansible.builtin.import_tasks: service.yml
+  tags: service
+
+- name: Apply cn=config settings
+  ansible.builtin.import_tasks: config.yml
+  when: openldap_start_on_install
+  tags: config
+
+- name: Seed directory entries
+  ansible.builtin.import_tasks: seed.yml
+  when: openldap_start_on_install
+  tags: seed
+
+- name: Publish axon-server LDAP settings
+  ansible.builtin.import_tasks: facts.yml
+  tags: always
+
+- name: Warn that LDAP traffic is not encrypted
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: openldap_tls_mode is 'disabled'. Bind passwords cross the network
+      in cleartext. Use this only for local testing; set openldap_tls_mode to
+      'generate' or 'custom' and use ldaps or startTLS for anything else.
+  when: openldap_tls_mode == 'disabled'
+  tags: always

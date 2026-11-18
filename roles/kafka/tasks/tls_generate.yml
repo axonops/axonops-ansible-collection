@@ -17,7 +17,7 @@
 - name: Check for existing CA private key on control node
   ansible.builtin.stat:
     path: "{{ kafka_tls_generate_local_dir }}/ca.key"
-  register: kafka__reg_local_ca
+  register: _kafka_reg_local_ca
   delegate_to: localhost
   become: false
   run_once: true
@@ -32,7 +32,7 @@
   delegate_to: localhost
   become: false
   run_once: true
-  when: not kafka__reg_local_ca.stat.exists
+  when: not _kafka_reg_local_ca.stat.exists
 
 - name: Generate CA certificate signing request
   community.crypto.openssl_csr:
@@ -49,7 +49,7 @@
   delegate_to: localhost
   become: false
   run_once: true
-  when: not kafka__reg_local_ca.stat.exists
+  when: not _kafka_reg_local_ca.stat.exists
 
 - name: Self-sign CA certificate
   community.crypto.x509_certificate:
@@ -61,7 +61,7 @@
   delegate_to: localhost
   become: false
   run_once: true
-  when: not kafka__reg_local_ca.stat.exists
+  when: not _kafka_reg_local_ca.stat.exists
 
 - name: Generate per-host private key
   community.crypto.openssl_privatekey:
@@ -99,7 +99,7 @@
 - name: Push generated certificate to broker
   ansible.builtin.copy:
     src: "{{ kafka_tls_generate_local_dir }}/{{ inventory_hostname }}.crt"
-    dest: "{{ kafka__tls_src_cert }}"
+    dest: "{{ _kafka_tls_src_cert }}"
     owner: "{{ kafka_user }}"
     group: "{{ kafka_group }}"
     mode: "0640"
@@ -108,7 +108,7 @@
 - name: Push generated private key to broker
   ansible.builtin.copy:
     src: "{{ kafka_tls_generate_local_dir }}/{{ inventory_hostname }}.key"
-    dest: "{{ kafka__tls_src_key }}"
+    dest: "{{ _kafka_tls_src_key }}"
     owner: "{{ kafka_user }}"
     group: "{{ kafka_group }}"
     mode: "0600"
@@ -118,7 +118,7 @@
 - name: Push generated CA bundle to broker
   ansible.builtin.copy:
     src: "{{ kafka_tls_generate_local_dir }}/ca.crt"
-    dest: "{{ kafka__tls_src_ca }}"
+    dest: "{{ _kafka_tls_src_ca }}"
     owner: "{{ kafka_user }}"
     group: "{{ kafka_group }}"
     mode: "0644"

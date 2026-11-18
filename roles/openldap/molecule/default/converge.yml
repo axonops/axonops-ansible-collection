@@ -1,0 +1,20 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    # Test-only credentials for a throwaway container.
+    openldap_admin_password: "molecule-admin-pass"
+    openldap_users:
+      - uid: alice
+        cn: Alice Admin
+        sn: Admin
+        mail: alice@axonops.local
+        password: "alice-pass"
+        groups: [axonops_admin, axonops_backup]
+      - uid: bob
+        cn: Bob Reader
+        sn: Reader
+        password: "bob-pass"
+        groups: [axonops_readonly]
+  roles:
+    - role: openldap

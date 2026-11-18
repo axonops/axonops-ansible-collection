@@ -1,0 +1,154 @@
+---
+# Creates the base entry, OUs, groups and users. Every entry is managed with
+# ldap_entry (create) plus ldap_attrs (state: exact), so reruns are no-ops.
+
+- name: Set seeding facts
+  ansible.builtin.set_fact:
+    _openldap_users_dn: "{{ openldap_users_ou }},{{ openldap_base_dn }}"
+    _openldap_groups_dn: "{{ openldap_groups_ou }},{{ openldap_base_dn }}"
+    # Users without the password key, safe to loop over without no_log.
+    _openldap_users_public: >-
+      {{ openldap_users | map('dict2items')
+         | map('rejectattr', 'key', 'equalto', 'password')
+         | map('items2dict') | list }}
+
+- name: Create base entry
+  community.general.ldap_entry:
+    dn: "{{ openldap_base_dn }}"
+    server_uri: ldapi:///
+    bind_dn: "{{ openldap_admin_dn }}"
+    bind_pw: "{{ openldap_admin_password }}"
+    objectClass:
+      - dcObject
+      - organization
+    attributes:
+      dc: "{{ openldap_base_dn | regex_replace('^dc=([^,]+).*$', '\\1') }}"
+      o: "{{ openldap_organization }}"
+
+- name: Create organizational units
+  community.general.ldap_entry:
+    dn: "{{ item }}"
+    server_uri: ldapi:///
+    bind_dn: "{{ openldap_admin_dn }}"
+    bind_pw: "{{ openldap_admin_password }}"
+    objectClass:
+      - organizationalUnit
+  loop:
+    - "{{ _openldap_users_dn }}"
+    - "{{ _openldap_groups_dn }}"
+
+- name: Create users
+  community.general.ldap_entry:
+    dn: "uid={{ item.uid }},{{ _openldap_users_dn }}"
+    server_uri: ldapi:///
+    bind_dn: "{{ openldap_admin_dn }}"
+    bind_pw: "{{ openldap_admin_password }}"
+    objectClass:
+      - inetOrgPerson
+    attributes:
+      cn: "{{ item.cn | default(item.uid) }}"
+      sn: "{{ item.sn | default(item.uid) }}"
+  loop: "{{ _openldap_users_public }}"
+  loop_control:
+    label: "{{ item.uid }}"
+
+- name: Set user attributes
+  community.general.ldap_attrs:
+    dn: "uid={{ item.uid }},{{ _openldap_users_dn }}"
+    server_uri: ldapi:///
+    bind_dn: "{{ openldap_admin_dn }}"
+    bind_pw: "{{ openldap_admin_password }}"
+    state: exact
+    attributes: >-
+      {{ {'cn': item.cn | default(item.uid), 'sn': item.sn | default(item.uid)}
+         | combine({'mail': item.mail} if item.mail is defined else {}) }}
+  loop: "{{ _openldap_users_public }}"
+  loop_control:
+    label: "{{ item.uid }}"
+
+- name: Check user passwords
+  community.general.ldap_search:
+    dn: "uid={{ item.uid }},{{ _openldap_users_dn }}"
+    scope: base
+    server_uri: ldapi:///
+    bind_dn: "uid={{ item.uid }},{{ _openldap_users_dn }}"
+    bind_pw: "{{ item.password }}"
+  loop: "{{ openldap_users }}"
+  loop_control:
+    label: "{{ item.uid }}"
+  register: _openldap_user_binds
+  failed_when: false
+  changed_when: false
+  no_log: true
+
+- name: Hash changed user passwords
+  ansible.builtin.command:
+    argv: [slappasswd, -h, "{SSHA}", -T, /dev/stdin]
+    stdin: "{{ item.item.password }}"
+    stdin_add_newline: false
+  loop: "{{ _openldap_user_binds.results | selectattr('results', 'undefined') | list }}"
+  loop_control:
+    label: "{{ item.item.uid }}"
+  register: _openldap_user_hashes
+  changed_when: false
+  no_log: true
+
+- name: Store changed user passwords
+  community.general.ldap_attrs:
+    dn: "uid={{ item.item.item.uid }},{{ _openldap_users_dn }}"
+    server_uri: ldapi:///
+    bind_dn: "{{ openldap_admin_dn }}"
+    bind_pw: "{{ openldap_admin_password }}"
+    state: exact
+    attributes:
+      userPassword: "{{ item.stdout }}"
+  loop: "{{ _openldap_user_hashes.results }}"
+  loop_control:
+    label: "{{ item.item.item.uid }}"
+  no_log: true
+
+# groupOfNames needs at least one member, so an empty group holds the admin DN.
+- name: Build group membership
+  ansible.builtin.set_fact:
+    _openldap_group_members: >-
+      {{ _openldap_group_members | default({}) | combine({
+           item.name: (openldap_users
+                       | selectattr('groups', 'defined')
+                       | selectattr('groups', 'contains', item.name)
+                       | map(attribute='uid')
+                       | product([',' ~ _openldap_users_dn])
+                       | map('join')
+                       | map('regex_replace', '^', 'uid=')
+                       | list) or [openldap_admin_dn]
+         }) }}
+  loop: "{{ openldap_groups }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create groups
+  community.general.ldap_entry:
+    dn: "cn={{ item.name }},{{ _openldap_groups_dn }}"
+    server_uri: ldapi:///
+    bind_dn: "{{ openldap_admin_dn }}"
+    bind_pw: "{{ openldap_admin_password }}"
+    objectClass:
+      - groupOfNames
+    attributes:
+      member: "{{ _openldap_group_members[item.name] }}"
+  loop: "{{ openldap_groups }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Set group members and description
+  community.general.ldap_attrs:
+    dn: "cn={{ item.name }},{{ _openldap_groups_dn }}"
+    server_uri: ldapi:///
+    bind_dn: "{{ openldap_admin_dn }}"
+    bind_pw: "{{ openldap_admin_password }}"
+    state: exact
+    attributes: >-
+      {{ {'member': _openldap_group_members[item.name]}
+         | combine({'description': item.description} if item.description is defined else {}) }}
+  loop: "{{ openldap_groups }}"
+  loop_control:
+    label: "{{ item.name }}"

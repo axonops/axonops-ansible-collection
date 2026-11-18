@@ -54,8 +54,10 @@ for new on-premises deployments. The same `axon_server_searchdb_*` variables are
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `axon_server_searchdb_host` | `http://127.0.0.1` | Search backend host URL |
-| `axon_server_searchdb_port` | `9200` | Search backend port |
+| `axon_server_searchdb_hosts` | `["http://127.0.0.1:9200"]` | Only the first entry is used, as `elastic_host` |
+| `axon_server_searchdb_port` | `9200` | Search backend port (`elastic_port`) |
+
+The username, password, shard, replica and `skip_verify` settings are not rendered for these versions.
 
 ### Cassandra Storage Configuration
 
@@ -72,6 +74,10 @@ for new on-premises deployments. The same `axon_server_searchdb_*` variables are
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `axon_server_tls_mode` | `disabled` | TLS mode: `disabled`, `TLS`, or `mTLS` |
+| `axon_server_tls_certfile` | - | **Required** for `TLS` and `mTLS`. Server certificate path on the target host |
+| `axon_server_tls_keyfile` | - | **Required** for `TLS` and `mTLS`. Server private key path on the target host |
+| `axon_server_tls_cafile` | - | CA file path. Used by `mTLS` only (the template does not check that it is set) |
+| `axon_server_tls_skipverify` | `false` | Skip client certificate verification. Used by `mTLS` only |
 
 ### LDAP Configuration
 
@@ -79,6 +85,15 @@ for new on-premises deployments. The same `axon_server_searchdb_*` variables are
 |----------|---------|-------------|
 | `axon_server_ldap_enabled` | `false` | Enable LDAP authentication |
 | `axon_server_ldap_setting` | - | LDAP configuration object (see example below) |
+
+When `axon_server_ldap_enabled` is true, `axon_server_ldap_setting.port` is required and must be an integer between 1 and 65535. A numeric string such as `"636"` is converted to an integer when rendered; anything else fails the preflight check.
+
+No directory yet? The [openldap](openldap.md) role installs a local OpenLDAP server, seeds groups that match `rolesMapping`, and publishes a ready-made `openldap_axon_server_ldap_setting` fact. That fact never includes `bindPassword` — combine it with the password from vault before assigning it to `axon_server_ldap_setting`:
+
+```yaml
+axon_server_ldap_setting: >-
+  {{ openldap_axon_server_ldap_setting | combine({'bindPassword': vault_openldap_admin_password}) }}
+```
 
 ### Retention Configuration
 
@@ -98,6 +113,18 @@ for new on-premises deployments. The same `axon_server_searchdb_*` variables are
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `axon_server_notification_interval` | `3h` | Interval between repeated notifications for the same alert |
+
+### Reporting Configuration (Reports v2)
+
+From Reports v2, the `axon_dash` config block and `axon_dash_url` option are removed from the
+AxonOps Server config. This role only ever templated the scalar `axon_dash_url` (never an
+`axon_dash:` block), and now gates it to `axon-server < 2.0.39`. For `axon_server_version` `latest`
+or `>= 2.0.39` it instead templates `axon_reporting_url` from the variable below, telling the server
+where to reach the reporting service (`axon-reporting`, installed by the `dash` role).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `axon_server_reporting_url` | `http://127.0.0.1:8081` | `AXON_REPORTING_URL`; where `axon-server` reaches the reporting service. Override when `axon-dash` is on a different host |
 
 ### Repository Configuration
 
@@ -426,8 +453,13 @@ The role automatically detects the server version and applies the appropriate co
 
 ## Tags
 
-- `server`: Apply all server installation and configuration tasks
-- `axonops-server`: Alias for server tag
+| Tag | Tasks |
+|-----|-------|
+| `axon_server_repo` | Package repository setup |
+| `axon_server_install` | Package installation |
+| `axon_server_configure` | `axon-server.yml` configuration |
+
+The role has no `server` tag. Use `tags: server` on the role entry in your play to select it as a whole.
 
 ## Notes
 

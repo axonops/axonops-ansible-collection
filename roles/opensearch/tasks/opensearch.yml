@@ -1,8 +1,8 @@
 ---
 - name: Download OpenSearch {{ opensearch_version }}
   ansible.builtin.get_url:
-    url: "{{ opensearch_download_url }}/{{ opensearch_version }}/opensearch-{{ opensearch_version }}-linux-x64.tar.gz"
-    dest: "/tmp/opensearch-{{ opensearch_version }}.tar.gz"
+    url: "{{ opensearch_download_url }}/{{ opensearch_version }}/opensearch-{{ opensearch_version }}-linux-{{ opensearch_arch }}.tar.gz"
+    dest: "/tmp/opensearch-{{ opensearch_version }}-linux-{{ opensearch_arch }}.tar.gz"
     mode: "0644"
   register: _opensearch_download
 
@@ -26,7 +26,7 @@
 
 - name: Extract OpenSearch archive
   ansible.builtin.unarchive:
-    src: "/tmp/opensearch-{{ opensearch_version }}.tar.gz"
+    src: "/tmp/opensearch-{{ opensearch_version }}-linux-{{ opensearch_arch }}.tar.gz"
     dest: "{{ opensearch_install_root }}"
     remote_src: true
     extra_opts: ["--strip-components=1"]
@@ -45,6 +45,15 @@
     mode: "0600"
   notify: Restart OpenSearch
 
+- name: Create custom OpenSearch tmp directory
+  ansible.builtin.file:
+    path: "{{ opensearch_tmp_dir }}"
+    state: directory
+    owner: "{{ opensearch_user }}"
+    group: "{{ opensearch_group }}"
+    mode: "0750"
+  when: opensearch_tmp_dir is defined and opensearch_tmp_dir | length > 0
+
 - name: Deploy JVM options
   ansible.builtin.template:
     src: jvm.options.j2
@@ -53,15 +62,6 @@
     group: "{{ opensearch_group }}"
     mode: "0600"
   notify: Restart OpenSearch
-
-- name: Create custom OpenSearch tmp directory
-  ansible.builtin.file:
-    path: "{{ opensearch_tmp_dir }}"
-    state: directory
-    owner: "{{ opensearch_user }}"
-    group: "{{ opensearch_group }}"
-    mode: "0755"
-  when: opensearch_tmp_dir is defined
 
 - name: Deploy systemd service
   ansible.builtin.template:

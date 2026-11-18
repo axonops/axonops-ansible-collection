@@ -1,0 +1,71 @@
+---
+# ============================================================================
+# Chrony Role - Default Variables
+# ============================================================================
+#
+# The NTP-related variable names below intentionally match the legacy
+# Digitalis `ar-chrony` role, so existing inventories/playbooks can switch to
+# axonops.axonops.chrony without renaming variables. Accurate, synchronized
+# time is critical for Cassandra (timestamp-based conflict resolution, LWTs,
+# repair correctness), Kafka, and OpenSearch/Elasticsearch cluster health.
+
+# --- NTP Servers --------------------------------------------------------------
+
+# Preferred NTP server. Rendered with the `prefer` directive so chronyd
+# favours it over the other configured sources.
+ntp_prefered_server: pool.ntp.org
+
+# Additional individually named servers, tried alongside the preferred one.
+# Left unset by default.
+# ntp_secondary_server: 1.pool.ntp.org
+# ntp_third_server: 2.pool.ntp.org
+# ntp_fourth_server: 3.pool.ntp.org
+
+# Extra individual NTP servers (list). Each entry is rendered as
+# `server <host> iburst`.
+ntp_servers: []
+
+# NTP pool hostnames (list). Each entry is rendered as `pool <host> iburst`.
+ntp_pool_hosts: []
+
+# Subnets/hosts allowed to query this host as an NTP server/peer, e.g.
+# ["10.0.0.0/8"]. Rendered as `allow <entry>`.
+ntp_allowed_clients: []
+
+# Extra options appended to the preferred server line, e.g. "minpoll 4 maxpoll 6".
+chrony_extra_options: ""
+
+# --- chrony.conf tuning --------------------------------------------------------
+
+# Path to the drift file. Defaults to the OS-appropriate path (see
+# vars/RedHat.yml / vars/Debian.yml) when left unset here.
+# chrony_driftfile:
+
+chrony_rtcsync: true
+chrony_makestep: "1.0 3"
+
+# Extra directives appended verbatim at the end of the rendered config, for
+# tuning not covered by the variables above (e.g. "leapsectz right/UTC").
+chrony_extra_directives: []
+
+# --- Package / service ----------------------------------------------------------
+
+# Package name, service name, and config file path default to the
+# OS-appropriate values (see vars/RedHat.yml / vars/Debian.yml) when unset.
+# chrony_package_name:
+# chrony_service_name:
+# chrony_config_path:
+
+chrony_service_enabled: true
+
+# Controls whether chronyd is actually started/restarted by this role run.
+# Independent of chrony_service_enabled (boot-time enablement always
+# applies). chronyd requires CAP_SYS_TIME to adjust the system clock via
+# adjtimex(), which some CI/container environments (including this
+# collection's own Docker-based molecule tests) do not grant even when
+# running privileged containers — set this to false there.
+chrony_start_on_install: true
+
+# Stop, disable, and mask systemd-timesyncd when present, so it does not
+# fight chronyd for the NTP client role.
+chrony_disable_timesyncd: true

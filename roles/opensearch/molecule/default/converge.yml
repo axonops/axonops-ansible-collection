@@ -2,7 +2,7 @@
 - name: Converge
   hosts: all
   vars:
-    opensearch_version: "3.6.0"
+    opensearch_version: "3.8.0"
     opensearch_cluster_name: molecule-test
     opensearch_cluster_type: single-node
     opensearch_heap_size: "512m"

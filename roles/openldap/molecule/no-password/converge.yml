@@ -1,0 +1,27 @@
+---
+# Negative test: the role must stop at the preflight assert when
+# openldap_admin_password is not set, before it installs anything.
+- name: Converge
+  hosts: all
+  tasks:
+    - name: Run the role without openldap_admin_password
+      block:
+        - name: Include openldap role
+          ansible.builtin.include_role:
+            name: openldap
+
+        - name: Fail if the role did not stop
+          ansible.builtin.fail:
+            msg: The openldap role ran without openldap_admin_password.
+      rescue:
+        - name: Assert the preflight check failed with a clear message
+          ansible.builtin.assert:
+            that:
+              - "'openldap_admin_password must be set' in ansible_failed_result.msg"
+              - ansible_failed_task.name == 'Validate admin password is set'
+
+        - name: Check slapd was not installed
+          ansible.builtin.command: which slapd
+          register: openldap_verify_slapd_bin
+          changed_when: false
+          failed_when: openldap_verify_slapd_bin.rc == 0

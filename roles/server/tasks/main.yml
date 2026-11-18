@@ -25,6 +25,10 @@
       - axon_server_org_name | length > 0
     fail_msg: "axon_server_state must be 'present' or 'absent', and axon_server_org_name must be set."
 
+- name: Validate LDAP settings
+  ansible.builtin.include_tasks: ldap_preflight.yml
+  when: axon_server_ldap_enabled | bool
+
 - name: Confirm if TLS is required
   ansible.builtin.assert:
     that:

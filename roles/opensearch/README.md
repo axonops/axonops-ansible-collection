@@ -22,8 +22,9 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `opensearch_version` | `3.6.0` | OpenSearch version to install |
+| `opensearch_version` | `3.8.0` | OpenSearch version to install |
 | `opensearch_download_url` | `https://artifacts.opensearch.org/releases/bundle/opensearch` | Base URL for the OpenSearch tar.gz download |
+| `opensearch_arch` | derived from `ansible_architecture` | Bundle architecture: `x64` on x86_64 hosts, `arm64` on aarch64. Override only to force a specific bundle. |
 | `opensearch_install_root` | `/usr/share/opensearch` | Directory where OpenSearch is extracted |
 | `opensearch_conf_dir` | `{{ opensearch_install_root }}/config` | Configuration directory |
 | `opensearch_user` | `opensearch` | System user that runs the OpenSearch process |
@@ -36,7 +37,7 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 | `opensearch_cluster_name` | `opensearch` | Name of the OpenSearch cluster. Change this for every deployment — the role warns if you leave the default |
 | `opensearch_cluster_type` | `multi-node` | Topology mode: `single-node` or `multi-node` |
 | `opensearch_seed_hosts` | All hosts in the current play | List of hostnames or IPs used for node discovery (multi-node only). Defaults to all hosts in the current play |
-| `opensearch_initial_master_nodes` | All hosts in the current play | List of master-eligible node names for initial cluster bootstrap (multi-node only). Removed automatically after the cluster forms |
+| `opensearch_initial_cluster_manager_nodes` | All hosts in the current play | List of cluster-manager-eligible node names, written to `cluster.initial_cluster_manager_nodes` (multi-node only) |
 | `opensearch_node_roles` | _(not set)_ | Comma-separated list of node roles (e.g. `cluster_manager, data, ingest`). When not set, the node takes all roles. Set per host in inventory |
 
 ### Network
@@ -52,7 +53,7 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `opensearch_heap_size` | `1g` | JVM heap size. Applied to both `-Xms` and `-Xmx`. Use `g` for gigabytes or `m` for megabytes (e.g. `4g`, `512m`). As a rule of thumb, set this to no more than half of available RAM |
-| `opensearch_tmp_dir` | _(not set)_ | Custom temporary directory for the JVM. Set this when `/tmp` is mounted with `noexec`, which prevents OpenSearch from starting |
+| `opensearch_tmp_dir` | `/var/lib/opensearch/tmp` | Temporary directory for the JVM (`-Djava.io.tmpdir`) and the `OPENSEARCH_TMPDIR` environment variable in the systemd unit. Created by the role, owned by `opensearch:opensearch`, mode `0750`. Set to `""` to fall back to the distribution defaults |
 
 ### Security Plugin
 
@@ -77,6 +78,9 @@ In `generate` mode, the role downloads and runs the `searchguard-tlstool` on the
 |----------|---------|-------------|
 | `opensearch_cert_valid_days` | `730` | Number of days the generated certificates remain valid |
 | `opensearch_domain_name` | _(not set)_ | Domain suffix used in certificate Distinguished Names and DNS SANs (e.g. `example.com`). Required in generate mode |
+| `opensearch_tlstool_url` | Maven Central `search-guard-tlstool-1.5.tar.gz` | Where the control node downloads `searchguard-tlstool`. Point at an internal mirror for air-gapped control nodes |
+| `opensearch_tlstool_checksum` | `sha256:97efc3cb…` (tlstool 1.5) | Checksum of the archive as `<algorithm>:<hex digest>`; the download is retried and fails on mismatch (e.g. a truncated download). Update it if you change the URL to a different version |
+| `opensearch_tlstool_local_archive` | `""` | Absolute path on the control node to a pre-downloaded tlstool archive (e.g. `~/Downloads/search-guard-tlstool-1.5.tar.gz`). When set, the role uses it instead of downloading; it must still match `opensearch_tlstool_checksum` |
 
 #### TLS: `custom` mode
 
@@ -96,6 +100,33 @@ Certificate path values support Jinja2 expressions, which lets you reference per
 | `opensearch_tls_node_http_key` | Path on the control node to each node's HTTP private key. Supports `{{ inventory_hostname }}` |
 | `opensearch_tls_admin_dn` | Full Distinguished Name of the admin certificate, written to `plugins.security.authcz.admin_dn` in `opensearch.yml`. Example: `CN=admin,OU=Ops,O=Example Inc.,DC=example,DC=com` |
 | `opensearch_tls_node_dn` | DN pattern that matches all node certificates, written to `plugins.security.nodes_dn`. Example: `CN=*.example.com,OU=Ops,O=Example Inc.,DC=example,DC=com` |
+
+### Users, Roles and Role Mappings
+
+Applied when the security plugin is enabled. Security configuration is written only on first initialisation, when certificates change, or when `opensearch_security_force_init` is `true`. Set it to `true` after changing any variable in this table on an existing cluster.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `opensearch_users` | `[]` | Extra internal users, added next to the built-in `admin` and `kibanaserver`. Each entry needs `name` and `password` (hashed with `hash.sh`; never written in plain text). Optional keys: `backend_roles`, `opendistro_security_roles`, `attributes`, `description`, `reserved` |
+| `opensearch_roles` | `{}` | Custom roles. Keys are role names; values use `cluster_permissions`, `index_permissions` (`index_patterns`, `allowed_actions`, `dls`, `fls`) and `tenant_permissions` (`tenant_patterns`, `allowed_actions`) |
+| `opensearch_roles_mapping` | `{}` | Custom role mappings. Keys are role names; values use `backend_roles`, `users`, `hosts`, `description`, `reserved`. Mappings for `all_access`, `own_index`, `logstash`, `kibana_user`, `readall`, `manage_snapshots` and `kibana_server` are always included |
+| `opensearch_security_force_init` | `false` | Re-apply the security configuration on an existing cluster |
+
+Example:
+
+```yaml
+opensearch_security_force_init: true
+opensearch_users:
+  - name: reporting
+    password: "{{ vault_reporting_password }}"
+    opendistro_security_roles: [my_app_role]
+opensearch_roles:
+  my_app_role:
+    cluster_permissions: [cluster_monitor]
+    index_permissions:
+      - index_patterns: ["my_app_*"]
+        allowed_actions: [read]
+```
 
 ### Custom Security Configuration
 
@@ -145,6 +176,40 @@ The systemd service unit also sets these resource limits regardless of tuning va
 - `LimitAS=infinity` — no virtual memory cap
 - `LimitFSIZE=infinity` — no file size cap
 
+### Snapshot Repositories (S3/GCS)
+
+| Variable | Type | Default | Example | Description |
+|----------|------|---------|---------|-------------|
+| `opensearch_snapshot_enabled` | bool | `false` | `true` | Install the repository plugin, load credentials and register the repository |
+| `opensearch_snapshot_type` | string | `s3` | `gcs` | Backend: `s3` (AWS S3 or any S3-compatible store) or `gcs` |
+| `opensearch_snapshot_client` | string | `default` | `backups` | Client name used in the `s3.client.<client>.*` / `gcs.client.<client>.*` settings |
+| `opensearch_snapshot_repository_name` | string | `<type>-snapshots` | `nightly` | Snapshot repository name |
+| `opensearch_snapshot_bucket` | string | `""` | `opensearch-backups` | Bucket name. Required |
+| `opensearch_snapshot_base_path` | string | `""` | `prod/cluster1` | Path prefix inside the bucket |
+| `opensearch_snapshot_plugin_local_archive` | string | `""` | `/srv/plugins/repository-s3-3.8.0.zip` | Plugin zip on the control node, for hosts that cannot reach `artifacts.opensearch.org`. Must match `opensearch_version` |
+| `opensearch_snapshot_s3_access_key` | string | `""` | `"{{ vault_s3_access_key }}"` | Static access key. Set together with the secret key |
+| `opensearch_snapshot_s3_secret_key` | string | `""` | `"{{ vault_s3_secret_key }}"` | Static secret key |
+| `opensearch_snapshot_s3_session_token` | string | `""` | `"{{ vault_s3_session_token }}"` | Optional session token for temporary credentials |
+| `opensearch_snapshot_s3_region` | string | `""` | `eu-west-1`, `fsn1` | Signing region |
+| `opensearch_snapshot_s3_endpoint` | string | `""` | `fsn1.your-objectstorage.com` | Endpoint for S3-compatible stores (Hetzner Object Storage, MinIO, Ceph RGW) |
+| `opensearch_snapshot_s3_protocol` | string | `""` | `http` | `http` or `https`. Empty keeps the plugin default (`https`) |
+| `opensearch_snapshot_s3_path_style_access` | bool | `false` | `true` | Use path-style URLs (`https://endpoint/bucket`) instead of virtual-hosted style |
+| `opensearch_snapshot_s3_extra_settings` | dict | `{}` | `{disable_chunked_encoding: true}` | Other non-secret `s3.client.<client>.*` settings, for S3-compatible stores that need them (`signer_override`, `disable_chunked_encoding`, `legacy_md5_checksum_calculation`, timeouts) |
+| `opensearch_snapshot_gcs_credentials_json` | string or mapping | `""` | `"{{ vault_gcs_sa_json }}"` | Service-account JSON |
+| `opensearch_snapshot_gcs_project_id` | string | `""` | `my-project` | GCP project ID |
+| `opensearch_snapshot_gcs_endpoint` | string | `""` | `https://storage.example.com` | Custom GCS endpoint |
+| `opensearch_snapshot_policy` | dict | `{}` | see below | Snapshot Management policy. `name` is the policy name; the other keys are the `_plugins/_sm/policies` request body. `snapshot_config.repository` defaults to the repository name |
+
+Credentials are written only to `opensearch.keystore` (owner `opensearch_user`, mode `0640`); they never appear in `opensearch.yml` or the Ansible output. Region, endpoint, protocol, path-style and project settings go into `opensearch.yml`.
+
+The keystore is created without a password, so it is obfuscated rather than encrypted: protect it with file permissions and keep the source credentials in ansible-vault.
+
+Leave the static credentials empty to use the instance identity instead: an EC2 instance profile or IRSA for S3, or GCE/GKE workload identity for GCS. The role then removes any credentials it previously stored for that client.
+
+Installing the plugin or changing credentials restarts OpenSearch on every node at the same time. The repository and policy are registered once per cluster, and only when `opensearch_start_on_install` is `true`. Restoring snapshots is not automated.
+
+Setting `opensearch_snapshot_enabled: false` later does not remove the plugin, the repository or the keystore credentials. Removing a key from `opensearch_snapshot_policy` does not remove it from an existing policy; delete the policy (`DELETE _plugins/_sm/policies/<name>`) and re-run the role.
+
 ### `/etc/hosts` Management
 
 | Variable | Default | Description |
@@ -177,6 +242,7 @@ Use tags to run only specific parts of the role:
 | `security` | Configure the Security plugin, generate or deploy TLS certificates, and initialise the security index |
 | `service` | Start the OpenSearch service and wait for it to become available |
 | `health` | Query the cluster health API and display the result |
+| `snapshot` | Install the snapshot repository plugin, load credentials and register the repository and policy |
 
 Example — run only system tuning and installation:
 
@@ -410,7 +476,13 @@ Enable `opensearch_iac_enable` when running the role from a CI/CD pipeline or ap
 
 ### Custom /tmp Directory
 
-If `/tmp` is mounted with `noexec` on your hosts, OpenSearch cannot extract its native libraries there and will fail to start. Set `opensearch_tmp_dir` to a directory on a `exec`-capable filesystem.
+If `/tmp` is mounted with `noexec` on your hosts, OpenSearch cannot extract its native libraries there and will fail to start. CIS-hardened builds and Amazon Linux 2023 mount `/tmp` that way by default.
+
+The role handles this out of the box: `opensearch_tmp_dir` defaults to `/var/lib/opensearch/tmp`, which the role creates as `opensearch:opensearch` with mode `0750`. That path is used for both `-Djava.io.tmpdir` in `jvm.options` and `Environment=OPENSEARCH_TMPDIR=` in the systemd unit, so plugins and helper scripts that read the environment variable land in the same place as the JVM.
+
+`PrivateTmp=true` in the unit does not remove the `noexec` flag — a private `/tmp` namespace inherits the mount options of its parent mount.
+
+Override the path when you want the directory somewhere else, or set `opensearch_tmp_dir: ""` to disable the override and use the distribution defaults.
 
 ```yaml
 - name: Deploy OpenSearch with custom temp directory
@@ -423,6 +495,77 @@ If `/tmp` is mounted with `noexec` on your hosts, OpenSearch cannot extract its 
     opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
     opensearch_domain_name: example.com
     opensearch_tmp_dir: /var/lib/opensearch/tmp
+
+  roles:
+    - axonops.axonops.opensearch
+```
+
+### S3 Snapshot Backups
+
+Works with AWS S3 and with S3-compatible stores. The example below uses Hetzner Object Storage; for AWS, drop the endpoint and path-style settings and set the AWS region.
+
+```yaml
+- name: Deploy OpenSearch with S3 snapshots
+  hosts: opensearch
+  become: true
+
+  vars:
+    opensearch_cluster_name: axonops-production
+    opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+    opensearch_domain_name: example.com
+    opensearch_snapshot_enabled: true
+    opensearch_snapshot_type: s3
+    opensearch_snapshot_bucket: opensearch-backups
+    opensearch_snapshot_base_path: axonops-production
+    opensearch_snapshot_s3_access_key: "{{ vault_s3_access_key }}"
+    opensearch_snapshot_s3_secret_key: "{{ vault_s3_secret_key }}"
+    opensearch_snapshot_s3_region: fsn1
+    opensearch_snapshot_s3_endpoint: fsn1.your-objectstorage.com
+    opensearch_snapshot_s3_path_style_access: true
+    opensearch_snapshot_policy:
+      name: daily
+      creation:
+        schedule:
+          cron:
+            expression: "0 2 * * *"
+            timezone: UTC
+      deletion:
+        schedule:
+          cron:
+            expression: "0 3 * * *"
+            timezone: UTC
+        condition:
+          max_age: 14d
+          min_count: 1
+      snapshot_config:
+        indices: "*"
+
+  roles:
+    - axonops.axonops.opensearch
+```
+
+Check the repository after the run:
+
+```bash
+curl -k -u admin:<password> -X POST https://<node>:9200/_snapshot/s3-snapshots/_verify
+```
+
+### GCS Snapshot Backups
+
+```yaml
+- name: Deploy OpenSearch with GCS snapshots
+  hosts: opensearch
+  become: true
+
+  vars:
+    opensearch_cluster_name: axonops-production
+    opensearch_admin_password: "{{ vault_opensearch_admin_password }}"
+    opensearch_domain_name: example.com
+    opensearch_snapshot_enabled: true
+    opensearch_snapshot_type: gcs
+    opensearch_snapshot_bucket: opensearch-backups
+    opensearch_snapshot_gcs_project_id: my-project
+    opensearch_snapshot_gcs_credentials_json: "{{ vault_gcs_service_account_json }}"
 
   roles:
     - axonops.axonops.opensearch
@@ -482,17 +625,17 @@ curl -k -u admin:your_password \
 
 - **Memory lock**: `opensearch_bootstrap_memory_lock` is enabled by default. The systemd service unit sets `LimitMEMLOCK=infinity` automatically, so no additional configuration is needed on the host.
 
-- **Multi-node bootstrap**: The role adds `cluster.initial_master_nodes` to `opensearch.yml` during initial bootstrap and then removes it once the cluster has formed. This follows the OpenSearch recommendation to avoid split-brain during restarts after the cluster is established.
+- **Multi-node bootstrap**: The role writes `cluster.initial_cluster_manager_nodes` to `opensearch.yml` from `opensearch_initial_cluster_manager_nodes` (default: all hosts in the play). It does not remove the setting after the cluster forms. When you add nodes to an existing cluster, set the variable explicitly to the original cluster-manager nodes.
 
 - **Password hashing**: The role hashes `opensearch_admin_password` and `opensearch_dashboards_password` using the `hash.sh` utility bundled with OpenSearch. Plain-text passwords are never written to configuration files.
 
-- **Custom internal users**: If a `files/internal_users.yml` file exists relative to your playbook, the role detects it and hashes passwords for any additional users defined there. Each user must have a corresponding `<username>_password` variable in scope.
+- **Custom internal users**: Define them with `opensearch_users` (see Users, Roles and Role Mappings). The role renders `internal_users.yml` from the variables; a `files/internal_users.yml` next to your playbook is not read.
 
 - **Security index initialisation**: The `securityadmin.sh` script runs with `-nhnv` (no hostname verification) and `-icl` (ignore cluster leader). It runs on one node only (`run_once`). If the cluster is not yet fully formed when this runs, OpenSearch retries internally. Allow up to two minutes for the cluster to become available.
 
 - **`/etc/hosts` population**: When `opensearch_populate_etc_hosts` is `true`, the role writes entries for every host in the current play to `/etc/hosts`. Entries are idempotent and managed within a marked block, so re-running the role safely updates them.
 
-- **Supported architecture**: The role downloads the `linux-x64` (AMD64) tarball. ARM64 nodes are not currently supported.
+- **Supported architecture**: x86_64 and aarch64. The bundle architecture is selected automatically from `ansible_architecture` via `opensearch_arch` (`x64` / `arm64`); any other architecture is rejected by a preflight assert, since installing a bundle built for the wrong architecture leaves an unrunnable bundled JDK and the service fails at start with `Exec format error`. Note that CI exercises amd64 only.
 
 ## License
 

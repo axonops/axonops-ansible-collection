@@ -40,15 +40,19 @@ offering flexibility for those who prefer different automation solutions.
 >
 > 🔧 If you are **upgrading from a previous version** of this role, please **review your configuration** and explicitly set the `cassandra_install_format` to match your environment.
 
-## Role Documentation
+
+
+## Roles Documentation
 
 This collection provides the following Ansible roles. Click on each role for detailed documentation, configuration options, and examples:
+
+### AxonOps Alerts and configurations
+- **[configurations](docs/roles/configurations.md)** - Configure alerts, integrations, and monitoring settings
 
 ### AxonOps Components
 - **[agent](docs/roles/agent.md)** - Install and configure AxonOps Agent for Cassandra monitoring
 - **[server](docs/roles/server.md)** - Install and configure AxonOps Server (self-hosted deployments)
 - **[dash](docs/roles/dash.md)** - Install and configure AxonOps Dashboard web interface
-- **[configurations](docs/roles/configurations.md)** - Configure alerts, integrations, and monitoring settings
 - **[cqlai](docs/roles/cqlai.md)** - Install CQL AI, the AI-powered CQL shell for Apache Cassandra
 
 ### Kubernetes / Operator
@@ -57,6 +61,7 @@ This collection provides the following Ansible roles. Click on each role for det
 - **[strimzi](docs/roles/strimzi.md)** - Deploy Apache Kafka on Kubernetes using the Strimzi operator with AxonOps images
 
 ### Infrastructure Components
+- **[chrony](docs/roles/chrony.md)** - Install and configure chrony (NTP) for time synchronization, critical for Cassandra, Kafka, and OpenSearch
 - **[cassandra](docs/roles/cassandra.md)** - Install and configure Apache Cassandra (3.11, 4.x, 5.x)
 - **[kafka](docs/roles/kafka.md)** - Install and configure Apache Kafka in KRaft mode (no ZooKeeper)
 - **[opensearch](docs/roles/opensearch.md)** - Install and configure OpenSearch for AxonOps (preferred for on-premises)
@@ -66,10 +71,16 @@ This collection provides the following Ansible roles. Click on each role for det
 ### Security
 
 - **[pki_agent](docs/roles/pki_agent.md)** - Automated PKI certificate management using OpenBao Agent
+- **[openldap](docs/roles/openldap.md)** - Local OpenLDAP directory for AxonOps Server LDAP authentication and role mapping
 
 ### Utilities
 
 - **[preflight](docs/roles/preflight.md)** - Run pre-installation system checks
+- **[docker](roles/docker/README.md)** - Install Docker CE and the Compose plugin (used by `devcluster`)
+
+### Development and demo
+
+- **[devcluster](roles/devcluster/README.md)** - Docker Compose-based AxonOps dev/demo stack (OpenSearch, axon-server, axon-dash, Cassandra). Not for production
 
 For a complete guide including deployment patterns and quick references, see the [Role Documentation Index](docs/roles/README.md).
 
@@ -128,6 +139,12 @@ in the [./examples](./examples) directory. There are two sections:
 - axon-server: list here the IP address or hostname of the server where you would like to install AxonOps
 - cassandra: these are the Apache Cassandra nodes where the agent will be installed
 
+## Container image
+
+An [Ansible Execution Environment](./ci/execution-environment/README.md) bundling this collection and its
+dependencies is published to `ghcr.io/axonops/axonops-ansible-ee`. Use it to run collection playbooks
+from a container without installing Ansible or fetching anything from Galaxy at start-up.
+
 ## Examples
 
 ### axon-agent.yml
@@ -144,7 +161,7 @@ the `*_redhat_repository` URLs.
   become: true
   vars:
     axon_java_agent: "axon-cassandra4.1-agent"
-    customer_name: example
+    axon_agent_customer_name: example
     java_pkg: java-11-openjdk-headless
     # Set to false if you already have Apache Cassandra running
     install_cassandra: true
@@ -191,6 +208,7 @@ OpenSearch and Elasticsearch endpoints.
     opensearch_domain_name: example.com
 
     # AxonOps Server
+    axon_server_org_name: example
     axon_server_license_key: "{{ vault_axonops_license_key }}"
     axon_server_cql_hosts:
       - localhost:9042
@@ -222,6 +240,7 @@ OpenSearch and Elasticsearch endpoints.
     install_cassandra: true
     install_elastic: true
     java_pkg: java-17-openjdk-headless
+    axon_server_org_name: example
     axon_server_cql_hosts:
       - localhost:9042
     axon_server_searchdb_hosts:

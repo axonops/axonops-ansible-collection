@@ -1,6 +1,6 @@
-# AxonOps Alerts Role
+# AxonOps Configurations Role (alerts)
 
-The `alerts` role in the AxonOps Ansible Collection automates the configuration and management of alerting, monitoring, and notification integrations for your AxonOps-managed clusters. It supports metric and log-based alerts, backup monitoring, service checks, and integrations with external services like Slack and PagerDuty.
+The `configurations` role in the AxonOps Ansible Collection automates the configuration and management of alerting, monitoring, and notification integrations for your AxonOps-managed clusters. It supports metric and log-based alerts, backup monitoring, service checks, and integrations with external services like Slack and PagerDuty.
 
 ## Features
 
@@ -29,16 +29,18 @@ Before you can run the playbook, you'll need to define the following variables. 
 |-------------|-----------------------------------|-------------|
 | org         | AXONOPS_ORG                       | Organization name in AxonOps |
 | cluster     | AXONOPS_CLUSTER                   | Cluster name to configure alerts for |
-| auth_token  | AXONOPS_TOKEN or AXONOPS_API_TOKEN| API authentication token for AxonOps |
+| auth_token  | AXONOPS_TOKEN                     | API authentication token for AxonOps |
+| base_url    | AXONOPS_URL                       | AxonOps server URL (self-hosted deployments) |
+| cluster_type| AXONOPS_CLUSTER_TYPE              | Cluster type, e.g. `cassandra` (default), `kafka` |
 | username    | AXONOPS_USERNAME                  | Username for AxonOps API authentication (if not using token) |
 | password    | AXONOPS_PASSWORD                  | Password for AxonOps API authentication (if not using token) |
-| enable_logging | AXONOPS_ENABLE_LOGGING | Optional flag to enable logging of API responses and errors (default: false) |
+| enable_logging | (Ansible variable only)        | Optional flag to enable logging of API responses and errors (default: false) |
 | use_saml    | AXONOPS_USE_SAML                  | Optional flag to indicate if SAML authentication should be used (default: false) |
 
 
 ## Directory Structure
 
-The `alerts` role can load the alerts configuration from a custom `config` directory as explained below or you can define the alerts
+The `configurations` role can load the alerts configuration from a custom `config` directory as explained below or you can define the alerts
 as part of your regulard `group_vars` or inventory configuration.
 
 Configuration files are expected under a `config/` directory, typically organized as:
@@ -102,7 +104,7 @@ The example playbook does not use the `config/` directory but it will read it if
         enable_override: false
 
   roles:
-    - role: axonops.axonops.alerts
+    - role: axonops.axonops.configurations
 ```
 
 ## Supported Variables
@@ -113,20 +115,22 @@ The example playbook does not use the `config/` directory but it will read it if
 - `axonops_tcp_check`: List of TCP service checks.
 - `axonops_slack_integrations`: List of Slack integration configs.
 - `axonops_pagerduty_integrations`: List of PagerDuty integration configs.
+- `axonops_teams_integrations`: List of Microsoft Teams integration configs.
 - `axonops_alert_routes`: List of alert routing rules.
 - `axonops_dashboard_templates`: List of dashboard templates.
 - `axonops_backups`: List of backup configurations.
 - `axonops_commitlog_archive`: List of commitlog archive configs.
-- `adaptive_repair`, `agent_disconnection_tolerance`, `human_readableid`, `logcollectors`: Advanced/optional features.
+- `adaptive_repair`, `agent_disconnection_tolerance`, `human_readableid`, `axonops_logcollectors`: Advanced/optional features.
 
 ## Tags
 
 You can use tags to run only specific parts of the role, e.g.:
 - `metrics`
-- `logs`
+- `log_alerts`
 - `backups`
 - `service_checks`
 - `slack`
+- `teams`
 - `pagerduty_integration`
 - `routes`
 - `dashboards`

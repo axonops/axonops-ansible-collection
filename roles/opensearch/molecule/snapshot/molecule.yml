@@ -1,0 +1,51 @@
+---
+dependency:
+  name: galaxy
+  options:
+    ignore-errors: true
+driver:
+  name: docker
+platforms:
+  - name: ${MOLECULE_INSTANCE_NAME:-opensearch-snapshot}-s3
+    image: "geerlingguy/docker-${MOLECULE_DISTRO:-rockylinux9}-ansible:latest"
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - snapshot_s3
+  - name: ${MOLECULE_INSTANCE_NAME:-opensearch-snapshot}-gcs
+    image: "geerlingguy/docker-${MOLECULE_DISTRO:-rockylinux9}-ansible:latest"
+    command: ${MOLECULE_DOCKER_COMMAND:-""}
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    privileged: true
+    pre_build_image: true
+    groups:
+      - snapshot_gcs
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      snapshot_s3:
+        opensearch_snapshot_type: s3
+        opensearch_snapshot_bucket: molecule-snapshots
+        opensearch_snapshot_s3_access_key: MOLECULEDUMMYACCESSKEY
+        opensearch_snapshot_s3_secret_key: molecule-dummy-secret-key-value
+        opensearch_snapshot_s3_region: eu-west-1
+        opensearch_snapshot_s3_endpoint: minio.molecule.test:9000
+        opensearch_snapshot_s3_protocol: http
+        opensearch_snapshot_s3_path_style_access: true
+        opensearch_snapshot_s3_extra_settings:
+          disable_chunked_encoding: true
+      snapshot_gcs:
+        opensearch_snapshot_type: gcs
+        opensearch_snapshot_bucket: molecule-snapshots
+        opensearch_snapshot_gcs_project_id: molecule-project
+        opensearch_snapshot_gcs_endpoint: https://gcs.molecule.test
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml

@@ -1,0 +1,4 @@
+# {{ ansible_managed }}
+[Service]
+ExecStart=
+ExecStart=/usr/sbin/slapd -u {{ _openldap_user }} -h "{{ _openldap_urls | join(' ') }}"
