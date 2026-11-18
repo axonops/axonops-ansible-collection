@@ -82,6 +82,6 @@
     - name: Configuration preserved
       ansible.builtin.assert:
         that:
-          - "'cluster.name: upgrade-test' in (_conf.content | b64decode)"
+          - "(_conf.content | b64decode) is search('cluster\\.name: \"?upgrade-test\"?')"
 
 # code: language=ansible
