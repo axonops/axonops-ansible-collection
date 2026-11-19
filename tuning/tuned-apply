@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Apply a pre-tuned alert_rules JSON to a given org+cluster.
+#
+# Usage:
+#   tuning/tuned-apply <org> <cluster> [--input PATH] [apply-tuned-alerts args...]
+#
+# Default --input, if not supplied, is:
+#   ./cli/exported/<org>/<cluster>/alert_rules.tuned.for.<cluster>.json
+#
+# Pass --dry-run first to preview. Pass --yes to skip the confirmation prompt.
+# Any extra args pass through verbatim to `axonopscli apply-tuned-alerts`.
+#
+# Required env:
+#   AXONOPS_TOKEN   — SaaS API token
+set -euo pipefail
+
+: "${AXONOPS_TOKEN:?AXONOPS_TOKEN must be set in env}"
+
+if [[ $# -lt 2 ]]; then
+    echo "usage: tuning/tuned-apply <org> <cluster> [--input PATH] [apply-tuned-alerts args...]" >&2
+    exit 2
+fi
+
+ORG="$1"
+CLUSTER="$2"
+shift 2
+
+cd "$(dirname "$0")/.."
+
+DEFAULT_INPUT="./cli/exported/${ORG}/${CLUSTER}/alert_rules.tuned.for.${CLUSTER}.json"
+
+# If the caller didn't pass --input, inject the conventional default.
+HAS_INPUT=false
+for arg in "$@"; do
+    if [[ "$arg" == "--input" ]]; then
+        HAS_INPUT=true
+        break
+    fi
+done
+
+if [[ "$HAS_INPUT" == false ]]; then
+    set -- --input "$DEFAULT_INPUT" "$@"
+fi
+
+# Safety net: snapshot the cluster's current state before this destructive
+# POST runs, labeled `pre-tuned-alerts`. Always recoverable as
+# cli/exported/<org>/<cluster>/alert_rules.pre-tuned-alerts.json. Skipped
+# under --dry-run (no HTTP writes happen).
+SKIP_PRE_SNAPSHOT=false
+for arg in "$@"; do
+    if [[ "$arg" == "--dry-run" ]]; then SKIP_PRE_SNAPSHOT=true; break; fi
+done
+if [[ "$SKIP_PRE_SNAPSHOT" == false ]]; then
+    echo "==> Pre-tuned-alerts snapshot of current state"
+    tuning/export "$ORG" "$CLUSTER" --label pre-tuned-alerts
+    echo ""
+fi
+
+exec python3 cli/axonops.py \
+    --org "$ORG" \
+    --cluster "$CLUSTER" \
+    apply-tuned-alerts \
+    "$@"

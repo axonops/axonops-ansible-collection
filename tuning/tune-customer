@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Run tuning/tune for a named customer using their tuning/customers/<name>.env config.
+#
+# Sources the env file for ORG, CLUSTER, HOT_KEYSPACE, HOT_TABLE, and optional
+# tune knobs (DAYS, MIN_SAMPLES, MAX_DELTA, EXTRA_SET_LABELS), then exec's
+# tuning/tune with the right --set-label / --days / etc. args.
+#
+# This replaces tuning/tune-<customer> one-off scripts; the customer-specific
+# wrappers are kept as thin delegators for muscle memory.
+#
+# Usage:
+#   tuning/tune-customer <name> [extra tune-alerts args...]
+#
+# Required env:
+#   AXONOPS_TOKEN   — SaaS API token
+set -euo pipefail
+
+NAME="${1:?usage: tuning/tune-customer <name> [extra tune-alerts args...]}"
+shift || true
+
+TUNING_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONF="${TUNING_DIR}/customers/${NAME}.env"
+
+if [[ ! -f "$CONF" ]]; then
+    echo "no customer config at ${CONF}" >&2
+    echo "available customers:" >&2
+    ls "${TUNING_DIR}/customers/" 2>/dev/null | sed 's|\.env$||;s|^|  |' >&2
+    exit 2
+fi
+
+# shellcheck source=/dev/null
+EXTRA_SET_LABELS=()  # default empty; the conf may set it
+source "$CONF"
+
+: "${ORG:?customer config ${CONF} missing ORG}"
+: "${CLUSTER:?customer config ${CONF} missing CLUSTER}"
+: "${HOT_KEYSPACE:?customer config ${CONF} missing HOT_KEYSPACE}"
+: "${HOT_TABLE:?customer config ${CONF} missing HOT_TABLE}"
+
+ARGS=(
+    "$ORG" "$CLUSTER"
+    --set-label "keyspace=${HOT_KEYSPACE}"
+    --set-label "cas_Table_*:scope=${HOT_TABLE}"
+)
+[[ -n "${DAYS:-}" ]]        && ARGS+=(--days "$DAYS")
+[[ -n "${MIN_SAMPLES:-}" ]] && ARGS+=(--min-samples "$MIN_SAMPLES")
+[[ -n "${MAX_DELTA:-}" ]]   && ARGS+=(--max-delta "$MAX_DELTA")
+for lbl in "${EXTRA_SET_LABELS[@]}"; do
+    [[ -n "$lbl" ]] && ARGS+=(--set-label "$lbl")
+done
+
+exec "${TUNING_DIR}/tune" "${ARGS[@]}" "$@"
