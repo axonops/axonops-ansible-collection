@@ -49,6 +49,9 @@ es_heap_size: "512M"
 
 # JVM custom parameters
 es_java_home: ''
+# Add -XX:-UseBASE64Intrinsics to jvm.options to mitigate CVE-2026-114938 (not applied on 6.x,
+# which may run on Java 8 where the flag is unknown). Set to false to opt out.
+es_jvm_disable_base64_intrinsics: true
 es_jvm_custom_parameters: ''
 es_heap_dump_path: "/var/lib/elasticsearch"
 

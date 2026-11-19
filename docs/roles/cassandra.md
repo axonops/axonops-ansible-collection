@@ -158,6 +158,12 @@ The role also sets Cassandra's sysctl tunables in `/etc/sysctl.d/99-cassandra.co
 Read-ahead is **not** configured by this role. If you tune it, note that
 `blockdev --setra` takes 512-byte sectors, so an 8 KiB read-ahead is `16` sectors.
 
+### JVM
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cassandra_jvm_disable_base64_intrinsics` | `true` | Add `-XX:-UseBASE64Intrinsics` to the JVM options (CVE-2026-114938 mitigation). Applies to 4.1.x and 5.0.x when running Java 11 or later; not applied on 3.11.x or Java 8. Set to `false` to opt out |
+
 ### Garbage Collector
 
 | Variable | Default | Description |

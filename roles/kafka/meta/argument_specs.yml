@@ -58,6 +58,10 @@ argument_specs:
         type: raw
         default: []
         description: Additional JVM flags. Accepts a list of strings or a single string.
+      kafka_jvm_disable_base64_intrinsics:
+        type: bool
+        default: true
+        description: Add C(-XX:-UseBASE64Intrinsics) to the JVM flags to mitigate CVE-2026-114938. Set to V(false) to opt out.
       kafka_node_roles:
         type: list
         elements: str

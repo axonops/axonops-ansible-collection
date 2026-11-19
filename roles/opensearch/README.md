@@ -53,6 +53,7 @@ The `opensearch` role installs and configures OpenSearch on target nodes. It ser
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `opensearch_heap_size` | `1g` | JVM heap size. Applied to both `-Xms` and `-Xmx`. Use `g` for gigabytes or `m` for megabytes (e.g. `4g`, `512m`). As a rule of thumb, set this to no more than half of available RAM |
+| `opensearch_jvm_disable_base64_intrinsics` | `true` | Add `-XX:-UseBASE64Intrinsics` to `jvm.options` (CVE-2026-114938 mitigation). Set to `false` to opt out |
 | `opensearch_tmp_dir` | `/var/lib/opensearch/tmp` | Temporary directory for the JVM (`-Djava.io.tmpdir`) and the `OPENSEARCH_TMPDIR` environment variable in the systemd unit. Created by the role, owned by `opensearch:opensearch`, mode `0750`. Set to `""` to fall back to the distribution defaults |
 
 ### Security Plugin

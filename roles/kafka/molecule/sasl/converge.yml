@@ -9,6 +9,7 @@
       - broker
       - controller
     kafka_heap_size: "512m"
+    kafka_jvm_disable_base64_intrinsics: false
     kafka_opts:
       - "-XX:NewSize=64m"
       - "-XX:MaxNewSize=64m"

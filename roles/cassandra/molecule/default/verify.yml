@@ -341,3 +341,26 @@
         cassandra_env: "{{ verify_cassandra_env.content | b64decode }}"
 
 # code: language=ansible
+
+- name: Verify Base64 intrinsics mitigation
+  hosts: all
+  gather_facts: false
+  vars:
+    cassandra_conf: /opt/apache-cassandra-5.0.9/conf
+  tasks:
+    - name: WHEN — the rendered JVM server options files are read
+      ansible.builtin.slurp:
+        src: "{{ cassandra_conf }}/{{ item }}"
+      loop:
+        - jvm11-server.options
+        - jvm17-server.options
+      register: verify_jvm_files
+
+    - name: THEN — Base64 intrinsics are disabled by default
+      ansible.builtin.assert:
+        that:
+          - "'-XX:-UseBASE64Intrinsics' in (item.content | b64decode)"
+        fail_msg: "{{ item.item }} does not disable Base64 intrinsics"
+      loop: "{{ verify_jvm_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"

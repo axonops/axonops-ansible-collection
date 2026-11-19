@@ -156,6 +156,11 @@
 {% endif %}
 {% endif %}
 
+{% if es_jvm_disable_base64_intrinsics | bool and es_major_version != "6.x" %}
+# CVE-2026-114938 mitigation
+9-:-XX:-UseBASE64Intrinsics
+{% endif %}
+
 {% if es_jvm_custom_parameters !='' %}
 {% for item in es_jvm_custom_parameters %}
 {{ item }}

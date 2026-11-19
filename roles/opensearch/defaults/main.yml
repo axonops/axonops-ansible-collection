@@ -41,6 +41,10 @@ opensearch_bootstrap_memory_lock: true
 
 opensearch_heap_size: "1g"
 
+# Add -XX:-UseBASE64Intrinsics to jvm.options to mitigate CVE-2026-114938.
+# Set to false to opt out.
+opensearch_jvm_disable_base64_intrinsics: true
+
 # Custom temp directory (useful when /tmp is mounted noexec, e.g. CIS-hardened
 # builds and Amazon Linux 2023). Used for both -Djava.io.tmpdir and the
 # OPENSEARCH_TMPDIR environment variable in the systemd unit. Set to an empty

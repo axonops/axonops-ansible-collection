@@ -293,6 +293,7 @@ Listeners and the controller quorum voter list are derived automatically from th
 | `kafka_log_dir` | JVM and service stdout log directory (not Kafka partition data). | str | no | /var/log/kafka |
 | `kafka_data_dirs` | Directories for Kafka topic/partition data. Multiple paths spread data across disks. | list of 'str' | no | ['/var/lib/kafka'] |
 | `kafka_heap_size` | JVM heap size, used for both `-Xms` and `-Xmx`. Set to 50-75% of available RAM. | str | no | 1G |
+| `kafka_jvm_disable_base64_intrinsics` | Add `-XX:-UseBASE64Intrinsics` to the JVM flags (CVE-2026-114938 mitigation). Set to `false` to opt out. | bool | no | true |
 | `kafka_opts` | Additional JVM flags. Accepts a list of strings or a single string. | raw | no | [] |
 | `kafka_node_roles` | Roles this node runs. `broker` and `controller` together make a combined node, either one alone makes a dedicated node. At least one host in the play must be a controller. | list of 'str' | no | ['broker', 'controller'] |
 | `kafka_listeners` | Override the auto-derived listener list. Empty means the role generates listeners from the node roles and security state (broker `9092`, controller `9093`). | list of 'str' | no | [] |

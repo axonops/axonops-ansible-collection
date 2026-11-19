@@ -35,6 +35,10 @@ kafka_heap_size: 1G
 #   - -XX:NewSize=256m
 kafka_opts: []
 
+# Add -XX:-UseBASE64Intrinsics to KAFKA_OPTS to mitigate CVE-2026-114938.
+# Set to false to opt out.
+kafka_jvm_disable_base64_intrinsics: true
+
 # --- KRaft Cluster ----------------------------------------------------------
 
 # REQUIRED per host — role fails without it

@@ -90,4 +90,16 @@
           - "'allow.everyone.if.no.acl.found=false' in kafka_props"
         fail_msg: "ACL block missing or incorrect"
 
+
+    - name: Read /etc/sysconfig/kafka
+      ansible.builtin.slurp:
+        src: /etc/sysconfig/kafka
+      register: kafka_sysconfig_content
+
+    - name: Assert Base64 intrinsics mitigation is absent when opted out
+      ansible.builtin.assert:
+        that:
+          - "'UseBASE64Intrinsics' not in (kafka_sysconfig_content.content | b64decode)"
+        fail_msg: "kafka_jvm_disable_base64_intrinsics=false still rendered the flag"
+
 # code: language=ansible

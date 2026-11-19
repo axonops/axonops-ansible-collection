@@ -174,6 +174,7 @@ kafka_topics:
 - **Java 17** — Kafka 4.x requires Java 17. The role installs `openjdk-17-jre-headless` (Debian) or `java-17-openjdk-headless` (RHEL). Set `kafka_java_install: false` to skip this step if Java is managed by another role.
 - **Topics require a running broker** — `kafka_topics` is processed only when `kafka_start_on_install: true` and the broker port is reachable. Topics are not created on configuration-only runs.
 - **Security** — TLS, SASL (SCRAM-SHA-512 / PLAIN) and ACL are opt-in via `kafka_security_enabled`. With the master switch off the role's behaviour is unchanged from previous versions. See the Security sections above for details.
+- **Base64 intrinsics mitigation** — `-XX:-UseBASE64Intrinsics` is added to `KAFKA_OPTS` by default (CVE-2026-114938). Set `kafka_jvm_disable_base64_intrinsics: false` to opt out.
 - **AxonOps agent** — the role adds the `axonops` user to the `kafka` group and the `kafka` user to the `axonops` group so that `axon-agent` can access Kafka files without requiring root.
 
 ## License
