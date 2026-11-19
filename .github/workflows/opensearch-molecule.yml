@@ -36,6 +36,7 @@ jobs:
           - default
           - noexec-tmp
           - snapshot
+          - upgrade
 
     steps:
       - name: Check out the codebase.
@@ -59,6 +60,26 @@ jobs:
           ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
           MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.scenario }}-${{ matrix.distro }}
 
+      - name: Run Molecule create
+        if: matrix.scenario == 'upgrade'
+        run: molecule -v create -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.scenario }}-${{ matrix.distro }}
+
+      - name: Run Molecule prepare
+        if: matrix.scenario == 'upgrade'
+        run: molecule -v prepare -s ${{ matrix.scenario }}
+        env:
+          PY_COLORS: '1'
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DISTRO: ${{ matrix.distro }}
+          ANSIBLE_ROLES_PATH: $GITHUB_WORKSPACE/roles
+          MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.scenario }}-${{ matrix.distro }}
+
       - name: Run Molecule converge
         run: molecule -v converge -s ${{ matrix.scenario }}
         env:
@@ -69,7 +90,7 @@ jobs:
           MOLECULE_INSTANCE_NAME: opensearch-${{ matrix.scenario }}-${{ matrix.distro }}
 
       - name: Run Molecule idempotence
-        if: matrix.scenario == 'snapshot'
+        if: matrix.scenario == 'snapshot' || matrix.scenario == 'upgrade'
         run: molecule -v idempotence -s ${{ matrix.scenario }}
         env:
           PY_COLORS: '1'

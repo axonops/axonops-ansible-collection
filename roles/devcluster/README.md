@@ -28,7 +28,7 @@ The stack runs OpenSearch (metrics backend), axon-server, axon-dash, and one to 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `devcluster_opensearch_version` | `2.19.1` | OpenSearch image tag. Security is disabled; the node runs in single-node discovery mode. |
+| `devcluster_opensearch_version` | `3.9.0` | OpenSearch image tag. Security is disabled; the node runs in single-node discovery mode. The default moved from `2.19.1` to `3.9.0`; a data volume written by 2.x cannot be opened by 3.x, so recreate the stack (`devcluster_state: absent`) first. |
 | `devcluster_opensearch_java_opts` | `-Xms512m -Xmx512m` | JVM heap settings passed to the OpenSearch container via `OPENSEARCH_JAVA_OPTS`. Increase if you run workloads larger than a few hundred megabytes of data. |
 
 ### AxonOps Server
@@ -185,7 +185,7 @@ Use when pulling from a private registry or pinning to specific releases.
   vars:
     devcluster_axon_server_version: "1.0.42"
     devcluster_axon_dash_version: "1.0.42"
-    devcluster_opensearch_version: "2.19.1"
+    devcluster_opensearch_version: "3.9.0"
     devcluster_pull_policy: missing
     devcluster_registry_auth:
       registry: registry.axonops.com

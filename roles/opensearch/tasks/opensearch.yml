@@ -1,10 +1,16 @@
 ---
+- name: Detect installed OpenSearch version and refuse unsafe states
+  ansible.builtin.import_tasks: upgrade_check.yml
+
 - name: Download OpenSearch {{ opensearch_version }}
   ansible.builtin.get_url:
     url: "{{ opensearch_download_url }}/{{ opensearch_version }}/opensearch-{{ opensearch_version }}-linux-{{ opensearch_arch }}.tar.gz"
     dest: "/tmp/opensearch-{{ opensearch_version }}-linux-{{ opensearch_arch }}.tar.gz"
     mode: "0644"
   register: _opensearch_download
+
+- name: Upgrade existing install when the version changed
+  ansible.builtin.import_tasks: upgrade.yml
 
 - name: Create OpenSearch user
   ansible.builtin.user:

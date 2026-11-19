@@ -1,0 +1,172 @@
+---
+# ============================================================================
+# In-place upgrade of an existing tar install
+# Replaces every top-level entry of the distribution and keeps config, data
+# and logs. The new distribution's default config/ is discarded; the previous
+# copy is kept in config.pre-upgrade-<version>/. Third-party plugins are
+# removed with plugins/ and must be reinstalled; the snapshot repository
+# plugin is reinstalled by snapshot.yml.
+# Old entries are moved aside, not deleted, until every new entry is in place.
+# ============================================================================
+
+- name: Upgrade existing OpenSearch install
+  when:
+    - _opensearch_installed_version | length > 0
+    - _opensearch_installed_version != opensearch_version
+  vars:
+    _staging: "{{ opensearch_install_root }}/.upgrade-{{ opensearch_version }}"
+    _old: "{{ opensearch_install_root }}/.old-{{ _opensearch_installed_version }}"
+    _preserved: [config, data, logs]
+  block:
+    - name: Gather service state before upgrade
+      ansible.builtin.service_facts:
+
+    - name: Record service state before upgrade
+      ansible.builtin.set_fact:
+        _opensearch_unit_live: "{{ ansible_facts.services['opensearch.service'].state | default('stopped') == 'running' }}"
+
+    - name: Stop OpenSearch
+      ansible.builtin.systemd:
+        name: opensearch
+        state: stopped
+      when: _opensearch_unit_live
+
+    - name: Back up configuration before upgrade
+      ansible.builtin.copy:
+        src: "{{ opensearch_conf_dir }}/"
+        dest: "{{ opensearch_install_root }}/config.pre-upgrade-{{ _opensearch_installed_version }}/"
+        remote_src: true
+        owner: "{{ opensearch_user }}"
+        group: "{{ opensearch_group }}"
+        mode: preserve
+        force: false
+
+    - name: Restrict configuration backup directory
+      ansible.builtin.file:
+        path: "{{ opensearch_install_root }}/config.pre-upgrade-{{ _opensearch_installed_version }}"
+        state: directory
+        owner: "{{ opensearch_user }}"
+        group: "{{ opensearch_group }}"
+        mode: "0700"
+
+    - name: Create staging and old-distribution directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ opensearch_user }}"
+        group: "{{ opensearch_group }}"
+        mode: "0755"
+      loop:
+        - "{{ _staging }}"
+        - "{{ _old }}"
+
+    - name: Extract new OpenSearch distribution to staging
+      ansible.builtin.unarchive:
+        src: "/tmp/opensearch-{{ opensearch_version }}-linux-{{ opensearch_arch }}.tar.gz"
+        dest: "{{ _staging }}"
+        remote_src: true
+        extra_opts: ["--strip-components=1"]
+        owner: "{{ opensearch_user }}"
+        group: "{{ opensearch_group }}"
+
+    - name: List new distribution entries
+      ansible.builtin.find:
+        paths: "{{ _staging }}"
+        file_type: any
+        hidden: true
+        excludes: "{{ _preserved }}"
+      register: _opensearch_new_entries
+
+    - name: Move old distribution entries aside
+      ansible.builtin.command:
+        argv:
+          - mv
+          - "{{ opensearch_install_root }}/{{ item.path | basename }}"
+          - "{{ _old }}/{{ item.path | basename }}"
+        removes: "{{ opensearch_install_root }}/{{ item.path | basename }}"
+      loop: "{{ _opensearch_new_entries.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+
+    - name: Move new distribution into place
+      ansible.builtin.command:
+        argv:
+          - mv
+          - "{{ item.path }}"
+          - "{{ opensearch_install_root }}/{{ item.path | basename }}"
+      loop: "{{ _opensearch_new_entries.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      changed_when: true
+
+  rescue:
+    - name: List entries moved aside
+      ansible.builtin.find:
+        paths: "{{ _old }}"
+        file_type: any
+        hidden: true
+      register: _opensearch_moved_aside
+
+    # Only names already moved aside: an entry not yet moved aside is still the old one.
+    - name: Remove partially placed new entries
+      ansible.builtin.file:
+        path: "{{ opensearch_install_root }}/{{ item.path | basename }}"
+        state: absent
+      loop: "{{ _opensearch_moved_aside.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+
+    - name: Restore previous distribution
+      ansible.builtin.command:
+        argv:
+          - mv
+          - "{{ item.path }}"
+          - "{{ opensearch_install_root }}/{{ item.path | basename }}"
+      loop: "{{ _opensearch_moved_aside.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      changed_when: true
+
+    - name: Start previous OpenSearch version again
+      ansible.builtin.systemd:
+        name: opensearch
+        state: started
+      when: _opensearch_unit_live | default(false)
+
+    - name: Remove upgrade working directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ _staging }}"
+        - "{{ _old }}"
+
+    - name: Fail after restoring previous distribution
+      ansible.builtin.fail:
+        msg: >-
+          Upgrade from {{ _opensearch_installed_version }} to {{ opensearch_version }}
+          failed. The previous distribution was restored. Configuration backup:
+          {{ opensearch_install_root }}/config.pre-upgrade-{{ _opensearch_installed_version }}.
+
+- name: Remove staging and old-distribution directories
+  when: _opensearch_installed_version | length > 0 and _opensearch_installed_version != opensearch_version
+  vars:
+    _staging: "{{ opensearch_install_root }}/.upgrade-{{ opensearch_version }}"
+    _old: "{{ opensearch_install_root }}/.old-{{ _opensearch_installed_version }}"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ _staging }}"
+    - "{{ _old }}"
+
+# The Restart OpenSearch handler starts the stopped service when the role
+# does not start it itself (opensearch_start_on_install: false).
+- name: Report upgrade and schedule restart
+  when: _opensearch_installed_version | length > 0 and _opensearch_installed_version != opensearch_version
+  ansible.builtin.debug:
+    msg: "OpenSearch upgraded from {{ _opensearch_installed_version }} to {{ opensearch_version }}"
+  changed_when: _opensearch_unit_live and not opensearch_start_on_install
+  notify: Restart OpenSearch
+
+# code: language=ansible

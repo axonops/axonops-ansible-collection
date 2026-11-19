@@ -84,6 +84,8 @@ This collection provides the following Ansible roles. Click on each role for det
 
 For a complete guide including deployment patterns and quick references, see the [Role Documentation Index](docs/roles/README.md).
 
+To change the version of an existing Cassandra, OpenSearch or Kafka cluster without an outage, see [Upgrading Existing Deployments](docs/upgrading.md).
+
 ## Playbooks
 
 ### Installing the collection

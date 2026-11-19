@@ -1,0 +1,73 @@
+---
+# Detect the installed version and refuse unsafe states before anything is
+# downloaded or changed. Sets _opensearch_installed_version.
+
+- name: Check for existing OpenSearch lib directory
+  ansible.builtin.stat:
+    path: "{{ opensearch_install_root }}/lib"
+    get_attributes: false
+    get_checksum: false
+    get_mime: false
+  register: _opensearch_lib_stat
+
+- name: Check for existing OpenSearch config directory
+  ansible.builtin.stat:
+    path: "{{ opensearch_conf_dir }}"
+    get_attributes: false
+    get_checksum: false
+    get_mime: false
+  register: _opensearch_conf_stat
+
+- name: Find installed OpenSearch core jar
+  ansible.builtin.find:
+    paths: "{{ opensearch_install_root }}/lib"
+    patterns: '^opensearch-[0-9][0-9.]*\.jar$'
+    use_regex: true
+  register: _opensearch_core_jar
+  when: _opensearch_lib_stat.stat.exists
+
+- name: Determine installed OpenSearch version
+  ansible.builtin.set_fact:
+    _opensearch_installed_version: >-
+      {{ (_opensearch_core_jar.files | map(attribute='path') | first | basename
+          | regex_replace('^opensearch-([0-9.]+)\.jar$', '\1'))
+         if _opensearch_core_jar.files | default([]) | length > 0 else '' }}
+
+- name: Find leftovers from an interrupted upgrade
+  ansible.builtin.find:
+    paths: "{{ opensearch_install_root }}"
+    patterns: ['.old-*', '.upgrade-*']
+    file_type: directory
+    hidden: true
+  register: _opensearch_upgrade_leftovers
+  when: _opensearch_lib_stat.stat.exists or _opensearch_conf_stat.stat.exists
+
+- name: Refuse to continue after an interrupted upgrade
+  ansible.builtin.assert:
+    that:
+      - _opensearch_upgrade_leftovers.files | default([]) | length == 0
+    fail_msg: >-
+      {{ _opensearch_upgrade_leftovers.files | default([]) | map(attribute='path') | join(', ') }}
+      exist, so a previous upgrade was interrupted. Restore the distribution
+      from the .old-* directory into {{ opensearch_install_root }}, remove the
+      leftover directories and re-run.
+
+- name: Refuse to continue on a broken install
+  ansible.builtin.assert:
+    that:
+      - _opensearch_installed_version | length > 0 or not _opensearch_conf_stat.stat.exists
+    fail_msg: >-
+      {{ opensearch_conf_dir }} exists but no OpenSearch core jar was found in
+      {{ opensearch_install_root }}/lib. A previous upgrade may have been
+      interrupted. Restore the distribution from {{ opensearch_install_root }}/.old-*
+      (move its entries back into {{ opensearch_install_root }}) and re-run.
+
+- name: Refuse to downgrade OpenSearch
+  ansible.builtin.assert:
+    that:
+      - _opensearch_installed_version == '' or _opensearch_installed_version is version(opensearch_version, '<=')
+    fail_msg: >-
+      Installed OpenSearch {{ _opensearch_installed_version }} is newer than
+      opensearch_version {{ opensearch_version }}. Downgrades are not supported.
+
+# code: language=ansible

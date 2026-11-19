@@ -2,6 +2,8 @@
 
 This directory contains detailed documentation for each role in the AxonOps Ansible Collection.
 
+Upgrading a running cluster: see [Upgrading Existing Deployments](../upgrading.md).
+
 ## Available Roles
 
 ### Core AxonOps Components
