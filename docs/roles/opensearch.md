@@ -49,6 +49,7 @@ For plays that mix OpenSearch hosts with other hosts, set both lists explicitly.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `opensearch_heap_size` | `1g` | JVM heap size (e.g. `1g`, `512m`) |
+| `opensearch_jvm_disable_base64_intrinsics` | `true` | Add `-XX:-UseBASE64Intrinsics` to `jvm.options` (CVE-2026-114938 mitigation). Set to `false` to opt out |
 | `opensearch_tmp_dir` | `/var/lib/opensearch/tmp` | Temp directory for the JVM (`-Djava.io.tmpdir`) and the `OPENSEARCH_TMPDIR` environment variable in the systemd unit. Created by the role, owned by `opensearch:opensearch`, mode `0750`. Set to `""` to use the distribution defaults |
 
 ### Temp directory and `noexec` on `/tmp`

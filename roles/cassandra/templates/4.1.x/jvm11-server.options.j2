@@ -130,4 +130,9 @@
 # inferior performance and risks exceeding MaxDirectMemory
 -Dio.netty.tryReflectionSetAccessible=true
 
+{% if cassandra_jvm_disable_base64_intrinsics | bool %}
+# CVE-2026-114938 mitigation
+-XX:-UseBASE64Intrinsics
+{% endif %}
+
 # The newline in the end of file is intentional

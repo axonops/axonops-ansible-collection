@@ -24,6 +24,17 @@
         src: "{{ '/etc/default/elasticsearch' if ansible_os_family == 'Debian' else '/etc/sysconfig/elasticsearch' }}"
       register: verify_es_default
 
+    - name: WHEN — jvm.options is read
+      ansible.builtin.slurp:
+        src: /etc/elasticsearch/jvm.options
+      register: verify_es_jvm
+
+    - name: THEN — Base64 intrinsics are disabled by default
+      ansible.builtin.assert:
+        that:
+          - "'-XX:-UseBASE64Intrinsics' in (verify_es_jvm.content | b64decode)"
+        fail_msg: jvm.options does not disable Base64 intrinsics
+
     - name: THEN — ES_TMPDIR points at the custom temp directory
       ansible.builtin.assert:
         that:

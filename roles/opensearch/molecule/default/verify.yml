@@ -118,6 +118,12 @@
           - "'## OpenSearch Performance Analyzer' in (_jvm_content.content | b64decode)"
         fail_msg: "jvm.options lacks the Performance Analyzer marker; every service start would rewrite it"
 
+    - name: THEN — jvm.options disables Base64 intrinsics by default
+      ansible.builtin.assert:
+        that:
+          - "'-XX:-UseBASE64Intrinsics' in (_jvm_content.content | b64decode)"
+        fail_msg: "jvm.options does not carry the Base64 intrinsics mitigation"
+
     - name: WHEN — the plugins directory is checked for snapshot repository plugins
       ansible.builtin.find:
         paths: /usr/share/opensearch/plugins

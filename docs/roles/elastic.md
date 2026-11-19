@@ -60,6 +60,7 @@ The `elastic` role installs and configures Elasticsearch for use with AxonOps Se
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `es_jvm_disable_base64_intrinsics` | `true` | Add `-XX:-UseBASE64Intrinsics` to `jvm.options` (CVE-2026-114938 mitigation). Not applied on 6.x. Set to `false` to opt out |
 | `es_heap_size` | `512M` | JVM heap size (e.g., "1g", "4g") |
 | `es_config['bootstrap.memory_lock']` | - | Lock process memory to prevent swapping |
 

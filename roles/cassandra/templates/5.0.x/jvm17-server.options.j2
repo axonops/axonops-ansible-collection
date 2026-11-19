@@ -131,6 +131,11 @@
 -Dio.netty.allocator.useCacheForAllThreads=true
 -Dio.netty.allocator.maxOrder=11
 
+{% if cassandra_jvm_disable_base64_intrinsics | bool %}
+# CVE-2026-114938 mitigation
+-XX:-UseBASE64Intrinsics
+{% endif %}
+
 {% for setting in cassandra_jvm17_server_settings %}
 {{ setting }}
 {% endfor %}

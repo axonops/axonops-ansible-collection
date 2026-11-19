@@ -71,6 +71,12 @@
           - "'KAFKA_HEAP_OPTS=' in (kafka_sysconfig_content.content | b64decode)"
         fail_msg: "/etc/sysconfig/kafka does not contain KAFKA_HEAP_OPTS"
 
+    - name: Assert KAFKA_OPTS carries the Base64 intrinsics mitigation
+      ansible.builtin.assert:
+        that:
+          - "'-XX:-UseBASE64Intrinsics' in (kafka_sysconfig_content.content | b64decode)"
+        fail_msg: "/etc/sysconfig/kafka does not disable Base64 intrinsics"
+
     - name: Assert KAFKA_OPTS contains expected JVM flag
       ansible.builtin.assert:
         that:

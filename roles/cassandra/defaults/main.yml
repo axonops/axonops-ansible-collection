@@ -429,6 +429,10 @@ cassandra_jvm_g1_new_size_percent: 50
 # cassandra_jvm_parallel_gc_threads:
 # cassandra_jvm_conc_gc_threads:
 
+# Disable the JVM Base64 intrinsics (-XX:-UseBASE64Intrinsics) to mitigate CVE-2026-114938.
+# Applies to Cassandra 4.1.x and 5.0.x (Java 11+). Set to false to opt out.
+cassandra_jvm_disable_base64_intrinsics: true
+
 # GC logging
 cassandra_jvm_gc_log_enabled: true
 cassandra_jvm_gc_log_file_number: 10

@@ -9,7 +9,9 @@ _kafka_install_path: "{{ kafka_install_root }}/kafka_{{ kafka_scala_version }}-{
 _kafka_home: "{{ kafka_install_root }}/kafka"
 _kafka_config_path: "{{ _kafka_home }}/config/server.properties"
 _kafka_uuid_file: "{{ _kafka_home }}/CLUSTER_UUID.lock"
-_kafka_opts: "{{ (kafka_opts | type_debug == 'list') | ternary(kafka_opts | join(' '), kafka_opts) }}"
+_kafka_user_opts: "{{ (kafka_opts | type_debug == 'list') | ternary(kafka_opts | join(' '), kafka_opts) }}"
+_kafka_opts: >-
+  {{ (((kafka_jvm_disable_base64_intrinsics | bool) | ternary('-XX:-UseBASE64Intrinsics ', '')) ~ _kafka_user_opts) | trim }}
 
 _kafka_java_pkg: >-
   {{ (ansible_os_family == 'Debian') | ternary(
